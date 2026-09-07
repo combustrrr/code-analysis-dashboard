@@ -174,6 +174,23 @@ def extract_zip(data: bytes, destination: Path) -> None:
         archive.extractall(destination)
 
 
+def validate_bundle(destination: Path, report: dict) -> None:
+    findings = load(destination / 'findings.json')
+    if not isinstance(findings, list) or len(findings) != report.get('finding_count'):
+        raise ValueError('hosted finding count does not reconcile')
+    identifiers = [f['id'] for f in findings]
+    if len(set(identifiers)) != len(identifiers):
+        raise ValueError('duplicate hosted finding identity')
+    details = [row for path in (destination / 'details').glob('*.json') for row in load(path)]
+    if len(details) != len(findings) or {r['id'] for r in details} != set(identifiers):
+        raise ValueError('hosted detail pages do not reconcile')
+    origins = {o['observation_id'] for row in details for o in row['origins']}
+    channel_origins = [oid for c in report['channels'] for oid in c['observation_ids']]
+    if (len(channel_origins) != report['observation_count'] or len(set(channel_origins)) != len(channel_origins)
+            or set(channel_origins) != origins):
+        raise ValueError('hosted observation provenance does not reconcile')
+
+
 def collect(config: dict, row: dict, destination: Path) -> dict:
     host, run_id = config['analysis_repository'], row['scan_run_id']
     run = api(f'repos/{host}/actions/runs/{run_id}')
@@ -186,9 +203,12 @@ def collect(config: dict, row: dict, destination: Path) -> dict:
     archive = gh('api', f"repos/{host}/actions/artifacts/{candidates[0]['id']}/zip", binary=True)
     extract_zip(archive, destination)
     report = load(destination / 'report.json')
+    if report.get('source_boundary') != 'isolated-tooling-v1':
+        raise ValueError('producer predates the isolated source/tooling boundary; rescan required')
     if any('.analysis-tooling' in str(f.get('file', '')).replace('\\', '/').split('/')
            for f in load(destination / 'findings.json')):
         raise ValueError('mixed source evidence: scanner traversed the trusted tooling checkout')
+    validate_bundle(destination, report)
     if (report.get('schema_version') == 'hosted-report-v1' and report.get('target', {}).get('kind') == 'branch'
             and row['kind'] == 'branch' and report.get('tooling_sha') == row['tooling_sha']
             and analysis_key(report['target'], row['tooling_sha'], config) == row['analysis_key']):
@@ -281,7 +301,13 @@ def publish(config: dict, output: Path) -> None:
                 unpacked = gzip.decompress(bundle.read_bytes())
                 if len(unpacked) > config['site_limit_bytes']:
                     raise ValueError('retained report exceeds site limit')
-                for name, value in json.loads(unpacked).items():
+                documents = json.loads(unpacked)
+                if documents.get('report.json', {}).get('source_boundary') != 'isolated-tooling-v1':
+                    row.update(status='failed', error='Retained report predates the isolated source/tooling boundary; rescan required')
+                    for field in ('report', 'asset', 'collected_run'):
+                        row.pop(field, None)
+                    continue
+                for name, value in documents.items():
                     path = output / 'data' / row['report'] / name
                     if not path.resolve().is_relative_to(output.resolve()):
                         raise ValueError('unsafe retained report path')
