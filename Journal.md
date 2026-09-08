@@ -17,3 +17,8 @@
 ### 2026-09-08 - Signed-in launch UX repaired
 - Live OAuth and target discovery succeeded. Signed-in developers now receive the current/preferred branch automatically, one direct Start analysis action, and no stale manual-Actions confirmation state. Production build and focused launch browser acceptance passed.
 
+
+### 2026-09-08 - Developer-centric launch UX polish
+- Published a four-section Ant Design analysis launcher covering project identity, exact revision, scanner profile, and authenticated workflow execution.
+- Added source/workflow provenance, channel and queue context, a run-progress receipt, responsive dark/light presentation, and a collapsed Actions fallback.
+- Production build and all 9 Playwright tests passed before publication.
