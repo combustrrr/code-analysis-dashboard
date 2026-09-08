@@ -9,3 +9,7 @@
 ### 2026-09-08 - Authenticated launch dashboard published
 - Pages run 34250820868 deployed the revised selection controls successfully. Added the linked repository/scanner integration guide to this standalone checkout.
 - Direct authenticated launching remains disabled pending GitHub App and Cloudflare setup.
+
+### 2026-09-08 - Authenticated launch activated
+- Connected the published manifest to code-analysis-launcher.icsarthak9.workers.dev after Cloudflare deployment and private GitHub App installation. OAuth redirect smoke check passed with exact callback and PKCE; live browser acceptance follows Pages publication.
+
