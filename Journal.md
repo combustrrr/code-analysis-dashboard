@@ -13,3 +13,7 @@
 ### 2026-09-08 - Authenticated launch activated
 - Connected the published manifest to code-analysis-launcher.icsarthak9.workers.dev after Cloudflare deployment and private GitHub App installation. OAuth redirect smoke check passed with exact callback and PKCE; live browser acceptance follows Pages publication.
 
+
+### 2026-09-08 - Signed-in launch UX repaired
+- Live OAuth and target discovery succeeded. Signed-in developers now receive the current/preferred branch automatically, one direct Start analysis action, and no stale manual-Actions confirmation state. Production build and focused launch browser acceptance passed.
+
