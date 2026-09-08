@@ -4,3 +4,7 @@ __pycache__/
 node_modules/
 dist/
 ui-build/
+
+analysis-launcher/.wrangler/
+analysis-launcher/.dev.vars*
+analysis-launcher/build/
