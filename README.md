@@ -27,10 +27,10 @@ npm run build
 
 ## Deployment
 
-This extraction branch consolidates the service files. Live host cutover is pending;
-see [migration prerequisites](docs/MIGRATION.md) before merging or activating it.
+This repository owns the complete service, including analysis execution and Pages
+publication. See [migration status](docs/MIGRATION.md) for remaining access setup.
 
-Source: ARYDESTROYER/Kavach-AgenticSOC. Analysis host: combustrrr/Agentic-Kibana.
+Source: ARYDESTROYER/Kavach-AgenticSOC. Analysis host: combustrrr/code-analysis-dashboard.
 
 GitHub Actions produces exact-revision reports. This repository maintains current report assets and publishes one UI to GitHub Pages. No application source is executed by the publisher.
 

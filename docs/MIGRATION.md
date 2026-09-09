@@ -8,12 +8,19 @@ report assets or retire a working scanner host before its replacement is verifie
 Dashboard, Cloudflare launcher, discovery, scanner workflows and adapters, publisher,
 repository profiles, canaries, maintenance automation, and standalone instructions.
 
-## Pending runner choice
+## Confirmed full separation
 
-Choose whether this repository also runs analysis, or the fork continues as a thin
-runner holding vendor credentials. Live configuration still names the fork.
-Do not merge this branch unchanged: discovery needs write access to the configured
-analysis repository, and the default GitHub token cannot write across repositories.
+The user selected complete removal of analysis code from the Agentic-Kibana fork.
+This repository owns discovery, scanners, UI, launcher, and report publication.
+Service and Worker configuration now identify this repository as the analysis host.
+The product repository retains only a documentation link to this external service.
+
+The user explicitly approved encrypted transfer of SONAR_TOKEN, SONAR_API_TOKEN,
+and SNYK_TOKEN. These three secrets are now configured in this repository. Values
+were encrypted for its public key before transport; no plaintext values were
+logged or stored in artifacts. Existing Sonar entitlement limitations remain.
+The launcher App installation may need access to this repository before
+authenticated dispatch works. SCANNER_UPDATE_TOKEN remains unconfigured.
 
 For a full move:
 
@@ -32,6 +39,4 @@ For a full move:
    required check from the old host while preserving any product checks. Retain
    product CI, release, and docs workflows and shared product dependencies.
 
-For a thin runner, implement immutable reusable workflow references and explicit
-service/runner provenance first. Retain secrets in the runner and preserve the
-existing exact-source validation when replacing its workflow implementations.
+The old fork is not retained as a thin runner.

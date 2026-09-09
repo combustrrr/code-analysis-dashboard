@@ -70,3 +70,9 @@
 - Added missing service workflows, canaries, contracts, maintenance checks, contributor instructions, and migration documentation. No product runtime code was copied.
 - Verified 57 service tests, workflow policy, 10 launcher tests, and standalone TypeScript/Vite production build. Live host and report assets remain unchanged. Runner ownership choice is pending before credential/App migration and removal from the product repository.
 
+
+### 2026-09-09 — Full service host cutover
+- User confirmed complete removal from the product fork. Point service/Worker configuration at code-analysis-dashboard and initialize its discovery state, preserving existing report assets.
+- Explicit user approval authorized encrypted transfer of SONAR_TOKEN, SONAR_API_TOKEN, and SNYK_TOKEN. Transfer run 34375135587 succeeded; destination secret names verified. Values were never exposed in plaintext logs/artifacts. Sonar entitlement and maintenance-token limits remain.
+- Service validation: 57 tests, workflow policy, and 10 launcher tests pass. Product cleanup independently passes 63 CI-policy tests and documentation consistency.
+

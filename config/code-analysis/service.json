@@ -1,7 +1,7 @@
 {
   "schema_version": "analysis-service-v1",
   "source_repository": "ARYDESTROYER/Kavach-AgenticSOC",
-  "analysis_repository": "combustrrr/Agentic-Kibana",
+  "analysis_repository": "combustrrr/code-analysis-dashboard",
   "publishing_repository": "combustrrr/code-analysis-dashboard",
   "preferred_branch": "Testing",
   "discovery_cron": "23 * * * *",
