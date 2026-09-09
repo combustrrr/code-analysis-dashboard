@@ -27,6 +27,22 @@ def load_projects(repository):
     return repo, document, revision
 
 
+def recover_expired_evidence(config, row):
+    """Retry only conclusively absent/expired completed-run evidence, at most twice."""
+    if row.get('evidence_retries', 0) >= 2:
+        return False
+    expected = f"hosted-report-{row['scan_run_id']}-{row['run_attempt']}"
+    artifacts = github.pages(f"repos/{config['analysis_repository']}/actions/runs/{row['scan_run_id']}/artifacts", 'artifacts')
+    usable = [a for a in artifacts if a['name'] == expected and not a.get('expired')]
+    if usable:
+        return False
+    row['evidence_retries'] = row.get('evidence_retries', 0) + 1
+    row['previous_producer'] = {'run_id':row.pop('scan_run_id'), 'attempt':row.pop('run_attempt')}
+    row.pop('request_id', None)
+    row.update(status='queued', recovery_reason='Completed producer evidence expired or is missing; bounded replacement queued')
+    return True
+
+
 def report_publication(config, state, report_release, document=None):
     """Publish all active targets together, then remove unreferenced assets."""
     repo = config['analysis_repository']
@@ -40,13 +56,14 @@ def report_publication(config, state, report_release, document=None):
         for row in state['targets']:
             entry = {**row}
             old = prior.get(row['id'], {})
-            for key in ('documents', 'assets', 'analyzed_sha', 'collected_run', 'report_status'):
+            for key in ('documents', 'assets', 'analyzed_sha', 'collected_run', 'report_status', 'native_feedback'):
                 if key in old:
                     entry[key] = old[key]
             if entry.get('analyzed_sha') and entry['analyzed_sha'] != row['head_sha']:
                 entry['status'] = 'stale'
             run_key = f"{row.get('scan_run_id')}-{row.get('run_attempt')}"
-            if row.get('status') == 'collected' and old.get('collected_run') != run_key:
+            native_upgrade = old.get('native_feedback', {}).get('reason', '').startswith('Native SARIF exceeds') and old.get('native_feedback', {}).get('adapter_version') != 2
+            if row.get('status') == 'collected' and (old.get('collected_run') != run_key or native_upgrade):
                 try:
                     destination = Path(directory) / row['id']
                     report = github.collect(config, row, destination)
@@ -70,6 +87,17 @@ def report_publication(config, state, report_release, document=None):
                             entry['native_feedback'] = {'status':'failed', 'reason':str(error)}
                 except (ValueError, RuntimeError) as error:
                     entry.update(status='failed', error=str(error))
+                    try:
+                        if recover_expired_evidence(config, row):
+                            entry['recovery_reason'] = row['recovery_reason']
+                    except (ValueError, RuntimeError):
+                        pass  # API failure does not prove evidence is absent.
+            if entry.get('native_feedback', {}).get('status') == 'security_processing':
+                from scripts.code_analysis.native_feedback import processing
+                try:
+                    entry['native_feedback'] = processing(repo, entry['native_feedback'])
+                except (ValueError, RuntimeError) as error:
+                    entry['native_feedback']['processing_error'] = str(error)
             result['targets'].append(entry)
         referenced = {name:meta for row in result['targets'] for name,meta in row.get('assets', {}).items()}
         size = sum(meta['bytes'] for meta in referenced.values())
@@ -173,6 +201,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             queued_asset = None
         current = github.release(repository,config['report_release'],create=True)
         summaries.append(report_publication(config,state,current,document)['metrics'])
+        release_manifest.write(repository,release,state)  # Persist bounded evidence recovery intents.
     return summaries
 
 

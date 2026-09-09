@@ -64,3 +64,39 @@ class TrustedBootstrapTests(unittest.TestCase):
             result=subprocess.run(command,cwd=root,env={**os.environ,'PYTHONPATH':str(root)},capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertNotIn('SOURCE_PACKAGE_EXECUTED',result.stderr)
+
+
+class PublicationRecoveryTests(unittest.TestCase):
+    def test_native_buckets_preserve_all_results_and_have_stable_categories(self):
+        from scripts.code_analysis.native_feedback import security_shards
+        import gzip, base64, json
+        findings=[{'id':str(i),'file':'safe.py','scanners':['Bandit'],'message':'test','rules':['B1']} for i in range(6000)]
+        payloads=[json.loads(gzip.decompress(base64.b64decode(p))) for p in security_shards(findings,'1')]
+        self.assertEqual(sum(len(p['runs'][0]['results']) for p in payloads),6000)
+        self.assertTrue(all(len(p['runs'][0]['results'])<=5000 for p in payloads))
+        empty=[json.loads(gzip.decompress(base64.b64decode(p))) for p in security_shards([],'1')]
+        self.assertEqual([p['runs'][0]['automationDetails'] for p in payloads],[p['runs'][0]['automationDetails'] for p in empty])
+
+    def test_native_processing_waits_for_every_upload_and_preserves_failures(self):
+        from scripts.code_analysis.native_feedback import processing
+        feedback={'uploads':[{'id':str(i),'status':'pending'} for i in range(16)]}
+        with patch('scripts.code_analysis.native_feedback.github.api',return_value={'processing_status':'complete'}):
+            self.assertEqual(processing('owner/repo',feedback)['status'],'security_published')
+        with patch('scripts.code_analysis.native_feedback.github.api',return_value={'processing_status':'failed','errors':['invalid']}):
+            self.assertEqual(processing('owner/repo',feedback)['status'],'failed')
+        self.assertEqual(feedback['uploads'][0]['status'],'pending')
+
+    def test_artifact_expiry_retries_are_bounded_and_api_failure_is_not_absence(self):
+        from scripts.code_analysis.repository_service import recover_expired_evidence
+        row={'scan_run_id':12,'run_attempt':2,'request_id':'request'}
+        with patch('scripts.code_analysis.repository_service.github.pages',return_value=[{'name':'hosted-report-12-2','expired':False}]):
+            self.assertFalse(recover_expired_evidence({'analysis_repository':'owner/repo'},row))
+        with patch('scripts.code_analysis.repository_service.github.pages',side_effect=RuntimeError('unavailable')):
+            with self.assertRaises(RuntimeError):recover_expired_evidence({'analysis_repository':'owner/repo'},row)
+        self.assertEqual(row['request_id'],'request')
+        with patch('scripts.code_analysis.repository_service.github.pages',return_value=[]):
+            self.assertTrue(recover_expired_evidence({'analysis_repository':'owner/repo'},row))
+        self.assertEqual(row['previous_producer'],{'run_id':12,'attempt':2})
+        self.assertEqual(row['status'],'queued')
+        row['evidence_retries']=2
+        self.assertFalse(recover_expired_evidence({'analysis_repository':'owner/repo'},row))

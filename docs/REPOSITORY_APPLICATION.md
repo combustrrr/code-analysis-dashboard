@@ -61,3 +61,24 @@ counting it toward API usage reduction. Scanner execution stays in Actions.
 References: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/),
 [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/),
 [R2 pricing](https://developers.cloudflare.com/r2/pricing/).
+
+## Acceptance evidence, 2026-09-10
+
+Fork and read-only upstream current reports are published in the fork's own Releases.
+Producer runs 34387983498 and 34387962071 retain exact source and attempt identity.
+Both are partial: Sonar branch entitlement and security-posture permissions remain
+named blockers. Fork tests returned exit 1 alongside usable coverage. No upstream
+native check or SARIF write occurred. Fork native check 102593359503 was created.
+The initial native SARIF limit is repaired with 16 stable partitions and explicit
+processing receipts; live processing confirmation is still required.
+
+Administrators can preview and confirm edits to preferred branch, scanner
+selection/deferrals and report budget. Trusted execution commands remain reviewed
+in the repository profile; the editor does not change source identity. Readiness
+shows configuration and missing adapters without claiming successful evidence.
+Missing or expired producer artifacts queue at most two replacement scans.
+
+A third project uses the standalone application source with the portable profile
+on the fork runner to verify another repository layout. Its live evidence remains
+pending. Legacy reports/schedules remain active until delivery cutover passes;
+new public App credential setup remains separately blocked on approval.

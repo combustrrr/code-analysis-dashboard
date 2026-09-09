@@ -116,3 +116,13 @@
 - Owner permits free Cloudflare services where useful. Verified official Workers/D1 free limits and R2 billable overages; retain GitHub current reports and the existing durable request queue. No database or paid subscription was provisioned.
 - Fork commit 72624f8f pins isolated scanner bootstrap and bounded report packing; scheduler reenabled. Corrected Testing request is run 34387926547, pending verification. Initial manually submitted structured selection was malformed and superseded.
 - Retained-data overview browser regression now passes with an appropriate initial-load timeout. Public App credential export approval remains pending; existing authentication remains unchanged.
+
+### 2026-09-09 — Application acceptance continuation
+- Continue live evidence validation, repository report publication, second-profile verification, configuration editing, readiness, and recovery acceptance. Keep existing reports and schedules until replacement evidence supports cutover; upstream remains read-only.
+
+
+### 2026-09-10 — Current publication and application configuration milestone
+- Verified exact producer reports: upstream Testing run 34387962071 has 21,475 findings; fork Testing run 34387983498 has 20,738. Both are valid partial reports. Sonar branch entitlement and security-posture permissions remain unavailable; fork coverage preserves test exit 1 and Scorecard CI-Tests is unavailable.
+- Repository-owned current assets published successfully (8,482,388 upstream bytes; 8,210,168 fork bytes). Native fork check 102593359503 is on the exact analyzed SHA; observer native feedback is prohibited.
+- Added administrator-reviewed configuration previews/commits and a per-scanner launch readiness table. Added stable native SARIF partitions, processing receipts, and bounded missing/expired artifact recovery.
+- Validation: 75 Python tests, 19 launcher tests and workflow audit passed; UI build/browser verification and second-profile live acceptance continue. Do not retire legacy schedules before public delivery/authentication cutover is verified.

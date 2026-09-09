@@ -185,6 +185,51 @@ export async function applicationApi(request, env, session, helpers) {
     const preview = {type:'installation', exp:Date.now()+600000, actor:user.id, repository:execution.full_name, repository_id:execution.id, branch:execution.default_branch, base:ref.object.sha, tree:commit.tree.sha, files};
     return json({execution_repository:identity(execution), project, detection:found, files, confirmation:await seal(preview, env.SESSION_KEY)});
   }
+  if (request.method === 'POST' && url.pathname === '/api/projects/preview') {
+    const input = await body();
+    const repo = await publicRepository(input.repository); await installation(repo, true);
+    const document = await config(repo);
+    const project = document.projects.find(p => p.id === input.project_id);
+    if (!project) throw new Failure(404, 'Unknown project.');
+    const changes = input.changes;
+    const allowed = ['preferred_branch','enabled_scanners','deferred_channels','report_budget_bytes'];
+    if (!changes || typeof changes !== 'object' || Array.isArray(changes) || Object.keys(changes).some(k => !allowed.includes(k))) throw new Failure(400, 'Only branch, scanner selection, deferrals and report budget can be edited here.');
+    const updated = {...project, ...changes};
+    if (typeof updated.preferred_branch !== 'string' || !updated.preferred_branch.trim() || updated.preferred_branch.length > 255) throw new Failure(400, 'Preferred branch is required.');
+    if (!Array.isArray(updated.enabled_scanners) || updated.enabled_scanners.some(s => typeof s !== 'string' || !/^[a-z0-9-]+$/.test(s)) || new Set(updated.enabled_scanners).size !== updated.enabled_scanners.length) throw new Failure(400, 'Scanner IDs must be unique.');
+    const deferred = updated.deferred_channels;
+    if (!deferred || typeof deferred !== 'object' || Array.isArray(deferred) || Object.entries(deferred).some(([id,reason]) => !/^[a-z0-9-]+$/.test(id) || typeof reason !== 'string' || !reason.trim() || updated.enabled_scanners.includes(id))) throw new Failure(400, 'Every deferred scanner needs a reason and cannot also be enabled.');
+    if (!Number.isSafeInteger(updated.report_budget_bytes) || updated.report_budget_bytes < 1 || updated.report_budget_bytes > 900000000) throw new Failure(400, 'Report budget must be between 1 and 900000000 bytes.');
+    if (SCANNERS.some(id => !updated.enabled_scanners.includes(id) && !(id in deferred))) throw new Failure(400, 'Every registered scanner must be enabled or explicitly deferred.');
+    const groups = [['eslint','typescript'],['shipping-image-cves','sbom-license-provenance'],['github-secret-protection-posture','github-actions-security'],['radon','xenon']];
+    if (groups.some(ids => ids.some(id => updated.enabled_scanners.includes(id)) && !ids.every(id => updated.enabled_scanners.includes(id)))) throw new Failure(400, 'Scanners sharing a producer must be enabled or deferred together.');
+    const source = await publicRepository(project.source_repository.full_name);
+    if (source.id !== project.source_repository.id) throw new Failure(409, 'Source identity changed.');
+    await github(`repos/${source.full_name}/branches/${encodeURIComponent(updated.preferred_branch)}`, token);
+    const head = await github(`repos/${repo.full_name}/git/ref/heads/${encodeURIComponent(repo.default_branch)}`, token);
+    const commit = await github(`repos/${repo.full_name}/git/commits/${head.object.sha}`, token);
+    // Bind the edited configuration to the same immutable tree used by the preview.
+    const file = await github(`repos/${repo.full_name}/contents/${CONFIG}?ref=${head.object.sha}`, token);
+    if (JSON.stringify(JSON.parse(decode(file.content))) !== JSON.stringify(document)) throw new Failure(409, 'Configuration changed. Review a fresh preview.');
+    document.projects = document.projects.map(p => p.id === project.id ? updated : p);
+    const files = {[CONFIG]:JSON.stringify(document,null,2)+'\n'};
+    const actor = await github('user',token);
+    const preview = {type:'installation',exp:Date.now()+600000,actor:actor.id,repository:repo.full_name,repository_id:repo.id,branch:repo.default_branch,base:head.object.sha,tree:commit.tree.sha,files};
+    return json({files,project:updated,confirmation:await seal(preview,env.SESSION_KEY)});
+  }
+  if (request.method === 'GET' && url.pathname === '/api/project-readiness') {
+    const repo = await publicRepository(url.searchParams.get('repository')); await installation(repo);
+    const document = await config(repo);
+    const project = document.projects.find(p => p.id === url.searchParams.get('project_id'));
+    if (!project) throw new Failure(404,'Unknown project.');
+    const portable = new Set(['semgrep','gitleaks','trivy','checkov','openssf-scorecard','github-secret-protection-posture','github-actions-security','coderabbit-ai-advisory']);
+    const channels = [...new Set([...project.enabled_scanners,...Object.keys(project.deferred_channels || {})])].map(channel => {
+      const reason = project.deferred_channels?.[channel];
+      const supported = SCANNERS.includes(channel);
+      return {channel,status:reason?'deferred':!supported?'setup_required':project.profile.mode==='portable'&&!portable.has(channel)?'setup_required':'configured',reason:reason || (!supported?'No registered adapter in this tooling revision.':project.profile.mode==='portable'&&!portable.has(channel)?'Requires a reviewed language or vendor execution profile.':'Configured for execution; a completed report is required to confirm usable evidence.')};
+    });
+    return json({project_id:project.id,preferred_branch:project.preferred_branch,tooling_sha:document.tooling_sha,channels,checked_at:new Date().toISOString()});
+  }
   if (request.method === 'POST' && url.pathname === '/api/connections/install') {
     const input = await body();
     const preview = await unseal(input.confirmation || '', env.SESSION_KEY, 'installation');
@@ -192,6 +237,7 @@ export async function applicationApi(request, env, session, helpers) {
     if (user.id !== preview.actor || input.confirm !== true) throw new Failure(403, 'Explicit confirmation by the preview owner is required.');
     const repo = await publicRepository(preview.repository);
     await installation(repo, true);
+    if (repo.default_branch !== preview.branch) throw new Failure(409, 'Default branch changed. Review a fresh preview.');
     if (repo.id !== preview.repository_id) throw new Failure(409, 'Repository identity changed.');
     const head = await github(`repos/${repo.full_name}/git/ref/heads/${encodeURIComponent(preview.branch)}`, token);
     if (head.object.sha !== preview.base) throw new Failure(409, 'Default branch changed. Review a fresh preview.');

@@ -1,6 +1,8 @@
 """GitHub-native feedback with an explicit connected-source boundary."""
 import base64
 import gzip
+import hashlib
+import copy
 import json
 from urllib.parse import urlencode
 
@@ -31,6 +33,42 @@ def sarif(findings):
             'runs':[{'tool':{'driver':{'name':'Code Analysis Security'}},'results':results}]}
 
 
+def security_shards(findings, project_id):
+    """Fixed hash buckets keep categories stable across revisions and clear empty buckets."""
+    template = sarif(findings)
+    buckets = [[] for _ in range(16)]
+    for result in template['runs'][0]['results']:
+        identity = result['partialFingerprints']['analysisFindingId/v1']
+        buckets[int(hashlib.sha256(identity.encode()).hexdigest()[0], 16)].append(result)
+    payloads = []
+    for index, results in enumerate(buckets):
+        if len(results) > 5000:
+            raise ValueError('A native security bucket exceeds 5000 results; complete findings remain in dashboard')
+        payload = copy.deepcopy(template)
+        payload['runs'][0]['results'] = results
+        payload['runs'][0]['automationDetails'] = {'id':f'code-analysis/{project_id}/security-v2/{index:02d}/'}
+        compressed = gzip.compress(json.dumps(payload).encode())
+        if len(compressed) > 10_000_000:
+            raise ValueError('Native security bucket exceeds upload size; complete findings remain in dashboard')
+        payloads.append(base64.b64encode(compressed).decode())
+    return payloads
+
+
+def processing(repository, feedback):
+    result = copy.deepcopy(feedback)
+    uploads = result.get('uploads', [])
+    for upload in uploads:
+        if upload.get('status') not in ('complete', 'failed'):
+            response = github.api(f"repos/{repository}/code-scanning/sarifs/{upload['id']}")
+            upload['status'] = response.get('processing_status', 'pending')
+            if response.get('errors'):
+                upload['errors'] = response['errors']
+    result['status'] = ('failed' if any(u.get('status') == 'failed' for u in uploads)
+                        else 'security_published' if len(uploads) == 16 and all(u.get('status') == 'complete' for u in uploads)
+                        else 'security_processing')
+    return result
+
+
 def publish(document, project_id, row, report, findings, *, dashboard_url):
     if not native_feedback_allowed(document,project_id,report):
         return {'status':'not_applicable','reason':'Read-only observer or foreign PR source; native upload prohibited'}
@@ -57,13 +95,16 @@ def publish(document, project_id, row, report, findings, *, dashboard_url):
     security = [c for c in report['channels'] if c['channel'] in {'bandit','gitleaks','osv','trivy'}]
     if len(security) != 4 or any(c['status'] not in COMPLETE_STATUSES for c in security):
         return {'status':'partial', 'check_id':check_id, 'reason':'Incomplete security channels; retain previous native security alerts'} 
-    payload = sarif(findings)
-    if len(payload['runs'][0]['results']) > 5000:
-        return {'status':'partial','check_id':check_id,'reason':'Native SARIF exceeds the 5000-result adapter limit; complete findings remain in the dashboard'}
-    payload['runs'][0]['automationDetails']={'id':f'code-analysis/{project_id}/security/'}
-    compressed = gzip.compress(json.dumps(payload).encode())
-    if len(compressed)>10_000_000:
-        return {'status':'partial','check_id':check_id,'reason':'Native SARIF exceeds upload size; full findings remain in dashboard'}
-    upload = github.api(f'repos/{repo}/code-scanning/sarifs',payload={
-        'commit_sha':report['analyzed_sha'],'ref':ref,'sarif':base64.b64encode(compressed).decode()})
-    return {'status':'security_processing','check_id':check_id,'sarif_id':upload['id']}
+    try:
+        payloads = security_shards(findings, project_id)
+    except ValueError as error:
+        return {'status':'partial','adapter_version':2,'check_id':check_id,'reason':str(error)}
+    uploads = []
+    for index, payload in enumerate(payloads):
+        try:
+            upload = github.api(f'repos/{repo}/code-scanning/sarifs',payload={
+                'commit_sha':report['analyzed_sha'],'ref':ref,'sarif':payload})
+            uploads.append({'bucket':index,'id':upload['id'],'status':'pending'})
+        except (RuntimeError, ValueError) as error:
+            return {'status':'failed','adapter_version':2,'check_id':check_id,'uploads':uploads,'reason':str(error)}
+    return {'status':'security_processing','adapter_version':2,'check_id':check_id,'uploads':uploads}

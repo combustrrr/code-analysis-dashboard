@@ -12,3 +12,5 @@ analysis-launcher/build/
 analysis-ui/public/data/
 analysis-ui/test-results/
 analysis-ui/playwright-report/
+
+.verification/

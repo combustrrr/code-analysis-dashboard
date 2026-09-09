@@ -49,3 +49,32 @@ test('wrappers are pinned and detected profiles never invent executable commands
  assert.ok(Object.values(files).every(x=>x.includes('@'+'a'.repeat(40))));
  assert.deepEqual(detectedProfile(['Cargo.toml','Dockerfile']).profile,{mode:'portable'});
 });
+const configuration={schema_version:'analysis-projects-v1',execution_repository:{id:1},tooling_sha:'a'.repeat(40),projects:[{id:'1',source_repository:{id:1,full_name:'owner/repo'},profile:{mode:'portable'},preferred_branch:'main',enabled_scanners:['semgrep','snyk','future-scanner'],deferred_channels:Object.fromEntries(['atheris','bandit','checkov','codeql','coderabbit-ai-advisory','coverage','eslint','github-actions-security','github-secret-protection-posture','gitleaks','hadolint','openssf-scorecard','osv','pyright','radon','ruff','sbom-license-provenance','schemathesis','shipping-image-cves','sonarqube-cloud','trivy','typescript','vulture','xenon'].map(s=>[s,'fixture'])),report_budget_bytes:900000000}]};
+const configBlob={content:Buffer.from(JSON.stringify(configuration)).toString('base64')};
+function configuredHelpers(extra={}) {return helpers({['repos/owner/repo/contents/.github/code-analysis/projects.json?ref=main']:configBlob,['repos/owner/repo/contents/.github/code-analysis/projects.json?ref='+'b'.repeat(40)]:configBlob,'repos/owner/repo/branches/main':{name:'main'},...extra});}
+test('configuration preview is read-only, rejects identity edits and validates deferrals',async()=>{
+ const h=configuredHelpers();
+ const input={repository:'owner/repo',project_id:'1',changes:{report_budget_bytes:500000000}};
+ const response=await applicationApi(request('/api/projects/preview',input),env,{token:'test'},h);
+ const result=await response.json();
+ assert.equal(result.project.report_budget_bytes,500000000);
+ assert.equal(Object.keys(result.files).length,1);
+ assert.ok(h.calls.every(x=>!x.options.method));
+ for(const changes of [{source_repository:{id:99}},{enabled_scanners:['semgrep'],deferred_channels:{semgrep:'reason'}},{report_budget_bytes:0}]) {
+  await assert.rejects(()=>applicationApi(request('/api/projects/preview',{...input,changes}),env,{token:'test'},configuredHelpers()),e=>e.status===400);
+ }
+});
+test('configuration edits require admin access and reject a stale default branch',async()=>{
+ const h=configuredHelpers({'repos/owner/repo':{...repo,permissions:{push:true,admin:false}}});
+ await assert.rejects(()=>applicationApi(request('/api/projects/preview',{repository:'owner/repo',project_id:'1',changes:{}},),env,{token:'test'},h),e=>e.status===403);
+ const preview={actor:4,repository:'owner/repo',repository_id:1,branch:'old',base:'b'.repeat(40)};
+ await assert.rejects(()=>applicationApi(request('/api/connections/install',{confirmation:JSON.stringify(preview),confirm:true}),env,{token:'test'},configuredHelpers()),e=>e.status===409);
+});
+test('readiness never calls configured evidence complete and flags absent adapters',async()=>{
+ const result=await applicationApi(new Request('https://worker.example/api/project-readiness?repository=owner/repo&project_id=1'),env,{token:'test'},configuredHelpers());
+ const rows=(await result.json()).channels;
+ assert.equal(rows.find(x=>x.channel==='semgrep').status,'configured');
+ assert.equal(rows.find(x=>x.channel==='snyk').status,'setup_required');
+ assert.equal(rows.find(x=>x.channel==='future-scanner').status,'setup_required');
+ assert.ok(rows.every(x=>x.status!=='completed'));
+});
