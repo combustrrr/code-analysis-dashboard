@@ -100,3 +100,16 @@ class PublicationRecoveryTests(unittest.TestCase):
         self.assertEqual(row['status'],'queued')
         row['evidence_retries']=2
         self.assertFalse(recover_expired_evidence({'analysis_repository':'owner/repo'},row))
+
+
+class ConfigurationSnapshotTests(unittest.TestCase):
+    def test_running_analysis_uses_immutable_default_branch_configuration(self):
+        from scripts.code_analysis.prepare_project import trusted_configuration_revision
+        revision='a'*40
+        with patch.dict('os.environ',{'GITHUB_SHA':revision,'GITHUB_REF':'refs/heads/main'}):
+            self.assertEqual(trusted_configuration_revision({'default_branch':'main'},{'execution_sha':revision}),revision)
+            with self.assertRaises(ValueError):
+                trusted_configuration_revision({'default_branch':'main'},{'execution_sha':'b'*40})
+        with patch.dict('os.environ',{'GITHUB_SHA':revision,'GITHUB_REF':'refs/pull/1/head'}):
+            with self.assertRaises(ValueError):
+                trusted_configuration_revision({'default_branch':'main'},{'execution_sha':revision})

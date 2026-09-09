@@ -126,3 +126,9 @@
 - Repository-owned current assets published successfully (8,482,388 upstream bytes; 8,210,168 fork bytes). Native fork check 102593359503 is on the exact analyzed SHA; observer native feedback is prohibited.
 - Added administrator-reviewed configuration previews/commits and a per-scanner launch readiness table. Added stable native SARIF partitions, processing receipts, and bounded missing/expired artifact recovery.
 - Validation: 75 Python tests, 19 launcher tests and workflow audit passed; UI build/browser verification and second-profile live acceptance continue. Do not retire legacy schedules before public delivery/authentication cutover is verified.
+
+### 2026-09-10 — Browser and portable-profile acceptance milestone
+- Production UI build and all 13 retained-data browser checks passed. The additional authenticated configuration-preview/explicit-confirmation browser test passed.
+- Public delivery exercised the real upstream manifest and a 1,015,239-byte shard successfully with verified SHA-256. Second-layout portable source run 34390606188 produced a valid partial report with 65 findings; supported portable channels completed and unconfigured language/vendor channels remain explicitly unavailable.
+- Repaired in-flight configuration loading to bind to the exact trusted default-branch workflow commit, with mismatched revision and PR-ref regression coverage. Draft PR #2 is open; Scanner compatibility passed on the prior pushed implementation revision.
+- Migration, schedule retirement and merge remain pending live native partition validation and authenticated delivery cutover. Existing reports remain readable. No upstream writes or paid infrastructure were introduced.

@@ -19,6 +19,16 @@ def fetch(path):
         return json.load(response)
 
 
+def trusted_configuration_revision(execution, target):
+    import re
+    revision = os.environ.get('GITHUB_SHA', '')
+    if (not re.fullmatch(r'[a-f0-9]{40}', revision)
+            or os.environ.get('GITHUB_REF') != 'refs/heads/' + execution['default_branch']
+            or target.get('execution_sha') != revision):
+        raise ValueError('Configuration must come from the exact trusted default-branch workflow revision')
+    return revision
+
+
 def main():
     import base64
     root = Path(__file__).resolve().parents[2]
@@ -26,7 +36,9 @@ def main():
     if actual != os.environ['TOOLING_SHA']:
         raise ValueError('Checked-out tooling does not match requested revision')
     execution = fetch('repos/' + os.environ['GITHUB_REPOSITORY'])
-    blob = fetch(f"repos/{execution['full_name']}/contents/.github/code-analysis/projects.json?ref={quote(execution['default_branch'], safe='')}")
+    target = json.loads(os.environ['TARGET_JSON'])
+    revision = trusted_configuration_revision(execution, target)
+    blob = fetch(f"repos/{execution['full_name']}/contents/.github/code-analysis/projects.json?ref={revision}")
     document = validate(json.loads(base64.b64decode(blob['content'])))
     if document['execution_repository']['id'] != execution['id'] or document['tooling_sha'] != actual:
         raise ValueError('Execution repository or approved tooling identity mismatch')
