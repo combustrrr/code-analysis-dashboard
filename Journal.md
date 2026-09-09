@@ -22,3 +22,6 @@
 - Published a four-section Ant Design analysis launcher covering project identity, exact revision, scanner profile, and authenticated workflow execution.
 - Added source/workflow provenance, channel and queue context, a run-progress receipt, responsive dark/light presentation, and a collapsed Actions fallback.
 - Production build and all 9 Playwright tests passed before publication.
+
+### 2026-09-09 - Issue explanation and grouping UX
+- Published evidence-backed scanner and rule explanation, observation provenance, related findings, and grouping by rule, file, directory, or scanner. Build and all 10 browser scenarios passed.
