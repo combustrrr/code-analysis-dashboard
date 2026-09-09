@@ -52,3 +52,7 @@
 ### 2026-09-09 - Scanner execution and diagnostic repair
 - Restored isolated Snyk resolver sibling imports and explicit repository attribution. Sonar probes match the actual branch and distinguish entitlement denial from token failure; quota warnings alone do not prove Snyk failure.
 - Fifty local regressions and workflow-policy audit passed. Live all-channel verification follows; upstream posture access and Sonar branch entitlement remain explicit requirements.
+
+### 2026-09-09 — Verified scanner repair synchronization
+- Snyk diagnostic 34368489309 completed all five dependency manifests and Code after aligning Node/Python resolver staging. Preserve structured evidence paths; sanitized resolver diagnostics are separate. Sonar branch entitlement and upstream posture permissions remain named blockers. Service regression suite: 51 passing tests.
+
