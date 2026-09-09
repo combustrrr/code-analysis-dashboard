@@ -1,6 +1,34 @@
 # Code Analysis Dashboard
 
-One public static dashboard for current upstream branch and pull-request findings.
+A standalone code-analysis application: React/Ant Design dashboard, Cloudflare
+authentication, GitHub Actions orchestration, scanner adapters, and current reports.
+
+## Project layout
+
+- `analysis-ui/`: static dashboard, themes, issues, provenance, and scan wizard.
+- `analysis-launcher/`: GitHub sign-in and authorized launching on Cloudflare.
+- `scripts/code_analysis/`: discovery, scanner adapters, normalization, publication.
+- `config/code-analysis/`: repository profile, scanner inventory, report contracts.
+- `.github/workflows/`: producers, discovery, compatibility, updates, Pages.
+- `tests/security_canary/`: scanner fixtures, never product runtime code.
+- `docs/code-analysis/`: architecture, integrations, and operations.
+
+## Local verification
+
+```shell
+python -m pip install -r .ci/requirements.txt
+python -m unittest scripts.code_analysis.test_hosted scripts.code_analysis.test_extensions scripts.code_analysis.test_portability scripts.code_analysis.test_scanner_access scripts.code_analysis.test_scanner_updates
+python -m scripts.code_analysis.audit_workflows
+node --test analysis-launcher/worker.test.mjs
+cd analysis-ui
+npm ci --ignore-scripts
+npm run build
+```
+
+## Deployment
+
+This extraction branch consolidates the service files. Live host cutover is pending;
+see [migration prerequisites](docs/MIGRATION.md) before merging or activating it.
 
 Source: ARYDESTROYER/Kavach-AgenticSOC. Analysis host: combustrrr/Agentic-Kibana.
 
