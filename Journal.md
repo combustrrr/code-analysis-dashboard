@@ -61,3 +61,18 @@
 - Synchronize stricter extension identity/result validation and isolated adapter working directories. The maintenance scheduler and required compatibility check live on the analysis fork; the dashboard remains a report publisher. Add scanner maintenance documentation and Scorecard release pin contract.
 - Analysis-host validation: 57 regressions, five native scanner canaries, workflow policy, documentation checks, and official Renovate validation pass. Updater token remains an explicit setup blocker.
 
+
+### 2026-09-09 — Standalone service extraction start
+- Assemble missing scanner workflows, trusted tooling, canaries, configuration, and maintenance contracts in the dedicated analysis repository. Keep the current running host configured until cutover is validated.
+
+
+### 2026-09-09 — Standalone extraction prepared
+- Added missing service workflows, canaries, contracts, maintenance checks, contributor instructions, and migration documentation. No product runtime code was copied.
+- Verified 57 service tests, workflow policy, 10 launcher tests, and standalone TypeScript/Vite production build. Live host and report assets remain unchanged. Runner ownership choice is pending before credential/App migration and removal from the product repository.
+
+
+### 2026-09-09 — Full service host cutover
+- User confirmed complete removal from the product fork. Point service/Worker configuration at code-analysis-dashboard and initialize its discovery state, preserving existing report assets.
+- Explicit user approval authorized encrypted transfer of SONAR_TOKEN, SONAR_API_TOKEN, and SNYK_TOKEN. Transfer run 34375135587 succeeded; destination secret names verified. Values were never exposed in plaintext logs/artifacts. Sonar entitlement and maintenance-token limits remain.
+- Service validation: 57 tests, workflow policy, and 10 launcher tests pass. Product cleanup independently passes 63 CI-policy tests and documentation consistency.
+

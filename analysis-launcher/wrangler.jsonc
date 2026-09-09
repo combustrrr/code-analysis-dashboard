@@ -6,7 +6,7 @@
   "workers_dev": true,
   "vars": {
     "SOURCE_REPOSITORY": "ARYDESTROYER/Kavach-AgenticSOC",
-    "ANALYSIS_REPOSITORY": "combustrrr/Agentic-Kibana",
+    "ANALYSIS_REPOSITORY": "combustrrr/code-analysis-dashboard",
     "DASHBOARD_ORIGIN": "https://combustrrr.github.io",
     "GITHUB_CLIENT_ID": "Iv23lixjTGgPaq9Jfp6R"
   },

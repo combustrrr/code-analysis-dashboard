@@ -7,6 +7,10 @@ description: External scanner, normalization, evidence, and Issue Wall service b
 
 ## Purpose
 
+The complete service is owned and executed by `combustrrr/code-analysis-dashboard`.
+The Agentic-Kibana product fork no longer contains the service implementation or
+scanner orchestration. The current source remains `ARYDESTROYER/Kavach-AgenticSOC`.
+
 The service diagnoses security and engineering issues for developers. It analyzes an
 exact repository revision, retains scanner-native proof, produces canonical findings,
 and serves a searchable current snapshot. It is external to the application and has no
