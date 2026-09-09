@@ -65,6 +65,11 @@ def _walk_steps(document: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     return rows
 
 
+def missing_tooling_paths(text: str) -> list[str]:
+    paths = re.findall(r'(?:\.analysis-tooling|analysis-tooling)/([A-Za-z0-9_./-]+)', text)
+    return sorted({path for path in paths if not (ROOT / path).exists()})
+
+
 def audit_service_layout() -> list[str]:
     """Validate the external-service ownership and application isolation contract."""
     errors: list[str] = []
@@ -168,6 +173,8 @@ def audit() -> list[str]:
                         f"{relative}: job {job_name} uses deprecated Node 20 action {action}"
                     )
             script = str(step.get("run") or "")
+            for missing in missing_tooling_paths(script):
+                errors.append(f"{relative}: job {job_name} references absent trusted tooling {missing}")
             if UNTRUSTED_INLINE.search(script):
                 errors.append(
                     f"{relative}: job {job_name} interpolates event/input data directly in a shell script"

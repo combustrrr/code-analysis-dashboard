@@ -1,42 +1,24 @@
-# Extraction from the product repository
+﻿# Extraction from the product repository
 
-This branch assembles the complete service in its own project. It does not delete
-report assets or retire a working scanner host before its replacement is verified.
+The service now lives entirely in combustrrr/code-analysis-dashboard: discovery,
+scanner workflows and adapters, repository profiles, canaries, maintenance,
+Cloudflare launcher, UI, and publication. Agentic-Kibana retains its product CI,
+release, and documentation workflows and links to this external service.
 
-## Ready
+The three approved vendor credentials were transferred encrypted for the destination
+repository. Snyk completed on the new host. The temporary transfer workflow and
+remote ciphertext artifact were removed. Existing Sonar entitlement limits remain;
+SECURITY_POSTURE_TOKEN and SCANNER_UPDATE_TOKEN still need provisioning.
 
-Dashboard, Cloudflare launcher, discovery, scanner workflows and adapters, publisher,
-repository profiles, canaries, maintenance automation, and standalone instructions.
+The existing Cloudflare Worker now dispatches to this repository, preserving its
+URL and secrets. The owner confirmed adding this repository to the GitHub App
+installation on 2026-09-09. A signed-in browser launch has not independently been
+verified since that access change.
 
-## Confirmed full separation
+Discovery and Pages publication have succeeded here. Current report assets and
+original producer references are preserved while fresh exact-source scans run.
+Scanner compatibility is required on main. A Ruff configuration dependency on the
+product checkout was extracted into scanner-owned configuration; workflow policy
+now rejects missing trusted tooling paths.
 
-The user selected complete removal of analysis code from the Agentic-Kibana fork.
-This repository owns discovery, scanners, UI, launcher, and report publication.
-Service and Worker configuration now identify this repository as the analysis host.
-The product repository retains only a documentation link to this external service.
-
-The user explicitly approved encrypted transfer of SONAR_TOKEN, SONAR_API_TOKEN,
-and SNYK_TOKEN. These three secrets are now configured in this repository. Values
-were encrypted for its public key before transport; no plaintext values were
-logged or stored in artifacts. Existing Sonar entitlement limitations remain.
-The launcher App installation may need access to this repository before
-authenticated dispatch works. SCANNER_UPDATE_TOKEN remains unconfigured.
-
-For a full move:
-
-1. Securely provision SONAR_TOKEN, SONAR_API_TOKEN, and SNYK_TOKEN here. Existing
-   vendor entitlement limits remain. SCANNER_UPDATE_TOKEN is still unconfigured.
-2. Add this repository to the existing launcher's GitHub App installation. The
-   current CLI token cannot list that App installation.
-3. Update service.json and Wrangler to use this repository as the analysis host;
-   preserve the Worker secrets, callback URL, and dashboard URL.
-4. Initialize discovery here. Preserve current-reports Release assets and their
-   original producer references while new reports are generated.
-5. Verify branch/PR/commit selection, exact-source scanning, partial publication,
-   and authenticated launching. Require Scanner compatibility on the default branch.
-6. Disable old analysis schedulers, then remove analysis-owned files from product
-   branches and update product documentation. Remove the retired service-only
-   required check from the old host while preserving any product checks. Retain
-   product CI, release, and docs workflows and shared product dependencies.
-
-The old fork is not retained as a thin runner.
+The old fork is not retained as a thin runner. Upstream source remains read-only.

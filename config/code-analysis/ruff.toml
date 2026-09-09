@@ -1,0 +1,3 @@
+# Trusted scanner profile, independent of the product checkout.
+line-length = 100
+target-version = "py311"

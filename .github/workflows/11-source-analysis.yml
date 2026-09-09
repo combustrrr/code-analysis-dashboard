@@ -249,15 +249,15 @@ jobs:
     - name: "Ruff lint (default rules \u2014 matches existing python-static CI gate)"
       run: python -m ruff check backend/app backend/tests --exit-zero
     - name: "Ruff lint (extended rules \u2014 advisory for baseline phase)"
-      run: "python -m ruff check backend/ \\\n  --config $RUNNER_TEMP/analysis-tooling/backend/pyproject.toml \\\
-        \n  --output-format=github \\\n  --exit-zero\n"
+      run: "python -m ruff check backend/ \\\n  --config $RUNNER_TEMP/analysis-tooling/config/code-analysis/ruff.toml\
+        \ \\\n  --output-format=github \\\n  --exit-zero\n"
     - name: Ruff format check (advisory)
-      run: "python -m ruff format --check backend/ \\\n  --config $RUNNER_TEMP/analysis-tooling/backend/pyproject.toml\
+      run: "python -m ruff format --check backend/ \\\n  --config $RUNNER_TEMP/analysis-tooling/config/code-analysis/ruff.toml\
         \ \\\n  || true\n"
     - name: Ruff lint (JSON for normalizer)
       if: always()
-      run: "python -m ruff check backend/ \\\n  --config $RUNNER_TEMP/analysis-tooling/backend/pyproject.toml \\\
-        \n  --output-format=json \\\n  --exit-zero \\\n  --output-file ruff-results.json\n"
+      run: "python -m ruff check backend/ \\\n  --config $RUNNER_TEMP/analysis-tooling/config/code-analysis/ruff.toml\
+        \ \\\n  --output-format=json \\\n  --exit-zero \\\n  --output-file ruff-results.json\n"
     - name: Upload Ruff results
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

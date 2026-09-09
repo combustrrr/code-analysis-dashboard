@@ -76,3 +76,9 @@
 - Explicit user approval authorized encrypted transfer of SONAR_TOKEN, SONAR_API_TOKEN, and SNYK_TOKEN. Transfer run 34375135587 succeeded; destination secret names verified. Values were never exposed in plaintext logs/artifacts. Sonar entitlement and maintenance-token limits remain.
 - Service validation: 57 tests, workflow policy, and 10 launcher tests pass. Product cleanup independently passes 63 CI-policy tests and documentation consistency.
 
+
+### 2026-09-09 — Cutover verification and Ruff isolation repair
+- Discovery and Pages publication succeeded on the standalone host; Snyk SCA and Code completed with migrated credentials. Owner confirmed destination App installation access. Worker deployment targets the standalone host; signed-in launch still needs browser verification.
+- Extracted Ruff settings from the removed product config and added a missing-tooling regression guard. Product fork now contains only its three product workflows. Vendor entitlement and optional credential blockers remain explicit.
+
+- Verification: all 58 service tests and workflow policy pass after the Ruff repair; prior standalone build, 10 launcher tests, and 63 product CI-policy tests passed.

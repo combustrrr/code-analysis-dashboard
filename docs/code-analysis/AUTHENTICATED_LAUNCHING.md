@@ -32,7 +32,7 @@ no credentials belong in that file.
 
 The current Kavach instance uses
 `https://code-analysis-launcher.icsarthak9.workers.dev`. Its private GitHub App is
-installed only on `combustrrr/Agentic-Kibana`; viewing reports remains public.
+installed on `combustrrr/code-analysis-dashboard`; viewing reports remains public.
 
 1. In your Cloudflare account, enable Workers and choose the Worker URL. Set the
    non-secret repository identifiers and dashboard origin in

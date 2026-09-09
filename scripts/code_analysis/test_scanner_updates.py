@@ -8,6 +8,18 @@ from scripts.code_analysis import extensions
 
 
 class ScannerUpdateTests(unittest.TestCase):
+    def test_standalone_tooling_cannot_borrow_product_configuration(self):
+        import tempfile
+        from unittest.mock import patch
+        from scripts.code_analysis import audit_workflows as audit
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root/'config').mkdir()
+            (root/'config/ruff.toml').write_text('line-length = 100')
+            with patch.object(audit, 'ROOT', root):
+                self.assertEqual(audit.missing_tooling_paths('ruff --config $RUNNER_TEMP/analysis-tooling/backend/pyproject.toml'), ['backend/pyproject.toml'])
+                self.assertEqual(audit.missing_tooling_paths('ruff --config .analysis-tooling/config/ruff.toml'), [])
+
     def test_inventory_accepts_one_hundred_independent_extensions(self):
         example = json.loads(Path('config/code-analysis/scanner-extension.example.json').read_text())
         rows = [{**example, 'channel': f'ext-scanner-{i}', 'name': f'Independent scanner {i}'} for i in range(100)]
