@@ -30,7 +30,7 @@ def reusable_source(portable=True):
                     path = opts.get('path', '.')
                     steps.append({'name':'Load reviewed execution project configuration',
                         'env': {'GH_TOKEN':'${{ github.token }}', 'TOOLING_SHA':'${{ inputs.tooling_sha }}', 'TARGET_JSON':'${{ inputs.target }}', 'EXPECTED_PROFILE':'portable' if portable else 'agentic-soc'},
-                        'run': f'python -I "{path}/scripts/code_analysis/prepare_project.py"'})
+                        'run': f'python -I "$GITHUB_WORKSPACE/{path}/scripts/code_analysis/prepare_project.py"'})
                     continue
             if 'env' in step and 'TOOLING_SHA' in step['env']:
                 step['env']['IS_REUSABLE_ANALYSIS'] = 'true'

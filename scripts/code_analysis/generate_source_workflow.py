@@ -185,6 +185,8 @@ def generate(config=None):
                     step['with']['config-file'] = '.git/code-analysis/codeql-config.yml'
                 if 'run' in step:
                     step['run'] = step['run'].replace('$GITHUB_WORKSPACE/.analysis-tooling', '$RUNNER_TEMP/analysis-tooling').replace('../.analysis-tooling', '$RUNNER_TEMP/analysis-tooling').replace('.analysis-tooling', '$RUNNER_TEMP/analysis-tooling')
+                if 'run' in step:
+                    step['run'] = step['run'].replace('PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile', 'python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile')
                 if 'with' in step:
                     step['with'] = {k: v.replace('.analysis-tooling', '${{ runner.temp }}/analysis-tooling') if isinstance(v, str) else v for k, v in step['with'].items()}
                 isolated.append(step)

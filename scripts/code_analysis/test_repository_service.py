@@ -46,3 +46,21 @@ class RepositoryExecutionTests(unittest.TestCase):
             save.assert_not_called();gh.assert_not_called()
 
 if __name__=='__main__':unittest.main()
+
+class TrustedBootstrapTests(unittest.TestCase):
+    def test_source_packages_cannot_shadow_trusted_profile_modules(self):
+        import os
+        import subprocess
+        import sys
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            package=root/'scripts'/'code_analysis'
+            package.mkdir(parents=True)
+            (root/'scripts/__init__.py').write_text('')
+            (package/'__init__.py').write_text('')
+            (package/'snapshot.py').write_text("raise RuntimeError('SOURCE_PACKAGE_EXECUTED')")
+            command=[sys.executable,'-I',str(Path('scripts/code_analysis/trusted_entry.py').resolve()),'run_profile','--help']
+            result=subprocess.run(command,cwd=root,env={**os.environ,'PYTHONPATH':str(root)},capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertNotIn('SOURCE_PACKAGE_EXECUTED',result.stderr)

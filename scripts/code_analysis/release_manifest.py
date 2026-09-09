@@ -1,4 +1,4 @@
-﻿"""Atomic manifest pointers backed by immutable compressed Release assets."""
+"""Atomic manifest pointers backed by immutable compressed Release assets."""
 import gzip
 import hashlib
 import json
@@ -19,7 +19,10 @@ def read(repository, release):
 
 
 def write(repository, release, state):
-    data = gzip.compress(json.dumps(state,sort_keys=True,separators=(',',':')).encode(),mtime=0)
+    raw = json.dumps(state,sort_keys=True,separators=(',',':')).encode()
+    if len(raw)>10_000_000:
+        raise ValueError('Project manifest exceeds unpacked delivery capacity; previous manifest retained')
+    data = gzip.compress(raw,mtime=0)
     if len(data)>5_000_000:
         raise ValueError('Project manifest exceeds delivery capacity; previous manifest retained')
     digest = hashlib.sha256(data).hexdigest()

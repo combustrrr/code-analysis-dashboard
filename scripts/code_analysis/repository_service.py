@@ -36,6 +36,7 @@ def report_publication(config, state, report_release, document=None):
     result = {**state, 'schema_version':'analysis-current-v1', 'targets':[]}
     pending = {}
     with tempfile.TemporaryDirectory(prefix='analysis-publication-') as directory:
+        project_dispatches = 0
         for row in state['targets']:
             entry = {**row}
             old = prior.get(row['id'], {})
@@ -93,21 +94,37 @@ def report_publication(config, state, report_release, document=None):
 
 def reconcile_repository(repository, project_id='', selection='', request_id=''):
     repo, document, execution_sha = load_projects(repository)
+    queued_asset = None
+    queue = github.release(repository, 'analysis-requests')
+    if queue:
+        candidates = sorted((a for a in github.pages(f"repos/{repository}/releases/{queue['id']}/assets") if a['name'].startswith('request-') and a['name'].endswith('.json')), key=lambda a:(a['created_at'],a['id']))
+        if candidates:
+            queued_asset = candidates[0]
+            if queued_asset.get('size', 0)>8192:
+                raise ValueError('Queued request exceeds the accepted request size')
+            intent = json.loads(github.gh('api',f"repos/{repository}/releases/assets/{queued_asset['id']}",'-H','Accept: application/octet-stream',binary=True))
+            if intent.get('schema_version')!='analysis-request-v1' or intent.get('execution_repository_id')!=repo['id'] or not any(p['id']==intent.get('project_id') for p in document['projects']):
+                raise ValueError('Queued request identity is invalid or project was removed')
+            project_id, selection, request_id = intent['project_id'], json.dumps(intent['selection']), intent['request_id']
     template = json.loads((Path(__file__).resolve().parents[2] / 'config/code-analysis/service.json').read_text(encoding='utf-8-sig'))
     runs = github.pages(f'repos/{repository}/actions/workflows/code-analysis-source.yml/runs', 'workflow_runs')
     running = sum(run['status'] != 'completed' for run in runs)
     by_id = {run['id']:run for run in runs}
     by_nonce = {run['display_title']:run for run in reversed(runs)}
     summaries = []
+    stored = {}
     for project in document['projects']:
+        rel = github.release(repository, 'analysis-state-' + project['id'], create=True)
+        stored[project['id']] = (rel, release_manifest.read(repository, rel))
+    projects = sorted(document['projects'], key=lambda p: not (p['id'] == project_id and selection or any(r.get('manual_refresh') for r in stored[p['id']][1].get('targets', []))))
+    for project in projects:
         config = service_config(document, project['id'], template)
         config['source_workflow'] = WORKFLOW
         source = github.api('repos/' + config['source_repository'])
         if source['id'] != config['source_repository_id'] or source['private']:
             raise ValueError('Source repository identity/visibility changed')
         config['source_repository'] = source['full_name']
-        release = github.release(repository, config['state_release'], create=True)
-        old = release_manifest.read(repository, release)
+        release, old = stored[project['id']]
         rows = github.inventory(config, old)  # Fail closed on incomplete pagination.
         if selection and project['id'] == project_id:
             selected = github.resolve_selection(config, selection, rows)
@@ -124,6 +141,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             github.request_refresh(state, selected['id'])
             state['last_request_id'] = request_id
         state['targets'].sort(key=lambda row: not row.get('manual_refresh',False))
+        project_dispatches = 0
         for row in state['targets']:
             key = analysis_key(row, document['tooling_sha'], config)
             if row.get('analysis_key') != key:
@@ -135,7 +153,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                     row.update(scan_run_id=run['id'],run_attempt=run['run_attempt'],
                                status='collected' if run['status']=='completed' else 'scanning',run_conclusion=run['conclusion'])
                 continue  # Never retry a dispatch with an uncertain outcome.
-            if running >= 2:
+            if running >= 2 or (len(projects)>1 and project_dispatches>=1):
                 continue
             row.update(profile_mode='portable' if project['profile'].get('mode') == 'portable' else 'agentic-soc', project_id=project['id'],request_id=uuid.uuid4().hex,status='dispatching',
                        tooling_sha=document['tooling_sha'], execution_sha=execution_sha)
@@ -148,7 +166,11 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                 row.update(scan_run_id=dispatched['workflow_run_id'],run_attempt=1)
             row['status']='scanning'
             running += 1
+            project_dispatches += 1
         release_manifest.write(repository,release,state)
+        if queued_asset is not None and project['id']==project_id and state.get('last_request_id')==request_id:
+            github.api(f"repos/{repository}/releases/assets/{queued_asset['id']}",method='DELETE')
+            queued_asset = None
         current = github.release(repository,config['report_release'],create=True)
         summaries.append(report_publication(config,state,current,document)['metrics'])
     return summaries

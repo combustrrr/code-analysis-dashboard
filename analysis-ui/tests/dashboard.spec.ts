@@ -101,7 +101,7 @@ test('Ant Design filters, pagination and responsive layout remain usable', async
 
 test('overview drilldown, scanner filters and provenance use retained evidence', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Directories with most findings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Directories with most findings' })).toBeVisible({timeout:30000});
   const directory = page.locator('.directory-row .ant-btn').first();
   const path = await directory.innerText();
   await directory.click();

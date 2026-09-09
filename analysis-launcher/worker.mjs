@@ -23,15 +23,15 @@ export async function unseal(value, secret, type) {
 class Failure extends Error { constructor(status, message) { super(message); this.status = status; } }
 const cookie = (value, age) => `__Host-analysis-oauth=${value}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${age}`;
 function settings(env) {
-  for (const key of ['SOURCE_REPOSITORY', 'ANALYSIS_REPOSITORY']) {
+  for (const key of (env.APPLICATION_MODE === 'repositories' ? ['ANALYSIS_REPOSITORY'] : ['SOURCE_REPOSITORY', 'ANALYSIS_REPOSITORY'])) {
     if (!/^[\w.-]+\/[\w.-]+$/.test(env[key] || '')) throw new Failure(503, 'Launcher repository configuration is unavailable.');
   }
-  if (env.SOURCE_REPOSITORY.toLowerCase() === env.ANALYSIS_REPOSITORY.toLowerCase()) throw new Failure(503, 'Source and analysis repositories must be separate.');
+  if (env.APPLICATION_MODE !== 'repositories' && env.SOURCE_REPOSITORY.toLowerCase() === env.ANALYSIS_REPOSITORY.toLowerCase()) throw new Failure(503, 'Source and analysis repositories must be separate.');
   if (new URL(env.DASHBOARD_ORIGIN).origin !== env.DASHBOARD_ORIGIN || !env.DASHBOARD_ORIGIN.startsWith('https://') || !env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET || !env.SESSION_KEY) throw new Failure(503, 'Launcher authentication is not configured.');
 }
 async function github(path, token, init = {}) {
   const response = await fetch(`https://api.github.com/${path}`, { ...init, headers: {
-    Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
+    Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28',
     'User-Agent': 'code-analysis-launcher', Authorization: `Bearer ${token}`, ...init.headers,
   } });
   if (!response.ok) throw new Failure(response.status === 401 ? 401 : response.status === 403 || response.status === 404 ? 403 : 502,
@@ -91,6 +91,10 @@ async function route(request, env) {
     } });
   }
   if (env.APPLICATION_MODE === 'repositories') {
+    if (request.method === 'GET' && url.pathname === '/api/public/config') {
+      const slug = env.GITHUB_APP_SLUG;
+      return json({mode:'repositories', installation_url: /^[a-z0-9-]+$/.test(slug || '') ? `https://github.com/apps/${slug}/installations/new` : null});
+    }
     const report = await publicReports(request);
     if (report) return report;
   }
@@ -170,10 +174,15 @@ async function route(request, env) {
   throw new Failure(404, 'Not found.');
 }
 export default { async fetch(request, env) {
+  if (env.APPLICATION_MODE === 'repositories' && env.NEXT_GITHUB_CLIENT_ID) {
+    env = {...env, GITHUB_CLIENT_ID:env.NEXT_GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET:env.NEXT_GITHUB_CLIENT_SECRET,
+      GITHUB_APP_ID:env.NEXT_GITHUB_APP_ID, GITHUB_APP_SLUG:env.NEXT_GITHUB_APP_SLUG,
+      GITHUB_APP_PRIVATE_KEY:env.NEXT_GITHUB_APP_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET:env.NEXT_GITHUB_WEBHOOK_SECRET};
+  }
   let response;
   try { response = await route(request, env); } catch (e) { response = json({ error: e instanceof Failure ? e.message : 'Launcher unavailable. No successful launch has been confirmed; check GitHub Actions before retrying.' }, e instanceof Failure ? e.status : 503); }
   const headers = new Headers(response.headers);
-  headers.set('Cache-Control', 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
+  if (!new URL(request.url).pathname.startsWith('/api/public/')) headers.set('Cache-Control', 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
   if (request.headers.get('Origin') === env.DASHBOARD_ORIGIN) {
     headers.set('Access-Control-Allow-Origin', env.DASHBOARD_ORIGIN); headers.set('Vary', 'Origin');
     headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');

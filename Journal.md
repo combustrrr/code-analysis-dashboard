@@ -105,3 +105,9 @@
 - Preserved the existing full scanner profile in a separate reusable producer and restricted portable jobs to explicit applicability. Trusted project bootstrap runs Python isolated from source imports.
 - Current manifests now use immutable Release assets behind atomic pointers, avoiding GitHub Release description-size limits. Full UI production build succeeds; wrapper-completion events support reconciliation without relying solely on webhooks.
 
+
+### 2026-09-09 — Live integration repairs and authentication approval blocker
+- Fork reusable reconciliation successfully dispatched native analysis. Live JavaScript bootstrap used a job-relative path, and older PR source packages shadowed trusted Python modules. Repaired absolute isolated bootstrap and added a source-package poisoning regression test.
+- Replaced quadratic compression with bounded batch packing: retained 21,189 findings across 673 documents pack into three assets totaling 8,368,824 bytes in 24.63 seconds. Added durable request intents before dispatch and bounded public manifest decompression.
+- Public App registration did not run: automatic approval review requires explicit authorization to store newly generated App client/private-key/webhook credentials in the existing Cloudflare Worker. Asked for that specific approval; existing login is unchanged. Continue unaffected integration work.
+

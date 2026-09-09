@@ -24,7 +24,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I "./scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
         repository: ${{ fromJSON(inputs.target).source_repository }}
@@ -67,7 +67,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Determine whether Sonar analysis is needed
@@ -244,7 +244,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Set up Python 3.11
@@ -310,7 +310,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Set up Python 3.11
@@ -423,7 +423,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Set up Node.js 22
@@ -433,7 +433,7 @@ jobs:
         cache: npm
         cache-dependency-path: webui/package-lock.json
     - name: Install locked dependencies
-      run: PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile javascript-install
+      run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile javascript-install
         --source "$GITHUB_WORKSPACE"
     - name: TypeScript type check
       shell: bash
@@ -470,7 +470,7 @@ jobs:
         retention-days: 7
     - name: Run repository JavaScript test profile
       if: always()
-      run: PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile javascript-test
+      run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile javascript-test
         --source "$GITHUB_WORKSPACE"
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
@@ -516,7 +516,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Stage trusted CodeQL policy in Git metadata
@@ -587,7 +587,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Set up Python 3.11
@@ -651,7 +651,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Record unconfigured status
@@ -972,7 +972,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Build exact-commit shipping images
@@ -1169,7 +1169,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I "./scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - name: Install verified Scorecard 5.5.0
       run: 'curl --fail --location --retry 3 https://github.com/ossf/scorecard/releases/download/v5.5.0/scorecard_5.5.0_linux_amd64.tar.gz
         -o scorecard.tar.gz
@@ -1236,7 +1236,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Set up Python 3.11
@@ -1309,7 +1309,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Set up Python 3.11
@@ -1359,7 +1359,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Set up Python 3.11
@@ -1369,13 +1369,13 @@ jobs:
         cache: pip
         cache-dependency-path: backend/requirements-dev.txt
     - name: Install dependencies
-      run: PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile python-install
+      run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile python-install
         --source "$GITHUB_WORKSPACE"
     - name: Run pytest with coverage
       env:
         PYTHONPATH: ${{ github.workspace }}/backend
-      run: PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile python-test --source
-        "$GITHUB_WORKSPACE"
+      run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile python-test
+        --source "$GITHUB_WORKSPACE"
     - name: Materialize coverage reports after failed or successful tests
       if: always()
       working-directory: backend
@@ -1437,7 +1437,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Set up Python 3.11
@@ -1447,14 +1447,14 @@ jobs:
         cache: pip
         cache-dependency-path: backend/requirements-dev.txt
     - name: Install dependencies & Schemathesis
-      run: 'PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile python-install
+      run: 'python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile python-install
         --source "$GITHUB_WORKSPACE"
 
         python -m pip install schemathesis==3.39.16 httpx==0.27.2'
     - name: Run API Fuzzing (Schemathesis)
       id: schemathesis
-      run: PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile api-fuzz --source
-        "$GITHUB_WORKSPACE"
+      run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile api-fuzz
+        --source "$GITHUB_WORKSPACE"
     - name: Upload Fuzzing Report
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -1497,7 +1497,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I ".analysis-tooling/scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
     - name: Set up Python 3.12
@@ -1591,7 +1591,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
-      run: python -I "./scripts/code_analysis/prepare_project.py"
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
         python-version: '3.11'

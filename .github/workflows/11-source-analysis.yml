@@ -408,7 +408,7 @@ jobs:
         cache: npm
         cache-dependency-path: webui/package-lock.json
     - name: Install locked dependencies
-      run: PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile javascript-install
+      run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile javascript-install
         --source "$GITHUB_WORKSPACE"
     - name: TypeScript type check
       shell: bash
@@ -445,7 +445,7 @@ jobs:
         retention-days: 7
     - name: Run repository JavaScript test profile
       if: always()
-      run: PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile javascript-test
+      run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile javascript-test
         --source "$GITHUB_WORKSPACE"
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
@@ -1287,13 +1287,13 @@ jobs:
         cache: pip
         cache-dependency-path: backend/requirements-dev.txt
     - name: Install dependencies
-      run: PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile python-install
+      run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile python-install
         --source "$GITHUB_WORKSPACE"
     - name: Run pytest with coverage
       env:
         PYTHONPATH: ${{ github.workspace }}/backend
-      run: PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile python-test --source
-        "$GITHUB_WORKSPACE"
+      run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile python-test
+        --source "$GITHUB_WORKSPACE"
     - name: Materialize coverage reports after failed or successful tests
       if: always()
       working-directory: backend
@@ -1358,14 +1358,14 @@ jobs:
         cache: pip
         cache-dependency-path: backend/requirements-dev.txt
     - name: Install dependencies & Schemathesis
-      run: 'PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile python-install
+      run: 'python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile python-install
         --source "$GITHUB_WORKSPACE"
 
         python -m pip install schemathesis==3.39.16 httpx==0.27.2'
     - name: Run API Fuzzing (Schemathesis)
       id: schemathesis
-      run: PYTHONPATH="$RUNNER_TEMP/analysis-tooling" python -m scripts.code_analysis.run_profile api-fuzz --source
-        "$GITHUB_WORKSPACE"
+      run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile api-fuzz
+        --source "$GITHUB_WORKSPACE"
     - name: Upload Fuzzing Report
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

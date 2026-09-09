@@ -1,11 +1,12 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {Alert, Button, Collapse, Input, Select, Space, Steps, Table, Tag} from 'antd';
 import {useLaunchAuth} from './useLaunchAuth';
 
 type Repository = {id:number;full_name:string;can_configure:boolean};
 type Preview = {confirmation:string;files:Record<string,string>;project:{relationship:string;source_repository:{full_name:string}};detection:{notice:string;detected_manifests:string[]}};
-export function Repositories({endpoint}:{endpoint?:string}) {
-  const auth=useLaunchAuth(endpoint);
+export function Repositories({auth,endpoint}:{endpoint?:string;auth:ReturnType<typeof useLaunchAuth>}) {
+  const [installation,setInstallation]=useState<string>();
+  useEffect(()=>{if(!endpoint)return;let active=true;fetch(endpoint+'/api/public/config').then(r=>r.json()).then(r=>{if(active && /^https:\/\/github\.com\/apps\/[a-z0-9-]+\/installations\/new$/.test(r.installation_url||''))setInstallation(r.installation_url);}).catch(()=>{});return()=>{active=false;};},[endpoint]);
   const [repositories,setRepositories]=useState<Repository[]>([]);
   const [projects,setProjects]=useState<{id:string;source_repository:{full_name:string};relationship:string}[]>([]);
   const [execution,setExecution]=useState('');
@@ -21,6 +22,7 @@ export function Repositories({endpoint}:{endpoint?:string}) {
   return <section className="connections-panel" aria-label="Connect repository">
     <h2>Repositories</h2><p>Run analysis in a repository you control. A read-only source is analyzed without changing that source repository.</p>
     <Steps current={installed?3:preview?2:execution?1:0} items={[{title:'Connect GitHub'},{title:'Select codebase'},{title:'Review installation'},{title:'Ready'}]}/>
+    {installation&&<Button href={installation} target="_blank" rel="noreferrer">Install GitHub App on selected repositories</Button>}
     {!auth.session?<Button onClick={auth.signIn} disabled={!auth.available}>Sign in with GitHub</Button>:<Space wrap><span>Signed in as {auth.session.login}</span><Button loading={busy} onClick={()=>void list()}>Load repositories</Button><Button onClick={auth.signOut}>Sign out</Button></Space>}
     {(error||auth.error)&&<Alert type="error" showIcon title="Connection needs attention" description={error||auth.error}/>}
     <label>Execution repository</label><Select style={{width:'100%'}} aria-label="Execution repository" showSearch optionFilterProp="label" value={execution||undefined} placeholder="Choose a repository you administer" options={repositories.filter(r=>r.can_configure).map(r=>({value:r.full_name,label:r.full_name}))} onChange={value=>{setExecution(value);setPreview(undefined);setInstalled('');}}/>

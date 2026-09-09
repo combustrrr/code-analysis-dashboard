@@ -19,6 +19,7 @@ def main() -> None:
     parser.add_argument("--worker-origin", required=True)
     parser.add_argument("--dashboard-url", required=True)
     parser.add_argument("--app-name", default="Code Analysis Launcher")
+    parser.add_argument('--application', action='store_true', help='Register the public repository onboarding application')
     args = parser.parse_args()
     worker = urllib.parse.urlsplit(args.worker_origin)
     dashboard = urllib.parse.urlsplit(args.dashboard_url)
@@ -36,17 +37,20 @@ def main() -> None:
         "redirect_url": "http://127.0.0.1:8979/created",
         "callback_urls": [args.worker_origin.rstrip("/") + "/auth/callback"],
         "setup_url": args.dashboard_url,
-        "public": False,
+        "public": args.application,
         "request_oauth_on_install": False,
-        "hook_attributes": {"url": args.worker_origin.rstrip("/") + "/webhook", "active": False},
-        "default_events": [],
+        "hook_attributes": {"url": args.worker_origin.rstrip("/") + "/webhook", "active": args.application},
+        "default_events": ["push", "pull_request", "workflow_run"] if args.application else [],
         "default_permissions": {
             "actions": "write",
-            "contents": "read",
+            "contents": "write" if args.application else "read",
             "metadata": "read",
             "pull_requests": "read",
         },
     }
+
+    if args.application:
+        manifest['default_permissions']['workflows'] = 'write'
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, _format: str, *_args: object) -> None:
@@ -97,14 +101,31 @@ def main() -> None:
         app = json.load(response)
     client_id = app["client_id"]
     subprocess.run(
-        ["npx.cmd", "--yes", "wrangler@4.129.1", "secret", "put", "GITHUB_CLIENT_SECRET"],
+        ["npx.cmd", "--yes", "wrangler@4.129.1", "secret", "put", "NEXT_GITHUB_CLIENT_SECRET" if args.application else "GITHUB_CLIENT_SECRET"],
         input=app["client_secret"] + "\n",
         text=True,
         check=True,
     )
+    if args.application:
+        import shutil
+        openssl = shutil.which('openssl')
+        if not openssl:
+            candidate = Path('C:/Program Files/Git/usr/bin/openssl.exe')
+            openssl = str(candidate) if candidate.exists() else None
+        if not openssl:
+            raise SystemExit('OpenSSL is needed to prepare the App private key; no key was printed')
+        converted = subprocess.run([openssl, 'pkcs8', '-topk8', '-nocrypt'], input=app['pem'],
+                                   text=True, capture_output=True, check=True)
+        for name, value in {'NEXT_GITHUB_APP_PRIVATE_KEY':converted.stdout,
+                            'NEXT_GITHUB_WEBHOOK_SECRET':app['webhook_secret']}.items():
+            subprocess.run(['npx.cmd','--yes','wrangler@4.129.1','secret','put',name],
+                           input=value+'\n', text=True, check=True)
     config_path = Path(__file__).with_name("wrangler.jsonc")
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    config["vars"]["GITHUB_CLIENT_ID"] = client_id
+    config["vars"]["NEXT_GITHUB_CLIENT_ID" if args.application else "GITHUB_CLIENT_ID"] = client_id
+    if args.application:
+        config['vars']['NEXT_GITHUB_APP_ID'] = str(app['id'])
+        config['vars']['NEXT_GITHUB_APP_SLUG'] = app['slug']
     config["preview_urls"] = False
     config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     print(f"GitHub App created: {app['html_url']}")

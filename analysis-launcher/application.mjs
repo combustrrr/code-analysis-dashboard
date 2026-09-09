@@ -231,7 +231,21 @@ export async function applicationApi(request, env, session, helpers) {
     const path = input.kind === 'branch' ? 'branches' : input.kind === 'pr' ? 'pulls' : 'commits';
     await github(`repos/${source.full_name}/${path}/${encodeURIComponent(input.ref)}`, token);
     const request_id = crypto.randomUUID();
-    const result = await github(`repos/${repo.full_name}/actions/workflows/code-analysis-reconcile.yml/dispatches`, token, {method:'POST', body:JSON.stringify({ref:repo.default_branch, return_run_details:true, inputs:{project_id:project.id,selection:JSON.stringify({repository:source.full_name,kind:input.kind,ref:input.ref}),request_id}})});
+    let queue;
+    const releases = await helpers.pages(`repos/${repo.full_name}/releases`, token);
+    queue = releases.find(r => r.tag_name === 'analysis-requests');
+    if (!queue) {
+      try {queue=await github(`repos/${repo.full_name}/releases`,token,{method:'POST',body:JSON.stringify({tag_name:'analysis-requests',name:'Analysis request queue',body:'Durable pending analysis requests. Processed entries are removed.',make_latest:'false'})});}
+      catch {queue=(await helpers.pages(`repos/${repo.full_name}/releases`,token)).find(r=>r.tag_name==='analysis-requests');if(!queue)throw new Failure(502,'Could not persist the analysis request.');}
+    }
+    const pending=await helpers.pages(`repos/${repo.full_name}/releases/${queue.id}/assets`,token);
+    if(pending.filter(a=>a.name.startsWith('request-')).length>=100)throw new Failure(429,'This repository has 100 pending requests. Wait for reconciliation before submitting another.');
+    const actor=await github('user',token);
+    const intent={schema_version:'analysis-request-v1',request_id,execution_repository_id:repo.id,project_id:project.id,selection:{repository:source.full_name,kind:input.kind,ref:input.ref},actor_id:actor.id,created_at:new Date().toISOString()};
+    const saved=await fetch(`https://uploads.github.com/repos/${repo.full_name}/releases/${queue.id}/assets?name=request-${request_id}.json`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','User-Agent':'code-analysis-application'},body:JSON.stringify(intent)});
+    if(!saved.ok)throw new Failure(502,'Could not persist the analysis request; no scan was confirmed.');
+    let result;
+    try { result = await github(`repos/${repo.full_name}/actions/workflows/code-analysis-reconcile.yml/dispatches`, token, {method:'POST', body:JSON.stringify({ref:repo.default_branch, return_run_details:true, inputs:{project_id:project.id,selection:JSON.stringify({repository:source.full_name,kind:input.kind,ref:input.ref}),request_id}})}); } catch { return json({status:'queued',request_id,run_id:null,repository:repo.full_name,warning:'Request saved. Immediate dispatch failed; repository reconciliation will recover it.'},202); }
     return json({status:'submitted',request_id,run_id:result?.workflow_run_id || null,repository:repo.full_name},202);
   }
   if (request.method === 'GET' && /^\/api\/project-runs\/[1-9][0-9]*$/.test(url.pathname)) {

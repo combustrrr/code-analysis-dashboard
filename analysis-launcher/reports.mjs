@@ -25,7 +25,11 @@ export async function publicReports(request) {
       const data=await (await fetch(metadata.browser_download_url)).arrayBuffer();
       const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data)),x=>x.toString(16).padStart(2,'0')).join('');
       if(digest!==pointer.sha256||data.byteLength!==pointer.bytes)throw new Error('Manifest integrity mismatch.');
-      manifest=await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('gzip'))).json();
+      const reader=new Blob([data]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();
+      let size=0, chunks=[];
+      while(true){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>10000000){await reader.cancel();throw new Error('Manifest exceeds the delivery limit.');}chunks.push(value);}
+      const decoded=new Uint8Array(size);let offset=0;for(const chunk of chunks){decoded.set(chunk,offset);offset+=chunk.length;}
+      manifest=JSON.parse(new TextDecoder().decode(decoded));
     }
     if(manifest.schema_version !== 'analysis-current-v1' || manifest.project_id !== project || manifest.analysis_repository?.toLowerCase() !== repo.full_name.toLowerCase()) throw new Error('Report identity could not be verified.');
     if(url.pathname.endsWith('/manifest')) return Response.json(manifest,{headers:{'Cache-Control':'public, max-age=60'}});
