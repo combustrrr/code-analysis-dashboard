@@ -38,3 +38,26 @@ checks succeed. Upstream ARYDESTROYER/Kavach-AgenticSOC remains strictly read-on
 Product docs CI was repaired by preserving the final fork-only analysis document in
 this service's historical docs and removing it from the product docs tree. Fork CI
 run 34380231777 completed successfully.
+
+## Free Cloudflare services (2026-09-09 decision)
+
+The owner permits Cloudflare services when they remain free. Keep the existing
+Worker for authentication and application APIs and GitHub Release assets for
+current reports. A public GitHub repository does not change Cloudflare quotas.
+Do not enable paid plans or usage-billed subscriptions automatically.
+
+Workers Free currently permits 100,000 requests per day. D1 Free includes five
+million rows read and 100,000 rows written per day, with 5 GB total storage;
+queries fail when daily limits are exhausted. D1 is an allowed option for small
+application metadata if it simplifies the implementation, but no database has
+been provisioned and the current GitHub request queue remains authoritative.
+Avoid introducing a second request queue during migration.
+
+R2 includes a free allowance but charges for overages, so it is not enabled.
+Keep authentication responses uncached; cache only validated public data with
+bounded freshness. Verify caching on the actual deployment hostname before
+counting it toward API usage reduction. Scanner execution stays in Actions.
+
+References: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/),
+[D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/),
+[R2 pricing](https://developers.cloudflare.com/r2/pricing/).

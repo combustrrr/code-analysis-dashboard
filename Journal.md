@@ -111,3 +111,8 @@
 - Replaced quadratic compression with bounded batch packing: retained 21,189 findings across 673 documents pack into three assets totaling 8,368,824 bytes in 24.63 seconds. Added durable request intents before dispatch and bounded public manifest decompression.
 - Public App registration did not run: automatic approval review requires explicit authorization to store newly generated App client/private-key/webhook credentials in the existing Cloudflare Worker. Asked for that specific approval; existing login is unchanged. Continue unaffected integration work.
 
+
+### 2026-09-09 — Free Cloudflare services and repaired fork restart
+- Owner permits free Cloudflare services where useful. Verified official Workers/D1 free limits and R2 billable overages; retain GitHub current reports and the existing durable request queue. No database or paid subscription was provisioned.
+- Fork commit 72624f8f pins isolated scanner bootstrap and bounded report packing; scheduler reenabled. Corrected Testing request is run 34387926547, pending verification. Initial manually submitted structured selection was malformed and superseded.
+- Retained-data overview browser regression now passes with an appropriate initial-load timeout. Public App credential export approval remains pending; existing authentication remains unchanged.
