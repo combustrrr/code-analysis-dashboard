@@ -30,6 +30,9 @@ on:
       request_id:
         type: string
         required: false
+  workflow_run:
+    workflows: ['Code analysis source']
+    types: [completed]
   schedule:
     - cron: '23 * * * *'
 permissions:

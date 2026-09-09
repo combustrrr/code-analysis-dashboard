@@ -1,4 +1,4 @@
-﻿// Public reports are resolved through verified public repositories and managed releases.
+// Public reports are resolved through verified public repositories and managed releases.
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 export async function publicReports(request) {
   const url = new URL(request.url);
@@ -16,7 +16,17 @@ export async function publicReports(request) {
     const repo = await github('repos/'+repository);
     if(repo.private) return Response.json({error:'Private reports are not supported.'},{status:403});
     const release = await github(`repos/${repository}/releases/tags/analysis-current-${project}`);
-    const manifest = JSON.parse(release.body || '{}');
+    let manifest = JSON.parse(release.body || '{}');
+    if(manifest.schema_version==='analysis-manifest-pointer-v1') {
+      const pointer=manifest.asset;
+      if(!Number.isSafeInteger(pointer.id)||pointer.bytes>5000000||!/^manifest-[a-f0-9]{64}\.json\.gz$/.test(pointer.name))throw new Error('Invalid manifest pointer.');
+      const metadata=await github(`repos/${repository}/releases/assets/${pointer.id}`);
+      if(metadata.name!==pointer.name||metadata.size!==pointer.bytes)throw new Error('Manifest asset identity mismatch.');
+      const data=await (await fetch(metadata.browser_download_url)).arrayBuffer();
+      const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data)),x=>x.toString(16).padStart(2,'0')).join('');
+      if(digest!==pointer.sha256||data.byteLength!==pointer.bytes)throw new Error('Manifest integrity mismatch.');
+      manifest=await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('gzip'))).json();
+    }
     if(manifest.schema_version !== 'analysis-current-v1' || manifest.project_id !== project || manifest.analysis_repository?.toLowerCase() !== repo.full_name.toLowerCase()) throw new Error('Report identity could not be verified.');
     if(url.pathname.endsWith('/manifest')) return Response.json(manifest,{headers:{'Cache-Control':'public, max-age=60'}});
     const name = url.searchParams.get('asset');

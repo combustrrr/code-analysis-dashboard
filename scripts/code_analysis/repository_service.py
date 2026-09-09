@@ -9,7 +9,7 @@ import tempfile
 from urllib.parse import quote
 import uuid
 
-from scripts.code_analysis import github_service as github
+from scripts.code_analysis import github_service as github, release_manifest
 from scripts.code_analysis.hosted import analysis_key, reconcile, now, accept
 from scripts.code_analysis.projects import validate, service_config, native_feedback_allowed
 from scripts.code_analysis.report_assets import shard
@@ -30,7 +30,7 @@ def load_projects(repository):
 def report_publication(config, state, report_release, document=None):
     """Publish all active targets together, then remove unreferenced assets."""
     repo = config['analysis_repository']
-    previous = json.loads(report_release['body'] or '{}')
+    previous = release_manifest.read(repo, report_release)
     prior = {row['id']: row for row in previous.get('targets', [])}
     assets = {a['name']: a for a in github.pages(f"repos/{repo}/releases/{report_release['id']}/assets")}
     result = {**state, 'schema_version':'analysis-current-v1', 'targets':[]}
@@ -84,7 +84,7 @@ def report_publication(config, state, report_release, document=None):
         result['metrics'] = {'compressed_bytes':size, 'budget_bytes':config['report_budget_bytes'],
                              'queued':sum(r['status']=='queued' for r in result['targets']),
                              'scanning':sum(r['status']=='scanning' for r in result['targets'])}
-        github.save_state(repo, report_release, result)
+        release_manifest.write(repo, report_release, result)
         for name, asset in assets.items():
             if name.startswith('analysis-') and name not in referenced:
                 github.api(f"repos/{repo}/releases/assets/{asset['id']}", method='DELETE')
@@ -107,7 +107,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             raise ValueError('Source repository identity/visibility changed')
         config['source_repository'] = source['full_name']
         release = github.release(repository, config['state_release'], create=True)
-        old = json.loads(release['body'] or '{}')
+        old = release_manifest.read(repository, release)
         rows = github.inventory(config, old)  # Fail closed on incomplete pagination.
         if selection and project['id'] == project_id:
             selected = github.resolve_selection(config, selection, rows)
@@ -140,7 +140,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             row.update(profile_mode='portable' if project['profile'].get('mode') == 'portable' else 'agentic-soc', project_id=project['id'],request_id=uuid.uuid4().hex,status='dispatching',
                        tooling_sha=document['tooling_sha'], execution_sha=execution_sha)
             row.pop('manual_refresh',None)
-            github.save_state(repository,release,state)
+            release_manifest.write(repository,release,state)
             dispatched = github.api(f'repos/{repository}/actions/workflows/code-analysis-source.yml/dispatches',
                 {'ref':repo['default_branch'],'return_run_details':True,'inputs':{
                     'target':json.dumps(row),'tooling_sha':document['tooling_sha'],'request_id':row['request_id']}})
@@ -148,7 +148,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                 row.update(scan_run_id=dispatched['workflow_run_id'],run_attempt=1)
             row['status']='scanning'
             running += 1
-        github.save_state(repository,release,state)
+        release_manifest.write(repository,release,state)
         current = github.release(repository,config['report_release'],create=True)
         summaries.append(report_publication(config,state,current,document)['metrics'])
     return summaries

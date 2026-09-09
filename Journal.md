@@ -100,3 +100,8 @@
 - Implemented project identity/boundary contracts, shared-host configuration repair, current-report sharding, reusable portable/full-profile producer generation, repository-local scheduling/publication, guarded native feedback, API installation previews/confirmed atomic commits, signed webhooks, and repository onboarding/launch/report-loading UI.
 - Verification so far: 71 Python tests, 16 launcher tests, TypeScript checks and workflow policy passed. Product fork CI run 34380231777 is green after the docs repair. Public self-service remains gated pending live integration, App permissions/authentication, and the remaining acceptance work in docs/REPOSITORY_APPLICATION.md.
 
+
+### 2026-09-09 — Reusable producer and report delivery verification
+- Preserved the existing full scanner profile in a separate reusable producer and restricted portable jobs to explicit applicability. Trusted project bootstrap runs Python isolated from source imports.
+- Current manifests now use immutable Release assets behind atomic pointers, avoiding GitHub Release description-size limits. Full UI production build succeeds; wrapper-completion events support reconciliation without relying solely on webhooks.
+
