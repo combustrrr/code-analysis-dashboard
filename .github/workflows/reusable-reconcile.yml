@@ -1,0 +1,43 @@
+name: Reusable repository reconciliation
+on:
+  workflow_call:
+    inputs:
+      tooling_sha:
+        type: string
+        required: true
+      project_id:
+        type: string
+        default: ''
+      selection:
+        type: string
+        default: ''
+      request_id:
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: write
+      checks: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: combustrrr/code-analysis-dashboard
+          ref: ${{ inputs.tooling_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.11'
+      - name: Reconcile exact-source analyses and publish current reports
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROJECT_ID: ${{ inputs.project_id }}
+          SELECTION: ${{ inputs.selection }}
+          REQUEST_ID: ${{ inputs.request_id }}
+        run: python -m scripts.code_analysis.repository_service

@@ -1,3 +1,6 @@
+import { ProjectLauncher } from './ProjectLauncher';
+import { applicationEndpoint, hasRepositorySelection, repositoryJson } from './repositoryReports';
+import { Repositories } from './Repositories';
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Alert, Button, Collapse, ConfigProvider, Descriptions, Drawer, Empty, Grid, Input, Segmented, Progress, Select, Space, Statistic, Table, Tabs, Tag, Typography, theme } from 'antd';
@@ -17,6 +20,7 @@ type Report = { tooling_sha?: string; producer_run_attempt?: number; analyzed_sh
 const states: Record<string, string> = { current: 'Up to date', partial: 'Partial analysis', queued: 'Queued', scanning: 'Scanning', stale: 'Newer revision pending', failed: 'Analysis failed' };
 const ranks: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4, UNKNOWN: 5 };
 async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
+  if (hasRepositorySelection()) return repositoryJson<T>(path, signal);
   const compressed = await fetch(`${path}.gz`, { signal, cache: 'no-store' });
   if (compressed.ok) {
     if (compressed.headers.get('content-encoding') === 'gzip') return compressed.json();
@@ -26,8 +30,8 @@ async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
   // Uncompressed local fixtures remain usable without a separate development server.
   const r = await fetch(path, { signal, cache: 'no-store' }); if (!r.ok) throw new Error(`Report unavailable (${r.status}). Try again after the next publication.`); return r.json();
 }
-function route() { const p = new URLSearchParams(location.hash.slice(1)); return { target: p.get('target') || '', tab: p.get('tab') || 'overview', issue: p.get('issue') || '' }; }
-function navigate(target: string, tab: string, issue = '') { location.hash = new URLSearchParams({ target, tab, ...(issue ? { issue } : {}) }).toString(); }
+function route() { const p = new URLSearchParams(location.hash.slice(1)); return { repository: p.get('repository') || '', project: p.get('project') || '', target: p.get('target') || '', tab: p.get('tab') || 'overview', issue: p.get('issue') || '' }; }
+function navigate(target: string, tab: string, issue = '') { const current = route(); location.hash = new URLSearchParams({ ...(current.repository ? { repository: current.repository, project: current.project } : {}), target, tab, ...(issue ? { issue } : {}) }).toString(); }
 function date(s?: string) { return s ? new Date(s).toLocaleString() : 'Unavailable'; }
 const colors: Record<string, string> = { CRITICAL: 'red', HIGH: 'volcano', MEDIUM: 'gold', LOW: 'blue', INFO: 'default', current: 'green', partial: 'orange', failed: 'red', scanning: 'blue', COMPLETED: 'green', CONFIGURED_COMPLETE: 'green', POLICY_FINDINGS: 'orange', NOT_AVAILABLE: 'orange', FAILED: 'red' };
 function Badge({ value }: { value: string }) { return <Tag className={`status-tag status-${value}`} color={colors[value]}>{states[value] || value.replaceAll('_', ' ')}</Tag>; }
@@ -74,8 +78,8 @@ function App() {
   const [index, setIndex] = useState<Index>(); const [error, setError] = useState(''); const [r, setRoute] = useState(route());
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
   const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
-  useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick]);
-  const launchAuth = useLaunchAuth(index?.launch_endpoint);
+  useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
+  const launchAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint);
   const launched = pendingLaunch && index?.targets.find(t => t.kind === pendingLaunch.kind && (t.kind === 'pr' ? String(t.pr) === pendingLaunch.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === pendingLaunch.ref.toLowerCase() : t.branch === pendingLaunch.ref));
   const newOutput = !!(launched?.report && launched.report !== pendingLaunch?.previousReport && ['current', 'partial'].includes(launched.status));
   const launchStatus = newOutput ? 'New report available for your selected target' : launched?.scan_run_id !== pendingLaunch?.previousRun && launched?.status === 'scanning' ? 'Analysis is running' : launched?.status === 'queued' ? 'Target is queued for analysis' : launched?.status === 'failed' && launched.scan_run_id !== pendingLaunch?.previousRun ? 'Analysis needs attention' : 'Request submitted — awaiting a new published result';
@@ -118,7 +122,8 @@ function App() {
   const completed = report?.channels.filter(c => ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(c.status)).length || 0;
   return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: { colorPrimary: appearance === 'dark' ? '#7bd0ff' : '#1765ad', colorLink: appearance === 'dark' ? '#7bd0ff' : '#1765ad', colorLinkHover: appearance === 'dark' ? '#b3e5ff' : '#124c85', colorBgBase: appearance === 'dark' ? '#071523' : '#f4f7fa', colorBgContainer: appearance === 'dark' ? '#102131' : '#ffffff', colorText: appearance === 'dark' ? '#dce8f5' : '#202d3d', colorTextSecondary: appearance === 'dark' ? '#a6b8c9' : '#52657a', colorBorder: appearance === 'dark' ? '#304459' : '#c9d4df', borderRadius: 6, fontFamily: 'Segoe UI, sans-serif' }, components: { Button: { primaryColor: appearance === 'dark' ? '#071523' : '#ffffff' } } }}>
     <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap><Segmented aria-label="Color theme" value={appearance} options={[{label:'Dark',value:'dark'},{label:'Light',value:'light'}]} onChange={setAppearance}/><Button type="primary" onClick={() => setRunOpen(true)}>Run analysis</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/Agentic-Kibana'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
-    {runOpen && <AnalysisLauncher
+    {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} close={() => setRunOpen(false)}/>} 
+    {runOpen && !(r.repository && r.project) && <AnalysisLauncher
       onSubmitted={request => {
         const previous = index?.targets.find(t => t.kind === request.kind && (t.kind === 'pr' ? String(t.pr) === request.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === request.ref : t.branch === request.ref));
         setPendingLaunch({ ...request, previousReport: previous?.report, previousRun: previous?.scan_run_id });
@@ -155,8 +160,8 @@ function App() {
       </section>
       {(error || index?.discovery_error || index?.publication_error || target?.error) && <Alert showIcon type="error" title="Report service error" description={error || index?.discovery_error || index?.publication_error || target?.error}/>}
       {report && (!fresh || report.status === 'partial') && <Alert showIcon type="warning" title={!fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={!fresh ? 'These findings belong to the older analyzed commit shown above.' : 'Available findings are shown. Unavailable scanners do not mean zero issues.'}/>}
-      <Tabs activeKey={r.tab} onChange={tab => navigate(target?.id || '', tab)} items={['overview', 'issues', 'scanners', 'provenance', 'connections'].map(tab => ({ key: tab, label: tab[0].toUpperCase() + tab.slice(1) + (tab === 'issues' && report ? ` (${report.finding_count.toLocaleString()})` : '') }))}/>
-      {r.tab === 'connections' ? <Connections auth={launchAuth} source={index?.source_repository || index?.targets[0]?.repository} host={index?.analysis_repository} publisher={index?.publishing_repository} endpoint={index?.launch_endpoint} start={() => setRunOpen(true)}/> : !report ? <div className="empty" role="status"><Empty description={loading ? 'Loading the selected report...' : r.target && !target ? 'Target no longer active' : 'No report available yet'}/></div> : <>
+      <Tabs activeKey={r.tab} onChange={tab => navigate(target?.id || '', tab)} items={['overview', 'issues', 'scanners', 'provenance', 'connections', ...(import.meta.env.VITE_APPLICATION_MODE === 'repositories' ? ['repositories'] : [])].map(tab => ({ key: tab, label: tab[0].toUpperCase() + tab.slice(1) + (tab === 'issues' && report ? ` (${report.finding_count.toLocaleString()})` : '') }))}/>
+      {r.tab === 'repositories' ? <Repositories endpoint={applicationEndpoint || index?.launch_endpoint}/> : r.tab === 'connections' ? <Connections auth={launchAuth} source={index?.source_repository || index?.targets[0]?.repository} host={index?.analysis_repository} publisher={index?.publishing_repository} endpoint={index?.launch_endpoint} start={() => setRunOpen(true)}/> : !report ? <div className="empty" role="status"><Empty description={loading ? 'Loading the selected report...' : r.target && !target ? 'Target no longer active' : 'No report available yet'}/></div> : <>
         {r.tab === 'overview' && <>
           <section className="metrics">{['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(s => <div key={s}><Statistic title={<Badge value={s}/>} value={report.severities[s] || 0}/><Button type="link" onClick={() => { setSeverity(s); navigate(target!.id, 'issues'); }}>View findings</Button></div>)}</section>
           <section className="summary"><div><h2>Reported issues</h2><p>{report.finding_count.toLocaleString()} findings from {report.observation_count.toLocaleString()} scanner observations.</p><p>Inspect the rule, exact source location, and evidence behind each finding.</p><Button type="primary" onClick={() => { setSeverity(''); setDirectory(''); setQuery(''); setScanner(''); navigate(target!.id, 'issues'); }}>Browse issues</Button></div>

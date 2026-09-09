@@ -82,3 +82,21 @@
 - Extracted Ruff settings from the removed product config and added a missing-tooling regression guard. Product fork now contains only its three product workflows. Vendor entitlement and optional credential blockers remain explicit.
 
 - Verification: all 58 service tests and workflow policy pass after the Ruff repair; prior standalone build, 10 launcher tests, and 63 product CI-policy tests passed.
+
+### 2026-09-09 — Application flow review start
+- Review repository onboarding, authenticated launching, scanner execution, report publication, and source-repository GitHub feedback to distinguish implemented capabilities from reusable-application gaps.
+
+
+### 2026-09-09 — Application flow review complete
+- Recorded implementation and gaps in docs/APPLICATION_FLOW_REVIEW.md. Single-source authorization, stale three-repository setup constraint, source GitHub feedback, and webhook onboarding prevent claiming an any-repository application today.
+- Live exact-source runs 34377060732 and 34377064511 completed successfully at workflow level; vendor completeness remains separate. Fork CI failure is Help Center & docs and the dependent final gate. This review changed documentation only; no deployment or permission expansion was performed.
+
+
+### 2026-09-09 — Reusable application implementation start
+- Implement the approved self-service application plan with repository-owned execution/storage and protected read-only upstream analysis. Begin with product docs CI and versioned project contracts; preserve live reporting during rollout.
+
+
+### 2026-09-09 — Repository-owned application implementation milestone
+- Implemented project identity/boundary contracts, shared-host configuration repair, current-report sharding, reusable portable/full-profile producer generation, repository-local scheduling/publication, guarded native feedback, API installation previews/confirmed atomic commits, signed webhooks, and repository onboarding/launch/report-loading UI.
+- Verification so far: 71 Python tests, 16 launcher tests, TypeScript checks and workflow policy passed. Product fork CI run 34380231777 is green after the docs repair. Public self-service remains gated pending live integration, App permissions/authentication, and the remaining acceptance work in docs/REPOSITORY_APPLICATION.md.
+

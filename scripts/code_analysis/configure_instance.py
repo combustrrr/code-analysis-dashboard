@@ -11,8 +11,8 @@ from scripts.code_analysis.hosted import REPOSITORY, load
 def configure(template: dict, source: str, analysis: str, publishing: str, branch: str, profile: dict) -> dict:
     if not all(REPOSITORY.fullmatch(value) for value in (source, analysis, publishing)) or not branch.strip():
         raise ValueError('Repository identifiers must be owner/repo; preferred branch is required')
-    if len({source.lower(), analysis.lower(), publishing.lower()}) != 3:
-        raise ValueError('Source, analysis host and publishing repository must be separate')
+    if source.lower() in {analysis.lower(), publishing.lower()}:
+        raise ValueError('Observer source must be separate from its execution and publication host')
     if not isinstance(profile, dict) or not profile:
         raise ValueError('Supply the new repository profile explicitly')
     required = set() if profile.get('mode') == 'portable' else {'python_root', 'python_requirements', 'javascript_root'}

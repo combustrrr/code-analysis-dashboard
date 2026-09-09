@@ -287,7 +287,7 @@ def validate_bundle(destination: Path, report: dict) -> None:
 def collect(config: dict, row: dict, destination: Path) -> dict:
     host, run_id = config['analysis_repository'], row['scan_run_id']
     run = api(f'repos/{host}/actions/runs/{run_id}')
-    if run['path'] != '.github/workflows/11-source-analysis.yml' or run['head_sha'] != row['tooling_sha'] or run['status'] != 'completed':
+    if run['path'] != config.get('source_workflow', '.github/workflows/11-source-analysis.yml') or run['head_sha'] != row.get('execution_sha', row['tooling_sha']) or run['status'] != 'completed':
         raise ValueError('producer workflow identity mismatch')
     artifacts = pages(f'repos/{host}/actions/runs/{run_id}/artifacts', 'artifacts')
     candidates = [a for a in artifacts if a['name'] == f"hosted-report-{run_id}-{row['run_attempt']}" and not a['expired']]
