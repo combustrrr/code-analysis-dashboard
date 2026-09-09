@@ -56,3 +56,8 @@
 ### 2026-09-09 — Verified scanner repair synchronization
 - Snyk diagnostic 34368489309 completed all five dependency manifests and Code after aligning Node/Python resolver staging. Preserve structured evidence paths; sanitized resolver diagnostics are separate. Sonar branch entitlement and upstream posture permissions remain named blockers. Service regression suite: 51 passing tests.
 
+
+### 2026-09-09 — Scanner extension compatibility synchronization
+- Synchronize stricter extension identity/result validation and isolated adapter working directories. The maintenance scheduler and required compatibility check live on the analysis fork; the dashboard remains a report publisher. Add scanner maintenance documentation and Scorecard release pin contract.
+- Analysis-host validation: 57 regressions, five native scanner canaries, workflow policy, documentation checks, and official Renovate validation pass. Updater token remains an explicit setup blocker.
+
