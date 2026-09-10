@@ -5,7 +5,7 @@
     "full_name": "combustrrr/code-analysis-dashboard",
     "private": false
   },
-  "tooling_sha": "baaa7e24070774e634faaf419cfcb77e4ee92f6b",
+  "tooling_sha": "d5ad3461ed741f62db76b97c8044b71421113eac",
   "max_parallel_analyses": 2,
   "projects": [
     {
@@ -196,7 +196,177 @@
       "relationship": "connected",
       "preferred_branch": "main",
       "profile": {
-        "mode": "portable"
+        "mode": "portable",
+        "python_root": "scripts/code_analysis",
+        "javascript_root": "analysis-ui",
+        "commands": {
+          "eslint": {
+            "cwd": "analysis-ui",
+            "install": [
+              [
+                "npm",
+                "ci",
+                "--ignore-scripts"
+              ],
+              [
+                "npm",
+                "install",
+                "--no-save",
+                "--ignore-scripts",
+                "eslint@9.34.0",
+                "typescript-eslint@8.42.0"
+              ]
+            ],
+            "argv": [
+              "npx",
+              "--no-install",
+              "eslint",
+              "src",
+              "--format",
+              "json",
+              "--output-file",
+              "eslint-results.json"
+            ]
+          },
+          "typescript": {
+            "cwd": "analysis-ui",
+            "install": [
+              [
+                "npm",
+                "ci",
+                "--ignore-scripts"
+              ]
+            ],
+            "argv": [
+              "npx",
+              "--no-install",
+              "tsc",
+              "--noEmit",
+              "--pretty",
+              "false"
+            ]
+          },
+          "coverage": {
+            "argv": [
+              "python",
+              "-m",
+              "coverage",
+              "run",
+              "--source=scripts/code_analysis",
+              "-m",
+              "unittest",
+              "scripts.code_analysis.test_portable_profile",
+              "scripts.code_analysis.test_projects"
+            ]
+          },
+          "atheris": {
+            "argv": [
+              "python",
+              "tests/security_canary/fuzz_portable_profile.py",
+              "-runs=25000",
+              "-max_total_time=60"
+            ]
+          },
+          "pyright": {
+            "install": [
+              [
+                "python",
+                "-m",
+                "pip",
+                "install",
+                "pyright==1.1.405"
+              ]
+            ],
+            "argv": [
+              "pyright",
+              "scripts/code_analysis",
+              "--outputjson"
+            ]
+          }
+        }
+      },
+      "enabled_scanners": [
+        "atheris",
+        "bandit",
+        "checkov",
+        "codeql",
+        "coderabbit-ai-advisory",
+        "coverage",
+        "eslint",
+        "github-actions-security",
+        "github-secret-protection-posture",
+        "gitleaks",
+        "hadolint",
+        "openssf-scorecard",
+        "osv",
+        "pyright",
+        "radon",
+        "ruff",
+        "sbom-license-provenance",
+        "schemathesis",
+        "semgrep",
+        "shipping-image-cves",
+        "snyk",
+        "sonarqube-cloud",
+        "trivy",
+        "typescript",
+        "vulture",
+        "xenon"
+      ],
+      "deferred_channels": {},
+      "report_budget_bytes": 900000000
+    },
+    {
+      "id": "965017740",
+      "source_repository": {
+        "id": 965017740,
+        "full_name": "combustrrr/parking-lot-simulator",
+        "private": false
+      },
+      "relationship": "observer",
+      "preferred_branch": "master",
+      "profile": {
+        "mode": "portable",
+        "python_root": "python",
+        "javascript_root": ".",
+        "commands": {
+          "eslint": {
+            "install": [
+              [
+                "npm",
+                "ci",
+                "--ignore-scripts"
+              ]
+            ],
+            "argv": [
+              "npx",
+              "--no-install",
+              "eslint",
+              ".",
+              "--format",
+              "json",
+              "--output-file",
+              "eslint-results.json"
+            ]
+          },
+          "typescript": {
+            "install": [
+              [
+                "npm",
+                "ci",
+                "--ignore-scripts"
+              ]
+            ],
+            "argv": [
+              "npx",
+              "--no-install",
+              "tsc",
+              "-b",
+              "--pretty",
+              "false"
+            ]
+          }
+        }
       },
       "enabled_scanners": [
         "atheris",
