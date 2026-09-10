@@ -1,4 +1,5 @@
 """Atomic manifest pointers backed by immutable compressed Release assets."""
+from datetime import datetime, timezone
 import gzip
 import hashlib
 import json
@@ -38,5 +39,14 @@ def write(repository, release, state):
     pointer={'schema_version':'analysis-manifest-pointer-v1','asset':{'id':asset['id'],'name':name,'bytes':len(data),'sha256':digest}}
     github.save_state(repository,release,pointer)
     for previous in assets:
-        if previous['name'].startswith('manifest-') and previous['name']!=name:
+        if previous['name'].startswith('manifest-') and previous['name']!=name and expired_grace(previous):
             github.api(f"repos/{repository}/releases/assets/{previous['id']}",method='DELETE')
+
+
+def expired_grace(asset, seconds=600):
+    """Keep superseded assets briefly so cached readers can finish their requests."""
+    try:
+        created=datetime.fromisoformat(asset['created_at'].replace('Z','+00:00'))
+        return (datetime.now(timezone.utc)-created).total_seconds()>seconds
+    except (KeyError,ValueError,TypeError):
+        return False

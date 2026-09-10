@@ -59,6 +59,9 @@ def validate(document: dict) -> dict:
             raise ValueError('A scanner cannot be enabled and deferred')
         if any(not isinstance(x, str) or not x.strip() for x in project.get('deferred_channels', {}).values()):
             raise ValueError('Every deferral requires a reason')
+        if project['profile'].get('mode') == 'portable':
+            from scripts.code_analysis.portable_profile import validate as validate_profile
+            validate_profile(project['profile'])
         project['source_repository'] = source
         project.setdefault('report_budget_bytes', 900_000_000)
         if type(project['report_budget_bytes']) is not int or project['report_budget_bytes'] <= 0:

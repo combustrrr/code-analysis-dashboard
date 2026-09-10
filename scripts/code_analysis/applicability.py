@@ -38,8 +38,14 @@ def selection(config: dict, source: Path) -> tuple[list[str], dict, list[str]]:
         return path.exists()
     portable = profile.get('mode') == 'portable'
     if portable:
-        languages = []
-        absent = {job: 'This channel needs a repository-specific scanner adapter, build profile, or vendor configuration; the portable profile does not execute the original repository harness.' for job in GROUPS if job not in PORTABLE_JOBS}
+        from scripts.code_analysis.portable_profile import readiness
+        supported = readiness(profile)
+        languages = (['python'] if profile.get('python_root') and present(profile['python_root']) else []) + (['javascript-typescript'] if profile.get('javascript_root') and present(profile['javascript_root']) else [])
+        absent = {job: 'Requires a reviewed source path, command adapter or vendor configuration.' for job, channels in GROUPS.items() if not all(c in supported for c in channels)}
+        for job in PYTHON_JOBS:
+            if job not in absent and 'python' not in languages:
+                absent[job] = 'Configured Python source path is absent at this revision.'
+        if not languages: absent['codeql'] = 'No configured supported language source at this revision.'
     else:
         python = present(profile['python_root'])
         javascript = present(profile['javascript_root'])

@@ -165,3 +165,7 @@
 - Producer 34440758894 attempt 1 analyzed the requested main commit 8c44cde0d2ae15d37056c9e16b1734708145a90c after the two-slot queue. Publisher 34440932058 succeeded.
 - Deployed browser/API returned matching source SHA and producer without JavaScript errors. All 32 supported SARIF partitions processed completely. No product or upstream writes were needed.
 - Report remains valid partial; portable language/runtime/vendor scanner adapter gaps remain outstanding.
+
+
+### 2026-09-10 - Portable scanners and activity acceptance
+- Added reviewed portable paths/commands, native adapters, exact request activity and cleanup grace. Canary, failed-test coverage, revoked-access and interrupted-publication checks pass; broader validation and live alternate-layout scan follow.
