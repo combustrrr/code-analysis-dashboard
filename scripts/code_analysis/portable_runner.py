@@ -56,12 +56,17 @@ def execute(channel, profile, source, output):
         if native.exists() and (rc in ({0,1,3} if channel=='vulture' else {0,1,2} if channel=='typescript' else {0,1}) or channel=='coverage' and rc>=0):
             if native.suffix=='.json':
                 data=json.loads(native.read_text())
+                if channel=='bandit' and (not isinstance(data,dict) or not isinstance(data.get('results'),list) or data.get('errors')):raise ValueError('Bandit reported scan errors or invalid output')
+                if channel in ('ruff','eslint') and not isinstance(data,list):raise ValueError('Expected a native findings array')
+                if channel=='pyright' and (not isinstance(data,dict) or not isinstance(data.get('generalDiagnostics'),list)):raise ValueError('Expected native Pyright diagnostics')
+                if channel=='coverage' and (not isinstance(data,dict) or not isinstance(data.get('files'),dict)):raise ValueError('Expected native file coverage')
                 def relative(value):
                     if isinstance(value,str):return value.replace(str(source)+'/', '').replace(str(source)+'\\','')
                     if isinstance(value,list):return [relative(x) for x in value]
                     if isinstance(value,dict):return {relative(k):relative(v) for k,v in value.items()}
                     return value
                 native.write_text(json.dumps(relative(data)))
+            if channel=='typescript' and rc!=0 and not re.search(r'error TS\d+:',native.read_text()):raise ValueError('TypeScript failed without native compiler diagnostics')
             status.update(status='COMPLETED',reason='Native report retained.' if rc==0 else 'Native report retained; command reported findings or test failures.')
         if channel=='typescript' and native.exists() and command and command.get('cwd','.')!='.':
             prefix=Path(command['cwd']).as_posix().rstrip('/')+'/'
@@ -72,6 +77,7 @@ def execute(channel, profile, source, output):
             package=inside(str(Path(command.get('cwd','.'))/'node_modules'/channel/'package.json')) if command else None
             status['scanner_version']=json.loads(package.read_text()).get('version','unavailable') if package and package.exists() else 'unavailable'
     except (OSError,ValueError,subprocess.SubprocessError) as error:
+        status['status']='FAILED'
         status['reason']=str(error) if isinstance(error,ValueError) else 'Scanner execution failed or timed out.'
     (output/('execution-status.json')).write_text(json.dumps(status))
     return status

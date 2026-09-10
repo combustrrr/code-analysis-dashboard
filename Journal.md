@@ -167,3 +167,6 @@
 ### 2026-09-10 - Portable rollout deployed
 - PR #5 merged at e35c66bd. Cloudflare activity/profile API deployed as 242df7a7-470c-434b-b568-dd108857ad1e. Service-self and alternate-layout observer requests are durably queued.
 - Focused authenticated wizard browser acceptance passed: exact scanner attempt link, continued polling and published partial result. Added nested TypeScript path regression and all-language CodeQL completion validation.
+
+### 2026-09-10 - Native evidence failure handling
+- Native adapter checks reject malformed output and compiler setup errors, preserve TypeScript diagnostic paths, and distinguish failed tests from usable coverage. Eight focused portable tests pass.

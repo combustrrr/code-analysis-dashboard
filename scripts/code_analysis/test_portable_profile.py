@@ -69,3 +69,15 @@ class NativePathTests(unittest.TestCase):
                 result=execute('typescript',{'mode':'portable','commands':{'typescript':{'cwd':'client','argv':['tsc']}}},root,root/'output')
             self.assertEqual(result['status'],'COMPLETED')
             self.assertIn('client/src/index.ts(2,3)',(root/'output/tsc-results.txt').read_text())
+
+
+class SetupFailureTests(unittest.TestCase):
+    def test_missing_compiler_cannot_be_clean_zero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            def run(argv,**kwargs):
+                kwargs['stdout'].write('npm error: executable unavailable\n')
+                return subprocess.CompletedProcess(argv,1)
+            with patch('scripts.code_analysis.portable_runner.subprocess.run',side_effect=run):
+                result=execute('typescript',{'mode':'portable','commands':{'typescript':{'argv':['npx','tsc']}}},root,root/'output')
+            self.assertEqual(result['status'],'FAILED')
