@@ -7,8 +7,8 @@ def scanner_jobs():
     result={}
     for job,channels in JOBS.items():
         steps=[{'uses':CHECKOUT,'with':{'ref':'${{ inputs.tooling_sha }}','persist-credentials':False}},
-               {'uses':PYTHON,'with':{'python-version':'3.12'}},
-               {'name':'Install pinned scanner dependencies','run':'python -m pip install -r .ci/requirements.txt coverage==7.10.6 pytest==8.4.2 atheris==2.3.0'},
+               {'uses':PYTHON,'with':{'python-version':'3.11'}},
+               {'name':'Install pinned scanner dependencies','run':'python -m pip install -r .ci/requirements.txt' + (' coverage==7.10.6 pytest==8.4.2' if job=='test-coverage' else ' atheris==2.3.0' if job=='atheris-state-machine' else '')},
                {'uses':CHECKOUT,'with':{'repository':'${{ fromJSON(inputs.target).source_repository }}','ref':'${{ fromJSON(inputs.target).head_sha }}','path':'.source','persist-credentials':False}}]
         for channel in channels:
             steps.append({'name':'Run reviewed '+channel+' adapter','run':f'python -I scripts/code_analysis/trusted_entry.py portable_runner {channel} --source .source --output .portable-output/{channel}'})

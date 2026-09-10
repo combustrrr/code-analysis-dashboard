@@ -43,8 +43,16 @@ def main():
                                         'source_repository': row['source_repository'], 'source_sha': row['head_sha']})
     from scripts.code_analysis.applicability import selection
     selected_jobs, excluded, _ = selection(json.loads(Path('config/code-analysis/service.json').read_text()), Path('.source'))
+    execution_jobs = pages(f'repos/{host}/actions/runs/{run}/attempts/{attempt}/jobs', 'jobs')
+    from scripts.code_analysis.portable_workflow import JOBS
+    from scripts.code_analysis.portable_runner import FAMILIES
+    for group, channels in JOBS.items():
+        matching = [j for j in execution_jobs if j.get('name','').endswith('Portable ' + group)]
+        if group in selected_jobs and matching and any(j.get('conclusion') != 'success' for j in matching):
+            for channel in channels:
+                write(root / 'zz-workflow-execution' / channel / 'execution-status.json', {'scanner_family':FAMILIES[channel], 'status':'FAILED', 'reason':'Portable scanner job failed before usable completion; inspect its exact producer run.'})
     if 'codeql' in selected_jobs:
-        codeql_jobs = [j for j in pages(f'repos/{host}/actions/runs/{run}/attempts/{attempt}/jobs', 'jobs') if 'CodeQL (' in j.get('name','')]
+        codeql_jobs = [j for j in execution_jobs if 'CodeQL (' in j.get('name','')]
         complete = bool(codeql_jobs) and all(j.get('conclusion') == 'success' for j in codeql_jobs)
         write(root / 'codeql-execution/execution-status.json', {'scanner_family':'CodeQL', 'status':'COMPLETED' if complete else 'FAILED', 'reason':'Every selected language job completed.' if complete else 'One or more selected CodeQL language jobs failed or lack completion evidence.'})
     if 'coderabbit-ai-advisory' in excluded:

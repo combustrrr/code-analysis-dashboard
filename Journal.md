@@ -170,3 +170,7 @@
 
 ### 2026-09-10 - Native evidence failure handling
 - Native adapter checks reject malformed output and compiler setup errors, preserve TypeScript diagnostic paths, and distinguish failed tests from usable coverage. Eight focused portable tests pass.
+
+### 2026-09-10 - Live portable setup failure repaired
+- First live runs exposed shared Atheris installation on Python 3.12 before source checkout. PyPI metadata confirms the pinned Atheris wheel supports Python 3.11. Separate fuzz/coverage dependencies and use 3.11 so unrelated static scanners do not depend on fuzz setup.
+- Added producer-job failure evidence to distinguish setup execution failures from missing configuration. Revalidation follows the repaired immutable tooling pin.
