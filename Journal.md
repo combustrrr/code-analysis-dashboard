@@ -141,3 +141,9 @@
 - Installed managed project wiring in the service repository and made fork/upstream observer-only. Added repository-ID guards to prevent future product installation and webhook dispatch. Restored the fork's three-workflow product-only allowlist locally.
 - Migration verified the fork-source collection (18 targets, 13 assets, 38,352,264 compressed bytes); remaining copies continue with source assets retained. Added migration provenance and independent native-channel tests. Validation: 79 Python tests, 19 launcher tests and workflow audit passed.
 
+
+
+### 2026-09-10 ? External service extraction verified
+- PR #2 merged at aa58a41e; Pages deployment succeeded. Fork removal 2410a3dd passed product CI. All execution wiring, vendor credentials and generated current/state Releases have been removed from the product fork; historical Actions/checks remain historical records.
+- Verified migration of 26 targets (60,060,125 compressed bytes) into service Releases, preserving source/producer identity. Service-host scheduler and self-analysis succeeded. All 32 native Gitleaks/Trivy SARIF partitions completed processing on the service's own commit; neither product repository receives native uploads.
+- Removed the legacy hourly discovery trigger while retaining the manual compatibility path. Authenticated multi-project delivery cutover and retirement of legacy Pages data refresh remain pending App credential approval and end-to-end browser verification. Scanner entitlement/setup exceptions remain explicit.

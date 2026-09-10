@@ -30,3 +30,27 @@ request. The service repository owns execution and Release storage for every
 configured project in this instance. Product fork and upstream are read-only
 observer sources; the service itself is the connected project used for native
 GitHub security verification. This supersedes the fork-runner rollout notes.
+
+
+### Verified extraction and native security, 2026-09-10
+
+PR #2 merged at aa58a41e2077f66b943c832d3d61ef2c0001a010 and Pages deployment
+34437071390 succeeded. The fork removal commit is 2410a3dd; its product CI
+34436866944 passed. Only ci.yml, docs.yml and release.yml remain in the fork.
+Scanner-only vendor secrets and six service-owned current/state Releases were
+removed from the fork after destination verification. Historical Actions runs and
+checks retain their original GitHub attribution.
+
+Migrated 26 targets in three collections, totaling 60,060,125 compressed bytes.
+Original producer evidence remains unchanged. New service-host reconciliation
+34437108601 and self-analysis 34437129625 succeeded. Publication 34437268755
+confirmed all 32 native security partitions complete for service commit aa58a41e.
+Only available Gitleaks/Trivy channels were uploaded; missing Bandit/OSV setup in
+the portable profile remains explicit and does not clear their alerts.
+
+The new repository-local scheduler owns hourly scanning. The legacy discovery
+workflow remains manually callable for the existing login path but no longer has
+an hourly trigger. Legacy Pages data refresh remains until authenticated public
+report delivery cutover is verified. New GitHub App credential provisioning and
+browser login-to-new-pipeline verification remain pending specific approval;
+this extraction does not claim that cutover has been completed.

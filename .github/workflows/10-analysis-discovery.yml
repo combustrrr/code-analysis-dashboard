@@ -9,8 +9,6 @@ on:
   workflow_run:
     workflows: ['Exact Source Analysis']
     types: [completed]
-  schedule:
-    - cron: '23 * * * *'
 permissions:
   contents: read
 concurrency:
