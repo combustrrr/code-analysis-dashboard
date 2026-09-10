@@ -174,3 +174,8 @@
 ### 2026-09-10 - Live portable setup failure repaired
 - First live runs exposed shared Atheris installation on Python 3.12 before source checkout. PyPI metadata confirms the pinned Atheris wheel supports Python 3.11. Separate fuzz/coverage dependencies and use 3.11 so unrelated static scanners do not depend on fuzz setup.
 - Added producer-job failure evidence to distinguish setup execution failures from missing configuration. Revalidation follows the repaired immutable tooling pin.
+
+### 2026-09-10 - Portable artifact retention repaired
+- Approved PR #6 rollout completed at a5e708e6; Cloudflare deployed cd792fd1-b4b9-489f-a496-2aae9bd8e577. Superseded runs were cancelled only after replacement requests were persisted.
+- Live retries completed portable execution, but upload-artifact excluded the hidden output directory. Move native evidence into portable-output/ and add a generated-workflow retention regression before retrying both layouts.
+- Full local acceptance now passes 154 service tests and 22 launcher tests, including protected-branch refusal without force or strategy changes.

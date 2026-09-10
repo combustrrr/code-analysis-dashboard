@@ -81,3 +81,13 @@ class SetupFailureTests(unittest.TestCase):
             with patch('scripts.code_analysis.portable_runner.subprocess.run',side_effect=run):
                 result=execute('typescript',{'mode':'portable','commands':{'typescript':{'argv':['npx','tsc']}}},root,root/'output')
             self.assertEqual(result['status'],'FAILED')
+
+
+class ArtifactRetentionTests(unittest.TestCase):
+    def test_portable_evidence_is_not_hidden_from_artifact_upload(self):
+        from scripts.code_analysis.portable_workflow import scanner_jobs
+        for job in scanner_jobs().values():
+            upload=job['steps'][-1]['with']
+            self.assertFalse(upload['path'].startswith('.'))
+            self.assertEqual(upload['retention-days'],7)
+            self.assertTrue(any('--output '+upload['path'] in step.get('run','') for step in job['steps']))
