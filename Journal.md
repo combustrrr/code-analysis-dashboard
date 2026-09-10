@@ -163,3 +163,14 @@
 - Verified authenticated producer 34440758894 attempt 1 and publisher 34440932058 for source 8c44cde0; 32 supported SARIF uploads complete.
 - Added reviewed portable scanner profiles, exact client-request/producer/publication tracking and cache-safe cleanup grace.
 - Validation: 152 service tests, 10 application tests, launcher regression checks, workflow audit, TypeScript/build and 14 retained-dataset browser tests passed. Alternate-layout live validation follows.
+
+### 2026-09-10 - Portable rollout deployed
+- PR #5 merged at e35c66bd. Cloudflare activity/profile API deployed as 242df7a7-470c-434b-b568-dd108857ad1e. Service-self and alternate-layout observer requests are durably queued.
+- Focused authenticated wizard browser acceptance passed: exact scanner attempt link, continued polling and published partial result. Added nested TypeScript path regression and all-language CodeQL completion validation.
+
+### 2026-09-10 - Native evidence failure handling
+- Native adapter checks reject malformed output and compiler setup errors, preserve TypeScript diagnostic paths, and distinguish failed tests from usable coverage. Eight focused portable tests pass.
+
+### 2026-09-10 - Live portable setup failure repaired
+- First live runs exposed shared Atheris installation on Python 3.12 before source checkout. PyPI metadata confirms the pinned Atheris wheel supports Python 3.11. Separate fuzz/coverage dependencies and use 3.11 so unrelated static scanners do not depend on fuzz setup.
+- Added producer-job failure evidence to distinguish setup execution failures from missing configuration. Revalidation follows the repaired immutable tooling pin.

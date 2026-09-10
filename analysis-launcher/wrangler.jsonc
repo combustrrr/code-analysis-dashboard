@@ -13,7 +13,7 @@
     "NEXT_GITHUB_APP_ID": "4893614",
     "NEXT_GITHUB_APP_SLUG": "code-analysis-dashboard",
     "APPLICATION_MODE": "repositories",
-    "TOOLING_SHA": "d5ad3461ed741f62db76b97c8044b71421113eac"
+    "TOOLING_SHA": "a4278927782ffae3fd019f2dd8939022bc3dca2b"
   },
   "secrets": {
     "required": [
