@@ -44,7 +44,9 @@ def main():
     from scripts.code_analysis.applicability import selection
     selected_jobs, excluded, _ = selection(json.loads(Path('config/code-analysis/service.json').read_text()), Path('.source'))
     execution_jobs = pages(f'repos/{host}/actions/runs/{run}/attempts/{attempt}/jobs', 'jobs')
-    from scripts.code_analysis.portable_workflow import JOBS
+    from scripts.code_analysis.applicability import GROUPS
+    from scripts.code_analysis.portable_profile import ADAPTER_JOBS
+    JOBS = {key:value for key,value in GROUPS.items() if key in ADAPTER_JOBS}
     from scripts.code_analysis.portable_runner import FAMILIES
     for group, channels in JOBS.items():
         matching = [j for j in execution_jobs if j.get('name','').endswith('Portable ' + group)]
