@@ -22,3 +22,11 @@ product checkout was extracted into scanner-owned configuration; workflow policy
 now rejects missing trusted tooling paths.
 
 The old fork is not retained as a thin runner. Upstream source remains read-only.
+
+## 2026-09-10: external service, no product runner
+
+The temporary repository-owned fork integration is being removed at the owner's
+request. The service repository owns execution and Release storage for every
+configured project in this instance. Product fork and upstream are read-only
+observer sources; the service itself is the connected project used for native
+GitHub security verification. This supersedes the fork-runner rollout notes.

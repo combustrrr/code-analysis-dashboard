@@ -132,3 +132,12 @@
 - Public delivery exercised the real upstream manifest and a 1,015,239-byte shard successfully with verified SHA-256. Second-layout portable source run 34390606188 produced a valid partial report with 65 findings; supported portable channels completed and unconfigured language/vendor channels remain explicitly unavailable.
 - Repaired in-flight configuration loading to bind to the exact trusted default-branch workflow commit, with mismatched revision and PR-ref regression coverage. Draft PR #2 is open; Scanner compatibility passed on the prior pushed implementation revision.
 - Migration, schedule retirement and merge remain pending live native partition validation and authenticated delivery cutover. Existing reports remain readable. No upstream writes or paid infrastructure were introduced.
+
+### 2026-09-10 — Restore external-service execution boundary
+- Owner clarified that Agentic-Kibana must have no analysis execution, storage or reporting integration. Move the repository-owned projects and current reports to this service; treat both product fork and upstream as read-only observers. Preserve original report producers throughout migration and verify native SARIF only on this service's own source.
+
+
+### 2026-09-10 — External execution migration implementation
+- Installed managed project wiring in the service repository and made fork/upstream observer-only. Added repository-ID guards to prevent future product installation and webhook dispatch. Restored the fork's three-workflow product-only allowlist locally.
+- Migration verified the fork-source collection (18 targets, 13 assets, 38,352,264 compressed bytes); remaining copies continue with source assets retained. Added migration provenance and independent native-channel tests. Validation: 79 Python tests, 19 launcher tests and workflow audit passed.
+

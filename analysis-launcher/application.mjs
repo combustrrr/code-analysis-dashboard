@@ -1,5 +1,6 @@
 // Repository application API. No source code is executed by the Worker.
 const PROTECTED = 'arydestroyer/kavach-agenticsoc';
+const readOnly = repo => [1267340546,1278177697].includes(repo.id) || [PROTECTED,'combustrrr/agentic-kibana'].includes(repo.full_name?.toLowerCase());
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 const SHA = /^[a-f0-9]{40}$/;
 const CONFIG = '.github/code-analysis/projects.json';
@@ -111,7 +112,7 @@ export async function applicationApi(request, env, session, helpers) {
     return repo;
   }
   async function installation(repo, admin = false) {
-    if (repo.full_name.toLowerCase() === PROTECTED) throw new Failure(403, 'This upstream repository is protected and read-only.');
+    if (readOnly(repo)) throw new Failure(403, 'This upstream repository is protected and read-only.');
     if (!(admin ? repo.permissions?.admin : repo.permissions?.push)) throw new Failure(403, admin ? 'Repository administration access required.' : 'Repository write access required.');
     // User-token installation enumeration also proves this App is installed here.
     for (let page = 1; page <= 20; page++) {
@@ -153,7 +154,7 @@ export async function applicationApi(request, env, session, helpers) {
     const page = Number(url.searchParams.get('page') || 1);
     if (!Number.isInteger(page) || page < 1 || page > 100) throw new Failure(400, 'Invalid page.');
     const rows = await github(`user/repos?affiliation=owner,collaborator,organization_member&per_page=100&page=${page}`, token);
-    return json({repositories: rows.filter(r => !r.private && r.permissions?.push && r.full_name.toLowerCase() !== PROTECTED).map(r => ({...identity(r), default_branch:r.default_branch, can_configure:!!r.permissions?.admin})), page, has_more:rows.length===100});
+    return json({repositories: rows.filter(r => !r.private && r.permissions?.push && !readOnly(r)).map(r => ({...identity(r), default_branch:r.default_branch, can_configure:!!r.permissions?.admin})), page, has_more:rows.length===100});
   }
   if (request.method === 'POST' && url.pathname === '/api/connections/preview') {
     const input = await body();

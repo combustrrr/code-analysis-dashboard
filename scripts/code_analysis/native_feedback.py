@@ -64,7 +64,7 @@ def processing(repository, feedback):
             if response.get('errors'):
                 upload['errors'] = response['errors']
     result['status'] = ('failed' if any(u.get('status') == 'failed' for u in uploads)
-                        else 'security_published' if len(uploads) == 16 and all(u.get('status') == 'complete' for u in uploads)
+                        else 'security_published' if len(uploads) == result.get('expected_uploads',16) and all(u.get('status') == 'complete' for u in uploads)
                         else 'security_processing')
     return result
 
@@ -93,12 +93,18 @@ def publish(document, project_id, row, report, findings, *, dashboard_url):
         return {'status':'checks_published','check_id':check_id}
     from scripts.code_analysis.snapshot import COMPLETE_STATUSES
     security = [c for c in report['channels'] if c['channel'] in {'bandit','gitleaks','osv','trivy'}]
-    if len(security) != 4 or any(c['status'] not in COMPLETE_STATUSES for c in security):
-        return {'status':'partial', 'check_id':check_id, 'reason':'Incomplete security channels; retain previous native security alerts'} 
+    completed = [c['channel'] for c in security if c['status'] in COMPLETE_STATUSES]
+    missing = sorted({'bandit','gitleaks','osv','trivy'} - set(completed))
+    if not completed:
+        return {'status':'partial', 'check_id':check_id, 'reason':'Incomplete security channels; retain previous native security alerts'}
+    payloads = []
     try:
-        payloads = security_shards(findings, project_id)
+        for channel in sorted(completed):
+            aliases = {'osv','osv-scanner'} if channel == 'osv' else {channel}
+            selected = [f for f in findings if aliases.intersection(str(x).lower() for x in f.get('scanners', []))]
+            payloads.extend(security_shards(selected, project_id + '/' + channel))
     except ValueError as error:
-        return {'status':'partial','adapter_version':2,'check_id':check_id,'reason':str(error)}
+        return {'status':'partial','adapter_version':3,'check_id':check_id,'reason':str(error)}
     uploads = []
     for index, payload in enumerate(payloads):
         try:
@@ -106,5 +112,5 @@ def publish(document, project_id, row, report, findings, *, dashboard_url):
                 'commit_sha':report['analyzed_sha'],'ref':ref,'sarif':payload})
             uploads.append({'bucket':index,'id':upload['id'],'status':'pending'})
         except (RuntimeError, ValueError) as error:
-            return {'status':'failed','adapter_version':2,'check_id':check_id,'uploads':uploads,'reason':str(error)}
-    return {'status':'security_processing','adapter_version':2,'check_id':check_id,'uploads':uploads}
+            return {'status':'failed','adapter_version':3,'check_id':check_id,'expected_uploads':len(payloads),'unavailable_channels':missing,'uploads':uploads,'reason':str(error)}
+    return {'status':'security_processing','adapter_version':3,'check_id':check_id,'expected_uploads':len(payloads),'unavailable_channels':missing,'uploads':uploads}

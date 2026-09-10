@@ -7,6 +7,8 @@ from typing import Any
 
 SCHEMA = 'analysis-projects-v1'
 PROTECTED_SOURCE = 'arydestroyer/kavach-agenticsoc'
+READ_ONLY_IDS = {1267340546, 1278177697}
+READ_ONLY_NAMES = {PROTECTED_SOURCE, 'combustrrr/agentic-kibana'}
 NAME = re.compile(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')
 SHA = re.compile(r'^[a-f0-9]{40}$')
 
@@ -23,7 +25,7 @@ def validate(document: dict) -> dict:
     if result.get('schema_version') != SCHEMA:
         raise ValueError('Unsupported project configuration version')
     execution = repository(result.get('execution_repository'))
-    if execution['full_name'].lower() == PROTECTED_SOURCE:
+    if execution['full_name'].lower() in READ_ONLY_NAMES or execution['id'] in READ_ONLY_IDS:
         raise ValueError('Protected upstream cannot be an execution or publication repository')
     if not SHA.fullmatch(result.get('tooling_sha', '')):
         raise ValueError('Shared tooling must use an immutable revision')

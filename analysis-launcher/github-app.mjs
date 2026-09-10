@@ -26,7 +26,7 @@ export async function webhook(request,env) {
   let event;try{event=JSON.parse(new TextDecoder().decode(buffer));}catch{return Response.json({error:'Invalid webhook payload.'},{status:400});}
   const kind=request.headers.get('X-GitHub-Event');
   const repository=event.repository;
-  if(!repository || repository.private || repository.full_name?.toLowerCase()==='arydestroyer/kavach-agenticsoc') return Response.json({status:'ignored'});
+  if(!repository || repository.private || [1267340546,1278177697].includes(repository.id) || ['arydestroyer/kavach-agenticsoc','combustrrr/agentic-kibana'].includes(repository.full_name?.toLowerCase())) return Response.json({status:'ignored'});
   const supported=kind==='push'||(kind==='pull_request'&&['opened','reopened','synchronize','closed','edited'].includes(event.action))||(kind==='workflow_run'&&event.action==='completed'&&event.workflow_run?.path?.split('@')[0]==='.github/workflows/code-analysis-source.yml');
   if(!supported) return Response.json({status:'ignored'});
   try {

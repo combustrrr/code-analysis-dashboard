@@ -1,0 +1,36 @@
+name: Code analysis reconciliation
+on:
+  workflow_dispatch:
+    inputs:
+      project_id:
+        type: string
+        required: false
+      selection:
+        type: string
+        required: false
+      request_id:
+        type: string
+        required: false
+  workflow_run:
+    workflows: ['Code analysis source']
+    types: [completed]
+  schedule:
+    - cron: '23 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: code-analysis-reconciliation
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    permissions:
+      contents: write
+      actions: write
+      checks: write
+      security-events: write
+    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-reconcile.yml@250e16a5079177b91cdc6be74f6f74e0c12b8978
+    with:
+      tooling_sha: 250e16a5079177b91cdc6be74f6f74e0c12b8978
+      project_id: ${{ inputs.project_id || '' }}
+      selection: ${{ inputs.selection || '' }}
+      request_id: ${{ inputs.request_id || '' }}

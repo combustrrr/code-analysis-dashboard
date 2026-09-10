@@ -1,0 +1,42 @@
+name: Code analysis source
+run-name: Source analysis ${{ inputs.request_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        type: string
+        required: true
+      tooling_sha:
+        type: string
+        required: true
+      request_id:
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  analyze:
+    if: ${{ fromJSON(inputs.target).profile_mode == 'portable' }}
+    permissions:
+      contents: read
+      actions: read
+    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source.yml@250e16a5079177b91cdc6be74f6f74e0c12b8978
+    with:
+      tooling_sha: 250e16a5079177b91cdc6be74f6f74e0c12b8978
+      target: ${{ inputs.target }}
+      request_id: ${{ inputs.request_id }}
+  configured-profile:
+    if: ${{ fromJSON(inputs.target).profile_mode == 'agentic-soc' }}
+    permissions:
+      contents: read
+      actions: read
+    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source-full.yml@250e16a5079177b91cdc6be74f6f74e0c12b8978
+    with:
+      tooling_sha: 250e16a5079177b91cdc6be74f6f74e0c12b8978
+      target: ${{ inputs.target }}
+      request_id: ${{ inputs.request_id }}
+    secrets:
+      SECURITY_POSTURE_TOKEN: ${{ secrets.SECURITY_POSTURE_TOKEN }}
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

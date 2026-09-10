@@ -82,3 +82,23 @@ A third project uses the standalone application source with the portable profile
 on the fork runner to verify another repository layout. Its live evidence remains
 pending. Legacy reports/schedules remain active until delivery cutover passes;
 new public App credential setup remains separately blocked on approval.
+
+## External-service boundary (2026-09-10, authoritative)
+
+The owner superseded the temporary fork-runner installation. All scanner execution,
+scheduling, repository profiles and current report storage belong in
+combustrrr/code-analysis-dashboard. Both combustrrr/Agentic-Kibana and
+ARYDESTROYER/Kavach-AgenticSOC are read-only observer sources. Neither receives
+analysis workflows, configuration, checks, SARIF uploads or vendor-token operations.
+Agentic-Kibana retains only its independent product CI, docs and release workflows.
+
+Public repository onboarding remains reusable for other authorized execution hosts,
+but this instance explicitly rejects installation on the two protected product
+repository IDs, including after a rename. Native GitHub security verification uses
+the service repository's own connected source project.
+
+Migration copies immutable report shards before replacing destination manifests.
+Original source SHAs, observation data and producer workflow links remain unchanged.
+Scheduling state is rediscovered on the new host; old run IDs are never interpreted
+as executions from the new repository. Source assets are retained until verified
+copies exist. Historical GitHub checks retain their original attribution.

@@ -113,3 +113,40 @@ class ConfigurationSnapshotTests(unittest.TestCase):
         with patch.dict('os.environ',{'GITHUB_SHA':revision,'GITHUB_REF':'refs/pull/1/head'}):
             with self.assertRaises(ValueError):
                 trusted_configuration_revision({'default_branch':'main'},{'execution_sha':revision})
+
+
+class ExternalServiceBoundaryTests(unittest.TestCase):
+    def test_product_execution_is_rejected_even_after_rename(self):
+        from scripts.code_analysis.projects import validate
+        document=config()
+        document['execution_repository']['id']=1278177697
+        with self.assertRaises(ValueError):validate(document)
+
+    def test_migration_preserves_producer_identity_and_disables_product_native_writes(self):
+        from scripts.code_analysis.migrate_execution import migrated_manifest
+        source={'schema_version':'analysis-current-v1','analysis_repository':'owner/old','source_repository':'owner/product','targets':[{'id':'one','scan_run_id':123,'run_attempt':2,'analyzed_sha':'a'*40,'assets':{'immutable':{'sha256':'hash'}},'native_feedback':{'check_id':9}}]}
+        result=migrated_manifest(source,'owner/old','owner/service')
+        row=result['targets'][0]
+        self.assertEqual(row['producer_repository'],'owner/old')
+        self.assertEqual(row['migration_producer'],{'repository':'owner/old','run_id':123,'attempt':2})
+        self.assertEqual(row['assets'],source['targets'][0]['assets'])
+        self.assertEqual(row['analyzed_sha'],'a'*40)
+        self.assertEqual(row['native_feedback']['status'],'not_applicable')
+        self.assertEqual(source['targets'][0]['native_feedback'],{'check_id':9})
+
+
+class IndependentSecurityChannelsTests(unittest.TestCase):
+    def test_available_security_channels_publish_without_clearing_missing_channels(self):
+        from scripts.code_analysis.native_feedback import publish
+        import gzip,base64,json
+        doc=config();project=doc['projects'][0]
+        project.update(id='1',relationship='connected',source_repository=doc['execution_repository'])
+        report={'analyzed_sha':'b'*40,'target':{'repository':'owner/runner','source_repository':'owner/runner','head_sha':'b'*40},'status':'partial','finding_count':0,'channels':[{'channel':'trivy','name':'Trivy','status':'COMPLETED'}]}
+        row={'id':'target','scan_run_id':2,'run_attempt':1,'kind':'branch','branch':'main'}
+        with patch('scripts.code_analysis.native_feedback.github.api',return_value={'id':3}) as api,patch('scripts.code_analysis.native_feedback.github.pages',return_value=[]):
+            result=publish(doc,'1',row,report,[],dashboard_url='https://example.test')
+        self.assertEqual(result['expected_uploads'],16)
+        self.assertIn('bandit',result['unavailable_channels'])
+        payloads=[c.kwargs['payload']['sarif'] for c in api.call_args_list if 'sarif' in c.kwargs.get('payload',{})]
+        categories=[json.loads(gzip.decompress(base64.b64decode(p)))['runs'][0]['automationDetails']['id'] for p in payloads]
+        self.assertTrue(all('/trivy/' in c for c in categories))
