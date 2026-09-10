@@ -12,7 +12,7 @@ import { Connections, RequestStatus } from './Integration';
 import { AnalysisLauncher, type LaunchRequest } from './AnalysisLauncher';
 
 type Target = { scan_run_id?: number; run_attempt?: number; tooling_sha?: string; id: string; label: string; repository: string; source_repository: string; head_sha: string; kind: string; branch: string; pr?: number; base_branch?: string; base_sha?: string; checked_at: string; status: string; report?: string; error?: string };
-type Index = { publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
+type Index = { report_storage?: {compressed_bytes:number;budget_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
 type Finding = { id: string; severity: string; message: string; file: string; line: number; scanners: string[]; rules: string[]; page: number };
 type Detail = Finding & { origins: { scanner_family: string; rule: string; file: string; start_line: number; raw_artifact: string; observation_id: string }[]; source: string | null; source_start: number; source_url: string | null };
 type Channel = { channel: string; name: string; class: string; status: string; findings: number | null; observation_count: number; reason: string; workflow: string };
@@ -64,6 +64,11 @@ function Evidence({ detail, source, error, findings, openFinding }: { detail?: D
         </> : <Empty description={error || 'Issue evidence unavailable or loading...'}/>}</div>;
 }
 
+function ProjectPicker({repository,project}:{repository:string;project:string}) {
+ const [projects,setProjects]=useState<{id:string;source_repository:string}[]>([]);
+ useEffect(()=>{if(!applicationEndpoint||!repository)return;const controller=new AbortController();fetch(`${applicationEndpoint}/api/public/projects?repository=${encodeURIComponent(repository)}`,{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Project discovery unavailable');return r.json();}).then(r=>setProjects(r.projects)).catch(()=>setProjects([]));return()=>controller.abort();},[repository]);
+ return <Select aria-label="Source project" style={{minWidth:260}} value={project||undefined} options={projects.map(p=>({value:p.id,label:p.source_repository}))} onChange={value=>{location.hash=new URLSearchParams({repository,project:value,tab:'overview'}).toString();}}/>;
+}
 function App() {
   const screens = Grid.useBreakpoint();
   const [appearance, setAppearance] = useState(() => { try { return localStorage.getItem('analysis-theme') || 'dark'; } catch { return 'dark'; } });
@@ -78,7 +83,7 @@ function App() {
   const [index, setIndex] = useState<Index>(); const [error, setError] = useState(''); const [r, setRoute] = useState(route());
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
   const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
-  useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
+  useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
   const launchAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint);
   const launched = pendingLaunch && index?.targets.find(t => t.kind === pendingLaunch.kind && (t.kind === 'pr' ? String(t.pr) === pendingLaunch.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === pendingLaunch.ref.toLowerCase() : t.branch === pendingLaunch.ref));
   const newOutput = !!(launched?.report && launched.report !== pendingLaunch?.previousReport && ['current', 'partial'].includes(launched.status));
@@ -121,7 +126,7 @@ function App() {
   const fresh = !!report && report.analyzed_sha === target?.head_sha;
   const completed = report?.channels.filter(c => ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(c.status)).length || 0;
   return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: { colorPrimary: appearance === 'dark' ? '#7bd0ff' : '#1765ad', colorLink: appearance === 'dark' ? '#7bd0ff' : '#1765ad', colorLinkHover: appearance === 'dark' ? '#b3e5ff' : '#124c85', colorBgBase: appearance === 'dark' ? '#071523' : '#f4f7fa', colorBgContainer: appearance === 'dark' ? '#102131' : '#ffffff', colorText: appearance === 'dark' ? '#dce8f5' : '#202d3d', colorTextSecondary: appearance === 'dark' ? '#a6b8c9' : '#52657a', colorBorder: appearance === 'dark' ? '#304459' : '#c9d4df', borderRadius: 6, fontFamily: 'Segoe UI, sans-serif' }, components: { Button: { primaryColor: appearance === 'dark' ? '#071523' : '#ffffff' } } }}>
-    <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap><Segmented aria-label="Color theme" value={appearance} options={[{label:'Dark',value:'dark'},{label:'Light',value:'light'}]} onChange={setAppearance}/><Button type="primary" onClick={() => setRunOpen(true)}>Run analysis</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/Agentic-Kibana'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
+    <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{r.repository&&<ProjectPicker repository={r.repository} project={r.project}/>}<Segmented aria-label="Color theme" value={appearance} options={[{label:'Dark',value:'dark'},{label:'Light',value:'light'}]} onChange={setAppearance}/><Button type="primary" onClick={() => setRunOpen(true)}>Run analysis</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/code-analysis-dashboard'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
     {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} close={() => setRunOpen(false)}/>} 
     {runOpen && !(r.repository && r.project) && <AnalysisLauncher
       onSubmitted={request => {
@@ -213,8 +218,20 @@ function App() {
       <Drawer title="Issue detail" open={!!r.issue && r.tab === 'issues' && !screens.lg} onClose={() => navigate(target?.id || '', 'issues')} size="min(850px, 100vw)" destroyOnHidden>
         <Evidence detail={detail} source={source} error={error} findings={findings} openFinding={id => navigate(target?.id || '', 'issues', id)}/>
       </Drawer>
-      <footer>{index?.metrics && <Collapse ghost items={[{ key: 'storage', label: `Current reports and UI: ${(index.metrics.site_bytes / 1000000).toFixed(1)} MB (${(100 * index.metrics.site_bytes / index.metrics.site_limit_bytes).toFixed(1)}% of capacity)`, children: <><p>This is the size of the currently published website, not a growing history of every scan. It contains the latest report for each active branch and PR, plus one manual selection.</p><p>Each successful deployment removes unreferenced report assets. Temporary scanner artifacts expire according to the configured retention period. Re-running analysis does not require flushing reports or browser storage.</p><p>The {(index.metrics.site_limit_bytes / 1000000).toFixed(0)} MB safety limit preserves the last working site if a new collection is too large. Active reports are never silently deleted to make room.</p>{index.publishing_repository && <a href={`https://github.com/${index.publishing_repository}/actions`} target="_blank" rel="noreferrer">View publication and cleanup runs</a>}</> }]}/>}Findings are scanner observations, not confirmed defects.</footer>
+      <footer>{index?.report_storage&&<p>Current project reports: {(index.report_storage.compressed_bytes/1000000).toFixed(1)} MB / {(index.report_storage.budget_bytes/1000000).toFixed(0)} MB budget. Stored in GitHub Releases; superseded assets are removed after publication.</p>}{index?.metrics && <Collapse ghost items={[{ key: 'storage', label: `Current reports and UI: ${(index.metrics.site_bytes / 1000000).toFixed(1)} MB (${(100 * index.metrics.site_bytes / index.metrics.site_limit_bytes).toFixed(1)}% of capacity)`, children: <><p>This is the size of the currently published website, not a growing history of every scan. It contains the latest report for each active branch and PR, plus one manual selection.</p><p>Each successful deployment removes unreferenced report assets. Temporary scanner artifacts expire according to the configured retention period. Re-running analysis does not require flushing reports or browser storage.</p><p>The {(index.metrics.site_limit_bytes / 1000000).toFixed(0)} MB safety limit preserves the last working site if a new collection is too large. Active reports are never silently deleted to make room.</p>{index.publishing_repository && <a href={`https://github.com/${index.publishing_repository}/actions`} target="_blank" rel="noreferrer">View publication and cleanup runs</a>}</> }]}/>}Findings are scanner observations, not confirmed defects.</footer>
     </main>
   </ConfigProvider>;
+}
+if(import.meta.env.VITE_APPLICATION_MODE==='repositories') {
+ const parameters=new URLSearchParams(location.hash.slice(1));
+ if(parameters.get('repository')?.toLowerCase()==='combustrrr/agentic-kibana') {
+  parameters.set('repository','combustrrr/code-analysis-dashboard');
+  history.replaceState(null,'','#'+parameters.toString());
+ }
+ if(!parameters.has('repository')) {
+  parameters.set('repository',import.meta.env.VITE_DEFAULT_EXECUTION_REPOSITORY||'combustrrr/code-analysis-dashboard');
+  parameters.set('project',import.meta.env.VITE_DEFAULT_PROJECT_ID||'1267340546');
+  history.replaceState(null,'','#'+parameters.toString());
+ }
 }
 createRoot(document.getElementById('root')!).render(<App/>);

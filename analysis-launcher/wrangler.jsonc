@@ -8,7 +8,12 @@
     "SOURCE_REPOSITORY": "ARYDESTROYER/Kavach-AgenticSOC",
     "ANALYSIS_REPOSITORY": "combustrrr/code-analysis-dashboard",
     "DASHBOARD_ORIGIN": "https://combustrrr.github.io",
-    "GITHUB_CLIENT_ID": "Iv23lixjTGgPaq9Jfp6R"
+    "GITHUB_CLIENT_ID": "Iv23lixjTGgPaq9Jfp6R",
+    "NEXT_GITHUB_CLIENT_ID": "Iv23liZLGddxXQUEV3Lq",
+    "NEXT_GITHUB_APP_ID": "4893614",
+    "NEXT_GITHUB_APP_SLUG": "code-analysis-dashboard",
+    "APPLICATION_MODE": "repositories",
+    "TOOLING_SHA": "baaa7e24070774e634faaf419cfcb77e4ee92f6b"
   },
   "secrets": {
     "required": [

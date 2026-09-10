@@ -17,7 +17,7 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
  const manifest=entry.value;
  const targetPath=(t:any)=>`repository-reports/${t.id}/${t.collected_run}`;
  if(path==='data/index.json')return {...manifest,launch_endpoint:applicationEndpoint,publishing_repository:repository,repository_assets:true,
-   metrics:undefined,targets:manifest.targets.map((t:any)=>({...t,report:t.documents?targetPath(t):undefined}))} as T;
+   metrics:undefined,report_storage:manifest.metrics,targets:manifest.targets.map((t:any)=>({...t,report:t.documents?targetPath(t):undefined}))} as T;
  const target=manifest.targets.find((t:any)=>path.startsWith('data/'+targetPath(t)+'/'));
  if(!target)throw new Error('Target report is no longer current. Refresh the target.');
  const document=path.slice(('data/'+targetPath(target)+'/').length);

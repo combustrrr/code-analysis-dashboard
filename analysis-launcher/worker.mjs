@@ -95,7 +95,7 @@ async function route(request, env) {
       const slug = env.GITHUB_APP_SLUG;
       return json({mode:'repositories', installation_url: /^[a-z0-9-]+$/.test(slug || '') ? `https://github.com/apps/${slug}/installations/new` : null});
     }
-    const report = await publicReports(request);
+    const report = await publicReports(request,env);
     if (report) return report;
   }
   if (!url.pathname.startsWith('/api/')) throw new Failure(404, 'Not found.');

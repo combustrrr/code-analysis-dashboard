@@ -54,3 +54,23 @@ an hourly trigger. Legacy Pages data refresh remains until authenticated public
 report delivery cutover is verified. New GitHub App credential provisioning and
 browser login-to-new-pipeline verification remain pending specific approval;
 this extraction does not claim that cutover has been completed.
+
+
+### Authenticated application delivery, 2026-09-10
+
+The owner authorized new App credential staging and confirmed installation of
+code-analysis-dashboard on the service repository only. Replacement credentials
+are stored in Cloudflare under NEXT_GITHUB_* names; existing credentials remain
+available for rollback. Repository application mode is now active in the Worker.
+Public project/manifest reads return HTTP 200; unauthenticated configuration reads
+return 401. Public report tokens are limited to one repository and read-only
+contents, with bounded metadata caching.
+
+Pages now builds only the application on UI/workflow changes or manual dispatch.
+No report data is bundled, and no report publication or cleanup runs in Pages.
+Current reports remain in per-project Releases and load through the Worker.
+Default project is upstream Testing; the source picker exposes all configured
+projects, and old fork-host links resolve to the service's migrated projects.
+Production build measured 1,075,537 bytes without a data directory. Browser preview
+loaded real upstream reports, switched to service-self findings, and exposed the
+new sign-in flow. Real authenticated launch acceptance remains pending UI rollout.
