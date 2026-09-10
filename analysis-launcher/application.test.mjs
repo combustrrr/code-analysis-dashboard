@@ -112,3 +112,21 @@ test('activity follows the exact scanner attempt through publication',async()=>{
   assert.ok(result.producer.url.endsWith('/99/attempts/2'));
  }finally{globalThis.fetch=original;}
 });
+
+
+test('protected branch installation fails without forcing or changing strategy',async()=>{
+ const h=helpers();
+ const preview=await (await applicationApi(request('/api/connections/preview',{execution_repository:'owner/repo'}),env,{token:'test'},h)).json();
+ const original=h.github;const writes=[];
+ h.github=async(path,token,options={})=>{
+  if(!options.method)return original(path,token,options);
+  writes.push({path,options});
+  if(path.endsWith('/git/trees'))return {sha:'tree'};
+  if(path.endsWith('/git/commits'))return {sha:'commit'};
+  if(path.includes('/git/refs/heads/'))throw new Failure(403,'Protected branch');
+  throw new Error('Unexpected mutation');
+ };
+ await assert.rejects(()=>applicationApi(request('/api/connections/install',{confirmation:preview.confirmation,confirm:true}),env,{token:'test'},h),e=>e.status===403);
+ assert.equal(writes.length,3);assert.deepEqual(JSON.parse(writes[2].options.body),{sha:'commit',force:false});
+ assert.equal(Object.keys(preview.files).length,3);
+});

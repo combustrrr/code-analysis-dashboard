@@ -456,12 +456,12 @@ jobs:
         path: .source
         persist-credentials: false
     - name: Run reviewed bandit adapter
-      run: python -I scripts/code_analysis/trusted_entry.py portable_runner bandit --source .source --output .portable-output/bandit
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner bandit --source .source --output portable-output/bandit
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: portable-python-bandit
-        path: .portable-output/
+        path: portable-output/
         retention-days: 7
         if-no-files-found: error
   portable-python-ruff:
@@ -498,12 +498,12 @@ jobs:
         path: .source
         persist-credentials: false
     - name: Run reviewed ruff adapter
-      run: python -I scripts/code_analysis/trusted_entry.py portable_runner ruff --source .source --output .portable-output/ruff
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner ruff --source .source --output portable-output/ruff
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: portable-python-ruff
-        path: .portable-output/
+        path: portable-output/
         retention-days: 7
         if-no-files-found: error
   portable-complexity:
@@ -540,14 +540,14 @@ jobs:
         path: .source
         persist-credentials: false
     - name: Run reviewed radon adapter
-      run: python -I scripts/code_analysis/trusted_entry.py portable_runner radon --source .source --output .portable-output/radon
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner radon --source .source --output portable-output/radon
     - name: Run reviewed xenon adapter
-      run: python -I scripts/code_analysis/trusted_entry.py portable_runner xenon --source .source --output .portable-output/xenon
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner xenon --source .source --output portable-output/xenon
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: portable-complexity
-        path: .portable-output/
+        path: portable-output/
         retention-days: 7
         if-no-files-found: error
   portable-dead-code:
@@ -584,12 +584,12 @@ jobs:
         path: .source
         persist-credentials: false
     - name: Run reviewed vulture adapter
-      run: python -I scripts/code_analysis/trusted_entry.py portable_runner vulture --source .source --output .portable-output/vulture
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner vulture --source .source --output portable-output/vulture
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: portable-dead-code
-        path: .portable-output/
+        path: portable-output/
         retention-days: 7
         if-no-files-found: error
   portable-typescript-quality:
@@ -626,15 +626,15 @@ jobs:
         path: .source
         persist-credentials: false
     - name: Run reviewed eslint adapter
-      run: python -I scripts/code_analysis/trusted_entry.py portable_runner eslint --source .source --output .portable-output/eslint
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner eslint --source .source --output portable-output/eslint
     - name: Run reviewed typescript adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner typescript --source .source --output
-        .portable-output/typescript
+        portable-output/typescript
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: portable-typescript-quality
-        path: .portable-output/
+        path: portable-output/
         retention-days: 7
         if-no-files-found: error
   portable-test-coverage:
@@ -671,12 +671,12 @@ jobs:
         path: .source
         persist-credentials: false
     - name: Run reviewed coverage adapter
-      run: python -I scripts/code_analysis/trusted_entry.py portable_runner coverage --source .source --output .portable-output/coverage
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner coverage --source .source --output portable-output/coverage
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: portable-test-coverage
-        path: .portable-output/
+        path: portable-output/
         retention-days: 7
         if-no-files-found: error
   portable-atheris-state-machine:
@@ -713,12 +713,12 @@ jobs:
         path: .source
         persist-credentials: false
     - name: Run reviewed atheris adapter
-      run: python -I scripts/code_analysis/trusted_entry.py portable_runner atheris --source .source --output .portable-output/atheris
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner atheris --source .source --output portable-output/atheris
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: portable-atheris-state-machine
-        path: .portable-output/
+        path: portable-output/
         retention-days: 7
         if-no-files-found: error
   portable-schemathesis-fuzz:
@@ -756,12 +756,12 @@ jobs:
         persist-credentials: false
     - name: Run reviewed schemathesis adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner schemathesis --source .source --output
-        .portable-output/schemathesis
+        portable-output/schemathesis
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: portable-schemathesis-fuzz
-        path: .portable-output/
+        path: portable-output/
         retention-days: 7
         if-no-files-found: error
   portable-python-types:
@@ -798,12 +798,12 @@ jobs:
         path: .source
         persist-credentials: false
     - name: Run reviewed pyright adapter
-      run: python -I scripts/code_analysis/trusted_entry.py portable_runner pyright --source .source --output .portable-output/pyright
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner pyright --source .source --output portable-output/pyright
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: portable-python-types
-        path: .portable-output/
+        path: portable-output/
         retention-days: 7
         if-no-files-found: error
   report:
