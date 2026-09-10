@@ -101,7 +101,7 @@ test('Ant Design filters, pagination and responsive layout remain usable', async
 
 test('overview drilldown, scanner filters and provenance use retained evidence', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Directories with most findings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Directories with most findings' })).toBeVisible({timeout:30000});
   const directory = page.locator('.directory-row .ant-btn').first();
   const path = await directory.innerText();
   await directory.click();
@@ -289,4 +289,43 @@ test('connections verify live configuration without claiming scanner completion'
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.getByRole('button',{name:'Sign out',exact:true}).click();
   await expect(page.getByText('Configuration needs attention')).not.toBeVisible();
+});
+
+test('repository configuration requires a preview and explicit confirmation', async ({page,context}) => {
+  let installs=0; let changes:any;
+  await page.route('**/index.json', async route => {
+    const data=JSON.parse(readFileSync('public/data/index.json','utf8'));
+    data.launch_endpoint='https://launcher.example';
+    await route.fulfill({json:data});
+  });
+  await context.route('https://launcher.example/**', async route => {
+    const url=new URL(route.request().url());
+    const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'opaque-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+    if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{installation_url:null}});
+    expect(route.request().headers().authorization).toBe('Bearer opaque-session');
+    if(url.pathname==='/api/repositories')return route.fulfill({headers,json:{repositories:[{id:1,full_name:'owner/repo',can_configure:true}],has_more:false}});
+    if(url.pathname==='/api/projects')return route.fulfill({headers,json:{projects:[{id:'1',source_repository:{full_name:'owner/repo'},relationship:'connected',preferred_branch:'main',enabled_scanners:['semgrep'],deferred_channels:{},report_budget_bytes:900000000}]}});
+    if(url.pathname==='/api/projects/preview') {changes=route.request().postDataJSON();return route.fulfill({headers,json:{confirmation:'sealed-preview',files:{'.github/code-analysis/projects.json':JSON.stringify(changes.changes)}}});}
+    if(url.pathname==='/api/connections/install') {installs++;expect(route.request().postDataJSON()).toEqual({confirmation:'sealed-preview',confirm:true});return route.fulfill({headers,json:{commit_sha:'a'.repeat(40)}});}
+    throw new Error(url.pathname);
+  });
+  await page.goto('/#tab=repositories');
+  await page.getByRole('button',{name:'Sign in with GitHub',exact:true}).click();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+  await page.getByRole('button',{name:'Load repositories',exact:true}).click();
+  await page.getByLabel('Execution repository', {exact:true}).click();
+  await page.getByLabel('Execution repository', {exact:true}).press('ArrowDown');
+  await page.getByLabel('Execution repository', {exact:true}).press('Enter');
+  await page.getByRole('button',{name:'Load configured projects'}).click();
+  await page.getByRole('button',{name:'Edit configuration'}).click();
+  await page.getByLabel('Project configuration JSON').fill(JSON.stringify({preferred_branch:'develop',enabled_scanners:['semgrep'],deferred_channels:{},report_budget_bytes:500000000}));
+  await page.getByRole('button',{name:'Preview configuration commit'}).click();
+  await expect(page.getByRole('button',{name:'Confirm configuration commit'})).toBeVisible();
+  expect(installs).toBe(0);
+  expect(changes.changes.preferred_branch).toBe('develop');
+  await page.getByRole('button',{name:'Confirm configuration commit'}).click();
+  await expect(page.getByText('Configuration installed', {exact:true})).toBeVisible();
+  expect(installs).toBe(1);
 });

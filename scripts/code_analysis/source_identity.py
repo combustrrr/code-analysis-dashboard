@@ -16,7 +16,9 @@ def main():
     row = json.loads(os.environ['TARGET_JSON'])
     validated = target(row['repository'], row['branch'], row['head_sha'], pr=row.get('pr'),
                        source_repository=row['source_repository'], base_sha=row.get('base_sha'), base_branch=row.get('base_branch'), kind=row.get('kind'))
-    if validated['id'] != row['id'] or os.environ['TOOLING_SHA'] != os.environ['GITHUB_SHA']:
+    import subprocess
+    tooling_revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() if os.environ.get('IS_REUSABLE_ANALYSIS') == 'true' else os.environ['GITHUB_SHA']
+    if validated['id'] != row['id'] or os.environ['TOOLING_SHA'] != tooling_revision:
         raise ValueError('dispatch identity or tooling revision mismatch')
     if not a.assemble:
         from scripts.code_analysis.applicability import selection
