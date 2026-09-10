@@ -42,7 +42,11 @@ def main():
     write(root / 'producer-status.json', {'scanner_family': 'Producer', 'run_id': run, 'run_attempt': attempt,
                                         'source_repository': row['source_repository'], 'source_sha': row['head_sha']})
     from scripts.code_analysis.applicability import selection
-    _, excluded, _ = selection(json.loads(Path('config/code-analysis/service.json').read_text()), Path('.source'))
+    selected_jobs, excluded, _ = selection(json.loads(Path('config/code-analysis/service.json').read_text()), Path('.source'))
+    if 'codeql' in selected_jobs:
+        codeql_jobs = [j for j in pages(f'repos/{host}/actions/runs/{run}/attempts/{attempt}/jobs', 'jobs') if 'CodeQL (' in j.get('name','')]
+        complete = bool(codeql_jobs) and all(j.get('conclusion') == 'success' for j in codeql_jobs)
+        write(root / 'codeql-execution/execution-status.json', {'scanner_family':'CodeQL', 'status':'COMPLETED' if complete else 'FAILED', 'reason':'Every selected language job completed.' if complete else 'One or more selected CodeQL language jobs failed or lack completion evidence.'})
     if 'coderabbit-ai-advisory' in excluded:
         write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', **excluded['coderabbit-ai-advisory']})
     elif row.get('pr'):

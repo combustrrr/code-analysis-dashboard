@@ -163,3 +163,7 @@
 - Verified authenticated producer 34440758894 attempt 1 and publisher 34440932058 for source 8c44cde0; 32 supported SARIF uploads complete.
 - Added reviewed portable scanner profiles, exact client-request/producer/publication tracking and cache-safe cleanup grace.
 - Validation: 152 service tests, 10 application tests, launcher regression checks, workflow audit, TypeScript/build and 14 retained-dataset browser tests passed. Alternate-layout live validation follows.
+
+### 2026-09-10 - Portable rollout deployed
+- PR #5 merged at e35c66bd. Cloudflare activity/profile API deployed as 242df7a7-470c-434b-b568-dd108857ad1e. Service-self and alternate-layout observer requests are durably queued.
+- Focused authenticated wizard browser acceptance passed: exact scanner attempt link, continued polling and published partial result. Added nested TypeScript path regression and all-language CodeQL completion validation.

@@ -2,6 +2,7 @@
 import argparse
 import importlib.metadata
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -62,6 +63,9 @@ def execute(channel, profile, source, output):
                     return value
                 native.write_text(json.dumps(relative(data)))
             status.update(status='COMPLETED',reason='Native report retained.' if rc==0 else 'Native report retained; command reported findings or test failures.')
+        if channel=='typescript' and native.exists() and command and command.get('cwd','.')!='.':
+            prefix=Path(command['cwd']).as_posix().rstrip('/')+'/'
+            native.write_text(re.sub(r'^([^\r\n(]+)(\(\d+,\d+\):)',lambda m:prefix+m.group(1)+m.group(2),native.read_text(),flags=re.MULTILINE))
         if channel=='coverage' and not native.exists():status['coverage_exit_code']=1
         try:status['scanner_version']=importlib.metadata.version({'coverage':'coverage'}.get(channel,channel))
         except importlib.metadata.PackageNotFoundError:

@@ -56,3 +56,16 @@ class PortableTests(unittest.TestCase):
             self.assertEqual(result['status'],'COMPLETED')
             data=json.loads((root/'output/bandit-results.json').read_text())
             self.assertTrue(any(r['test_id']=='B602' for r in data['results']))
+
+
+class NativePathTests(unittest.TestCase):
+    def test_nested_typescript_diagnostics_keep_repository_prefix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'client').mkdir()
+            def run(argv,**kwargs):
+                kwargs['stdout'].write('src/index.ts(2,3): error TS1234: canary\n')
+                return subprocess.CompletedProcess(argv,2)
+            with patch('scripts.code_analysis.portable_runner.subprocess.run',side_effect=run):
+                result=execute('typescript',{'mode':'portable','commands':{'typescript':{'cwd':'client','argv':['tsc']}}},root,root/'output')
+            self.assertEqual(result['status'],'COMPLETED')
+            self.assertIn('client/src/index.ts(2,3)',(root/'output/tsc-results.txt').read_text())
