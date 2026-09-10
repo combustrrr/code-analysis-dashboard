@@ -38,6 +38,78 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         IS_REUSABLE_ANALYSIS: 'true'
       run: python -m scripts.code_analysis.source_identity
+  scanner-2-codeql:
+    name: CodeQL (Semantic SAST)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(needs.identity.outputs.languages) }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        fetch-depth: 2
+        persist-credentials: false
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+    - name: Checkout trusted analysis tooling
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        path: .analysis-tooling
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
+    - name: Keep trusted tooling outside the source scan tree
+      run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
+    - name: Stage trusted CodeQL policy in Git metadata
+      run: 'mkdir -p "$GITHUB_WORKSPACE/.git/code-analysis"
+
+        cp "$RUNNER_TEMP/analysis-tooling/.github/codeql/codeql-config.yml" "$GITHUB_WORKSPACE/.git/code-analysis/codeql-config.yml"'
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85
+      with:
+        languages: ${{ matrix.language }}
+        queries: +security-extended,security-and-quality
+        build-mode: none
+    - name: "Build (Python \u2014 no explicit build needed)"
+      if: matrix.language == 'python'
+      run: "echo \"Python \u2014 autobuild skipped, using source\""
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@42947a340483f03ba47bb1a039b2c519aab3df85
+      with:
+        category: /language:${{ matrix.language }}
+        output: codeql-output
+        upload: false
+    - name: Canonicalize CodeQL SARIF artifact
+      shell: bash
+      env:
+        CODEQL_LANGUAGE: ${{ matrix.language }}
+      run: "set -euo pipefail\nmapfile -d '' sarif_files < <(find codeql-output -type f -name '*.sarif' -print0)\n\
+        if (( ${#sarif_files[@]} != 1 )); then\n  echo \"::error::Expected exactly one CodeQL SARIF file, found\
+        \ ${#sarif_files[@]}\"\n  exit 1\nfi\ncp \"${sarif_files[0]}\" \"codeql-${CODEQL_LANGUAGE}.sarif\"\n"
+    - name: Upload SARIF artifact (for normalizer)
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: codeql-${{ matrix.language }}-sarif
+        path: codeql-${{ matrix.language }}.sarif
+        retention-days: 7
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'codeql') }}
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-2-semgrep:
     name: Semgrep (Pattern Analysis)
     runs-on: ubuntu-latest
@@ -350,15 +422,409 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'openssf-scorecard') }}
     env:
       SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+  portable-python-bandit:
+    name: Portable python-bandit
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-bandit') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.12'
+    - name: Install pinned scanner dependencies
+      run: python -m pip install -r .ci/requirements.txt coverage==7.10.6 pytest==8.4.2 atheris==2.3.0
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run reviewed bandit adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner bandit --source .source --output .portable-output/bandit
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: portable-python-bandit
+        path: .portable-output/
+        retention-days: 7
+        if-no-files-found: error
+  portable-python-ruff:
+    name: Portable python-ruff
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-ruff') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.12'
+    - name: Install pinned scanner dependencies
+      run: python -m pip install -r .ci/requirements.txt coverage==7.10.6 pytest==8.4.2 atheris==2.3.0
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run reviewed ruff adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner ruff --source .source --output .portable-output/ruff
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: portable-python-ruff
+        path: .portable-output/
+        retention-days: 7
+        if-no-files-found: error
+  portable-complexity:
+    name: Portable complexity
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'complexity') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.12'
+    - name: Install pinned scanner dependencies
+      run: python -m pip install -r .ci/requirements.txt coverage==7.10.6 pytest==8.4.2 atheris==2.3.0
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run reviewed radon adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner radon --source .source --output .portable-output/radon
+    - name: Run reviewed xenon adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner xenon --source .source --output .portable-output/xenon
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: portable-complexity
+        path: .portable-output/
+        retention-days: 7
+        if-no-files-found: error
+  portable-dead-code:
+    name: Portable dead-code
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'dead-code') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.12'
+    - name: Install pinned scanner dependencies
+      run: python -m pip install -r .ci/requirements.txt coverage==7.10.6 pytest==8.4.2 atheris==2.3.0
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run reviewed vulture adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner vulture --source .source --output .portable-output/vulture
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: portable-dead-code
+        path: .portable-output/
+        retention-days: 7
+        if-no-files-found: error
+  portable-typescript-quality:
+    name: Portable typescript-quality
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'typescript-quality') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.12'
+    - name: Install pinned scanner dependencies
+      run: python -m pip install -r .ci/requirements.txt coverage==7.10.6 pytest==8.4.2 atheris==2.3.0
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run reviewed eslint adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner eslint --source .source --output .portable-output/eslint
+    - name: Run reviewed typescript adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner typescript --source .source --output
+        .portable-output/typescript
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: portable-typescript-quality
+        path: .portable-output/
+        retention-days: 7
+        if-no-files-found: error
+  portable-test-coverage:
+    name: Portable test-coverage
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'test-coverage') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.12'
+    - name: Install pinned scanner dependencies
+      run: python -m pip install -r .ci/requirements.txt coverage==7.10.6 pytest==8.4.2 atheris==2.3.0
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run reviewed coverage adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner coverage --source .source --output .portable-output/coverage
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: portable-test-coverage
+        path: .portable-output/
+        retention-days: 7
+        if-no-files-found: error
+  portable-atheris-state-machine:
+    name: Portable atheris-state-machine
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'atheris-state-machine') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.12'
+    - name: Install pinned scanner dependencies
+      run: python -m pip install -r .ci/requirements.txt coverage==7.10.6 pytest==8.4.2 atheris==2.3.0
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run reviewed atheris adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner atheris --source .source --output .portable-output/atheris
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: portable-atheris-state-machine
+        path: .portable-output/
+        retention-days: 7
+        if-no-files-found: error
+  portable-schemathesis-fuzz:
+    name: Portable schemathesis-fuzz
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'schemathesis-fuzz') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.12'
+    - name: Install pinned scanner dependencies
+      run: python -m pip install -r .ci/requirements.txt coverage==7.10.6 pytest==8.4.2 atheris==2.3.0
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run reviewed schemathesis adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner schemathesis --source .source --output
+        .portable-output/schemathesis
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: portable-schemathesis-fuzz
+        path: .portable-output/
+        retention-days: 7
+        if-no-files-found: error
+  portable-python-types:
+    name: Portable python-types
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-types') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.12'
+    - name: Install pinned scanner dependencies
+      run: python -m pip install -r .ci/requirements.txt coverage==7.10.6 pytest==8.4.2 atheris==2.3.0
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run reviewed pyright adapter
+      run: python -I scripts/code_analysis/trusted_entry.py portable_runner pyright --source .source --output .portable-output/pyright
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: portable-python-types
+        path: .portable-output/
+        retention-days: 7
+        if-no-files-found: error
   report:
     needs:
     - identity
+    - scanner-2-codeql
     - scanner-2-semgrep
     - scanner-3-gitleaks
     - scanner-3-trivy
     - scanner-3-checkov
     - scanner-3-workflow-security-posture
     - scanner-3-openssf-scorecard
+    - portable-python-bandit
+    - portable-python-ruff
+    - portable-complexity
+    - portable-dead-code
+    - portable-typescript-quality
+    - portable-test-coverage
+    - portable-atheris-state-machine
+    - portable-schemathesis-fuzz
+    - portable-python-types
     if: ${{ always() && needs.identity.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30

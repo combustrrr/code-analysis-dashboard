@@ -150,3 +150,33 @@ class IndependentSecurityChannelsTests(unittest.TestCase):
         payloads=[c.kwargs['payload']['sarif'] for c in api.call_args_list if 'sarif' in c.kwargs.get('payload',{})]
         categories=[json.loads(gzip.decompress(base64.b64decode(p)))['runs'][0]['automationDetails']['id'] for p in payloads]
         self.assertTrue(all('/trivy/' in c for c in categories))
+
+
+class PublicationCompletenessTests(unittest.TestCase):
+    def test_reconciliation_preserves_partial_and_never_deletes_before_upload(self):
+        import json
+        old={'id':'one','head_sha':'a'*40,'analyzed_sha':'a'*40,'collected_run':'12-1','report_status':'partial','assets':{},'documents':{}}
+        state={'targets':[{'id':'one','head_sha':'a'*40,'status':'collected','scan_run_id':12,'run_attempt':1}]}
+        config={'analysis_repository':'owner/repo','report_budget_bytes':1000}
+        with patch('scripts.code_analysis.repository_service.github.pages',return_value=[]),patch('scripts.code_analysis.repository_service.release_manifest.write') as write:
+            result=report_publication(config,state,{'id':1,'body':json.dumps({'targets':[old]})})
+        self.assertEqual(result['targets'][0]['status'],'partial')
+        self.assertEqual(result['targets'][0]['collected_run'],'12-1')
+
+    def test_interrupted_manifest_update_does_not_delete_assets(self):
+        from scripts.code_analysis import release_manifest
+        import gzip,hashlib,json
+        state={'targets':[]};data=gzip.compress(json.dumps(state,sort_keys=True,separators=(',',':')).encode(),mtime=0)
+        name='manifest-'+hashlib.sha256(data).hexdigest()+'.json.gz'
+        with patch.object(release_manifest.github,'pages',return_value=[{'name':name,'id':1},{'name':'manifest-old.json.gz','id':2}]),patch.object(release_manifest.github,'save_state',side_effect=RuntimeError('interrupted')),patch.object(release_manifest.github,'api') as api:
+            with self.assertRaises(RuntimeError):release_manifest.write('owner/repo',{'id':1},state)
+        api.assert_not_called()
+
+
+class CleanupGraceTests(unittest.TestCase):
+    def test_only_expired_unreferenced_assets_are_eligible(self):
+        from scripts.code_analysis.release_manifest import expired_grace
+        from datetime import datetime,timezone
+        self.assertFalse(expired_grace({'created_at':datetime.now(timezone.utc).isoformat()}))
+        self.assertFalse(expired_grace({}))
+        self.assertTrue(expired_grace({'created_at':'2020-01-01T00:00:00Z'}))

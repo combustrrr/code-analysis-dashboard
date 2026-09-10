@@ -74,3 +74,20 @@ projects, and old fork-host links resolve to the service's migrated projects.
 Production build measured 1,075,537 bytes without a data directory. Browser preview
 loaded real upstream reports, switched to service-self findings, and exposed the
 new sign-in flow. Real authenticated launch acceptance remains pending UI rollout.
+
+### Authenticated launch accepted, 2026-09-10
+
+The owner signed in with the new App and submitted service main through the
+wizard. Request d425a274-16c8-4bec-91c9-2854b37f3b71 persisted while two slots were
+occupied, then producer 34440758894 attempt 1 analyzed exact source commit
+8c44cde0d2ae15d37056c9e16b1734708145a90c. Reconciliation 34440932058 succeeded.
+The deployed browser and public report API returned that exact producer and SHA;
+all 32 supported native SARIF partitions completed processing. Browser execution
+reported no JavaScript errors. Login, launch, bounded queue and report delivery
+are verified. Earlier credential-approval and authenticated-launch pending notes
+above are historical and superseded by this evidence.
+
+The report remains valid partial: the portable profile does not yet execute all
+language/runtime/vendor adapters. Readiness setup_required entries are actual
+configuration/adapter gaps, not failed dependency installation. This launch proof
+does not accept all-scanner readiness or unrestricted arbitrary-repository support.

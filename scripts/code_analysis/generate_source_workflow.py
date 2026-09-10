@@ -37,7 +37,7 @@ def generate(config=None):
         for name, original in old['jobs'].items():
             if profile.get('mode') == 'portable':
                 from scripts.code_analysis.applicability import PORTABLE_JOBS
-                if name not in PORTABLE_JOBS:
+                if name not in PORTABLE_JOBS | {'codeql'}:
                     continue
             if name == 'dependency-review':
                 # GitHub's host-PR gate is not an upstream-head scanner.
@@ -190,6 +190,12 @@ def generate(config=None):
                 if 'with' in step:
                     step['with'] = {k: v.replace('.analysis-tooling', '${{ runner.temp }}/analysis-tooling') if isinstance(v, str) else v for k, v in step['with'].items()}
                 isolated.append(step)
+            if profile.get('mode') == 'portable' and name == 'codeql':
+                isolated = [s for s in isolated if not s.get('uses', '').startswith('github/codeql-action/autobuild@')]
+                for step in isolated:
+                    if step.get('uses', '').startswith('github/codeql-action/init@'):
+                        step['with'].pop('config-file', None)
+                        step['with']['build-mode'] = 'none'
             if profile.get('mode') == 'portable' and name == 'semgrep':
                 for step in isolated:
                     if 'run' in step and 'backend/ webui/src/' in step['run']:
@@ -220,6 +226,9 @@ def generate(config=None):
                          'if': "${{ contains(fromJSON(needs.identity.outputs.jobs), '" + channel + "') }}",
                          'runs-on': 'ubuntu-latest', 'timeout-minutes': extension.get('timeout_minutes', 15) + 5,
                          'permissions': {'contents': 'read'}, 'steps': steps}
+    if profile.get('mode') == 'portable':
+        from scripts.code_analysis.portable_workflow import scanner_jobs
+        jobs.update(scanner_jobs())
     jobs['report'] = {'needs': list(jobs), 'if': "${{ always() && needs.identity.result == 'success' }}",
         'runs-on': 'ubuntu-latest', 'timeout-minutes': 30, 'permissions': {'contents': 'read', 'actions': 'read'},
         'steps': [{'uses': CHECKOUT, 'with': {'ref': '${{ inputs.tooling_sha }}', 'persist-credentials': False}},

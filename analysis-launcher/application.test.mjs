@@ -78,3 +78,37 @@ test('readiness never calls configured evidence complete and flags absent adapte
  assert.equal(rows.find(x=>x.channel==='future-scanner').status,'setup_required');
  assert.ok(rows.every(x=>x.status!=='completed'));
 });
+
+
+test('revoked installation access blocks configuration and launch before writes',async()=>{
+ for(const [path,payload] of [['/api/projects/preview',{repository:'owner/repo',project_id:'1',changes:{report_budget_bytes:100}}],['/api/project-launch',{repository:'owner/repo',project_id:'1',kind:'branch',ref:'main'}]]){
+  const h=configuredHelpers({'user/installations?per_page=100&page=1':{installations:[]}});
+  await assert.rejects(()=>applicationApi(request(path,payload),env,{token:'test'},h),e=>e.status===403);
+  assert.ok(h.calls.every(c=>!c.options.method));
+ }
+});
+test('portable configuration supports two layouts and rejects executable path escape',async()=>{
+ const {validatePortableProfile}=await import('./application.mjs');
+ for(const profile of [{mode:'portable',python_root:'packages/core'},{mode:'portable',javascript_root:'client',commands:{eslint:{cwd:'client',argv:['npx','--no-install','eslint','.'],install:[['npm','ci']]}}}])assert.doesNotThrow(()=>validatePortableProfile(profile));
+ assert.throws(()=>validatePortableProfile({mode:'portable',commands:{coverage:{argv:['pytest'],cwd:'../outside'}}}));
+ const detection=detectedProfile(['packages/core/main.py','client/src/index.ts']);
+ assert.equal(detection.profile.python_root,'.');assert.equal(detection.profile.javascript_root,'.');assert.equal(detection.profile.commands,undefined);
+});
+
+
+test('activity follows the exact scanner attempt through publication',async()=>{
+ const original=globalThis.fetch;let published=false;
+ const id='11111111-1111-1111-1111-111111111111';
+ const row={id:'target',client_request_id:id,head_sha:'d'.repeat(40),execution_sha:'b'.repeat(40),scan_run_id:99,run_attempt:2};
+ globalThis.fetch=async url=>{
+  if(url.endsWith('/repos/owner/repo'))return Response.json({full_name:'owner/repo',private:false});
+  if(url.includes('/releases/tags/'))return Response.json({body:JSON.stringify({schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/repo',targets:[row]})});
+  throw new Error('Unexpected fetch');
+ };
+ try{
+  const h=configuredHelpers({'repos/owner/repo/actions/runs/99/attempts/2':{head_sha:'b'.repeat(40),status:'completed',conclusion:'success'}});
+  const result=await (await applicationApi(new Request(`https://worker.example/api/project-activity?repository=owner/repo&project_id=1&request_id=${id}`),env,{token:'test'},h)).json();
+  assert.equal(result.phase,'publishing');assert.equal(result.source_sha,'d'.repeat(40));assert.equal(result.producer.attempt,2);
+  assert.ok(result.producer.url.endsWith('/99/attempts/2'));
+ }finally{globalThis.fetch=original;}
+});

@@ -1,3 +1,4 @@
+import {publicReports} from './reports.mjs';
 // Repository application API. No source code is executed by the Worker.
 const PROTECTED = 'arydestroyer/kavach-agenticsoc';
 const readOnly = repo => [1267340546,1278177697].includes(repo.id) || [PROTECTED,'combustrrr/agentic-kibana'].includes(repo.full_name?.toLowerCase());
@@ -8,9 +9,25 @@ const SCANNERS = ['atheris','bandit','checkov','codeql','coderabbit-ai-advisory'
 const encode = value => btoa(String.fromCharCode(...new TextEncoder().encode(value)));
 const decode = value => new TextDecoder().decode(Uint8Array.from(atob(value.replace(/\s/g, '')), c => c.charCodeAt(0)));
 
+export function validatePortableProfile(profile) {
+  const path=p=>typeof p==='string'&&p.length>0&&!p.includes('\\')&&!p.includes(':')&&!p.startsWith('/')&&!p.split('/').includes('..');
+  if(!profile||profile.mode!=='portable'||Object.keys(profile).some(k=>!['mode','python_root','javascript_root','commands'].includes(k)))throw new Error('Use a portable profile with reviewed paths and command adapters.');
+  for(const key of ['python_root','javascript_root'])if(key in profile&&!path(profile[key]))throw new Error('Profile paths must stay inside the repository.');
+  const commands=profile.commands||{};
+  if(typeof commands!=='object'||Array.isArray(commands))throw new Error('Commands must be an object.');
+  for(const [channel,c] of Object.entries(commands)){
+    if(!['eslint','typescript','coverage','atheris','schemathesis','pyright'].includes(channel)||!c||Object.keys(c).some(k=>!['argv','cwd','install','output'].includes(k))||!path(c.cwd||'.')||('output' in c&&!path(c.output)))throw new Error('Invalid command adapter or source path.');
+    if(c.install&&!Array.isArray(c.install))throw new Error('Installation commands must be argument arrays.');
+    for(const argv of [c.argv,...(c.install||[])])if(!Array.isArray(argv)||!argv.length||argv.length>100||argv.some(x=>typeof x!=='string'||!x||x.length>4096||x.includes('\0')))throw new Error('Commands must be bounded argument arrays.');
+  }
+}
+
 export function detectedProfile(paths) {
   const manifests = paths.filter(p => /(^|\/)(package.json|pyproject.toml|requirements[^/]*\.txt|Cargo.toml|go.mod|pom.xml|build.gradle)$/.test(p));
-  return {profile: {mode: 'portable'}, detected_manifests: manifests,
+  const profile={mode:'portable'};
+  if(paths.some(p=>p.endsWith('.py')))profile.python_root='.';
+  if(paths.some(p=>/\.[cm]?[jt]sx?$/.test(p)))profile.javascript_root='.';
+  return {profile, detected_manifests: manifests,
     dockerfiles: paths.filter(p => /(^|\/)Dockerfile(?:\.[^/]*)?$/.test(p)),
     notice: 'Portable scanners can run immediately. Language build, test, fuzzing and vendor adapters require reviewed repository configuration.'};
 }
@@ -193,9 +210,10 @@ export async function applicationApi(request, env, session, helpers) {
     const project = document.projects.find(p => p.id === input.project_id);
     if (!project) throw new Failure(404, 'Unknown project.');
     const changes = input.changes;
-    const allowed = ['preferred_branch','enabled_scanners','deferred_channels','report_budget_bytes'];
-    if (!changes || typeof changes !== 'object' || Array.isArray(changes) || Object.keys(changes).some(k => !allowed.includes(k))) throw new Failure(400, 'Only branch, scanner selection, deferrals and report budget can be edited here.');
+    const allowed = ['preferred_branch','enabled_scanners','deferred_channels','report_budget_bytes','profile'];
+    if (!changes || typeof changes !== 'object' || Array.isArray(changes) || Object.keys(changes).some(k => !allowed.includes(k))) throw new Failure(400, 'Only branch, scanner selection, deferrals, profile and report budget can be edited here.');
     const updated = {...project, ...changes};
+    if(changes.profile){try{validatePortableProfile(changes.profile);}catch(e){throw new Failure(400,e.message);}}
     if (typeof updated.preferred_branch !== 'string' || !updated.preferred_branch.trim() || updated.preferred_branch.length > 255) throw new Failure(400, 'Preferred branch is required.');
     if (!Array.isArray(updated.enabled_scanners) || updated.enabled_scanners.some(s => typeof s !== 'string' || !/^[a-z0-9-]+$/.test(s)) || new Set(updated.enabled_scanners).size !== updated.enabled_scanners.length) throw new Failure(400, 'Scanner IDs must be unique.');
     const deferred = updated.deferred_channels;
@@ -224,6 +242,9 @@ export async function applicationApi(request, env, session, helpers) {
     const project = document.projects.find(p => p.id === url.searchParams.get('project_id'));
     if (!project) throw new Failure(404,'Unknown project.');
     const portable = new Set(['semgrep','gitleaks','trivy','checkov','openssf-scorecard','github-secret-protection-posture','github-actions-security','coderabbit-ai-advisory']);
+    if(project.profile.python_root)['bandit','ruff','radon','xenon','vulture','codeql'].forEach(c=>portable.add(c));
+    if(project.profile.javascript_root)portable.add('codeql');
+    Object.keys(project.profile.commands||{}).forEach(c=>portable.add(c));
     const channels = [...new Set([...project.enabled_scanners,...Object.keys(project.deferred_channels || {})])].map(channel => {
       const reason = project.deferred_channels?.[channel];
       const supported = SCANNERS.includes(channel);
@@ -294,6 +315,31 @@ export async function applicationApi(request, env, session, helpers) {
     let result;
     try { result = await github(`repos/${repo.full_name}/actions/workflows/code-analysis-reconcile.yml/dispatches`, token, {method:'POST', body:JSON.stringify({ref:repo.default_branch, return_run_details:true, inputs:{project_id:project.id,selection:JSON.stringify({repository:source.full_name,kind:input.kind,ref:input.ref}),request_id}})}); } catch { return json({status:'queued',request_id,run_id:null,repository:repo.full_name,warning:'Request saved. Immediate dispatch failed; repository reconciliation will recover it.'},202); }
     return json({status:'submitted',request_id,run_id:result?.workflow_run_id || null,repository:repo.full_name},202);
+  }
+  if (request.method === 'GET' && url.pathname === '/api/project-activity') {
+    const repo = await publicRepository(url.searchParams.get('repository')); await installation(repo);
+    const document = await config(repo);
+    const project = document.projects.find(p=>p.id===url.searchParams.get('project_id'));
+    const id=url.searchParams.get('request_id');
+    if(!project || !/^[a-f0-9-]{36}$/.test(id||''))throw new Failure(400,'Choose a project and request.');
+    const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repo.full_name,project_id:project.id});
+    const response=await publicReports(new Request(reportUrl),env);
+    if(!response.ok)throw new Failure(502,'Publication status is temporarily unavailable. Your queued request is retained.');
+    const manifest=await response.json();
+    const receipt=manifest.requests?.find(r=>r.request_id===id);
+    const row=manifest.targets.find(t=>t.client_request_id===id&&(!receipt||t.head_sha===receipt.head_sha));
+    if(receipt&&!row)return json({phase:'superseded',source_sha:receipt.head_sha,request_id:id,checked_at:new Date().toISOString()});
+    if(!row)return json({phase:'queued',request_id:id,checked_at:new Date().toISOString()});
+    const result={request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'queued',checked_at:new Date().toISOString()};
+    if(row.scan_run_id){
+      const run=await github(`repos/${repo.full_name}/actions/runs/${row.scan_run_id}/attempts/${row.run_attempt}`,token);
+      if(run.head_sha!==row.execution_sha)throw new Failure(409,'Producer revision does not match the request.');
+      result.producer={run_id:row.scan_run_id,attempt:row.run_attempt,status:run.status,conclusion:run.conclusion,url:`https://github.com/${repo.full_name}/actions/runs/${row.scan_run_id}/attempts/${row.run_attempt}`};
+      result.phase=run.status==='completed'?'publishing':'scanning';
+      if(row.collected_run===`${row.scan_run_id}-${row.run_attempt}`&&row.analyzed_sha===row.head_sha){result.phase='published';result.completeness=row.report_status;}
+    }
+    if(row.error){result.phase='failed';result.error=row.error;}
+    return json(result);
   }
   if (request.method === 'GET' && /^\/api\/project-runs\/[1-9][0-9]*$/.test(url.pathname)) {
     const repo = await publicRepository(url.searchParams.get('repository')); await installation(repo);

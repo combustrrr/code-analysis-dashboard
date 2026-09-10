@@ -157,3 +157,9 @@
 - New public GitHub App creation and staged credential transfer succeeded after explicit authorization; owner confirmed service-only installation. Worker repository application mode deployed, retaining old credentials for rollback.
 - Verified public projects/manifest HTTP 200 and unauthenticated configuration HTTP 401. Eliminated anonymous metadata lookup from the App token path; tokens are single-repository, contents-read only and tested.
 - Prepared app-only Pages workflow with no scheduled data publication/cleanup. Production build is 1,075,537 bytes without report data. Browser preview loaded live reports and switched to the service-self project with 69 findings and no JavaScript errors. Twenty launcher tests, TypeScript and workflow audit passed. End-to-end user login and scan verification follows UI deployment.
+
+
+### 2026-09-10 - Authenticated launch and portable scanner implementation
+- Verified authenticated producer 34440758894 attempt 1 and publisher 34440932058 for source 8c44cde0; 32 supported SARIF uploads complete.
+- Added reviewed portable scanner profiles, exact client-request/producer/publication tracking and cache-safe cleanup grace.
+- Validation: 152 service tests, 10 application tests, launcher regression checks, workflow audit, TypeScript/build and 14 retained-dataset browser tests passed. Alternate-layout live validation follows.

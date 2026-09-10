@@ -59,6 +59,8 @@ def report_publication(config, state, report_release, document=None):
             for key in ('documents', 'assets', 'analyzed_sha', 'collected_run', 'report_status', 'native_feedback'):
                 if key in old:
                     entry[key] = old[key]
+            if row.get('status') == 'collected' and old.get('collected_run') == f"{row.get('scan_run_id')}-{row.get('run_attempt')}":
+                entry['status'] = old.get('report_status', 'partial')
             if entry.get('analyzed_sha') and entry['analyzed_sha'] != row['head_sha']:
                 entry['status'] = 'stale'
             run_key = f"{row.get('scan_run_id')}-{row.get('run_attempt')}"
@@ -115,7 +117,7 @@ def report_publication(config, state, report_release, document=None):
                              'scanning':sum(r['status']=='scanning' for r in result['targets'])}
         release_manifest.write(repo, report_release, result)
         for name, asset in assets.items():
-            if name.startswith('analysis-') and name not in referenced:
+            if name.startswith('analysis-') and name not in referenced and release_manifest.expired_grace(asset):
                 github.api(f"repos/{repo}/releases/assets/{asset['id']}", method='DELETE')
     return result
 
@@ -168,6 +170,8 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         if selection and project['id'] == project_id and request_id != old.get('last_request_id'):
             github.request_refresh(state, selected['id'])
             state['last_request_id'] = request_id
+            next(r for r in state['targets'] if r['id'] == selected['id'])['client_request_id'] = request_id
+            state['requests'] = [r for r in state.get('requests', []) if r['request_id'] != request_id][-99:] + [{'request_id':request_id,'target_id':selected['id'],'head_sha':selected['head_sha']}]
         state['targets'].sort(key=lambda row: not row.get('manual_refresh',False))
         project_dispatches = 0
         for row in state['targets']:
@@ -199,6 +203,10 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         if queued_asset is not None and project['id']==project_id and state.get('last_request_id')==request_id:
             github.api(f"repos/{repository}/releases/assets/{queued_asset['id']}",method='DELETE')
             queued_asset = None
+        for receipt in state.get('requests', []):
+            selected_row = next((r for r in state['targets'] if r.get('client_request_id') == receipt['request_id'] and r['head_sha'] == receipt['head_sha']), None)
+            if selected_row and selected_row.get('scan_run_id'):
+                receipt.update({k:selected_row[k] for k in ('scan_run_id','run_attempt','execution_sha')})
         current = github.release(repository,config['report_release'],create=True)
         summaries.append(report_publication(config,state,current,document)['metrics'])
         release_manifest.write(repository,release,state)  # Persist bounded evidence recovery intents.
