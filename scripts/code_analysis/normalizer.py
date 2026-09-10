@@ -543,7 +543,7 @@ class RuffParser:
 
         findings: list[Finding] = []
         for result in data:
-            code = result.get("code", "")
+            code = result.get("code") or "syntax-error"
             prefix = code[:1]
             is_security = prefix in self._SECURITY_PREFIXES
             category = "SECURITY" if is_security else "QUALITY"
@@ -769,6 +769,15 @@ class RadonParser:
         if not isinstance(report, dict):
             raise ValueError("Radon report must be an object keyed by source path")
         for file_name, blocks in report.items():
+            if isinstance(blocks, dict) and isinstance(blocks.get("error"), str):
+                findings.append(Finding(
+                    source_tool="Radon", category="QUALITY", severity="MEDIUM",
+                    confidence="HIGH", file=file_name, start_line=0, end_line=0,
+                    rule_id="radon-source-parse-error", rule_name="Source parsing failed",
+                    message="Complexity could not be measured: " + blocks["error"],
+                    tags=["parse-error", "incomplete-analysis"],
+                ))
+                continue
             if not isinstance(blocks, list):
                 raise ValueError(f"Radon blocks must be an array: {file_name}")
             for block in blocks:

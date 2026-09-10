@@ -68,6 +68,8 @@ def execute(channel, profile, source, output):
                 native.write_text(json.dumps(relative(data)))
             if channel=='typescript' and rc!=0 and not re.search(r'error TS\d+:',native.read_text()):raise ValueError('TypeScript failed without native compiler diagnostics')
             status.update(status='COMPLETED',reason='Native report retained.' if rc==0 else 'Native report retained; command reported findings or test failures.')
+            if channel=='radon' and any(isinstance(v,dict) and 'error' in v for v in data.values()):
+                status.update(status='FAILED',reason='Radon could not parse one or more source files; retained diagnostics identify affected files.')
         if channel=='typescript' and native.exists() and command and command.get('cwd','.')!='.':
             prefix=Path(command['cwd']).as_posix().rstrip('/')+'/'
             native.write_text(re.sub(r'^([^\r\n(]+)(\(\d+,\d+\):)',lambda m:prefix+m.group(1)+m.group(2),native.read_text(),flags=re.MULTILINE))

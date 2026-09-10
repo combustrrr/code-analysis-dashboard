@@ -91,3 +91,19 @@ The report remains valid partial: the portable profile does not yet execute all
 language/runtime/vendor adapters. Readiness setup_required entries are actual
 configuration/adapter gaps, not failed dependency installation. This launch proof
 does not accept all-scanner readiness or unrestricted arbitrary-repository support.
+
+### 2026-09-10 - Approved portable rollout verified
+
+Service run 34453034854 attempt 1 published 637 findings at 1b040419; all 48
+supported SARIF partitions completed. Observer run 34453210882 published 11
+findings at 9d39d52a without native reporting or source writes. Browser requests
+returned both exact reports with HTTP 200 and no JavaScript errors.
+
+Both reports remain partial. The alternate source has Python syntax errors and
+an ESLint config importing an undeclared plugin. Radon also rejects BOMs in some
+service files. Ruff null-rule diagnostics and Radon parse-error normalization are
+repaired on the follow-up branch, pending a new immutable tooling rollout.
+Vendor/API/image adapter configuration and repository-posture access remain
+incomplete. This proves a second source layout, not independent App installation.
+
+Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass.

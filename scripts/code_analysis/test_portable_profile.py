@@ -91,3 +91,33 @@ class ArtifactRetentionTests(unittest.TestCase):
             self.assertFalse(upload['path'].startswith('.'))
             self.assertEqual(upload['retention-days'],7)
             self.assertTrue(any('--output '+upload['path'] in step.get('run','') for step in job['steps']))
+
+
+class NativeSyntaxEvidenceTests(unittest.TestCase):
+    def test_ruff_null_rule_preserves_syntax_diagnostic(self):
+        from scripts.code_analysis.normalizer import RuffParser
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'ruff-results.json'
+            path.write_text(json.dumps([{'code':None,'filename':'pkg/bad.py','message':'SyntaxError: missing quote','location':{'row':2}}]))
+            findings=RuffParser().parse(path)
+            self.assertEqual(findings[0].rule_id,'syntax-error')
+            self.assertEqual(findings[0].start_line,2)
+
+    def test_radon_parse_errors_are_native_diagnostics(self):
+        from scripts.code_analysis.normalizer import RadonParser
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'radon-cc.json'
+            path.write_text(json.dumps({'pkg/bad.py':{'error':'invalid syntax'}}))
+            findings=RadonParser().parse(path)
+            self.assertEqual(findings[0].rule_id,'radon-source-parse-error')
+            self.assertEqual(findings[0].file,'pkg/bad.py')
+
+    def test_radon_parse_failure_is_not_completed_complexity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            def run(argv,**kwargs):
+                kwargs['stdout'].write('{"bad.py":{"error":"invalid syntax"}}')
+                return subprocess.CompletedProcess(argv,0)
+            with patch('scripts.code_analysis.portable_runner.subprocess.run',side_effect=run):
+                result=execute('radon',{'mode':'portable','python_root':'.'},root,root/'output')
+            self.assertEqual(result['status'],'FAILED')
