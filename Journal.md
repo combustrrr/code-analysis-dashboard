@@ -147,3 +147,13 @@
 - PR #2 merged at aa58a41e; Pages deployment succeeded. Fork removal 2410a3dd passed product CI. All execution wiring, vendor credentials and generated current/state Releases have been removed from the product fork; historical Actions/checks remain historical records.
 - Verified migration of 26 targets (60,060,125 compressed bytes) into service Releases, preserving source/producer identity. Service-host scheduler and self-analysis succeeded. All 32 native Gitleaks/Trivy SARIF partitions completed processing on the service's own commit; neither product repository receives native uploads.
 - Removed the legacy hourly discovery trigger while retaining the manual compatibility path. Authenticated multi-project delivery cutover and retirement of legacy Pages data refresh remain pending App credential approval and end-to-end browser verification. Scanner entitlement/setup exceptions remain explicit.
+
+### 2026-09-10 — Authenticated cutover authorized
+- Owner approved proceeding with the previously described new GitHub App credential setup and transfer to the existing Cloudflare Worker. Stage replacement credentials separately, preserve legacy login, and verify browser launch/current-report delivery before retiring compatibility publication.
+
+
+
+### 2026-09-10 ? New App and live report delivery activated
+- New public GitHub App creation and staged credential transfer succeeded after explicit authorization; owner confirmed service-only installation. Worker repository application mode deployed, retaining old credentials for rollback.
+- Verified public projects/manifest HTTP 200 and unauthenticated configuration HTTP 401. Eliminated anonymous metadata lookup from the App token path; tokens are single-repository, contents-read only and tested.
+- Prepared app-only Pages workflow with no scheduled data publication/cleanup. Production build is 1,075,537 bytes without report data. Browser preview loaded live reports and switched to the service-self project with 69 findings and no JavaScript errors. Twenty launcher tests, TypeScript and workflow audit passed. End-to-end user login and scan verification follows UI deployment.
