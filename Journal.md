@@ -246,3 +246,5 @@ Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass
 
 ### 2026-09-11 - Issue filtering and repository connection review
 - User requested richer issue filters and verification of application components, especially Connections and Repositories. Found Connections still calls the retired single-repository API; repair selected-project verification and repository form state safety.
+
+- Implemented combined rule/file/directory/location/scanner-overlap filters and reset behavior. Repaired Connections to use selected-project API with installation, source identity and both workflow checks. Repositories preserves scan-only visibility, restricts administrative controls, invalidates stale previews and supports retry. 59 service tests and workflow policy passed; 28 targeted API tests passed. Retained browser suite initially passed 15 tests; two regression failures were resolved and all three affected checks passed, including mobile layout and repository recovery.

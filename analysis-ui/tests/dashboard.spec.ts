@@ -287,7 +287,7 @@ test('connections verify live configuration without claiming scanner completion'
   await expect(page.getByText('Configuration needs attention')).toBeVisible();
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:testInfo.outputPath('connections-mobile.png'),fullPage:true});
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.getByRole('button',{name:'Sign out',exact:true}).click();
   await expect(page.getByText('Configuration needs attention')).not.toBeVisible();
 });
@@ -378,7 +378,7 @@ test('issue filters compose, clear and remain usable on mobile',async({page})=>{
  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'Single scanner'}).click();
  await expect(rows.first()).toBeVisible();
  await page.setViewportSize({width:390,height:844});
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
 test('repositories recover from failures and discard stale installation preview',async({page,context})=>{
