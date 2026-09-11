@@ -179,3 +179,26 @@
 - Approved PR #6 rollout completed at a5e708e6; Cloudflare deployed cd792fd1-b4b9-489f-a496-2aae9bd8e577. Superseded runs were cancelled only after replacement requests were persisted.
 - Live retries completed portable execution, but upload-artifact excluded the hidden output directory. Move native evidence into portable-output/ and add a generated-workflow retention regression before retrying both layouts.
 - Full local acceptance now passes 154 service tests and 22 launcher tests, including protected-branch refusal without force or strategy changes.
+
+### 2026-09-10 - Live evidence acceptance and syntax diagnostics
+- Approved rollout and retention repair deployed. Service producer 34453034854 published 637 findings at 1b040419; all 48 supported security uploads completed. Observer producer 34453210882 published 11 findings without source writes or native uploads.
+- Both reports remain partial. Retained native evidence exposes source Python syntax errors and a missing ESLint plugin in the alternate layout, plus Radon BOM parsing failures. Repair Ruff null-rule diagnostics and retain Radon parse errors without declaring complete complexity coverage.
+
+### 2026-09-10 - Approved portable rollout verified
+
+Service run 34453034854 attempt 1 published 637 findings at 1b040419; all 48
+supported SARIF partitions completed. Observer run 34453210882 published 11
+findings at 9d39d52a without native reporting or source writes. Browser requests
+returned both exact reports with HTTP 200 and no JavaScript errors.
+
+Both reports remain partial. The alternate source has Python syntax errors and
+an ESLint config importing an undeclared plugin. Radon also rejects BOMs in some
+service files. Ruff null-rule diagnostics and Radon parse-error normalization are
+repaired on the follow-up branch, pending a new immutable tooling rollout.
+Vendor/API/image adapter configuration and repository-posture access remain
+incomplete. This proves a second source layout, not independent App installation.
+
+Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass.
+
+### 2026-09-11 - Repository onboarding and diagnostic rollout started
+- User requested PR #8 tooling deployment and independently authorized execution-repository onboarding validation. Inspect current access and review installation files before source-repository mutations.
