@@ -96,3 +96,11 @@ Next chat: read live profile/run/Release state, keep named scanner limitations h
 and implement new requested work only in the service unless product work is explicit.
 Preserve unrelated local edits, never log secrets, and journal work at start/end.
 See README.md for validation commands and docs/code-analysis/README.md for guides.
+
+## 2026-09-12 free-service operations update
+
+Workers Logs is configured for sanitized API errors and 5% of successful API requests.
+Automatic invocation logs and traces are disabled; OAuth callbacks are excluded.
+Responses carry an opaque X-Request-ID. Existing auth and GitHub storage are unchanged.
+See [free-service decisions](FREE_SERVICES.md) for quotas, operational steps and OSS
+programs assessed. No paid plans, credit programs or third-party accounts activated.

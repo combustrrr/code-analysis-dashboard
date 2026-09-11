@@ -256,3 +256,8 @@ Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass
 - User requested all implementation documentation and handoffs updated in service and product fork, then committed and pushed. Consolidate current deployed architecture, authorization, launch/filter UX, scanner maintenance and named evidence blockers; preserve historical records as historical.
 
 - Updated current architecture, operation, authentication, readiness, maintenance and repository guides; historical references now point to the current handoff. Added docs/HANDOFF.md with exact rollout and tooling provenance, tests, storage/access boundaries and named external exceptions. Current guide links and whitespace checks passed. Product fork documentation/version validation also passed in an isolated checkout; no implementation changes.
+
+### 2026-09-12 - Free Cloudflare operations and OSS perks review
+- User requested useful free Cloudflare components and OSS perks. Reviewed current provider documentation and Ossium directory. Add sampled sanitized API diagnostics through included Workers Logs; do not provision paid credit plans, duplicate storage or analytics vendors. Sonar OSS plan is a potential entitlement remedy, not yet activated.
+
+- Added Workers Logs configuration with invocation logs/traces off; custom events exclude auth callbacks and payload/identity data, sample successes and include opaque response correlation IDs. 34 launcher tests pass, including privacy and authorization regressions; Wrangler dry-run accepts configuration. Documented provider quotas and perk decisions. Project Alexandria requires payment-method/eligibility approval; Sonar OSS entitlement remains unactivated; no third-party telemetry or duplicate storage added.

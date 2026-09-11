@@ -1,3 +1,4 @@
+import {emitDiagnostic} from './diagnostics.mjs';
 import {isCollaborator} from './viewer-access.mjs';
 import { webhook } from './github-app.mjs';
 import { publicReports } from './reports.mjs';
@@ -193,6 +194,7 @@ async function route(request, env) {
   throw new Failure(404, 'Not found.');
 }
 export default { async fetch(request, env) {
+  const started=Date.now();const requestId=crypto.randomUUID();
   if (env.APPLICATION_MODE === 'repositories' && env.NEXT_GITHUB_CLIENT_ID) {
     env = {...env, GITHUB_CLIENT_ID:env.NEXT_GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET:env.NEXT_GITHUB_CLIENT_SECRET,
       GITHUB_APP_ID:env.NEXT_GITHUB_APP_ID, GITHUB_APP_SLUG:env.NEXT_GITHUB_APP_SLUG,
@@ -201,9 +203,12 @@ export default { async fetch(request, env) {
   let response;
   try { response = await route(request, env); } catch (e) { response = json({ error: e instanceof Failure ? e.message : 'Launcher unavailable. No successful launch has been confirmed; check GitHub Actions before retrying.' }, e instanceof Failure ? e.status : 503); }
   const headers = new Headers(response.headers);
+  headers.set('X-Request-ID',requestId);
+  emitDiagnostic(request,response.status,started,requestId,env);
   if (restricted(env) || !new URL(request.url).pathname.startsWith('/api/public/')) headers.set('Cache-Control', restricted(env) ? 'private, no-store' : 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
   if (request.headers.get('Origin') === env.DASHBOARD_ORIGIN) {
     headers.set('Access-Control-Allow-Origin', env.DASHBOARD_ORIGIN); headers.set('Vary', 'Origin');
+    headers.set('Access-Control-Expose-Headers','X-Request-ID, Retry-After');
     headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   }
   return new Response(response.body, { status: response.status, headers });
