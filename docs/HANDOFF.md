@@ -113,3 +113,21 @@ and external analysis ownership preserved. Dashboard obsolete implementation bra
 were removed after merge/tree verification; main and two open scanner-update PR
 branches remain. Future merged PR branches are automatically deleted. See
 [cleanup audit](BRANCH_CLEANUP_2026-09-12.md) for exact deleted refs and recovery proof.
+
+## Final cleanup checkpoint (2026-09-12)
+
+Product synchronization CI 34635362172 and documentation CI 34635362297 both passed.
+Dashboard reconciliation 34635758316 succeeded; this is discovery/publication
+orchestration evidence, not proof every latest scanner completed. Cloudflare API
+version fa8abdc1-4941-4626-9595-5ce8b7b33480 includes sanitized diagnostics and live
+request correlation, with anonymous requests still denied. The implementation and
+synchronization records are committed to service main and fork Testing.
+
+Obsolete local publication clones/worktrees, scanner downloads, verification logs,
+generated builds/test outputs and caches were removed. Active service dependencies
+and retained browser-test data remain. Do not look for new implementation inside
+product-side temporary directories. Tests can regenerate build outputs as needed.
+
+Remaining: Sonar OSS branch entitlement, upstream posture permissions, exact latest
+report/channel verification, and review of open scanner updates. Another accepted
+collaborator live login stays deferred. No paid plan or upstream write is authorized.
