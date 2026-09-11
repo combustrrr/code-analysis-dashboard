@@ -5,7 +5,7 @@ authentication, GitHub Actions orchestration, scanner adapters, and current repo
 
 ## Project layout
 
-- `analysis-ui/`: static dashboard, themes, issues, provenance, and scan wizard.
+- `analysis-ui/`: static dashboard, themes, issues, provenance, and direct scan launch.
 - `analysis-launcher/`: GitHub sign-in and authorized launching on Cloudflare.
 - `scripts/code_analysis/`: discovery, scanner adapters, normalization, publication.
 - `config/code-analysis/`: repository profile, scanner inventory, report contracts.
@@ -55,3 +55,16 @@ do not treat the second read-only source test as independent onboarding acceptan
 
 See [migration status](docs/MIGRATION.md) and
 [authenticated launch setup](docs/code-analysis/AUTHENTICATED_LAUNCHING.md).
+
+## Finding filters and connection checks
+
+Issues supports combined severity, scanner, rule, file, directory, source-location and
+scanner-overlap filters, plus free-text search and Clear filters. Multiple scanners
+means supporting scanner families, not proof of a shared root cause. Overview
+shortcuts and target changes clear unrelated filters.
+
+Connections verifies the selected project identity, current App access and both
+execution workflows. A successful connection check does not imply complete scanner
+evidence. Repositories allows scan users to inspect projects; administrator access
+is required for setup or configuration commits. Changing the source invalidates
+an installation preview, and failed requests can be retried.

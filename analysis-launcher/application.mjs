@@ -238,6 +238,18 @@ export async function applicationApi(request, env, session, helpers) {
     const preview = {type:'installation',exp:Date.now()+600000,actor:actor.id,repository:repo.full_name,repository_id:repo.id,branch:repo.default_branch,base:head.object.sha,tree:commit.tree.sha,files};
     return json({files,project:updated,confirmation:await seal(preview,env.SESSION_KEY)});
   }
+  if (request.method === 'GET' && url.pathname === '/api/project-integration') {
+    const repo = await publicRepository(url.searchParams.get('repository')); await installation(repo);
+    const document = await config(repo);
+    const project = document.projects.find(p => p.id === url.searchParams.get('project_id'));
+    if (!project) throw new Failure(404,'Unknown project.');
+    const source = await publicRepository(project.source_repository.full_name);
+    const workflows = await Promise.all(['code-analysis-reconcile.yml','code-analysis-source.yml'].map(name=>github(`repos/${repo.full_name}/actions/workflows/${name}`,token)));
+    const matches = source.id === project.source_repository.id;
+    return json({source_repository:source.full_name,analysis_repository:repo.full_name,publishing_repository:repo.full_name,
+      workflow_branch:repo.default_branch,workflow_state:workflows.map(w=>`${w.name}: ${w.state}`).join('; '),
+      configuration_matches:matches,ready:matches && workflows.every(w=>w.state==='active'),enabled_scanners:project.enabled_scanners,checked_at:new Date().toISOString()});
+  }
   if (request.method === 'GET' && url.pathname === '/api/project-readiness') {
     const repo = await publicRepository(url.searchParams.get('repository')); await installation(repo);
     const document = await config(repo);

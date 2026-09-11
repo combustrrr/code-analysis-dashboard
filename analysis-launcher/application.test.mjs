@@ -141,3 +141,16 @@ test('new connections use the adopted service tooling revision',async()=>{
  assert.equal(JSON.parse(preview.files['.github/code-analysis/projects.json']).tooling_sha,'d'.repeat(40));
  assert.ok(preview.files['.github/workflows/code-analysis-source.yml'].includes('@'+'d'.repeat(40)));
 });
+
+
+test('project connection verification uses current project identity and both workflows',async()=>{
+ const path='/api/project-integration?repository=owner/repo&project_id=1';
+ const h=configuredHelpers({'repos/owner/repo/actions/workflows/code-analysis-reconcile.yml':{name:'Discovery',state:'active'},'repos/owner/repo/actions/workflows/code-analysis-source.yml':{name:'Scanners',state:'disabled_manually'}});
+ const result=await (await applicationApi(new Request('https://worker.example'+path),env,{token:'test'},h)).json();
+ assert.equal(result.ready,false);assert.equal(result.configuration_matches,true);
+ assert.match(result.workflow_state,/disabled_manually/);assert.equal(result.publishing_repository,'owner/repo');
+ assert.ok(h.calls.every(c=>!c.options.method));
+ await assert.rejects(()=>applicationApi(new Request('https://worker.example'+path.replace('project_id=1','project_id=missing')),env,{token:'test'},h),e=>e.status===404);
+ const revoked=configuredHelpers({'user/installations?per_page=100&page=1':{installations:[]}});
+ await assert.rejects(()=>applicationApi(new Request('https://worker.example'+path),env,{token:'test'},revoked),e=>e.status===403);
+});
