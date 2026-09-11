@@ -202,3 +202,17 @@ Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass
 
 ### 2026-09-11 - Repository onboarding and diagnostic rollout started
 - User requested PR #8 tooling deployment and independently authorized execution-repository onboarding validation. Inspect current access and review installation files before source-repository mutations.
+
+### 2026-09-11 - PR 8 deployed; independent installation prepared
+- PR #8 merged at f375dd277c28da6cd7498e035cdc73e39f66b20e. Immutable tooling a0dcd02062a1dbfc24d085fcaea71e36b3ba3512 deployed to Cloudflare version a5abd528-0ded-48cb-ad01-b058cb003e40.
+- Validation passed 92 service tests, 21 launcher tests, workflow policy and GitHub scanner compatibility. New request 2107d699-8853-4318-a656-baedf88d4b6d is durably queued; cancelled only superseded run 34618955338 to free capacity.
+- Prepared a fresh three-file parking-lot execution installation with the missing ESLint plugin supplied in the isolated scanner profile. Awaiting explicit file review and GitHub App access; no second-repository writes performed. Independent onboarding acceptance remains pending.
+
+### 2026-09-11 - Kavach-only validation focus
+- User cancelled independent parking-lot installation work and requested verification of Kavach monitoring, Actions execution and Cloudflare Worker hosting. Keep source repositories read-only.
+
+- Verified upstream Testing head 231bb41f7eb1b707e25113c258eb8d5c7356b743 matches published producer 34461843043 attempt 1, with 21,475 findings. Native upstream reporting is prohibited; execution and Releases remain in the service repository. Sonar and security-posture evidence remain partial.
+- Requested prioritized Kavach refresh c6672ee7-ecc6-4e8c-8e80-0d432d4bc00d through reconciliation 34625102888. Independent parking-lot installation is cancelled; no source writes performed.
+
+### 2026-09-11 - Remove parking monitoring and audit automatic scanner updates
+- User requested only Kavach upstream, Agentic-Kibana fork and service-self projects. Remove parking-lot service configuration and managed current/state assets, never the source repository. Daily updater currently fails because SCANNER_UPDATE_TOKEN is absent; extend maintenance coverage to portable profiles and reusable workflows.

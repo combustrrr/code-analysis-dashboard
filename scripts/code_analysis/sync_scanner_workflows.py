@@ -47,6 +47,7 @@ def sync(root: Path):
             raise ValueError('Missing generator action constant')
     path.write_text(content, encoding='utf-8')
     subprocess.run([sys.executable, '-m', 'scripts.code_analysis.generate_source_workflow'], cwd=root, check=True)
+    subprocess.run([sys.executable, '-m', 'scripts.code_analysis.generate_reusable_workflows'], cwd=root, check=True)
 
 
 if __name__ == '__main__':

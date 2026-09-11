@@ -25,19 +25,33 @@ npm ci --ignore-scripts
 npm run build
 ```
 
+## Connect a repository
+
+Open the application's **Repositories** section, sign in with GitHub, and install
+Code Analysis Dashboard on an execution repository you administer. Load repositories
+and select it. Leave Source repository blank to analyze that repository, or enter
+another public repository to analyze it read-only.
+
+Preview setup and review every generated workflow and profile before confirming
+the installation commit. Branch protection is never bypassed. Load configured
+projects to review scanner commands and credentials, then open the project and
+choose **Run analysis**. Select a branch, PR number, or full 40-character commit SHA.
+The activity view distinguishes queued execution from published results.
+
+Each execution repository runs its own Actions and stores current reports in
+managed Release assets. Small wrappers reference immutable shared workflows in
+this service repository. Scanner credentials are supplied by that repository's
+owner; configuration alone does not prove usable scanner evidence. Source-only
+observer projects do not upload checks or security findings to the source.
+
 ## Deployment
 
-This repository owns the complete service, including analysis execution and Pages
-publication. See [migration status](docs/MIGRATION.md) for remaining access setup.
+The shared UI is hosted on GitHub Pages; Cloudflare handles authentication,
+authorization and report delivery. Reports are not bundled into the UI build.
+This instance currently executes connected service-self and read-only source
+projects in combustrrr/code-analysis-dashboard. Agentic-Kibana and upstream remain
+read-only. Independent execution installation is awaiting owner review/access;
+do not treat the second read-only source test as independent onboarding acceptance.
 
-Source: ARYDESTROYER/Kavach-AgenticSOC. Analysis host: combustrrr/code-analysis-dashboard.
-
-GitHub Actions produces exact-revision reports. This repository maintains current report assets and publishes one UI to GitHub Pages. No application source is executed by the publisher.
-
-Configure config/code-analysis/service.json to replicate the service. The source host runs the discovery and exact-source workflows; this repository runs the publication template.
-
-Viewing reports is public and static. Direct analysis launching uses GitHub sign-in through the optional Cloudflare Worker in analysis-launcher/. No report database or historical findings browser is required.
-
-See [authenticated launch setup](docs/code-analysis/AUTHENTICATED_LAUNCHING.md). Direct launch is disabled until the GitHub App and Worker are configured; the Run analysis dialog provides the GitHub Actions handoff meanwhile.
-
-To retry one target after vendor access is repaired, run Discover upstream analysis targets in the analysis host Actions tab. Set refresh_target to a branch name, PR #number, or dashboard target ID. Other targets remain visible and the two-analysis limit still applies.
+See [migration status](docs/MIGRATION.md) and
+[authenticated launch setup](docs/code-analysis/AUTHENTICATED_LAUNCHING.md).
