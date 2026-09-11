@@ -13,8 +13,7 @@
     "NEXT_GITHUB_APP_ID": "4893614",
     "NEXT_GITHUB_APP_SLUG": "code-analysis-dashboard",
     "APPLICATION_MODE": "repositories",
-    "DASHBOARD_ACCESS": "allowlist",
-    "DASHBOARD_ALLOWED_USERS": "combustrrr",
+    "DASHBOARD_ACCESS": "collaborators",
     "TOOLING_SHA": "a0dcd02062a1dbfc24d085fcaea71e36b3ba3512"
   },
   "secrets": {

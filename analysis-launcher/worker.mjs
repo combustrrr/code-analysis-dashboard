@@ -1,3 +1,4 @@
+import {isCollaborator} from './viewer-access.mjs';
 import { webhook } from './github-app.mjs';
 import { publicReports } from './reports.mjs';
 import { applicationApi } from './application.mjs';
@@ -53,12 +54,14 @@ async function pages(path, token) {
   }
   throw new Failure(422, 'Target inventory exceeds the launcher pagination limit. Use GitHub Actions to launch this repository.');
 }
+const restricted = env => ['allowlist','collaborators'].includes(env.DASHBOARD_ACCESS);
 async function viewer(env, token) {
   const user = await github('user', token);
   if (env.DASHBOARD_ACCESS === 'allowlist') {
     const allowed = (env.DASHBOARD_ALLOWED_USERS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
     if (!allowed.includes(user.login?.toLowerCase())) throw new Failure(403, 'This GitHub account is not authorized to view this dashboard.');
   }
+  if(env.DASHBOARD_ACCESS === 'collaborators' && !await isCollaborator(env,user.login)) throw new Failure(403, 'Only collaborators of the analysis repository may view this dashboard.');
   return user;
 }
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } });
@@ -101,9 +104,9 @@ async function route(request, env) {
   if (env.APPLICATION_MODE === 'repositories') {
     if (request.method === 'GET' && url.pathname === '/api/public/config') {
       const slug = env.GITHUB_APP_SLUG;
-      return json({mode:'repositories', require_login:env.DASHBOARD_ACCESS === 'allowlist', installation_url: /^[a-z0-9-]+$/.test(slug || '') ? `https://github.com/apps/${slug}/installations/new` : null});
+      return json({mode:'repositories', require_login:restricted(env), installation_url: /^[a-z0-9-]+$/.test(slug || '') ? `https://github.com/apps/${slug}/installations/new` : null});
     }
-    if (env.DASHBOARD_ACCESS !== 'allowlist') {
+    if (!restricted(env)) {
       const report = await publicReports(request,env);
       if (report) return report;
     }
@@ -112,7 +115,7 @@ async function route(request, env) {
   if (request.headers.get('Origin') !== env.DASHBOARD_ORIGIN) throw new Failure(403, 'Dashboard origin required.');
   if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
   const session = await unseal((request.headers.get('Authorization') || '').replace(/^Bearer /, ''), env.SESSION_KEY, 'session');
-  if (env.DASHBOARD_ACCESS === 'allowlist' || url.pathname === '/api/session') {
+  if (restricted(env) || url.pathname === '/api/session') {
     const user = await viewer(env, session.token);
     if (request.method === 'GET' && url.pathname === '/api/session') return json({login:user.login});
   }
@@ -198,7 +201,7 @@ export default { async fetch(request, env) {
   let response;
   try { response = await route(request, env); } catch (e) { response = json({ error: e instanceof Failure ? e.message : 'Launcher unavailable. No successful launch has been confirmed; check GitHub Actions before retrying.' }, e instanceof Failure ? e.status : 503); }
   const headers = new Headers(response.headers);
-  if (env.DASHBOARD_ACCESS === 'allowlist' || !new URL(request.url).pathname.startsWith('/api/public/')) headers.set('Cache-Control', env.DASHBOARD_ACCESS === 'allowlist' ? 'private, no-store' : 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
+  if (restricted(env) || !new URL(request.url).pathname.startsWith('/api/public/')) headers.set('Cache-Control', restricted(env) ? 'private, no-store' : 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
   if (request.headers.get('Origin') === env.DASHBOARD_ORIGIN) {
     headers.set('Access-Control-Allow-Origin', env.DASHBOARD_ORIGIN); headers.set('Vary', 'Origin');
     headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
