@@ -202,3 +202,8 @@ Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass
 
 ### 2026-09-11 - Repository onboarding and diagnostic rollout started
 - User requested PR #8 tooling deployment and independently authorized execution-repository onboarding validation. Inspect current access and review installation files before source-repository mutations.
+
+### 2026-09-11 - PR 8 deployed; independent installation prepared
+- PR #8 merged at f375dd277c28da6cd7498e035cdc73e39f66b20e. Immutable tooling a0dcd02062a1dbfc24d085fcaea71e36b3ba3512 deployed to Cloudflare version a5abd528-0ded-48cb-ad01-b058cb003e40.
+- Validation passed 92 service tests, 21 launcher tests, workflow policy and GitHub scanner compatibility. New request 2107d699-8853-4318-a656-baedf88d4b6d is durably queued; cancelled only superseded run 34618955338 to free capacity.
+- Prepared a fresh three-file parking-lot execution installation with the missing ESLint plugin supplied in the isolated scanner profile. Awaiting explicit file review and GitHub App access; no second-repository writes performed. Independent onboarding acceptance remains pending.
