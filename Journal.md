@@ -216,3 +216,17 @@ Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass
 
 ### 2026-09-11 - Remove parking monitoring and audit automatic scanner updates
 - User requested only Kavach upstream, Agentic-Kibana fork and service-self projects. Remove parking-lot service configuration and managed current/state assets, never the source repository. Daily updater currently fails because SCANNER_UPDATE_TOKEN is absent; extend maintenance coverage to portable profiles and reusable workflows.
+
+- PR #9 merged after 16 maintenance/project tests, workflow policy and GitHub compatibility passed. Verified main has exactly upstream, fork and service-self. Removed only parking project current/state Releases and matching queued requests; source repository untouched. Updater remains explicitly blocked by missing repository-scoped SCANNER_UPDATE_TOKEN.
+
+### 2026-09-11 - Scanner updater credential setup
+- User authorized configuring SCANNER_UPDATE_TOKEN. Existing CLI authentication is an account-wide OAuth token, not a repository-scoped maintenance credential. Do not persist it in the updater. Prepare fine-grained token creation and repository-secret setup; never log token values.
+- Credential setup remains pending owner token creation: prepared a prefilled fine-grained GitHub token link and direct repository-secret page. Existing broad CLI OAuth credential was not copied; no secret values were read or exposed.
+
+### 2026-09-11 - Verify saved scanner maintenance credential
+- Owner saved SCANNER_UPDATE_TOKEN; verified secret name exists without accessing its value. Dispatched updater run 34627221312 for live permission and dependency discovery validation.
+- Updater run 34627221312 succeeded in 86 seconds. Dependency discovery found 199 references across 26 files and created PR #10 (pin dependencies) and PR #11 (Gitleaks Action digest). Secret and required-status protection gates passed. Credential blocker is resolved; update PR validation and immutable tooling promotion remain separate.
+
+### 2026-09-11 - GitHub allowlist dashboard access
+- User requested GitHub sign-in and a username allowlist for viewing. Prepare server-side authorization and a sign-in-only UI before report loading; owner combustrrr included pending additional usernames. Public GitHub Release storage remains public and is not made confidential by this application gate.
+- Implemented live GitHub username checks for protected report and mutation APIs, private/no-store responses, sign-in gate, session recheck and report-cache clearing. Owner-only configuration prepared. 27 launcher/App/report tests pass; browser acceptance is running. Public GitHub storage limitation documented.

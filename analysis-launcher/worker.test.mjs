@@ -115,3 +115,26 @@ test('exact request status remains confined to the configured discovery workflow
   path = '.github/workflows/unrelated.yml';
   assert.equal((await worker.fetch(await request('/api/runs/42'),env)).status,404);
 });
+
+
+test('allowlisted reports require authentication before any report fetch',async t=>{
+ const calls=t.mock.method(globalThis,'fetch',()=>{throw new Error('No upstream access expected');});
+ const restricted={...env,APPLICATION_MODE:'repositories',DASHBOARD_ACCESS:'allowlist',DASHBOARD_ALLOWED_USERS:'combustrrr'};
+ for(const path of ['projects','manifest','asset']){
+  const r=await worker.fetch(new Request('https://launcher.example/api/public/'+path+'?repository=host/scanners&project_id=1',{headers:{Origin:env.DASHBOARD_ORIGIN}}),restricted);
+  assert.equal(r.status,401);assert.equal(r.headers.get('Cache-Control'),'private, no-store');
+ }
+ assert.equal(calls.mock.calls.length,0);
+});
+test('viewer authorization is case insensitive and rechecked after removal',async t=>{
+ t.mock.method(globalThis,'fetch',async url=>{assert.equal(url,'https://api.github.com/user');return reply({login:'Combustrrr'});});
+ const restricted={...env,APPLICATION_MODE:'repositories',DASHBOARD_ACCESS:'allowlist',DASHBOARD_ALLOWED_USERS:' combustrrr '};
+ assert.equal((await worker.fetch(await request('/api/session'),restricted)).status,200);
+ assert.equal((await worker.fetch(await request('/api/session'),{...restricted,DASHBOARD_ALLOWED_USERS:'another-user'})).status,403);
+ assert.equal((await worker.fetch(await request('/api/public/manifest?repository=host/scanners&project_id=1'),{...restricted,DASHBOARD_ALLOWED_USERS:''})).status,403);
+});
+test('allowlisted viewer still needs repository write access to launch',async t=>{
+ t.mock.method(globalThis,'fetch',async url=>reply(url.endsWith('/user')?{login:'combustrrr'}:{permissions:{pull:true,push:false}}));
+ const restricted={...env,DASHBOARD_ACCESS:'allowlist',DASHBOARD_ALLOWED_USERS:'combustrrr'};
+ assert.equal((await worker.fetch(await request('/api/launch',{repository:'source/app',kind:'branch',ref:'main'}),restricted)).status,403);
+});

@@ -89,4 +89,4 @@ To recover a bad upgrade, revert its maintenance PR in the analysis host and req
 a fresh scan. The new tooling revision preserves attribution; never relabel a
 previous report as though it came from the reverted scanner version.
 
-Portable scanner pins in portable_workflow.py and repository project commands are now included. Regeneration includes both reusable source workflows. Current operational blocker: SCANNER_UPDATE_TOKEN is absent; daily update runs fail explicitly. Required Scanner compatibility branch protection is configured. Merged dependency changes must also be promoted through a tested immutable tooling revision before existing installations execute them.
+Portable scanner pins in portable_workflow.py and repository project commands are now included. Regeneration includes both reusable source workflows. SCANNER_UPDATE_TOKEN was configured and verified on 2026-09-11: updater run 34627221312 succeeded and opened update PRs #10 and #11. Required Scanner compatibility branch protection is configured. Merged dependency changes must also be promoted through a tested immutable tooling revision before existing installations execute them.
