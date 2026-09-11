@@ -3,6 +3,8 @@ title: Current Findings Platform
 description: Read-only exact-commit scanner aggregation and the offline Issue Wall operating contract.
 ---
 
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../../../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 # Agentic SOC Current Findings Platform
 
 > **Authority:** the checked-in workflows, scanner catalog, and current contracts listed

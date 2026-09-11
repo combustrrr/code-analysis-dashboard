@@ -1,3 +1,5 @@
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 # Issue Wall UI handoff — 2026-09-06
 
 Copy the **Next-chat prompt** section into a fresh chat. This file records the verified

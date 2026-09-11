@@ -1,3 +1,5 @@
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 ﻿# Extraction from the product repository
 
 The service now lives entirely in combustrrr/code-analysis-dashboard: discovery,

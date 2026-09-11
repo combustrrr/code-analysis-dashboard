@@ -57,3 +57,8 @@ cached readers; deletion happens only after the new manifest is committed.
 Validation must distinguish adapter coverage from universal language support:
 CodeQL portability currently covers Python and JavaScript/TypeScript. A second
 read-only source proves another layout; it does not prove a second App installation.
+
+Current instance: only service-self and the read-only Kavach upstream/product fork
+are monitored. The alternate layout was a historical test and is no longer active.
+New previews use the adopted service tooling pin; do not copy a historical pin
+without checking the execution profile. See [handoff](HANDOFF.md).

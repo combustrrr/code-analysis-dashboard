@@ -19,3 +19,8 @@ This is application access control, not confidential report storage. The public
 GitHub repository, its Release assets and Actions artifacts remain publicly
 accessible through GitHub. GitHub Pages serves the static login application.
 Private findings require a separately reviewed storage-visibility migration.
+
+Verified baseline: owner login is confirmed. Production-mode browser tests cover
+login, logout and revoked access; live anonymous project-integration returns 401.
+A second collaborator live test is deferred by the owner. See the
+[current handoff](../HANDOFF.md) for deployment evidence.

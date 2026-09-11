@@ -3,6 +3,8 @@ title: Scanner and repository integrations
 description: Connect another scanner or repository to the static analysis dashboard.
 ---
 
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 # Scanner and repository integrations
 
 The service uses this pattern for each repository instance:
