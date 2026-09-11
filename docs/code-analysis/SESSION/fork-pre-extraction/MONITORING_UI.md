@@ -3,6 +3,8 @@ title: Issue Wall
 description: Generate, open, verify, filter, and review the offline exact-commit Issue Wall artifact.
 ---
 
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../../../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 # Issue Wall
 
 The coordinated scanner and evidence system is the **Web of Scanners**. Its external,

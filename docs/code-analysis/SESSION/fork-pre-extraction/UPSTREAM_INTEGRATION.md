@@ -3,6 +3,8 @@ title: Code-analysis integration gate
 description: Scope and acceptance gates for a future code-analysis proposal to upstream Testing.
 ---
 
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../../../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 # Upstream integration and enterprise release gate
 
 This code-analysis subsystem is external, read-only engineering infrastructure. It can

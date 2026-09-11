@@ -1,34 +1,23 @@
----
-title: Code-analysis current state
-description: Release state, integration decisions, and explicit non-goals for the code-analysis subsystem.
----
+# Current implementation state
 
-# Code-analysis current state
+The authoritative [new-chat handoff](../HANDOFF.md) records the verified deployment,
+source projects, producer evidence, tests and remaining work as of 2026-09-11.
 
-The implemented scanner and Issue Wall subsystem is release-review ready. No product-code
-integration or automated remediation work remains.
+Deployed: standalone Ant Design application, collaborator login, repository/profile
+configuration, direct branch/PR/full-SHA launch, durable bounded queue, current Release
+reports, automatic selected-target results, issue filtering/grouping/provenance,
+selected-project connection verification, and validated immutable scanner adoption.
 
-## Upstream review gate
+Execution/storage: service repository only. Kavach upstream and Agentic-Kibana fork
+are read-only sources; service-self is connected. Parking-lot monitoring is removed.
+The product retains independent CI/docs/release workflows. Pages has no report data.
 
-- Prepare any proposal from the latest upstream `Testing` branch; `main` is the stable
-  release branch and is not the development integration target.
-- Apply only the scoped paths defined in [`UPSTREAM_INTEGRATION.md`](UPSTREAM_INTEGRATION.md).
-- Run **Full Code Analysis (Manual)** for the proposed exact commit. Each invocation
-  dispatches four fresh scanner groups. The reusable builder independently selects
-  successful exact-title runs, so fresh-run exclusivity is not yet proven.
-- Confirm additional observation channel availability at review time. CodeRabbit remains advisory;
-  Snyk and SonarQube Cloud remain additional observation evidence lanes and cannot satisfy required channels.
-- Obtain repository-owner approval before creating an upstream pull request.
+Open exceptions: Sonar non-main-branch entitlement and upstream repository-security
+posture permissions. A successful advisory workflow is not a complete scanner report.
+Another collaborator's live login is deferred; independent external-owner installation
+is not live-proven and is outside the current Kavach-focused scope. Do not restore
+superseded fork installation or claim every scanner has usable evidence.
 
-## Explicit non-goals
-
-- No hosted Issue Wall server or VM is required.
-- No scanner may patch code, push branches, create issues, or remediate findings.
-- No deferred scanner placeholder is part of the supported dashboard.
-- No upstream branch, pull request, or repository setting is created by the subsystem.
-
-
-The published data contract is now snapshot-v2 with one `analysis_channels` inventory,
-class metadata owned by the catalog, and a separate static publication gate. Historical
-v1 artifacts are not rewritten. The UI leads with Snapshot health and Risk posture,
-then discovery, with Channel Observatory, Workflow Provenance, and Snapshot Proof below.
+Latest UI/API rollout: PR #17, Pages run 34632779427, Worker version
+13dc3e20-4d86-4350-9167-4223ed24ad04. Latest verified adopted tooling: PR #16,
+7cc92da3ecb6229359e364d163d42a70c305c096. Read live profiles before reusing a pin.

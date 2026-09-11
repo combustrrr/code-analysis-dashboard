@@ -3,6 +3,8 @@ title: Code-analysis production readiness
 description: Enterprise release controls, evidence gates, workflow security, and artifact delivery boundaries.
 ---
 
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../../../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 # External code-analysis service production readiness
 
 ## Service boundary

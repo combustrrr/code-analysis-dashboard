@@ -3,6 +3,9 @@
 A standalone code-analysis application: React/Ant Design dashboard, Cloudflare
 authentication, GitHub Actions orchestration, scanner adapters, and current reports.
 
+Start a new chat with [docs/HANDOFF.md](docs/HANDOFF.md). Current operational guides
+are indexed in [docs/code-analysis/README.md](docs/code-analysis/README.md).
+
 ## Project layout
 
 - `analysis-ui/`: static dashboard, themes, issues, provenance, and direct scan launch.
@@ -50,7 +53,7 @@ The shared UI is hosted on GitHub Pages; Cloudflare handles authentication,
 authorization and report delivery. Reports are not bundled into the UI build.
 This instance currently executes connected service-self and read-only source
 projects in combustrrr/code-analysis-dashboard. Agentic-Kibana and upstream remain
-read-only. Independent execution installation is awaiting owner review/access;
+read-only. Independent external-owner installation is outside the current scope and not live-proven;
 do not treat the second read-only source test as independent onboarding acceptance.
 
 See [migration status](docs/MIGRATION.md) and

@@ -3,6 +3,8 @@ title: Snyk contribution measurement
 description: Measure Snyk findings that add unique value beyond the required scanner channels.
 ---
 
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 # Snyk unique-contribution measurement
 
 > **Measured:** 2026-08-28

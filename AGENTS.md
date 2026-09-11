@@ -1,6 +1,6 @@
 # Code Analysis Dashboard contributor instructions
 
-This repository owns the external code-analysis service. Read README.md and
+This repository owns the external code-analysis service. Read docs/HANDOFF.md, README.md and
 docs/MIGRATION.md before changing deployment wiring.
 
 - Append Journal.md at session start/end and meaningful milestones.

@@ -3,6 +3,8 @@ title: Code-analysis current decisions
 description: Remaining integration decisions and explicit non-goals for the code-analysis subsystem.
 ---
 
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../../../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 # Code-analysis current decisions
 
 The implemented scanner and Issue Wall subsystem is release-review ready. No product-code

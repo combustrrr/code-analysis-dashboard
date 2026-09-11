@@ -36,7 +36,7 @@ or credential stay unavailable; they are not silently deferred.
 
 There is no application-maintained fixed list of extension slots. This is not
 unlimited compute or storage: GitHub workflow/runner limits, vendor quotas, the
-50 MB per-envelope bound, and the existing 900 MB site safety threshold still
+50 MB per-envelope bound, and the 900,000,000-byte current-report budget per project still
 apply. Large inventories may need batched workflows or sharded adapter output;
 those are capacity changes, not extra UI implementations.
 
@@ -94,3 +94,9 @@ Portable scanner pins in portable_workflow.py and repository project commands ar
 ## Adoption of validated tooling
 
 15-tooling-rollout.yml validates trusted main with scanner tests and canaries, then proposes an exact three-file tooling pin PR. A subsequent compatibility completion or daily reconciliation merges only matching managed files after exact-head Scanner compatibility and remaining branch protections pass. No default-branch force updates are used. The publisher uses the maintenance token separately from scanner validation. Main advancing during validation postpones promotion. New connections read the adopted revision from the service profile rather than requiring a Worker redeploy. Existing external execution repositories keep their own reviewed pins; this instance currently hosts all three projects itself.
+
+Live adoption proof: PR #16 was automatically created, validated and merged; active
+verified pin is 7cc92da3ecb6229359e364d163d42a70c305c096. Consult the
+[handoff](../HANDOFF.md) and live profile for current evidence. Registration must be
+wired into the selected execution profile and reusable producer, not only a legacy
+catalog entry. Missing adapters remain setup_required; UI rendering is generic.

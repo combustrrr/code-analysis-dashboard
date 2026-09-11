@@ -3,6 +3,8 @@ title: External scanner activation
 description: Optional CodeRabbit, SonarQube Cloud, and Snyk activation and credential boundaries.
 ---
 
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 # External analysis activation
 
 The deterministic 16-channel current-findings platform works without external AI

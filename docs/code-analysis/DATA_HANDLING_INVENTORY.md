@@ -3,6 +3,8 @@ title: Code-analysis data handling
 description: Scanner credentials, evidence retention, failure behavior, and removal boundaries for Issue Wall.
 ---
 
+> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+
 # Code-analysis scanner and data-handling inventory
 
 > **Scope:** release-facing inventory for the fork-only, read-only Issue Wall service.
