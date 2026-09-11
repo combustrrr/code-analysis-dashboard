@@ -20,7 +20,7 @@ jobs:
         run: python -m pip install -r .ci/requirements.txt
       - name: Validate generated workflows and channel contracts
         run: |
-          python -m unittest scripts.code_analysis.test_hosted scripts.code_analysis.test_extensions scripts.code_analysis.test_portability scripts.code_analysis.test_scanner_access scripts.code_analysis.test_scanner_updates scripts.code_analysis.test_projects scripts.code_analysis.test_repository_service
+          python -m unittest scripts.code_analysis.test_hosted scripts.code_analysis.test_extensions scripts.code_analysis.test_portability scripts.code_analysis.test_scanner_access scripts.code_analysis.test_scanner_updates scripts.code_analysis.test_projects scripts.code_analysis.test_repository_service scripts.code_analysis.test_tooling_promotion
           python -m scripts.code_analysis.audit_workflows
       - name: Exercise native scanner output compatibility
         run: python -m scripts.code_analysis.scanner_smoke

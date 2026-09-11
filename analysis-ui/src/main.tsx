@@ -78,6 +78,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const [pendingLaunch, setPendingLaunch] = useState<(LaunchRequest & { previousReport?: string; previousRun?: number })>();
   const [refreshTick, setRefreshTick] = useState(0);
   const [lastRefresh, setLastRefresh] = useState('');
+  useEffect(()=>{const refresh=()=>setRefreshTick(t=>t+1);window.addEventListener('analysis-report-published',refresh);return()=>window.removeEventListener('analysis-report-published',refresh);},[]);
   useEffect(() => { document.documentElement.dataset.theme = appearance; try { localStorage.setItem('analysis-theme', appearance); } catch {} }, [appearance]);
   const [category, setCategory] = useState('');
   const [channelStatus, setChannelStatus] = useState('');
@@ -167,7 +168,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
         </Space>
       </section>
       {(error || index?.discovery_error || index?.publication_error || target?.error) && <Alert showIcon type="error" title="Report service error" description={error || index?.discovery_error || index?.publication_error || target?.error}/>}
-      {report && (!fresh || report.status === 'partial') && <Alert showIcon type="warning" title={!fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={!fresh ? 'These findings belong to the older analyzed commit shown above.' : 'Available findings are shown. Unavailable scanners do not mean zero issues.'}/>}
+      {report && (!fresh || report.status === 'partial') && <Alert showIcon type="warning" title={!fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={!fresh ? 'These findings belong to the older analyzed commit shown above.' : `Available findings are shown. Incomplete scanners: ${report.channels.filter(c=>!['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE','DEFERRED'].includes(c.status)).map(c=>c.name).join(', ') || 'see Scanners for evidence details'}. Open Scanners for the failure reason.`}/>}
       <Tabs activeKey={r.tab} onChange={tab => navigate(target?.id || '', tab)} items={['overview', 'issues', 'scanners', 'provenance', 'connections', ...(import.meta.env.VITE_APPLICATION_MODE === 'repositories' ? ['repositories'] : [])].map(tab => ({ key: tab, label: tab[0].toUpperCase() + tab.slice(1) + (tab === 'issues' && report ? ` (${report.finding_count.toLocaleString()})` : '') }))}/>
       {r.tab === 'repositories' ? <Repositories auth={launchAuth} endpoint={applicationEndpoint || index?.launch_endpoint}/> : r.tab === 'connections' ? <Connections auth={launchAuth} source={index?.source_repository || index?.targets[0]?.repository} host={index?.analysis_repository} publisher={index?.publishing_repository} endpoint={index?.launch_endpoint} start={() => setRunOpen(true)}/> : !report ? <div className="empty" role="status"><Empty description={loading ? 'Loading the selected report...' : r.target && !target ? 'Target no longer active' : 'No report available yet'}/></div> : <>
         {r.tab === 'overview' && <>

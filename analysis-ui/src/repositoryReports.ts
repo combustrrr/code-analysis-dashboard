@@ -2,6 +2,7 @@
 const manifests = new Map<string, {at:number; value:any}>();
 const shards = new Map<string, Promise<Record<string, unknown>>>();
 export const applicationEndpoint = import.meta.env.VITE_LAUNCH_ENDPOINT as string | undefined;
+export function refreshRepositoryReports(){manifests.clear();shards.clear();}
 let reportBearer: string | undefined;
 export function setReportSession(token?:string) {
  if(token!==reportBearer){manifests.clear();shards.clear();reportBearer=token;}

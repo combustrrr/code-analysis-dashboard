@@ -234,3 +234,8 @@ Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass
 
 ### 2026-09-11 - Repository collaborators determine dashboard viewers
 - User replaced manual username allowlisting with current code-analysis-dashboard collaborators. Use an exact GitHub collaborator check, not public repository read permissions; preserve write/admin mutation checks and no-store responses.
+- PR #14 merged and Worker 790b69a7-4b11-4803-955b-5cd29a1a4318 deployed in collaborators mode. 29 tests and required compatibility CI passed. GitHub collaborator endpoint recognizes owner with 204; no collaborator invitations or source-repository changes made.
+
+### 2026-09-11 - Scanner acceptance and validated update adoption
+- User requested live collaborator validation, latest Kavach scanner evidence and automatic adoption of validated tooling. Collaborator sign-in requested; no impersonation. Inspect exact producer evidence and implement protected-branch-safe tooling promotion.
+- Owner login confirmed; other collaborator validation explicitly postponed. Latest Kavach producer 34625192366 published 21,477 findings at current head. Sonar failed because trusted sonar-project.properties was missing; restored the existing vendor project identity. Upstream security posture remains permission-limited; CLI has no upstream admin access. Simplified run selection and automatic result navigation; protected tooling adoption prepared.

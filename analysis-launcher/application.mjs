@@ -184,13 +184,15 @@ export async function applicationApi(request, env, session, helpers) {
     const sourceTree = source.id === execution.id ? tree : await github(`repos/${source.full_name}/git/trees/${encodeURIComponent(source.default_branch)}?recursive=1`, token);
     if (tree.truncated || sourceTree.truncated) throw new Failure(422, 'Repository inventory is incomplete; manual profile setup is required.');
     const found = detectedProfile(sourceTree.tree.filter(x => x.type === 'blob').map(x => x.path));
-    const files = wrappers(env.ANALYSIS_REPOSITORY, env.TOOLING_SHA);
-    let document = {schema_version:'analysis-projects-v1', execution_repository:identity(execution), tooling_sha:env.TOOLING_SHA, max_parallel_analyses:2, projects:[]};
+    const tooling = env.TOOLING_FROM_SERVICE === 'true' ? (await config(await publicRepository(env.ANALYSIS_REPOSITORY))).tooling_sha : env.TOOLING_SHA;
+    if(!SHA.test(tooling||''))throw new Failure(503,'Validated tooling revision unavailable.');
+    const files = wrappers(env.ANALYSIS_REPOSITORY, tooling);
+    let document = {schema_version:'analysis-projects-v1', execution_repository:identity(execution), tooling_sha:tooling, max_parallel_analyses:2, projects:[]};
     if (tree.tree.some(x => x.path === CONFIG)) document = await config(execution);
     if (document.projects.some(p => p.id === String(source.id))) throw new Failure(409, 'This source project is already connected.');
     const project = {id:String(source.id), source_repository:identity(source), relationship:source.id === execution.id ? 'connected':'observer', preferred_branch:source.default_branch, profile:found.profile, enabled_scanners:SCANNERS, deferred_channels:{}, report_budget_bytes:900000000};
     document.projects.push(project);
-    document.tooling_sha = env.TOOLING_SHA;
+    document.tooling_sha = tooling;
     files[CONFIG] = JSON.stringify(document, null, 2) + '\n';
     // Existing managed wrappers may be updated; unknown files are never overwritten.
     for (const path of Object.keys(files).filter(p => p !== CONFIG)) {
