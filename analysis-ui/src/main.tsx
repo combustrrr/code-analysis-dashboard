@@ -83,6 +83,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const [category, setCategory] = useState('');
   const [channelStatus, setChannelStatus] = useState('');
   const [directory, setDirectory] = useState('');
+  const [rule,setRule]=useState(''); const [file,setFile]=useState(''); const [locationFilter,setLocationFilter]=useState(''); const [overlap,setOverlap]=useState('');
   const [index, setIndex] = useState<Index>(); const [error, setError] = useState(''); const [r, setRoute] = useState(route());
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
   const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
@@ -99,14 +100,17 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   useEffect(() => { setDetail(undefined); setSource([]); if (!r.issue || !target?.report) return; const f = findings.find(f => f.id === r.issue); if (!f) return; const c = new AbortController();
     json<Detail[]>(`data/${target.report}/details/${f.page}.json`, c.signal).then(async rows => { const d = rows.find(d => d.id === f.id); setDetail(d); if (d?.source) setSource(await json<string[]>(`data/${target.report}/${d.source}`, c.signal)); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); return () => c.abort();
   }, [r.issue, findings, target?.report]);
-  const filtered = useMemo(() => findings.filter(f => (!directory || (f.file.includes('/') ? f.file.slice(0, f.file.lastIndexOf('/')) : '(root)') === directory) && (!severity || f.severity === severity) && (!scanner || f.scanners.includes(scanner)) && `${f.message} ${f.file} ${f.rules.join(' ')}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => (ranks[a.severity] ?? 9) - (ranks[b.severity] ?? 9) || a.file.localeCompare(b.file)), [findings, query, severity, scanner, directory]);
+  const filtered = useMemo(() => findings.filter(f => (!directory || (f.file.includes('/') ? f.file.slice(0, f.file.lastIndexOf('/')) : '(root)') === directory) && (!rule || f.rules.includes(rule)) && (!file || f.file === file) && (!locationFilter || (locationFilter === 'located' ? !!f.file && f.line > 0 : !f.file || !f.line)) && (!overlap || (overlap === 'multiple' ? new Set(f.scanners).size > 1 : new Set(f.scanners).size === 1)) && (!severity || f.severity === severity) && (!scanner || f.scanners.includes(scanner)) && `${f.message} ${f.file} ${f.rules.join(' ')} ${f.scanners.join(' ')}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => (ranks[a.severity] ?? 9) - (ranks[b.severity] ?? 9) || a.file.localeCompare(b.file)), [findings, query, severity, scanner, directory, rule, file, locationFilter, overlap]);
+  const issueOptions = useMemo(()=>({rules:[...new Set(findings.flatMap(f=>f.rules))].sort(),files:[...new Set(findings.map(f=>f.file).filter(Boolean))].sort(),directories:[...new Set(findings.map(f=>directoryOf(f.file)))].sort()}),[findings]);
+  const resetFilters=()=>{setQuery('');setSeverity('');setScanner('');setDirectory('');setRule('');setFile('');setLocationFilter('');setOverlap('');setPage(0);};
+  useEffect(resetFilters,[r.repository,r.project,target?.id]);
   const grouped = useMemo(() => {
     if (groupBy === 'none') return [] as [string, Finding[]][];
     const groups = new Map<string, Finding[]>();
     filtered.forEach(f => { const key = groupBy === 'rule' ? f.rules[0] || 'No rule' : groupBy === 'scanner' ? f.scanners[0] || 'No scanner' : groupBy === 'file' ? f.file || 'No file' : directoryOf(f.file); groups.set(key, [...(groups.get(key) || []), f]); });
     return [...groups].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
   }, [filtered, groupBy]);
-  useEffect(() => setPage(0), [query, severity, scanner, directory]);
+  useEffect(() => setPage(0), [query, severity, scanner, directory, rule, file, locationFilter, overlap]);
   const directories = useMemo(() => {
     const counts = new Map<string, number>();
     findings.forEach(f => { const dir = f.file.includes('/') ? f.file.slice(0, f.file.lastIndexOf('/')) : '(root)'; counts.set(dir, (counts.get(dir) || 0) + 1); });
@@ -170,7 +174,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
       {(error || index?.discovery_error || index?.publication_error || target?.error) && <Alert showIcon type="error" title="Report service error" description={error || index?.discovery_error || index?.publication_error || target?.error}/>}
       {report && (!fresh || report.status === 'partial') && <Alert showIcon type="warning" title={!fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={!fresh ? 'These findings belong to the older analyzed commit shown above.' : `Available findings are shown. Incomplete scanners: ${report.channels.filter(c=>!['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE','DEFERRED'].includes(c.status)).map(c=>c.name).join(', ') || 'see Scanners for evidence details'}. Open Scanners for the failure reason.`}/>}
       <Tabs activeKey={r.tab} onChange={tab => navigate(target?.id || '', tab)} items={['overview', 'issues', 'scanners', 'provenance', 'connections', ...(import.meta.env.VITE_APPLICATION_MODE === 'repositories' ? ['repositories'] : [])].map(tab => ({ key: tab, label: tab[0].toUpperCase() + tab.slice(1) + (tab === 'issues' && report ? ` (${report.finding_count.toLocaleString()})` : '') }))}/>
-      {r.tab === 'repositories' ? <Repositories auth={launchAuth} endpoint={applicationEndpoint || index?.launch_endpoint}/> : r.tab === 'connections' ? <Connections auth={launchAuth} source={index?.source_repository || index?.targets[0]?.repository} host={index?.analysis_repository} publisher={index?.publishing_repository} endpoint={index?.launch_endpoint} start={() => setRunOpen(true)}/> : !report ? <div className="empty" role="status"><Empty description={loading ? 'Loading the selected report...' : r.target && !target ? 'Target no longer active' : 'No report available yet'}/></div> : <>
+      {r.tab === 'repositories' ? <Repositories auth={launchAuth} endpoint={applicationEndpoint || index?.launch_endpoint}/> : r.tab === 'connections' ? <Connections repository={r.repository} project={r.project} auth={launchAuth} source={index?.source_repository || index?.targets[0]?.repository} host={index?.analysis_repository} publisher={index?.publishing_repository} endpoint={applicationEndpoint || index?.launch_endpoint} start={() => setRunOpen(true)}/> : !report ? <div className="empty" role="status"><Empty description={loading ? 'Loading the selected report...' : r.target && !target ? 'Target no longer active' : 'No report available yet'}/></div> : <>
         {r.tab === 'overview' && <>
           <section className="metrics">{['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(s => <div key={s}><Statistic title={<Badge value={s}/>} value={report.severities[s] || 0}/><Button type="link" onClick={() => { setSeverity(s); navigate(target!.id, 'issues'); }}>View findings</Button></div>)}</section>
           <section className="summary"><div><h2>Reported issues</h2><p>{report.finding_count.toLocaleString()} findings from {report.observation_count.toLocaleString()} scanner observations.</p><p>Inspect the rule, exact source location, and evidence behind each finding.</p><Button type="primary" onClick={() => { setSeverity(''); setDirectory(''); setQuery(''); setScanner(''); navigate(target!.id, 'issues'); }}>Browse issues</Button></div>
@@ -204,9 +208,15 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
           ]}/></>}
         {r.tab === 'issues' && <>
           {directory && <Tag closable onClose={() => setDirectory('')}>Directory: {directory}</Tag>}
-          <div className="filters"><Input aria-label="Search issues" prefix={<SearchOutlined/>} placeholder="Search message, file, or rule" allowClear value={query} onChange={e => setQuery(e.target.value)}/>
+          <div className="filters"><Input aria-label="Search issues" prefix={<SearchOutlined/>} placeholder="Search message, file, rule, or scanner" allowClear value={query} onChange={e => setQuery(e.target.value)}/>
             <Select aria-label="Severity" value={severity} onChange={setSeverity} options={[{ value: '', label: 'All severities' }, ...Object.keys(ranks).map(s => ({ value: s, label: s }))]}/>
             <Select aria-label="Scanner" showSearch optionFilterProp="label" value={scanner} onChange={setScanner} options={[{ value: '', label: 'All scanners' }, ...[...new Set(findings.flatMap(f => f.scanners))].sort().map(s => ({ value: s, label: s }))]}/>
+            <Select aria-label="Rule" showSearch optionFilterProp="label" value={rule} onChange={setRule} options={[{value:'',label:'All rules'},...issueOptions.rules.map(value=>({value,label:value}))]}/>
+            <Select aria-label="File" showSearch optionFilterProp="label" value={file} onChange={setFile} options={[{value:'',label:'All files'},...issueOptions.files.map(value=>({value,label:value}))]}/>
+            <Select aria-label="Directory" showSearch optionFilterProp="label" value={directory} onChange={setDirectory} options={[{value:'',label:'All directories'},...issueOptions.directories.map(value=>({value,label:value}))]}/>
+            <Select aria-label="Source location" value={locationFilter} onChange={setLocationFilter} options={[{value:'',label:'Any source location'},{value:'located',label:'File and line available'},{value:'unlocated',label:'Missing file or line'}]}/>
+            <Select aria-label="Scanner overlap" value={overlap} onChange={setOverlap} options={[{value:'',label:'Any scanner support'},{value:'multiple',label:'Multiple scanners'},{value:'single',label:'Single scanner'}]}/>
+            <Button onClick={resetFilters}>Clear filters</Button>
             <Select aria-label="Group issues" value={groupBy} onChange={setGroupBy} options={[{ value: 'none', label: 'No grouping' }, { value: 'rule', label: 'Group by rule' }, { value: 'file', label: 'Group by file' }, { value: 'directory', label: 'Group by directory' }, { value: 'scanner', label: 'Group by scanner' }]}/>
             <span>{filtered.length.toLocaleString()} results</span>
           </div>

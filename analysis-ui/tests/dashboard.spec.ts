@@ -272,10 +272,11 @@ test('connections verify live configuration without claiming scanner completion'
     const headers = {'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
     if(route.request().method()==='OPTIONS') return route.fulfill({status:204,headers});
     if(url.pathname==='/auth/login') return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'connection-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
-    expect(url.pathname).toBe('/api/integration');
+    expect(url.pathname).toBe('/api/project-integration');
+    expect(url.searchParams.get('repository')).toBe(source);expect(url.searchParams.get('project_id')).toBe('selected');
     return route.fulfill({headers,json:{source_repository:source,analysis_repository:source,publishing_repository:'owner/dashboard',workflow_branch:'Testing',workflow_state:ready?'active':'disabled_manually',configuration_matches:true,ready,enabled_scanners:['ruff','coverage'],checked_at:new Date().toISOString()}});
   });
-  await page.goto('/#tab=connections');
+  await page.goto('/#'+new URLSearchParams({tab:'connections',repository:source,project:'selected'}));
   await expect(page.getByRole('heading',{name:'Application connections'})).toBeVisible();
   await expect(page.getByText('Launch configuration verified')).not.toBeVisible();
   await page.getByRole('button',{name:'Sign in to verify connections'}).click();
@@ -356,4 +357,55 @@ test('simple analysis follows scanner attempt and opens published target',async(
  await expect(page).toHaveURL(/target=selected-target/,{timeout:25000});
  await expect(page.getByRole('dialog')).toHaveCount(0);
  expect(polls).toBe(2);
+});
+
+
+test('issue filters compose, clear and remain usable on mobile',async({page})=>{
+ await page.goto('/#tab=issues');
+ const rows=page.locator('.ant-table-tbody > tr.ant-table-row');
+ await expect(rows.first()).toBeVisible();
+ await page.getByLabel('Rule',{exact:true}).click();
+ await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(1).click();
+ await expect(rows.first()).toBeVisible();
+ await page.getByLabel('Search issues').fill('no-such-issue-unique-123');
+ await expect(page.getByText('No findings match these filters.')).toBeVisible();
+ await page.getByRole('button',{name:'Clear filters',exact:true}).click();
+ await expect(rows.first()).toBeVisible();
+ await page.getByLabel('Source location',{exact:true}).click();
+ await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'File and line available'}).click();
+ await expect(rows.first()).toBeVisible();
+ await page.getByLabel('Scanner overlap',{exact:true}).click();
+ await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'Single scanner'}).click();
+ await expect(rows.first()).toBeVisible();
+ await page.setViewportSize({width:390,height:844});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('repositories recover from failures and discard stale installation preview',async({page,context})=>{
+ const data=JSON.parse(readFileSync('public/data/index.json','utf8'));data.launch_endpoint='https://launcher.example';
+ await page.route('**/index.json',r=>r.fulfill({json:data}));
+ let fail=true;
+ await context.route('https://launcher.example/**',async route=>{
+  const url=new URL(route.request().url());
+  const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'test-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{installation_url:'https://github.com/apps/test/installations/new'}});
+  if(url.pathname==='/api/repositories')return route.fulfill({headers,status:fail?503:200,json:fail?{error:'GitHub temporarily unavailable'}:{repositories:[{id:1,full_name:'owner/service',can_configure:true}],has_more:false}});
+  if(url.pathname==='/api/connections/preview')return route.fulfill({headers,json:{confirmation:'opaque',files:{'config.json':'{}'},project:{relationship:'observer',source_repository:{full_name:'owner/source'}},detection:{notice:'Review scanner setup',detected_manifests:[]}}});
+  throw Error('Unexpected request '+url.pathname);
+ });
+ await page.goto('/#tab=repositories');
+ await page.getByRole('button',{name:'Sign in with GitHub',exact:true}).click();
+ await page.getByRole('button',{name:'Load repositories',exact:true}).click();
+ await expect(page.getByText('Error: GitHub temporarily unavailable',{exact:true})).toBeVisible();
+ fail=false;await page.getByRole('button',{name:'Load repositories',exact:true}).click();
+ await page.getByLabel('Execution repository',{exact:true}).click();
+ await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'owner/service'}).click();
+ await page.getByRole('button',{name:'Preview setup',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Confirm installation commit'})).toBeVisible();
+ await page.getByLabel('Source repository',{exact:true}).fill('owner/another');
+ await expect(page.getByRole('button',{name:'Confirm installation commit'})).not.toBeVisible();
+ await page.getByRole('button',{name:'Sign out',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Preview setup',exact:true})).toBeDisabled();
 });
