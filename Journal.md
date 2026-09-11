@@ -270,3 +270,8 @@ Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass
 
 - Cleanup completed: deleted 11 obsolete dashboard remote branches plus the completed cleanup PR branch using atomic exact-SHA leases; matching local branches removed after integration proof. Remaining remote branches are main and the two open scanner-update PRs (#10/#11). Enabled delete_branch_on_merge. Local dashboard main and product Testing updated; original uncommitted product Journal note and untracked files preserved. Corrected upstream fetch URL; push remains DISABLED.
 - Fork Testing ccc711e3 contains upstream 231bb41f with zero missing upstream commits. Documentation CI passed; product CI has no failures observed and only offline backend tests still running at this check. Reconciliation 34635758316 requested to refresh source heads and retire deleted dashboard targets. No upstream writes or paid services.
+
+### 2026-09-12 - Final documentation and temporary artifact cleanup
+- User requested commit/push, current handoff and temporary-file removal. Implementation is merged. Remove stale verification downloads/logs, generated build/test output and deployment/Python caches; retain active dependencies and the 21,189-finding browser fixture. Product sync CI and docs both passed; preserve vendor entitlement exceptions as pending.
+
+- Cleanup completed for service verification downloads/logs, Wrangler state, generated UI build/test output and Python caches. Active dependencies and retained browser fixture preserved. Documentation whitespace check passed; no implementation changes or scanner reruns required.
