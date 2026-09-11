@@ -130,3 +130,14 @@ test('protected branch installation fails without forcing or changing strategy',
  assert.equal(writes.length,3);assert.deepEqual(JSON.parse(writes[2].options.body),{sha:'commit',force:false});
  assert.equal(Object.keys(preview.files).length,3);
 });
+
+
+test('new connections use the adopted service tooling revision',async()=>{
+ const service={...repo,id:2,full_name:'owner/service'};
+ const current={schema_version:'analysis-projects-v1',execution_repository:{id:2},tooling_sha:'d'.repeat(40),projects:[]};
+ const h=helpers({'repos/owner/service':service,'repos/owner/service/contents/.github/code-analysis/projects.json?ref=main':{content:Buffer.from(JSON.stringify(current)).toString('base64')}});
+ const result=await applicationApi(request('/api/connections/preview',{execution_repository:'owner/repo'}),{...env,TOOLING_FROM_SERVICE:'true'},{token:'test'},h);
+ const preview=await result.json();
+ assert.equal(JSON.parse(preview.files['.github/code-analysis/projects.json']).tooling_sha,'d'.repeat(40));
+ assert.ok(preview.files['.github/workflows/code-analysis-source.yml'].includes('@'+'d'.repeat(40)));
+});

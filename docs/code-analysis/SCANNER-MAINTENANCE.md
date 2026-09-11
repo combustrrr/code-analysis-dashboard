@@ -90,3 +90,7 @@ a fresh scan. The new tooling revision preserves attribution; never relabel a
 previous report as though it came from the reverted scanner version.
 
 Portable scanner pins in portable_workflow.py and repository project commands are now included. Regeneration includes both reusable source workflows. SCANNER_UPDATE_TOKEN was configured and verified on 2026-09-11: updater run 34627221312 succeeded and opened update PRs #10 and #11. Required Scanner compatibility branch protection is configured. Merged dependency changes must also be promoted through a tested immutable tooling revision before existing installations execute them.
+
+## Adoption of validated tooling
+
+15-tooling-rollout.yml validates trusted main with scanner tests and canaries, then proposes an exact three-file tooling pin PR. A subsequent compatibility completion or daily reconciliation merges only matching managed files after exact-head Scanner compatibility and remaining branch protections pass. No default-branch force updates are used. The publisher uses the maintenance token separately from scanner validation. Main advancing during validation postpones promotion. New connections read the adopted revision from the service profile rather than requiring a Worker redeploy. Existing external execution repositories keep their own reviewed pins; this instance currently hosts all three projects itself.

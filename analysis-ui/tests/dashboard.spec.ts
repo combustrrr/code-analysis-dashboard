@@ -331,7 +331,7 @@ test('repository configuration requires a preview and explicit confirmation', as
 });
 
 
-test('project wizard follows scanner attempt until publication',async({page,context})=>{
+test('simple analysis follows scanner attempt and opens published target',async({page,context})=>{
  let polls=0;
  await page.route('**/index.json',async route=>{const data=JSON.parse(readFileSync('public/data/index.json','utf8'));data.launch_endpoint='https://launcher.example';await route.fulfill({json:data});});
  await context.route('https://launcher.example/**',async route=>{
@@ -342,18 +342,18 @@ test('project wizard follows scanner attempt until publication',async({page,cont
   if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:'owner/repo',branches:[{name:'main',sha:'a'.repeat(40)}],prs:[]}});
   if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{tooling_sha:'b'.repeat(40),channels:[{channel:'bandit',status:'configured',reason:'Native evidence required'}]}});
   if(url.pathname==='/api/project-launch')return route.fulfill({headers,json:{request_id:'11111111-1111-1111-1111-111111111111',run_id:10}});
-  if(url.pathname==='/api/project-activity'){polls++;return route.fulfill({headers,json:{phase:polls===1?'scanning':'published',source_sha:'a'.repeat(40),producer:{url:'https://github.com/owner/repo/actions/runs/11/attempts/2',attempt:2,status:polls===1?'in_progress':'completed'},...(polls>1?{completeness:'partial'}:{})}});}
+  if(url.pathname==='/api/project-activity'){polls++;return route.fulfill({headers,json:{phase:polls===1?'scanning':'published',target_id:'selected-target',source_sha:'a'.repeat(40),producer:{url:'https://github.com/owner/repo/actions/runs/11/attempts/2',attempt:2,status:polls===1?'in_progress':'completed'},...(polls>1?{completeness:'partial'}:{})}});}
   throw new Error(url.pathname);
  });
  await page.goto('/#repository=owner%2Frepo&project=1');
  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
  await page.getByRole('button',{name:'Sign in with GitHub',exact:true}).click();
  await page.getByLabel('Revision',{exact:true}).click();await page.getByLabel('Revision',{exact:true}).press('ArrowDown');await page.getByLabel('Revision',{exact:true}).press('Enter');
- await page.getByRole('button',{name:'Continue',exact:true}).click();await expect(page.getByText('bandit',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('button',{name:'Start analysis',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Continue',exact:true})).toHaveCount(0);
+ await page.getByRole('dialog').getByRole('button',{name:'Run analysis',exact:true}).click();
  await expect(page.getByRole('link',{name:'Scanner workflow ? attempt 2'})).toHaveAttribute('href','https://github.com/owner/repo/actions/runs/11/attempts/2');
  await expect(page.getByText('scanning',{exact:true})).toBeVisible();
- await expect(page.getByText('published',{exact:true})).toBeVisible({timeout:25000});
- await expect(page.getByRole('link',{name:'View results',exact:true})).toBeVisible();
+ await expect(page).toHaveURL(/target=selected-target/,{timeout:25000});
+ await expect(page.getByRole('dialog')).toHaveCount(0);
  expect(polls).toBe(2);
 });

@@ -14,6 +14,7 @@
     "NEXT_GITHUB_APP_SLUG": "code-analysis-dashboard",
     "APPLICATION_MODE": "repositories",
     "DASHBOARD_ACCESS": "collaborators",
+    "TOOLING_FROM_SERVICE": "true",
     "TOOLING_SHA": "a0dcd02062a1dbfc24d085fcaea71e36b3ba3512"
   },
   "secrets": {
