@@ -1,35 +1,80 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "enabledManagers": ["github-actions", "pip_requirements", "custom.regex"],
-  "includePaths": [".ci/**", ".github/workflows/0*.yml", ".github/workflows/13-scanner-updates.yml", "scripts/code_analysis/generate_source_workflow.py", "scripts/code_analysis/adapters/**"],
-  "ignorePaths": [".github/workflows/11-source-analysis.yml", ".github/workflows/12-scanner-diagnostics.yml"],
-  "pip_requirements": {"managerFilePatterns": ["/^\\.ci/.*requirements.*\\.txt$/"]},
+  "extends": [
+    "config:recommended"
+  ],
+  "enabledManagers": [
+    "github-actions",
+    "pip_requirements",
+    "custom.regex"
+  ],
+  "includePaths": [
+    ".ci/**",
+    ".github/workflows/0*.yml",
+    ".github/workflows/13-scanner-updates.yml",
+    "scripts/code_analysis/generate_source_workflow.py",
+    "scripts/code_analysis/adapters/**",
+    "scripts/code_analysis/portable_workflow.py",
+    ".github/code-analysis/projects.json"
+  ],
+  "ignorePaths": [
+    ".github/workflows/11-source-analysis.yml",
+    ".github/workflows/12-scanner-diagnostics.yml",
+    ".github/workflows/reusable-source.yml",
+    ".github/workflows/reusable-source-full.yml"
+  ],
+  "pip_requirements": {
+    "managerFilePatterns": [
+      "/^\\.ci/.*requirements.*\\.txt$/"
+    ]
+  },
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.ci/scorecard\\.json$/"],
-      "matchStrings": ["\"version\": \"(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)\""],
+      "managerFilePatterns": [
+        "/^\\.ci/scorecard\\.json$/"
+      ],
+      "matchStrings": [
+        "\"version\": \"(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)\""
+      ],
       "depNameTemplate": "ossf/scorecard",
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.*)$"
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/workflows/0.*\\.yml$/", "/^scripts/code_analysis/(generate_source_workflow\\.py|adapters/.*\\.py)$/"],
-      "matchStrings": ["(?<depName>[A-Za-z][A-Za-z0-9_.-]+)==(?<currentValue>[0-9]+(?:\\.[0-9A-Za-z]+)+)"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/0.*\\.yml$/",
+        "/^scripts/code_analysis/(generate_source_workflow\\.py|adapters/.*\\.py)$/",
+        "/^scripts/code_analysis/portable_workflow\\.py$/",
+        "/^\\.github/code-analysis/projects\\.json$/"
+      ],
+      "matchStrings": [
+        "(?<depName>[A-Za-z][A-Za-z0-9_.-]+)==(?<currentValue>[0-9]+(?:\\.[0-9A-Za-z]+)+)"
+      ],
       "datasourceTemplate": "pypi"
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/workflows/.*\\.yml$/", "/^scripts/code_analysis/adapters/.*\\.py$/"],
-      "matchStrings": ["(?<depName>snyk|renovate)@(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.*\\.yml$/",
+        "/^scripts/code_analysis/adapters/.*\\.py$/",
+        "/^\\.github/code-analysis/projects\\.json$/"
+      ],
+      "matchStrings": [
+        "(?<depName>snyk|renovate|eslint|typescript-eslint|eslint-plugin-react|typescript)@(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"
+      ],
       "datasourceTemplate": "npm"
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/workflows/0.*\\.yml$/", "/^scripts/code_analysis/(generate_source_workflow\\.py|adapters/.*\\.py)$/"],
-      "matchStrings": ["(?<depName>zricethezav/gitleaks):(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/0.*\\.yml$/",
+        "/^scripts/code_analysis/(generate_source_workflow\\.py|adapters/.*\\.py)$/"
+      ],
+      "matchStrings": [
+        "(?<depName>zricethezav/gitleaks):(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"
+      ],
       "datasourceTemplate": "docker"
     }
   ],
@@ -47,16 +92,35 @@
   "packageRules": [
     {
       "description": "Only tested stable Python scanner patch updates qualify for automatic merge",
-      "matchDatasources": ["pypi"],
-      "matchPackageNames": ["bandit", "ruff", "vulture", "radon", "xenon"],
-      "matchUpdateTypes": ["patch"],
+      "matchDatasources": [
+        "pypi"
+      ],
+      "matchPackageNames": [
+        "bandit",
+        "ruff",
+        "vulture",
+        "radon",
+        "xenon"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "matchCurrentVersion": "!/^0/",
       "automerge": true
     }
   ],
   "postUpgradeTasks": {
-    "commands": ["python -m scripts.code_analysis.sync_scanner_workflows"],
-    "fileFilters": [".ci/scorecard.json", "scripts/code_analysis/generate_source_workflow.py", ".github/workflows/11-source-analysis.yml", ".github/workflows/12-scanner-diagnostics.yml"],
+    "commands": [
+      "python -m scripts.code_analysis.sync_scanner_workflows"
+    ],
+    "fileFilters": [
+      ".ci/scorecard.json",
+      "scripts/code_analysis/generate_source_workflow.py",
+      ".github/workflows/11-source-analysis.yml",
+      ".github/workflows/12-scanner-diagnostics.yml",
+      ".github/workflows/reusable-source.yml",
+      ".github/workflows/reusable-source-full.yml"
+    ],
     "executionMode": "branch"
   }
 }

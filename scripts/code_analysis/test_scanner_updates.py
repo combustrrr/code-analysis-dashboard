@@ -127,3 +127,12 @@ class ScannerUpdateTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PortableMaintenanceTests(unittest.TestCase):
+    def test_portable_pins_and_reusable_generation_are_maintained(self):
+        policy=json.loads(Path('.github/renovate-scanners.json').read_text())
+        self.assertIn('scripts/code_analysis/portable_workflow.py',policy['includePaths'])
+        self.assertIn('.github/code-analysis/projects.json',policy['includePaths'])
+        self.assertIn('.github/workflows/reusable-source.yml',policy['postUpgradeTasks']['fileFilters'])
+        self.assertIn('scripts.code_analysis.generate_reusable_workflows',Path('scripts/code_analysis/sync_scanner_workflows.py').read_text())
