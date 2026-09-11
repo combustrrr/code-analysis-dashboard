@@ -15,7 +15,8 @@
     "APPLICATION_MODE": "repositories",
     "DASHBOARD_ACCESS": "collaborators",
     "TOOLING_FROM_SERVICE": "true",
-    "TOOLING_SHA": "a0dcd02062a1dbfc24d085fcaea71e36b3ba3512"
+    "TOOLING_SHA": "a0dcd02062a1dbfc24d085fcaea71e36b3ba3512",
+    "SAFE_API_LOGS": "true"
   },
   "secrets": {
     "required": [
@@ -24,7 +25,15 @@
     ]
   },
   "observability": {
-    "enabled": false
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    },
+    "traces": {
+      "enabled": false
+    }
   },
   "preview_urls": false
 }

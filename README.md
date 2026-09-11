@@ -71,3 +71,6 @@ execution workflows. A successful connection check does not imply complete scann
 evidence. Repositories allows scan users to inspect projects; administrator access
 is required for setup or configuration commits. Changing the source invalidates
 an installation preview, and failed requests can be retried.
+
+See [free services and OSS perks](docs/FREE_SERVICES.md) for the Cloudflare operations
+configuration, diagnostics privacy and evaluated optional programs.
