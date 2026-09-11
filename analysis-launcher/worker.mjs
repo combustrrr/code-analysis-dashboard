@@ -53,6 +53,14 @@ async function pages(path, token) {
   }
   throw new Failure(422, 'Target inventory exceeds the launcher pagination limit. Use GitHub Actions to launch this repository.');
 }
+async function viewer(env, token) {
+  const user = await github('user', token);
+  if (env.DASHBOARD_ACCESS === 'allowlist') {
+    const allowed = (env.DASHBOARD_ALLOWED_USERS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+    if (!allowed.includes(user.login?.toLowerCase())) throw new Failure(403, 'This GitHub account is not authorized to view this dashboard.');
+  }
+  return user;
+}
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } });
 async function route(request, env) {
   if (env.APPLICATION_MODE === 'repositories') {
@@ -81,7 +89,7 @@ async function route(request, env) {
     const grant = await exchange.json();
     if (!exchange.ok || !grant.access_token) throw new Failure(401, 'GitHub sign-in failed. Start sign-in again.');
     if (env.APPLICATION_MODE !== 'repositories') await access(env, grant.access_token);
-    const user = await github('user', grant.access_token);
+    const user = await viewer(env, grant.access_token);
     const token = await seal({ type: 'session', token: grant.access_token, exp: Date.now() + Math.min(3600, grant.expires_in || 3600) * 1000 }, env.SESSION_KEY);
     const scriptNonce = random();
     const message = JSON.stringify({ type: 'analysis-auth', nonce: pending.nonce, token, login: user.login }).replaceAll('<', '\\u003c');
@@ -93,16 +101,24 @@ async function route(request, env) {
   if (env.APPLICATION_MODE === 'repositories') {
     if (request.method === 'GET' && url.pathname === '/api/public/config') {
       const slug = env.GITHUB_APP_SLUG;
-      return json({mode:'repositories', installation_url: /^[a-z0-9-]+$/.test(slug || '') ? `https://github.com/apps/${slug}/installations/new` : null});
+      return json({mode:'repositories', require_login:env.DASHBOARD_ACCESS === 'allowlist', installation_url: /^[a-z0-9-]+$/.test(slug || '') ? `https://github.com/apps/${slug}/installations/new` : null});
     }
-    const report = await publicReports(request,env);
-    if (report) return report;
+    if (env.DASHBOARD_ACCESS !== 'allowlist') {
+      const report = await publicReports(request,env);
+      if (report) return report;
+    }
   }
   if (!url.pathname.startsWith('/api/')) throw new Failure(404, 'Not found.');
   if (request.headers.get('Origin') !== env.DASHBOARD_ORIGIN) throw new Failure(403, 'Dashboard origin required.');
   if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
   const session = await unseal((request.headers.get('Authorization') || '').replace(/^Bearer /, ''), env.SESSION_KEY, 'session');
+  if (env.DASHBOARD_ACCESS === 'allowlist' || url.pathname === '/api/session') {
+    const user = await viewer(env, session.token);
+    if (request.method === 'GET' && url.pathname === '/api/session') return json({login:user.login});
+  }
   if (env.APPLICATION_MODE === 'repositories') {
+    const report = await publicReports(request,env);
+    if (report) return report;
     const response = await applicationApi(request, env, session, {github, json, Failure, seal, unseal, pages});
     if (response) return response;
     throw new Failure(404, 'Unknown application endpoint.');
@@ -182,7 +198,7 @@ export default { async fetch(request, env) {
   let response;
   try { response = await route(request, env); } catch (e) { response = json({ error: e instanceof Failure ? e.message : 'Launcher unavailable. No successful launch has been confirmed; check GitHub Actions before retrying.' }, e instanceof Failure ? e.status : 503); }
   const headers = new Headers(response.headers);
-  if (!new URL(request.url).pathname.startsWith('/api/public/')) headers.set('Cache-Control', 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
+  if (env.DASHBOARD_ACCESS === 'allowlist' || !new URL(request.url).pathname.startsWith('/api/public/')) headers.set('Cache-Control', env.DASHBOARD_ACCESS === 'allowlist' ? 'private, no-store' : 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
   if (request.headers.get('Origin') === env.DASHBOARD_ORIGIN) {
     headers.set('Access-Control-Allow-Origin', env.DASHBOARD_ORIGIN); headers.set('Vary', 'Origin');
     headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');

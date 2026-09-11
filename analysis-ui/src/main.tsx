@@ -1,3 +1,5 @@
+import { DashboardAccess } from './DashboardAccess';
+import { reportFetch } from './repositoryReports';
 import { ProjectLauncher } from './ProjectLauncher';
 import { applicationEndpoint, hasRepositorySelection, repositoryJson } from './repositoryReports';
 import { Repositories } from './Repositories';
@@ -66,10 +68,10 @@ function Evidence({ detail, source, error, findings, openFinding }: { detail?: D
 
 function ProjectPicker({repository,project}:{repository:string;project:string}) {
  const [projects,setProjects]=useState<{id:string;source_repository:string}[]>([]);
- useEffect(()=>{if(!applicationEndpoint||!repository)return;const controller=new AbortController();fetch(`${applicationEndpoint}/api/public/projects?repository=${encodeURIComponent(repository)}`,{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Project discovery unavailable');return r.json();}).then(r=>setProjects(r.projects)).catch(()=>setProjects([]));return()=>controller.abort();},[repository]);
+ useEffect(()=>{if(!applicationEndpoint||!repository)return;const controller=new AbortController();reportFetch(`${applicationEndpoint}/api/public/projects?repository=${encodeURIComponent(repository)}`,{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Project discovery unavailable');return r.json();}).then(r=>setProjects(r.projects)).catch(()=>setProjects([]));return()=>controller.abort();},[repository]);
  return <Select aria-label="Source project" style={{minWidth:260}} value={project||undefined} options={projects.map(p=>({value:p.id,label:p.source_repository}))} onChange={value=>{location.hash=new URLSearchParams({repository,project:value,tab:'overview'}).toString();}}/>;
 }
-function App() {
+function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const screens = Grid.useBreakpoint();
   const [appearance, setAppearance] = useState(() => { try { return localStorage.getItem('analysis-theme') || 'dark'; } catch { return 'dark'; } });
   const [runOpen, setRunOpen] = useState(false);
@@ -84,7 +86,8 @@ function App() {
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
   const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
   useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
-  const launchAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint);
+  const localAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint);
+  const launchAuth = viewerAuth || localAuth;
   const launched = pendingLaunch && index?.targets.find(t => t.kind === pendingLaunch.kind && (t.kind === 'pr' ? String(t.pr) === pendingLaunch.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === pendingLaunch.ref.toLowerCase() : t.branch === pendingLaunch.ref));
   const newOutput = !!(launched?.report && launched.report !== pendingLaunch?.previousReport && ['current', 'partial'].includes(launched.status));
   const launchStatus = newOutput ? 'New report available for your selected target' : launched?.scan_run_id !== pendingLaunch?.previousRun && launched?.status === 'scanning' ? 'Analysis is running' : launched?.status === 'queued' ? 'Target is queued for analysis' : launched?.status === 'failed' && launched.scan_run_id !== pendingLaunch?.previousRun ? 'Analysis needs attention' : 'Request submitted — awaiting a new published result';
@@ -126,7 +129,7 @@ function App() {
   const fresh = !!report && report.analyzed_sha === target?.head_sha;
   const completed = report?.channels.filter(c => ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(c.status)).length || 0;
   return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: { colorPrimary: appearance === 'dark' ? '#7bd0ff' : '#1765ad', colorLink: appearance === 'dark' ? '#7bd0ff' : '#1765ad', colorLinkHover: appearance === 'dark' ? '#b3e5ff' : '#124c85', colorBgBase: appearance === 'dark' ? '#071523' : '#f4f7fa', colorBgContainer: appearance === 'dark' ? '#102131' : '#ffffff', colorText: appearance === 'dark' ? '#dce8f5' : '#202d3d', colorTextSecondary: appearance === 'dark' ? '#a6b8c9' : '#52657a', colorBorder: appearance === 'dark' ? '#304459' : '#c9d4df', borderRadius: 6, fontFamily: 'Segoe UI, sans-serif' }, components: { Button: { primaryColor: appearance === 'dark' ? '#071523' : '#ffffff' } } }}>
-    <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{r.repository&&<ProjectPicker repository={r.repository} project={r.project}/>}<Segmented aria-label="Color theme" value={appearance} options={[{label:'Dark',value:'dark'},{label:'Light',value:'light'}]} onChange={setAppearance}/><Button type="primary" onClick={() => setRunOpen(true)}>Run analysis</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/code-analysis-dashboard'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
+    <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}{r.repository&&<ProjectPicker repository={r.repository} project={r.project}/>}<Segmented aria-label="Color theme" value={appearance} options={[{label:'Dark',value:'dark'},{label:'Light',value:'light'}]} onChange={setAppearance}/><Button type="primary" onClick={() => setRunOpen(true)}>Run analysis</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/code-analysis-dashboard'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
     {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} close={() => setRunOpen(false)}/>} 
     {runOpen && !(r.repository && r.project) && <AnalysisLauncher
       onSubmitted={request => {
@@ -234,4 +237,4 @@ if(import.meta.env.VITE_APPLICATION_MODE==='repositories') {
   history.replaceState(null,'','#'+parameters.toString());
  }
 }
-createRoot(document.getElementById('root')!).render(<App/>);
+createRoot(document.getElementById('root')!).render(<DashboardAccess>{auth=><App viewerAuth={auth}/>}</DashboardAccess>);

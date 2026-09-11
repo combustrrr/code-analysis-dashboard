@@ -1,11 +1,22 @@
-﻿// Read current repository-owned reports without bundling data into the UI build.
+// Read current repository-owned reports without bundling data into the UI build.
 const manifests = new Map<string, {at:number; value:any}>();
 const shards = new Map<string, Promise<Record<string, unknown>>>();
 export const applicationEndpoint = import.meta.env.VITE_LAUNCH_ENDPOINT as string | undefined;
+let reportBearer: string | undefined;
+export function setReportSession(token?:string) {
+ if(token!==reportBearer){manifests.clear();shards.clear();reportBearer=token;}
+}
+export async function reportFetch(path:string,init:RequestInit={}) {
+ const headers=new Headers(init.headers);
+ if(reportBearer && applicationEndpoint && new URL(path,location.href).origin===new URL(applicationEndpoint).origin)headers.set('Authorization','Bearer '+reportBearer);
+ const response=await fetch(path,{...init,headers,cache:'no-store'});
+ if(reportBearer && [401,403].includes(response.status))window.dispatchEvent(new Event('analysis-access-denied'));
+ return response;
+}
 function selection() {const p=new URLSearchParams(location.hash.slice(1));return {repository:p.get('repository'),project:p.get('project')};}
 export function hasRepositorySelection() {const s=selection();return !!(applicationEndpoint&&s.repository&&s.project);}
 async function response(path:string,signal?:AbortSignal) {
- const r=await fetch(path,{signal});if(!r.ok){let reason='Report unavailable';try{reason=(await r.json()).error||reason;}catch{}throw new Error(reason);}return r;
+ const r=await reportFetch(path,{signal});if(!r.ok){let reason='Report unavailable';try{reason=(await r.json()).error||reason;}catch{}throw new Error(reason);}return r;
 }
 export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise<T> {
  const {repository,project}=selection();
