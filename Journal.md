@@ -199,3 +199,6 @@ Vendor/API/image adapter configuration and repository-posture access remain
 incomplete. This proves a second source layout, not independent App installation.
 
 Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass.
+
+### 2026-09-11 - Repository onboarding and diagnostic rollout started
+- User requested PR #8 tooling deployment and independently authorized execution-repository onboarding validation. Inspect current access and review installation files before source-repository mutations.
