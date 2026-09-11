@@ -138,3 +138,22 @@ test('allowlisted viewer still needs repository write access to launch',async t=
  const restricted={...env,DASHBOARD_ACCESS:'allowlist',DASHBOARD_ALLOWED_USERS:'combustrrr'};
  assert.equal((await worker.fetch(await request('/api/launch',{repository:'source/app',kind:'branch',ref:'main'}),restricted)).status,403);
 });
+
+
+test('collaborator mode protects anonymous reports and advertises login',async()=>{
+ const mode={...env,APPLICATION_MODE:'repositories',DASHBOARD_ACCESS:'collaborators'};
+ const config=await worker.fetch(new Request('https://launcher.example/api/public/config'),mode);
+ assert.equal((await config.json()).require_login,true);
+ const denied=await worker.fetch(new Request('https://launcher.example/api/public/projects?repository=host/scanners',{headers:{Origin:env.DASHBOARD_ORIGIN}}),mode);
+ assert.equal(denied.status,401);assert.equal(denied.headers.get('Cache-Control'),'private, no-store');
+});
+test('collaborator check accepts only membership and observes removal',async t=>{
+ const {isCollaborator}=await import('./viewer-access.mjs');let status=204;
+ t.mock.method(globalThis,'fetch',async(url,init)=>{assert.equal(url,'https://api.github.com/repos/host/scanners/collaborators/viewer');assert.equal(init.headers.Authorization,'Bearer scoped');return new Response(null,{status});});
+ const token=async()=> 'scoped';
+ assert.equal(await isCollaborator(env,'viewer',token),true);
+ status=404;assert.equal(await isCollaborator(env,'viewer',token),false);
+ status=403;await assert.rejects(isCollaborator(env,'viewer',token));
+ status=200;await assert.rejects(isCollaborator(env,'viewer',token));
+ await assert.rejects(isCollaborator(env,'viewer',async()=>undefined));
+});

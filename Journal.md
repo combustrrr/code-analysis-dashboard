@@ -230,3 +230,7 @@ Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass
 ### 2026-09-11 - GitHub allowlist dashboard access
 - User requested GitHub sign-in and a username allowlist for viewing. Prepare server-side authorization and a sign-in-only UI before report loading; owner combustrrr included pending additional usernames. Public GitHub Release storage remains public and is not made confidential by this application gate.
 - Implemented live GitHub username checks for protected report and mutation APIs, private/no-store responses, sign-in gate, session recheck and report-cache clearing. Owner-only configuration prepared. 27 launcher/App/report tests pass; browser acceptance is running. Public GitHub storage limitation documented.
+- PR #13 merged at 79532c237d094dd9c064d2329dd06b6c77d06490; Worker d79136e7-6800-47f7-b82c-58d44835c7a8 and Pages 34628374507 deployed successfully. Live browser shows sign-in, no Run analysis before auth, projects/manifest/asset HTTP 401 anonymously, and zero JavaScript errors. Owner-only allowlist is active; additional usernames were not supplied.
+
+### 2026-09-11 - Repository collaborators determine dashboard viewers
+- User replaced manual username allowlisting with current code-analysis-dashboard collaborators. Use an exact GitHub collaborator check, not public repository read permissions; preserve write/admin mutation checks and no-store responses.

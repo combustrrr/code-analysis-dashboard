@@ -1,13 +1,15 @@
 # Dashboard viewer authorization
 
-This deployment requires GitHub sign-in. The Cloudflare configuration sets
-DASHBOARD_ACCESS to allowlist and DASHBOARD_ALLOWED_USERS to a comma-separated
-list of GitHub usernames (currently combustrrr). Matching is case-insensitive;
-an empty list denies everyone. Edit the trusted Worker configuration and deploy
-to add or remove viewers. No browser-supplied username grants access.
+This deployment requires GitHub sign-in and current collaborator membership in
+combustrrr/code-analysis-dashboard. Add users through GitHub repository Settings,
+Collaborators; they must accept the invitation before access is granted. Removing
+a collaborator revokes future application access without editing a username list
+or redeploying. Public repository read access does not qualify.
 
-The Worker resolves the authenticated GitHub user on each protected request,
-including projects, manifests, report assets and launch/configuration operations.
+DASHBOARD_ACCESS is set to collaborators. The Worker identifies the signed-in
+GitHub user and uses its repository-scoped App installation token to check exact
+collaborator membership on every protected request. Missing App access or GitHub
+API failures deny access. The repository owner qualifies through the same check.
 Responses use private, no-store caching. View permission does not grant launch or
 repository configuration permission: existing write/admin checks still apply.
 The UI loads reports only after session verification, polls access while visible,
