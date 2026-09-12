@@ -77,7 +77,7 @@ jobs:
 
         cp "$RUNNER_TEMP/analysis-tooling/.github/codeql/codeql-config.yml" "$GITHUB_WORKSPACE/.git/code-analysis/codeql-config.yml"'
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63
       with:
         languages: ${{ matrix.language }}
         queries: +security-extended,security-and-quality
@@ -86,7 +86,7 @@ jobs:
       if: matrix.language == 'python'
       run: "echo \"Python \u2014 autobuild skipped, using source\""
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63
       with:
         category: /language:${{ matrix.language }}
         output: codeql-output
@@ -143,7 +143,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
     - name: Install Semgrep
       run: pip install semgrep==1.80.0 click==8.1.7 python-dateutil==2.9.0.post0
     - name: Validate custom Semgrep rules
@@ -265,7 +265,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
     - name: Install Checkov
       run: pip install "checkov==3.2.468"
     - name: Run Checkov

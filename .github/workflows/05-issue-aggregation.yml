@@ -49,14 +49,14 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout this fork branch
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          python-version: "3.11"
+          python-version: "3.11.16"
 
       - name: Install pinned service dependencies
         run: python -m pip install "click==8.2.1" "ruff==0.12.5"
@@ -194,7 +194,7 @@ jobs:
       - name: Upload complete current snapshot
         id: analysis-artifact
         if: success()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: current-findings-dashboard-${{ steps.snapshot-key.outputs.branch-key }}-${{ steps.snapshot-key.outputs.commit-key }}-${{ github.run_id }}
           path: |
