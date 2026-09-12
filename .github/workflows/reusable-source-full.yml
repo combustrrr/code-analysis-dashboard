@@ -250,7 +250,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
         cache: pip
         cache-dependency-path: ${{ runner.temp }}/analysis-tooling/.ci/requirements.txt
     - name: Install pinned tools
@@ -316,7 +316,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
         cache: pip
         cache-dependency-path: ${{ runner.temp }}/analysis-tooling/.ci/requirements.txt
     - name: Install tools
@@ -368,7 +368,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
         cache: pip
         cache-dependency-path: backend/requirements-dev.txt
     - name: Install dependencies + Pyright
@@ -429,7 +429,7 @@ jobs:
     - name: Set up Node.js 22
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
       with:
-        node-version: '22'
+        node-version: 22.23.2
         cache: npm
         cache-dependency-path: webui/package-lock.json
     - name: Install locked dependencies
@@ -524,7 +524,7 @@ jobs:
 
         cp "$RUNNER_TEMP/analysis-tooling/.github/codeql/codeql-config.yml" "$GITHUB_WORKSPACE/.git/code-analysis/codeql-config.yml"'
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63
       with:
         languages: ${{ matrix.language }}
         queries: +security-extended,security-and-quality
@@ -534,9 +534,9 @@ jobs:
       run: "echo \"Python \u2014 autobuild skipped, using source\""
     - name: Autobuild (TypeScript/React)
       if: matrix.language == 'javascript-typescript'
-      uses: github/codeql-action/autobuild@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/autobuild@b96794f015dfd88f77b49b1c93e0fa7110f94c63
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63
       with:
         category: /language:${{ matrix.language }}
         output: codeql-output
@@ -593,7 +593,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
     - name: Install Semgrep
       run: pip install semgrep==1.80.0 click==8.1.7 python-dateutil==2.9.0.post0
     - name: Validate custom Semgrep rules
@@ -668,7 +668,7 @@ jobs:
       if: env.SNYK_CONFIGURED == 'true'
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
         cache: pip
         cache-dependency-path: '.ci/requirements.txt
 
@@ -921,7 +921,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
     - name: Install Checkov
       run: pip install "checkov==3.2.468"
     - name: Run Checkov
@@ -1242,7 +1242,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
         cache: pip
         cache-dependency-path: ${{ runner.temp }}/analysis-tooling/.ci/requirements.txt
     - name: Install tools
@@ -1315,7 +1315,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
         cache: pip
         cache-dependency-path: ${{ runner.temp }}/analysis-tooling/.ci/requirements.txt
     - name: Install tools
@@ -1365,7 +1365,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
         cache: pip
         cache-dependency-path: backend/requirements-dev.txt
     - name: Install dependencies
@@ -1443,7 +1443,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.16
         cache: pip
         cache-dependency-path: backend/requirements-dev.txt
     - name: Install dependencies & Schemathesis
@@ -1503,7 +1503,7 @@ jobs:
     - name: Set up Python 3.12
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.12'
+        python-version: 3.12.14
         cache: pip
         cache-dependency-path: backend/requirements.txt
     - name: Install bounded fuzz target

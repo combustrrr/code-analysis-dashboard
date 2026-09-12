@@ -52,13 +52,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 2
 
       - name: Checkout trusted analysis tooling
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ github.event.repository.default_branch }}
           path: .analysis-tooling
@@ -66,7 +66,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85 # v4
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           languages: ${{ matrix.language }}
           queries: +security-extended,security-and-quality
@@ -78,10 +78,10 @@ jobs:
 
       - name: Autobuild (TypeScript/React)
         if: matrix.language == 'javascript-typescript'
-        uses: github/codeql-action/autobuild@42947a340483f03ba47bb1a039b2c519aab3df85 # v4
+        uses: github/codeql-action/autobuild@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@42947a340483f03ba47bb1a039b2c519aab3df85 # v4
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           category: "/language:${{ matrix.language }}"
           output: codeql-output
@@ -102,14 +102,14 @@ jobs:
 
       - name: Upload SARIF to GitHub Security tab
         if: success()
-        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v4
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           sarif_file: codeql-${{ matrix.language }}.sarif
           category: "codeql-${{ matrix.language }}"
 
       - name: Upload SARIF artifact (for normalizer)
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codeql-${{ matrix.language }}-sarif
           path: codeql-${{ matrix.language }}.sarif
@@ -129,13 +129,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Checkout trusted analysis tooling
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ github.event.repository.default_branch }}
           path: .analysis-tooling
@@ -145,9 +145,9 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          python-version: "3.11"
+          python-version: "3.11.16"
 
       - name: Install Semgrep
         run: pip install semgrep==1.80.0 click==8.1.7 python-dateutil==2.9.0.post0
@@ -181,21 +181,21 @@ jobs:
       - name: Upload SARIF to GitHub Security tab
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v4
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           sarif_file: semgrep-normalized/normalized.sarif
           category: "semgrep"
 
       - name: Upload SARIF artifact (for normalizer)
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: semgrep-sarif
           path: semgrep-normalized/normalized.sarif
 
       - name: Upload JSON results (for normalizer)
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: semgrep-results
           path: semgrep-results.json
