@@ -71,8 +71,40 @@ async function route(request, env) {
     const response = await webhook(request, env);
     if (response) return response;
   }
-  settings(env);
   const url = new URL(request.url);
+  
+  if (url.pathname.startsWith('/api/state/') || url.pathname.startsWith('/api/report/')) {
+    if (request.headers.get('Authorization') !== `Bearer ${env.WORKER_API_TOKEN}`) {
+      throw new Failure(401, 'Unauthorized state access.');
+    }
+    const id = url.pathname.split('/').at(-1);
+    
+    if (url.pathname.startsWith('/api/state/')) {
+      if (!env.ANALYSIS_STATE) throw new Failure(500, 'KV binding not configured.');
+      if (request.method === 'GET') {
+        const val = await env.ANALYSIS_STATE.get(id);
+        return new Response(val || '{}', { headers: { 'Content-Type': 'application/json' } });
+      } else if (request.method === 'POST') {
+        const body = await request.text();
+        await env.ANALYSIS_STATE.put(id, body);
+        return new Response('OK');
+      }
+    }
+    
+    if (url.pathname.startsWith('/api/report/')) {
+      if (!env.ANALYSIS_REPORTS) throw new Failure(500, 'R2 binding not configured.');
+      if (request.method === 'GET') {
+        const obj = await env.ANALYSIS_REPORTS.get(id);
+        if (!obj) throw new Failure(404, 'Report not found.');
+        return new Response(obj.body, { headers: { 'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream' } });
+      } else if (request.method === 'POST') {
+        await env.ANALYSIS_REPORTS.put(id, request.body, { httpMetadata: { contentType: request.headers.get('Content-Type') } });
+        return new Response('OK');
+      }
+    }
+  }
+
+  settings(env);
   if (request.method === 'GET' && url.pathname === '/auth/login') {
     const nonce = url.searchParams.get('nonce');
     if (!/^[a-f0-9]{64}$/.test(nonce || '')) throw new Failure(400, 'Invalid login request.');

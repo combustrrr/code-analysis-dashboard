@@ -21,9 +21,22 @@
   "secrets": {
     "required": [
       "GITHUB_CLIENT_SECRET",
-      "SESSION_KEY"
+      "SESSION_KEY",
+      "WORKER_API_TOKEN"
     ]
   },
+  "kv_namespaces": [
+    {
+      "binding": "ANALYSIS_STATE",
+      "id": "e0b04c86ebf443bcaef13459e74d32cf"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ANALYSIS_REPORTS",
+      "bucket_name": "code-analysis-reports"
+    }
+  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,

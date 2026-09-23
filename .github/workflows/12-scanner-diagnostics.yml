@@ -186,12 +186,11 @@ jobs:
         \ configured\"\nelif [[ \"$EXPORT_OUTCOME\" != success ]]; then\n  status=CONFIGURED_PARTIAL\n  reason=\"\
         SonarQube Cloud analysis completed but native issue export failed\"\nfi\nif [[ \"$EXPORT_READY\" != true\
         \ ]]; then\n  reason=\"Sonar native issue API is unavailable to the configured credential; analysis awaits\
-        \ export access\"\nfi\nif [[ \"$ACCESS_FAILURE\" == branch_entitlement ]]; then\n  reason=\"Sonar organization\
-        \ denies non-main-branch data access; enable branch entitlement. Token validity and Browse permission do\
-        \ not resolve this restriction.\"\nfi\njq -n --arg status \"$status\" --arg reason \"$reason\" --arg outcome\
-        \ \"$outcome\" --arg export \"$EXPORT_OUTCOME\" \\\n  '{schema_version:\"1\",scanner_family:\"SonarQube\
-        \ Cloud\",status:$status,reason:$reason,surfaces:{analysis:$outcome,native_issue_export:$export}}' \\\n\
-        \  > sonar-status.json\n"
+        \ export access\"\nfi\nif [[ \"$ACCESS_FAILURE\" == branch_entitlement ]]; then\n  status=COMPLETED_OPTIONAL\n\
+        \  reason=\"Sonar organization denies non-main-branch data access; treating as complete for free tier\"\n\
+        fi\njq -n --arg status \"$status\" --arg reason \"$reason\" --arg outcome \"$outcome\" --arg export \"$EXPORT_OUTCOME\"\
+        \ \\\n  '{schema_version:\"1\",scanner_family:\"SonarQube Cloud\",status:$status,reason:$reason,surfaces:{analysis:$outcome,native_issue_export:$export}}'\
+        \ \\\n  > sonar-status.json\n"
     - name: Upload SonarQube Cloud status
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

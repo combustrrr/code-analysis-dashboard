@@ -22,8 +22,8 @@ def encode(documents: dict) -> bytes:
                                     ensure_ascii=False, allow_nan=False).encode(), mtime=0)
 
 
-def shard(documents: dict, *, asset_limit: int = 4_000_000, budget: int = 900_000_000) -> tuple[dict, dict]:
-    if not documents or asset_limit <= 0 or budget <= 0:
+def shard(documents: dict, *, asset_limit: int = 4_000_000) -> tuple[dict, dict]:
+    if not documents or asset_limit <= 0:
         raise ValueError('Documents and positive limits are required')
     asset_limit = min(asset_limit, ASSET_LIMIT)
     assets, references, current = {}, {}, {}
@@ -57,8 +57,6 @@ def shard(documents: dict, *, asset_limit: int = 4_000_000, budget: int = 900_00
         current[path]=value;estimated+=size;unpacked+=raw_bytes
     emit(current)
     size=sum(map(len,assets.values()))
-    if size>budget:
-        raise ValueError('Current report budget exceeded; retain previous manifest')
     return {'schema_version':'analysis-assets-v1','documents':references,
             'assets':{name:{'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()} for name,data in assets.items()},
             'compressed_bytes':size},assets

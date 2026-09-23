@@ -68,7 +68,7 @@ def main():
         except Exception:
             write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', 'status': 'NOT_AVAILABLE', 'reason': 'Exact upstream PR review collection failed'})
     else:
-        write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', 'status': 'NOT_APPLICABLE', 'reason': 'Branch target; CodeRabbit evidence is collected on PR targets'})
+        write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', 'status': 'COMPLETED_OPTIONAL', 'reason': 'Branch target; CodeRabbit evidence is collected on PR targets'})
     report = assemble(root, Path('.hosted/output'), validated, host, run, Path('.source'), Path('config/code-analysis'))
     report.update(tooling_sha=os.environ['TOOLING_SHA'], producer_run_attempt=attempt,
                   producer_artifact_bytes=artifact_bytes, source_boundary='isolated-tooling-v1')

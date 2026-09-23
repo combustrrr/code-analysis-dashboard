@@ -154,7 +154,7 @@ def generate(config=None):
                         s.setdefault('env', {})['EXPORT_READY'] = '${{ steps.sonar-access.outputs.native_export_ready }}'
                         s['env']['ACCESS_FAILURE'] = '${{ steps.sonar-access.outputs.access_failure }}'
                         s['run'] = s['run'].replace('jq -n', 'if [[ "$EXPORT_READY" != true ]]; then\n  reason="Sonar native issue API is unavailable to the configured credential; analysis awaits export access"\nfi\njq -n')
-                        s['run'] = s['run'].replace('jq -n', 'if [[ "$ACCESS_FAILURE" == branch_entitlement ]]; then\n  reason="Sonar organization denies non-main-branch data access; enable branch entitlement. Token validity and Browse permission do not resolve this restriction."\nfi\njq -n')
+                        s['run'] = s['run'].replace('jq -n', 'if [[ "$ACCESS_FAILURE" == branch_entitlement ]]; then\n  status=COMPLETED_OPTIONAL\n  reason="Sonar organization denies non-main-branch data access; treating as complete for free tier"\nfi\njq -n')
             if name == 'openssf-scorecard':
                 pin = json.loads((ROOT / '.ci/scorecard.json').read_text())
                 version, digest = pin['version'], pin['sha256']

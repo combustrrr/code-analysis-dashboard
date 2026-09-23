@@ -47,7 +47,8 @@ No frontend session replay or third-party analytics SDK is installed.
 | [Sonar OSS plan](https://docs.sonarsource.com/sonarqube-cloud/administering-sonarcloud/managing-subscription/subscription-plans) | Most relevant next entitlement: offers branch/PR analysis for eligible open-source organizations. Could address current branch_entitlement. Existing organization access has not changed; keep scanner partial until real evidence succeeds. |
 | [Sentry OSS sponsorship](https://sentry.io/for/open-source/) | Potential future browser error monitoring. Not needed for current Worker diagnostics; no account, SDK, replay or telemetry export added. Sponsorship is not assumed approved. |
 | Cloudflare Turnstile | Free bot checks exist, but adding a challenge to an already collaborator-gated launch flow is not currently necessary. Reconsider for public onboarding. |
-| R2, D1, KV and Queues | No new storage or scheduler provisioned. Current GitHub queue and Release storage already satisfy this instance; do not duplicate state just because a free tier exists. |
+| R2 and KV | Provisioned to store tracking state (KV) and final reports (R2). Replaces GitHub Releases as the durable store to remove clutter from the repository's Releases page. |
+| D1 and Queues | No new database or scheduler provisioned. |
 | Additional analytics, search, hosting and CI perks | No migration needed for this request. Current filters run locally and current hosting/CI already work. |
 
 Provider plan changes and application approvals require verification at activation.

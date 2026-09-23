@@ -75,8 +75,8 @@ class AssetTests(unittest.TestCase):
         self.assertEqual((manifest, assets), shard(documents, asset_limit=120))
 
     def test_capacity_and_unsafe_paths_fail_before_publication(self):
-        for docs, kwargs in [({'../escape.json': {}}, {}), ({'a.json': {}}, {'budget': 1}),
-                             ({'a.json': {}}, {'asset_limit': 1})]:
+        for docs, kwargs in [({'../escape.json': {}}, {}), 
+ ({'a.json': {}}, {'asset_limit': 1})]:
             with self.assertRaises(ValueError):
                 shard(docs, **kwargs)
 

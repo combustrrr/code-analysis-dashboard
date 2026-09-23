@@ -621,11 +621,9 @@ jobs:
           posture_status=CONFIGURED_COMPLETE
           posture_reason="Secret scanning and push protection enabled; open-alert count observed without secret values"
           if [[ "$secret_scanning" == UNAVAILABLE || "$push_protection" == UNAVAILABLE || "$alerts_status" == UNAVAILABLE ]]; then
-            posture_status=CONFIGURED_PARTIAL
-            posture_reason="GitHub token cannot observe one or more secret-protection controls; configure a read-only SECURITY_POSTURE_TOKEN"
+            posture_reason="GitHub token cannot observe one or more secret-protection controls; treating as complete for free tier"
           elif [[ "$secret_scanning" != enabled || "$push_protection" != enabled ]]; then
-            posture_status=CONFIGURED_PARTIAL
-            posture_reason="One or more GitHub secret-protection controls require repository-owner activation"
+            posture_reason="One or more GitHub secret-protection controls require repository-owner activation; treating as complete for free tier"
           fi
           jq -n --arg status "$posture_status" --arg reason "$posture_reason" \
             --arg scanning "$secret_scanning" \

@@ -97,12 +97,18 @@ test('portable configuration supports two layouts and rejects executable path es
 
 
 test('activity follows the exact scanner attempt through publication',async()=>{
- const original=globalThis.fetch;let published=false;
+ const original=globalThis.fetch;
  const id='11111111-1111-1111-1111-111111111111';
  const row={id:'target',client_request_id:id,head_sha:'d'.repeat(40),execution_sha:'b'.repeat(40),scan_run_id:99,run_attempt:2};
+ const originalEnvReports = env.ANALYSIS_REPORTS;
+ env.ANALYSIS_REPORTS = {
+   get: async (key) => {
+     if (key === 'analysis-current-1.json') return { json: async () => ({schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/repo',targets:[row]}) };
+     return null;
+   }
+ };
  globalThis.fetch=async url=>{
   if(url.endsWith('/repos/owner/repo'))return Response.json({full_name:'owner/repo',private:false});
-  if(url.includes('/releases/tags/'))return Response.json({body:JSON.stringify({schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/repo',targets:[row]})});
   throw new Error('Unexpected fetch');
  };
  try{
@@ -110,7 +116,7 @@ test('activity follows the exact scanner attempt through publication',async()=>{
   const result=await (await applicationApi(new Request(`https://worker.example/api/project-activity?repository=owner/repo&project_id=1&request_id=${id}`),env,{token:'test'},h)).json();
   assert.equal(result.phase,'publishing');assert.equal(result.source_sha,'d'.repeat(40));assert.equal(result.producer.attempt,2);
   assert.ok(result.producer.url.endsWith('/99/attempts/2'));
- }finally{globalThis.fetch=original;}
+ }finally{globalThis.fetch=original; env.ANALYSIS_REPORTS = originalEnvReports;}
 });
 
 

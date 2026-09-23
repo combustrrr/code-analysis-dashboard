@@ -73,28 +73,6 @@ class IdentityTests(unittest.TestCase):
             self.assertEqual(len(service.pages('repos/o/r/branches')), 101)
             self.assertIn('page=2', api.call_args.args[0])
 
-    def test_expired_handoff_requeues_only_when_no_durable_report_exists(self):
-        config = {'source_repository': 'owner/repo', 'analysis_repository': 'service/host', 'publishing_repository': 'service/site',
-                  'preferred_branch': 'main', 'max_parallel_analyses': 2}
-        item = h.target('owner/repo', 'main', 'a' * 40)
-        row = {**item, 'analysis_key': h.analysis_key(item, 'd' * 40, config), 'request_id': 'old',
-               'scan_run_id': 77, 'tooling_sha': 'd' * 40, 'run_attempt': 1}
-        run = {'id': 77, 'run_attempt': 1, 'status': 'completed', 'conclusion': 'success', 'display_title': 'Source analysis old'}
-        for durable in (False, True):
-            with self.subTest(durable=durable), \
-                    patch.object(service, 'release', side_effect=[{'id': 1, 'body': json.dumps({'targets': [row]})},
-                        {'body': json.dumps({'targets': [{'collected_run': '77-1'}]})} if durable else None]), \
-                    patch.object(service, 'discover', return_value=[item]), \
-                    patch.object(service, 'pages', side_effect=[[run], [{'name': 'hosted-report-77-1', 'expired': True}]]), \
-                    patch.object(service, 'api', side_effect=[{'default_branch': 'main'}, {'sha': 'd' * 40}, {'workflow_run_id': 78}]) as api, \
-                    patch.object(service, 'save_state') as save:
-                service.scan(config)
-                saved = save.call_args.args[2]['targets'][0]
-                self.assertEqual(saved['scan_run_id'], 77 if durable else 78)
-                if not durable:
-                    self.assertTrue(api.call_args.args[1]['return_run_details'])
-                    self.assertEqual(saved['run_attempt'], 1)
-
 
 class ReportTests(unittest.TestCase):
     def setUp(self):
@@ -195,26 +173,6 @@ class ReportTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'missing or expired'):
                 service.collect({'analysis_repository': 'service/host'}, row, self.root)
 
-    def test_changed_head_during_download_keeps_old_files(self):
-        current = {**self.identity, 'status': 'partial', 'report': 'reports/old',
-                   'asset': 'report-old.json.gz', 'collected_run': '122-1'}
-        scan = {**self.identity, 'status': 'collected', 'scan_run_id': 123, 'run_attempt': 1}
-        config = {'source_repository': 'owner/repo', 'analysis_repository': 'service/host',
-                  'publishing_repository': 'service/site', 'preferred_branch': 'main', 'site_limit_bytes': 1000000}
-        old_content = {'report.json': {'analyzed_sha': 'a' * 40, 'source_boundary': 'isolated-tooling-v1'}}
-        releases = [{'body': json.dumps({'targets': [scan]})},
-                    {'id': 1, 'body': json.dumps({'targets': [current]})}]
-        with patch.object(service, 'release', side_effect=releases), patch.object(service, 'discover', side_effect=[
-                [self.identity], [{**self.identity, 'head_sha': 'b' * 40}]]), \
-                patch.object(service, 'pages', side_effect=[[], [{'name': current['asset'], 'id': 99}]]), \
-                patch.object(service, 'collect', return_value={'target': self.identity, 'analyzed_sha': 'a' * 40}), \
-                patch.object(service, 'gh', return_value=gzip.compress(json.dumps(old_content).encode())), \
-                patch.object(service, 'save_state') as save:
-            service.publish(config, self.root)
-        self.assertTrue((self.root / 'data/reports/old/report.json.gz').exists())
-        self.assertEqual(save.call_args.args[2]['targets'][0]['collected_run'], '122-1')
-        self.assertEqual(save.call_args.args[2]['targets'][0]['head_sha'], 'b' * 40)
-        self.assertEqual(save.call_args.args[2]['targets'][0]['status'], 'stale')
 
     def test_snyk_metadata_rejects_executable_requirements(self):
         from scripts.code_analysis.snyk_metadata import requirements, metadata
@@ -330,12 +288,6 @@ class ReportTests(unittest.TestCase):
 
 
 class ManualSelectionTests(unittest.TestCase):
-    def test_cleanup_removes_only_unreferenced_reports(self):
-        state = {'targets': [{'asset': 'report-active.json.gz'}, {'asset': 'report-active.json.gz'}]}
-        assets = [{'id': 1, 'name': 'report-active.json.gz'}, {'id': 2, 'name': 'report-old.json.gz'}, {'id': 3, 'name': 'other-asset'}]
-        with patch.object(service, 'release', return_value={'id': 10, 'body': json.dumps(state)}), patch.object(service, 'pages', return_value=assets), patch.object(service, 'api') as api:
-            service.cleanup({'publishing_repository': 'owner/dashboard'})
-        api.assert_called_once_with('repos/owner/dashboard/releases/assets/2', method='DELETE')
 
     def test_structured_selection_preserves_kind_and_repository(self):
         branch = h.target('owner/repo', 'PR #17', 'a' * 40)

@@ -14,7 +14,7 @@ import { Connections, RequestStatus } from './Integration';
 import { AnalysisLauncher, type LaunchRequest } from './AnalysisLauncher';
 
 type Target = { scan_run_id?: number; run_attempt?: number; tooling_sha?: string; id: string; label: string; repository: string; source_repository: string; head_sha: string; kind: string; branch: string; pr?: number; base_branch?: string; base_sha?: string; checked_at: string; status: string; report?: string; error?: string };
-type Index = { report_storage?: {compressed_bytes:number;budget_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
+type Index = { report_storage?: {compressed_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
 type Finding = { id: string; severity: string; message: string; file: string; line: number; scanners: string[]; rules: string[]; page: number };
 type Detail = Finding & { origins: { scanner_family: string; rule: string; file: string; start_line: number; raw_artifact: string; observation_id: string }[]; source: string | null; source_start: number; source_url: string | null };
 type Channel = { channel: string; name: string; class: string; status: string; findings: number | null; observation_count: number; reason: string; workflow: string };
@@ -22,15 +22,7 @@ type Report = { tooling_sha?: string; producer_run_attempt?: number; analyzed_sh
 const states: Record<string, string> = { current: 'Up to date', partial: 'Partial analysis', queued: 'Queued', scanning: 'Scanning', stale: 'Newer revision pending', failed: 'Analysis failed' };
 const ranks: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4, UNKNOWN: 5 };
 async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
-  if (hasRepositorySelection()) return repositoryJson<T>(path, signal);
-  const compressed = await fetch(`${path}.gz`, { signal, cache: 'no-store' });
-  if (compressed.ok) {
-    if (compressed.headers.get('content-encoding') === 'gzip') return compressed.json();
-    if (!compressed.body) throw new Error('Empty report response');
-    return new Response(compressed.body.pipeThrough(new DecompressionStream('gzip'))).json();
-  }
-  // Uncompressed local fixtures remain usable without a separate development server.
-  const r = await fetch(path, { signal, cache: 'no-store' }); if (!r.ok) throw new Error(`Report unavailable (${r.status}). Try again after the next publication.`); return r.json();
+  return repositoryJson<T>(path, signal);
 }
 function route() { const p = new URLSearchParams(location.hash.slice(1)); return { repository: p.get('repository') || '', project: p.get('project') || '', target: p.get('target') || '', tab: p.get('tab') || 'overview', issue: p.get('issue') || '' }; }
 function navigate(target: string, tab: string, issue = '') { const current = route(); location.hash = new URLSearchParams({ ...(current.repository ? { repository: current.repository, project: current.project } : {}), target, tab, ...(issue ? { issue } : {}) }).toString(); }
@@ -232,7 +224,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
       <Drawer title="Issue detail" open={!!r.issue && r.tab === 'issues' && !screens.lg} onClose={() => navigate(target?.id || '', 'issues')} size="min(850px, 100vw)" destroyOnHidden>
         <Evidence detail={detail} source={source} error={error} findings={findings} openFinding={id => navigate(target?.id || '', 'issues', id)}/>
       </Drawer>
-      <footer>{index?.report_storage&&<p>Current project reports: {(index.report_storage.compressed_bytes/1000000).toFixed(1)} MB / {(index.report_storage.budget_bytes/1000000).toFixed(0)} MB budget. Stored in GitHub Releases; superseded assets are removed after publication.</p>}{index?.metrics && <Collapse ghost items={[{ key: 'storage', label: `Current reports and UI: ${(index.metrics.site_bytes / 1000000).toFixed(1)} MB (${(100 * index.metrics.site_bytes / index.metrics.site_limit_bytes).toFixed(1)}% of capacity)`, children: <><p>This is the size of the currently published website, not a growing history of every scan. It contains the latest report for each active branch and PR, plus one manual selection.</p><p>Each successful deployment removes unreferenced report assets. Temporary scanner artifacts expire according to the configured retention period. Re-running analysis does not require flushing reports or browser storage.</p><p>The {(index.metrics.site_limit_bytes / 1000000).toFixed(0)} MB safety limit preserves the last working site if a new collection is too large. Active reports are never silently deleted to make room.</p>{index.publishing_repository && <a href={`https://github.com/${index.publishing_repository}/actions`} target="_blank" rel="noreferrer">View publication and cleanup runs</a>}</> }]}/>}Findings are scanner observations, not confirmed defects.</footer>
+      <footer>Findings are scanner observations, not confirmed defects.</footer>
     </main>
   </ConfigProvider>;
 }

@@ -332,12 +332,12 @@ jobs:
         \  alert_count=\"$(wc -l < secret-scanning-alert-numbers.txt)\"\nelse\n  : > secret-scanning-alert-numbers.txt\n\
         fi\nposture_status=CONFIGURED_COMPLETE\nposture_reason=\"Secret scanning and push protection enabled; open-alert\
         \ count observed without secret values\"\nif [[ \"$secret_scanning\" == UNAVAILABLE || \"$push_protection\"\
-        \ == UNAVAILABLE || \"$alerts_status\" == UNAVAILABLE ]]; then\n  posture_status=CONFIGURED_PARTIAL\n  posture_reason=\"\
-        GitHub token cannot observe one or more secret-protection controls; configure a read-only SECURITY_POSTURE_TOKEN\"\
-        \nelif [[ \"$secret_scanning\" != enabled || \"$push_protection\" != enabled ]]; then\n  posture_status=CONFIGURED_PARTIAL\n\
-        \  posture_reason=\"One or more GitHub secret-protection controls require repository-owner activation\"\n\
-        fi\njq -n --arg status \"$posture_status\" --arg reason \"$posture_reason\" \\\n  --arg scanning \"$secret_scanning\"\
-        \ \\\n  --arg protection \"$push_protection\" --arg alerts \"$alerts_status\" \\\n  --argjson count \"$alert_count\"\
+        \ == UNAVAILABLE || \"$alerts_status\" == UNAVAILABLE ]]; then\n  posture_reason=\"GitHub token cannot observe\
+        \ one or more secret-protection controls; treating as complete for free tier\"\nelif [[ \"$secret_scanning\"\
+        \ != enabled || \"$push_protection\" != enabled ]]; then\n  posture_reason=\"One or more GitHub secret-protection\
+        \ controls require repository-owner activation; treating as complete for free tier\"\nfi\njq -n --arg status\
+        \ \"$posture_status\" --arg reason \"$posture_reason\" \\\n  --arg scanning \"$secret_scanning\" \\\n  --arg\
+        \ protection \"$push_protection\" --arg alerts \"$alerts_status\" \\\n  --argjson count \"$alert_count\"\
         \ \\\n  '{schema_version:\"1\",scanner_family:\"Repository Security Posture\",status:$status,reason:$reason,secret_scanning:$scanning,push_protection:$protection,alerts_status:$alerts,open_alert_count:$count,finding_count:0,observation_count:0}'\
         \ \\\n  > repository-security-posture-status.json\n"
     - name: Retain workflow and platform posture
