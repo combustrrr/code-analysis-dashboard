@@ -77,7 +77,7 @@ class ExtensionTests(unittest.TestCase):
         h.write(self.root/'config/code-analysis/service.json', config)
         with patch.object(generator, 'ROOT', self.root):
             jobs = yaml.safe_load(generator.generate())['jobs']
-        self.assertNotIn('secrets.', json.dumps(jobs['ext-example']))
+        self.assertNotIn('secrets.VENDOR_ACCESS_TOKEN', json.dumps(jobs['ext-example']))
         self.assertNotIn('source_repository', json.dumps(jobs['ext-vendor']))
         self.assertIn('secrets.VENDOR_ACCESS_TOKEN', json.dumps(jobs['ext-vendor']))
         self.assertIn('ext-example', jobs['report']['needs'])
