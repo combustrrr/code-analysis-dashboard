@@ -282,3 +282,5 @@ Validation: 12 focused diagnostic tests and 80 service/recovery regressions pass
  
  -   2 0 2 6 - 0 9 - 2 3 :   I n t e g r a t e d   9   n e w   s c a n n e r s   c o v e r i n g   O p e n A I   C o d e x ,   A l i b a b a   O C R ,   F l o u n d e r ,   V u l n A g e n t ,   a n d   l a n g u a g e - s p e c i f i c   O W A S P   t o o l s .   U p d a t e d   n o r m a l i z e r   a n d   o r c h e s t r a t o r .  
  
+ -   2 0 2 6 - 0 9 - 2 3 :   C r e a t e d   d o c s / R O A D M A P . m d   d o c u m e n t i n g   p l a n n e d   h y b r i d   a r t i f a c t   a r c h i t e c t u r e   ( R 2   +   G i t H u b )   a n d   f u t u r e   s c a n n e r   e x p a n s i o n .  
+ 
