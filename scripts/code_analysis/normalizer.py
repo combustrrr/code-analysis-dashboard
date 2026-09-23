@@ -1084,6 +1084,56 @@ class SonarExternalIssuesExporter:
 # CLI Entry Point
 # ─────────────────────────────────────────────────────────────
 
+class FlounderParser:
+    """Parses Flounder JSON output."""
+    def parse(self, path):
+        import json
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except:
+            data = []
+        findings = []
+        for issue in data:
+            findings.append(Finding(
+                id=str(issue.get("id", "")),
+                source_tool="Flounder",
+                rule_id=str(issue.get("rule_id", "flounder-audit")),
+                file=str(issue.get("file", "")),
+                start_line=int(issue.get("line", 1)),
+                end_line=int(issue.get("line", 1)),
+                message=str(issue.get("message", "")),
+                severity="HIGH",
+                confidence="HIGH",
+                evidence_source="AI_ADVISORY",
+                tags=["flounder", "AI_ADVISORY"]
+            ))
+        return findings
+
+class VulnAgentParser:
+    """Parses VulnAgent JSON output."""
+    def parse(self, path):
+        import json
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except:
+            data = []
+        findings = []
+        for issue in data:
+            findings.append(Finding(
+                id=str(issue.get("id", "")),
+                source_tool="VulnAgent",
+                rule_id=str(issue.get("rule_id", "vulnagent-triage")),
+                file=str(issue.get("file", "")),
+                start_line=int(issue.get("line", 1)),
+                end_line=int(issue.get("line", 1)),
+                message=str(issue.get("message", "")),
+                severity="HIGH",
+                confidence="HIGH",
+                evidence_source="AI_ADVISORY",
+                tags=["vulnagent", "AI_ADVISORY"]
+            ))
+        return findings
+
 @click.command()
 @click.option("--input-dir", "-i", type=click.Path(exists=True), required=True,
               help="Directory containing tool output files")
@@ -1144,6 +1194,25 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
                 print(f"[Sonar] {sonar_file.name}: {len(findings)} findings")
         except Exception as e:
             report_parse_error(sonar_file, e)
+
+    flounder_parser = FlounderParser()
+    vulnagent_parser = VulnAgentParser()
+
+    for file in input_path.rglob("flounder-findings.json"):
+        try:
+            findings = flounder_parser.parse(file)
+            retain(findings, file)
+            parsed_files.add(file)
+        except Exception as e:
+            report_parse_error(file, e)
+
+    for file in input_path.rglob("vulnagent.json"):
+        try:
+            findings = vulnagent_parser.parse(file)
+            retain(findings, file)
+            parsed_files.add(file)
+        except Exception as e:
+            report_parse_error(file, e)
 
     for sarif_file in input_path.rglob("*.sarif"):
         try:

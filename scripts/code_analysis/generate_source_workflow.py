@@ -31,8 +31,8 @@ def generate(config=None):
                   {'name': 'Validate trusted tooling and selected target', 'id': 'identity',
                    'env': {'TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}'},
                    'run': 'python -m scripts.code_analysis.source_identity'}]}
-    for number in (1, 2, 3, 4, 7):
-        path = next((ROOT / '.github/workflows').glob(f'0{number}-*.yml'))
+    for number in (1, 2, 3, 4, 7, 13, 14, 15, 16, 17, 18, 19, 20, 21):
+        path = next((ROOT / '.github/workflows').glob(f'{number:02d}-*.yml'))
         old = yaml.safe_load(path.read_text(encoding='utf-8'))
         for name, original in old['jobs'].items():
             if profile.get('mode') == 'portable':

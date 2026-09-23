@@ -1,0 +1,46 @@
+name: Alibaba Open Code Review
+run-name: Alibaba Open Code Review · ${{ inputs.scan_branch || github.head_ref || github.ref_name }} · ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_sha:
+        description: "Exact branch-head commit selected by the manual orchestrator"
+        required: false
+        type: string
+      scan_branch:
+        description: "Source branch associated with the selected commit"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alibaba-ocr-${{ inputs.scan_branch || github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  alibaba-ocr:
+    name: Alibaba Open Code Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Run scanner
+        run: |
+          npx @alibaba-group/open-code-review --format sarif > alibaba-ocr.sarif || true
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: alibaba-ocr-output
+          path: |
+            alibaba-ocr.sarif
+          if-no-files-found: ignore

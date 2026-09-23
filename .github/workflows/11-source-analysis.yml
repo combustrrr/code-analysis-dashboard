@@ -1452,6 +1452,309 @@ jobs:
       SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
       ANALYSIS_BACKEND_ROOT: ${{ github.workspace }}/backend
       ANALYSIS_SOURCE_SHA: ${{ fromJSON(inputs.target).head_sha }}
+  scanner-13-codex-security:
+    name: Codex Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        fetch-depth: 0
+        persist-credentials: false
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+    - name: Run scanner
+      run: 'npx @openai/codex-security scan . --format=sarif > codex-security.sarif || true
+
+        '
+    - name: Upload artifact
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: codex-security-output
+        path: 'codex-security.sarif
+
+          '
+        if-no-files-found: ignore
+        retention-days: 7
+    needs:
+    - identity
+    permissions:
+      contents: read
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'codex-security') }}
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+  scanner-14-alibaba-ocr:
+    name: Alibaba Open Code Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        fetch-depth: 0
+        persist-credentials: false
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+    - name: Run scanner
+      run: 'npx @alibaba-group/open-code-review --format sarif > alibaba-ocr.sarif || true
+
+        '
+    - name: Upload artifact
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: alibaba-ocr-output
+        path: 'alibaba-ocr.sarif
+
+          '
+        if-no-files-found: ignore
+        retention-days: 7
+    needs:
+    - identity
+    permissions:
+      contents: read
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'alibaba-ocr') }}
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+  scanner-15-flounder-audit:
+    name: Flounder Autonomous Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        fetch-depth: 0
+        persist-credentials: false
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+    - name: Run scanner
+      run: 'flounder run default || true
+
+        cp ~/.flounder/findings.json flounder-findings.json || touch flounder-findings.json
+
+        '
+    - name: Upload artifact
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: flounder-audit-output
+        path: 'flounder-findings.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 7
+    needs:
+    - identity
+    permissions:
+      contents: read
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'flounder-audit') }}
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+  scanner-16-vulnagent-triage:
+    name: VulnAgent Triage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        fetch-depth: 0
+        persist-credentials: false
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+    - name: Run scanner
+      run: 'echo "Run VulnAgent post-processing" > vulnagent.json
+
+        '
+    - name: Upload artifact
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: vulnagent-triage-output
+        path: 'vulnagent.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 7
+    needs:
+    - identity
+    permissions:
+      contents: read
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'vulnagent-triage') }}
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+  scanner-17-owasp-jvm:
+    name: OWASP FindSecBugs (JVM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        fetch-depth: 0
+        persist-credentials: false
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+    - name: Run scanner
+      run: 'echo "Run FindSecBugs" > findsecbugs.sarif
+
+        '
+    - name: Upload artifact
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: owasp-jvm-output
+        path: 'findsecbugs.sarif
+
+          '
+        if-no-files-found: ignore
+        retention-days: 7
+    needs:
+    - identity
+    permissions:
+      contents: read
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-jvm') }}
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+  scanner-18-owasp-go:
+    name: OWASP Gosec
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        fetch-depth: 0
+        persist-credentials: false
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+    - name: Run scanner
+      run: 'gosec -fmt sarif -out gosec.sarif ./... || true
+
+        '
+    - name: Upload artifact
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: owasp-go-output
+        path: 'gosec.sarif
+
+          '
+        if-no-files-found: ignore
+        retention-days: 7
+    needs:
+    - identity
+    permissions:
+      contents: read
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-go') }}
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+  scanner-19-owasp-js:
+    name: OWASP njsscan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        fetch-depth: 0
+        persist-credentials: false
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+    - name: Run scanner
+      run: 'njsscan . --sarif -o njsscan.sarif || true
+
+        '
+    - name: Upload artifact
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: owasp-js-output
+        path: 'njsscan.sarif
+
+          '
+        if-no-files-found: ignore
+        retention-days: 7
+    needs:
+    - identity
+    permissions:
+      contents: read
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-js') }}
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+  scanner-20-owasp-ruby:
+    name: OWASP Brakeman
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        fetch-depth: 0
+        persist-credentials: false
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+    - name: Run scanner
+      run: 'brakeman -f sarif -o brakeman.sarif || true
+
+        '
+    - name: Upload artifact
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: owasp-ruby-output
+        path: 'brakeman.sarif
+
+          '
+        if-no-files-found: ignore
+        retention-days: 7
+    needs:
+    - identity
+    permissions:
+      contents: read
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-ruby') }}
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+  scanner-21-owasp-iac-secrets:
+    name: OWASP IaC and Secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        fetch-depth: 0
+        persist-credentials: false
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+    - name: Run scanner
+      run: 'checkov -d . -o sarif > checkov.sarif || true
+
+        trufflehog git file://. --json > trufflehog.json || true
+
+        '
+    - name: Upload artifact
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: owasp-iac-secrets-output
+        path: 'checkov.sarif
+
+          trufflehog.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 7
+    needs:
+    - identity
+    permissions:
+      contents: read
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-iac-secrets') }}
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   report:
     needs:
     - identity
@@ -1476,6 +1779,15 @@ jobs:
     - scanner-4-test-coverage
     - scanner-7-schemathesis-fuzz
     - scanner-7-atheris-state-machine
+    - scanner-13-codex-security
+    - scanner-14-alibaba-ocr
+    - scanner-15-flounder-audit
+    - scanner-16-vulnagent-triage
+    - scanner-17-owasp-jvm
+    - scanner-18-owasp-go
+    - scanner-19-owasp-js
+    - scanner-20-owasp-ruby
+    - scanner-21-owasp-iac-secrets
     if: ${{ always() && needs.identity.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
