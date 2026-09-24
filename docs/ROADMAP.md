@@ -22,3 +22,16 @@ We will pivot to a hybrid model involving GitHub Artifacts and Cloudflare R2:
 - **GitHub Artifacts for Metadata:** GitHub Artifacts will be strictly reserved for lightweight metadata and execution summaries.
 - **Cost & Retention Mitigation:** R2 provides a generous 10GB free tier. By applying a 1-day auto-delete lifecycle rule on the `temp-runs/` prefix, we eliminate the artifact bottleneck entirely without incurring storage costs. The final aggregated state (`unified-findings.json`) will remain permanently in Cloudflare KV/R2 to power the frontend UI indefinitely.
 
+
+## 3. Triage & False Positive Suppression Engine (OWASP Alignment)
+**The Problem:** Running 15+ scanners produces significant noise. Alert fatigue is the primary reason SAST deployments fail in enterprise environments (per OWASP guidelines).
+
+**The Solution:**
+We will implement a hybrid suppression engine to allow developers and security engineers to mute false positives:
+- **Developer-Driven:** Support a .securityignore.yml configuration at the root of target repositories to ignore findings by path, rule, or hash.
+- **Security-Driven:** Build a UI feature in the dashboard allowing security analysts to mark findings as "False Positive" or "Risk Accepted," suppressing them in all future runs.
+
+## 4. Compliance and SLA Tracking
+To enforce actionable security outcomes, we will track the remediation velocity of vulnerabilities.
+- **Implementation:** Configure SLAs (e.g., Critical bugs must be fixed in 48 hours). 
+- **Visibility:** Repositories violating SLAs will be flagged (color-coded red/amber) on the dashboard to immediately draw attention to non-compliant projects.
