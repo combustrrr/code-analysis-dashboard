@@ -415,6 +415,8 @@ def publish(config: dict, output: Path) -> None:
                     except Exception as e:
                         raise ValueError(f'manifest references a missing retained report: {e}')
                 unpacked = gzip.decompress(bundle.read_bytes())
+                if len(unpacked) > config['site_limit_bytes']:
+                    raise ValueError('retained report exceeds site limit')
                 documents = json.loads(unpacked)
                 if documents.get('report.json', {}).get('source_boundary') != 'isolated-tooling-v1':
                     row.update(status='failed', error='Retained report predates the isolated source/tooling boundary; rescan required')
@@ -433,18 +435,26 @@ def publish(config: dict, output: Path) -> None:
             path.with_suffix('.json.gz').write_bytes(gzip.compress(path.read_bytes(), mtime=0))
             path.unlink()
         size = sum(p.stat().st_size for p in output.rglob('*') if p.is_file())
-        state['metrics'] = {'site_bytes': size,
+        state['metrics'] = {'site_bytes': size, 'site_limit_bytes': config['site_limit_bytes'],
                             'queued': sum(r['status'] == 'queued' for r in state['targets']),
                             'scanning': sum(r['status'] == 'scanning' for r in state['targets'])}
         (output / 'data/index.json.gz').write_bytes(gzip.compress(json.dumps(state, separators=(',', ':')).encode(), mtime=0))
         size = sum(p.stat().st_size for p in output.rglob('*') if p.is_file())
+        if size >= config['site_limit_bytes']:
+            raise ValueError(f'site capacity exceeded: {size} bytes; previous deployment retained')
         # Commit only after every referenced file is materialized and validated.
         cf_api(config, '/api/report/current-reports.json', method='POST', data=json.dumps(state, separators=(',', ':')).encode())
         print(json.dumps({'site_bytes': size, 'targets': len(state['targets'])}))
 
 
 def cleanup(config: dict) -> None:
+    repo = config['publishing_repository']
     pass
+    return
+    
+    if False:
+        pass
+            
 
 
 def main() -> None:

@@ -22,13 +22,3 @@ We will pivot to a hybrid model involving GitHub Artifacts and Cloudflare R2:
 - **GitHub Artifacts for Metadata:** GitHub Artifacts will be strictly reserved for lightweight metadata and execution summaries.
 - **Cost & Retention Mitigation:** R2 provides a generous 10GB free tier. By applying a 1-day auto-delete lifecycle rule on the `temp-runs/` prefix, we eliminate the artifact bottleneck entirely without incurring storage costs. The final aggregated state (`unified-findings.json`) will remain permanently in Cloudflare KV/R2 to power the frontend UI indefinitely.
 
-## 3. Automated SaaS-Style Integration (Frictionless Onboarding)
-**The Vision:** Evolve the software from a static repository dashboard into a generalized, automated Code Analysis platform capable of analyzing any repository or branch with zero manual configuration.
-
-**Proposed User Flow:**
-1. **Seamless Sign-in:** Users authenticate via GitHub OAuth.
-2. **One-Click Authorization:** The user accepts permissions to install the GitHub App on their selected repositories (public or private).
-3. **Automated Integration:** The software automatically detects the repository's stack, injects the necessary workflow hooks, and triggers the analysis pipeline.
-4. **Immediate Results:** Analysis is executed in the background. Once finished, the dashboard dynamically generates a customized report for the newly onboarded repository and branch.
-
-This architecture will allow any developer to "bring their own repo," instantly leveraging our entire suite of AI agents and deterministic SAST scanners without needing to manually copy workflow files or configure secrets.
