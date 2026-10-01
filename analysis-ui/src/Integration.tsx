@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Descriptions, Space, Steps, Tag } from 'antd';
+import { applicationEndpoint } from './repositoryReports';
 import type { useLaunchAuth } from './useLaunchAuth';
 
 type Auth = ReturnType<typeof useLaunchAuth>;
-type Configuration = { source_repository: string; analysis_repository: string; publishing_repository?: string; workflow_branch: string; workflow_state: string; configuration_matches: boolean; ready: boolean; enabled_scanners: string[]; checked_at: string };
+type Configuration = { source_repository: string; analysis_repository: string; publishing_repository?: string; workflow_branch: string; workflow_state: string; configuration_matches: boolean; ready: boolean; enabled_scanners: string[]; checked_at: string; report_budget_bytes?: number; report_storage?: { compressed_bytes: number|null; remaining_bytes: number|null; history_points: number }; storage_backend?: string };
 
 export function Connections({ auth, source, host, publisher, endpoint, start, repository, project }: { repository?:string; project?:string; auth: Auth; source?: string; host?: string; publisher?: string; endpoint?: string; start: () => void }) {
   const [configuration, setConfiguration] = useState<Configuration>();
@@ -20,16 +21,19 @@ export function Connections({ auth, source, host, publisher, endpoint, start, re
     }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, [auth.session, source, host, publisher, repository, project, refresh]);
+  const humanBytes=(n?:number|null)=>typeof n==='number'&&n>=0? (n>950_000_000? (n/1_000_000_000).toFixed(2)+' GB' : (n/1_000_000).toFixed(1)+' MB') : 'Unavailable';
   return <section className="connections-panel">
     <h2>Application connections</h2><p>Verify the selected source project, GitHub authorization, scanner workflows, and current-report storage.</p>
     <Steps responsive={false} titlePlacement="vertical" items={[{title:'Git repository'}, {title:'Cloudflare login'}, {title:'GitHub Actions'}, {title:'Dashboard'}]} current={-1}/>
     <Descriptions column={1} bordered items={[
       {key:'source',label:'Source codebase',children:source || 'Unavailable'},
-      {key:'gateway',label:'Authentication and launch gateway',children:endpoint || 'Not configured'},
+      {key:'gateway',label:'Authentication and launch gateway',children:endpoint || applicationEndpoint || 'Not configured'},
       {key:'analysis',label:'Scanner execution repository',children:host ? <a href={`https://github.com/${host}/actions`} target="_blank" rel="noreferrer">{host}</a> : 'Unavailable'},
-      {key:'reports',label:'Current report storage',children:publisher ? <a href={`https://github.com/${publisher}/actions`} target="_blank" rel="noreferrer">{publisher}</a> : 'Unavailable'},
+      {key:'reports',label:'Current report storage',children:configuration?.storage_backend ? `${configuration.storage_backend}` : (publisher ? 'GitHub Releases' : 'Unavailable')},
+      configuration?.report_budget_bytes ? {key:'budget',label:'Report storage budget',children:humanBytes(configuration.report_budget_bytes)} : undefined,
+      configuration?.report_storage ? {key:'usage',label:'Storage used / remaining',children:`${humanBytes(configuration.report_storage.compressed_bytes)} / ${humanBytes(configuration.report_storage.remaining_bytes)}`} : undefined,
       {key:'identity',label:'GitHub session',children:auth.session ? `Signed in as ${auth.session.login}` : 'Not signed in'},
-    ]}/>
+    ].filter(Boolean) as any}/>
     <Space wrap>{auth.session ? <><Button loading={busy} onClick={() => setRefresh(n => n + 1)}>Verify connections</Button><Button onClick={auth.signOut}>Sign out</Button></> : <Button disabled={!auth.available} onClick={auth.signIn}>Sign in to verify connections</Button>}<Button type="primary" disabled={!auth.session || busy || !configuration?.ready} onClick={start}>Choose revision to analyze</Button></Space>
     {(error || auth.error) && <Alert showIcon type="error" title="Connection check unavailable" description={error || auth.error}/>}
     {configuration && <Alert showIcon type={configuration.ready ? 'success' : 'warning'} title={configuration.ready ? 'Launch configuration verified' : 'Configuration needs attention'} description={<><p>Configuration match: {configuration.configuration_matches ? 'yes' : 'no'}. Discovery workflow: {configuration.workflow_state}. Trusted workflow branch: {configuration.workflow_branch}. Checked {new Date(configuration.checked_at).toLocaleString()}.</p><p>{configuration.enabled_scanners.length} enabled channels: {configuration.enabled_scanners.join(', ')}.</p><p>This verifies routing and workflow availability. Scanner results determine which channels actually completed.</p></>}/>}
