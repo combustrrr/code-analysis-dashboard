@@ -82,6 +82,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
   const localAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint);
   const launchAuth = viewerAuth || localAuth;
+  const [autoLaunchedTarget, setAutoLaunchedTarget] = useState<string>('');
   const launched = pendingLaunch && index?.targets.find(t => t.kind === pendingLaunch.kind && (t.kind === 'pr' ? String(t.pr) === pendingLaunch.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === pendingLaunch.ref.toLowerCase() : t.branch === pendingLaunch.ref));
   const newOutput = !!(launched?.report && launched.report !== pendingLaunch?.previousReport && ['current', 'partial'].includes(launched.status));
   const launchStatus = newOutput ? 'New report available for your selected target' : launched?.scan_run_id !== pendingLaunch?.previousRun && launched?.status === 'scanning' ? 'Analysis is running' : launched?.status === 'queued' ? 'Target is queued for analysis' : launched?.status === 'failed' && launched.scan_run_id !== pendingLaunch?.previousRun ? 'Analysis needs attention' : 'Request submitted — awaiting a new published result';
@@ -89,6 +90,26 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   useEffect(() => { setReport(undefined); setFindings([]); setDetail(undefined); setSource([]); setPage(0); setError(''); setLoading(false); if (!target?.report) return;
     const c = new AbortController(); setLoading(true); Promise.all([json<Report>(`data/${target.report}/report.json`, c.signal), json<Finding[]>(`data/${target.report}/findings.json`, c.signal)]).then(([a, b]) => { setReport(a); setFindings(b); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort();
   }, [target?.id, target?.report]);
+  // If there is no current report for the selected target and the user is signed in, automatically launch a fresh analysis once.
+  useEffect(() => {
+    if (!target || target.report || !launchAuth.session) return;
+    if (autoLaunchedTarget === target.id) return;
+    const repo = index?.source_repository || index?.targets[0]?.repository;
+    const kind = target.kind;
+    const ref = kind === 'pr' ? String(target.pr) : kind === 'commit' ? target.head_sha.toLowerCase() : target.branch;
+    if (!repo || !kind || !ref) return;
+    (async () => {
+      try {
+        const submittedAt = new Date().toISOString();
+        const result = await launchAuth.api<{ url: string; run_id?: number }>('launch', { repository: repo, kind, ref });
+        setPendingLaunch({ kind, ref, url: result.url, submittedAt, runId: result.run_id, previousReport: undefined, previousRun: undefined });
+        setAutoLaunchedTarget(target.id);
+        setRefreshTick(t => t + 1);
+      } catch (_) {
+        // Silent: if launch fails (no permission, quota), user can use Run analysis manually.
+      }
+    })();
+  }, [target?.id, target?.report, launchAuth.session]);
   useEffect(() => { setDetail(undefined); setSource([]); if (!r.issue || !target?.report) return; const f = findings.find(f => f.id === r.issue); if (!f) return; const c = new AbortController();
     json<Detail[]>(`data/${target.report}/details/${f.page}.json`, c.signal).then(async rows => { const d = rows.find(d => d.id === f.id); setDetail(d); if (d?.source) setSource(await json<string[]>(`data/${target.report}/${d.source}`, c.signal)); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); return () => c.abort();
   }, [r.issue, findings, target?.report]);
