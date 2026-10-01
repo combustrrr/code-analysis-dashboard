@@ -109,6 +109,15 @@ def report_publication(config, state, report_release, document=None):
         result['metrics'] = {'compressed_bytes':size,
                              'queued':sum(r['status']=='queued' for r in result['targets']),
                              'scanning':sum(r['status']=='scanning' for r in result['targets'])}
+        # Track a small bounded history of compressed storage usage for free-tier monitoring.
+        history = previous.get('report_storage_history', [])
+        try:
+            # Append current point with timestamp; keep last 60 points (~rolling window via publisher cadence)
+            history = [h for h in history if isinstance(h, dict) and 'compressed_bytes' in h and 'at' in h]
+        except Exception:
+            history = []
+        history.append({'at': now(), 'compressed_bytes': size})
+        result['report_storage_history'] = history[-60:]
         release_manifest.write(config, report_release, result)
     return result
 
