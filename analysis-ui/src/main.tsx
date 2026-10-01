@@ -5,7 +5,7 @@ import { applicationEndpoint, hasRepositorySelection, repositoryJson } from './r
 import { Repositories } from './Repositories';
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Alert, Button, Collapse, ConfigProvider, Descriptions, Drawer, Empty, Grid, Input, Segmented, Progress, Select, Space, Statistic, Table, Tabs, Tag, Typography, theme } from 'antd';
+import { Alert, Button, Collapse, ConfigProvider, Descriptions, Drawer, Empty, Grid, Input, Segmented, Progress, Select, Space, Statistic, Table, Tabs, Tag, Typography, theme, message } from 'antd';
 import { CodeOutlined, GithubOutlined, SearchOutlined } from '@ant-design/icons';
 import 'antd/dist/reset.css';
 import './style.css';
@@ -70,6 +70,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const [pendingLaunch, setPendingLaunch] = useState<(LaunchRequest & { previousReport?: string; previousRun?: number })>();
   const [refreshTick, setRefreshTick] = useState(0);
   const [lastRefresh, setLastRefresh] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   useEffect(()=>{const refresh=()=>setRefreshTick(t=>t+1);window.addEventListener('analysis-report-published',refresh);return()=>window.removeEventListener('analysis-report-published',refresh);},[]);
   useEffect(() => { document.documentElement.dataset.theme = appearance; try { localStorage.setItem('analysis-theme', appearance); } catch {} }, [appearance]);
   const [category, setCategory] = useState('');
@@ -79,7 +80,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const [index, setIndex] = useState<Index>(); const [error, setError] = useState(''); const [r, setRoute] = useState(route());
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
   const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
-  useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
+  useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(()=>setRefreshing(false)); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
   const localAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint);
   const launchAuth = viewerAuth || localAuth;
   const [autoLaunchedTarget, setAutoLaunchedTarget] = useState<string>('');
@@ -177,8 +178,8 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
       {pendingLaunch && <Alert className="launch-tracking" type={newOutput ? 'success' : 'info'} showIcon closable onClose={() => setPendingLaunch(undefined)} title={launchStatus} description={<><p>{pendingLaunch.kind}: <code>{pendingLaunch.ref}</code>. Submitted {date(pendingLaunch.submittedAt)}. {newOutput ? 'Open the report to inspect its analyzed SHA, producing run, and scanner completeness.' : 'Previous output may remain visible until a new report is published. Status is based on the latest published inventory.'}</p><RequestStatus auth={launchAuth} runId={pendingLaunch.runId}/><Space wrap><a href={pendingLaunch.url} target="_blank" rel="noreferrer">Track analysis request</a>{launched && <Button onClick={() => navigate(launched.id, 'overview')}>{newOutput ? 'Open new report' : 'View selected target'}</Button>}<Button onClick={() => setRefreshTick(t => t + 1)}>Check for results</Button></Space></>}/>}
       <section className="project">
         <div className="eyebrow">SOURCE REPOSITORY</div><h1>{target?.repository || 'Code quality dashboard'}</h1>
-        <div className="target-row"><label htmlFor="target">Branch or pull request</label>
-          <Select id="target" aria-label="Branch or pull request" showSearch optionFilterProp="label" value={target?.id} placeholder="Select a target" onChange={value => navigate(value, r.tab)} options={['branch', 'pr', 'commit'].map(kind => ({ label: kind === 'branch' ? 'Branches' : kind === 'pr' ? 'Pull requests' : 'Selected commit', options: index?.targets.filter(t => t.kind === kind).map(t => ({ value: t.id, label: t.label })) || [] }))}/>
+        <div className="target-row"><label htmlFor="target">What do you want to analyze?</label>
+          <Select id="target" aria-label="Target revision" showSearch optionFilterProp="label" value={target?.id} placeholder="Choose branch, pull request, or commit" onChange={value => navigate(value, r.tab)} options={['branch', 'pr', 'commit'].map(kind => ({ label: kind === 'branch' ? 'Branches' : kind === 'pr' ? 'Pull requests' : 'Selected commit', options: index?.targets.filter(t => t.kind === kind).map(t => ({ value: t.id, label: t.label })) || [] }))}/>
           {target && <Badge value={target.status || 'queued'}/>}
         </div>
         <p className="helper-text">Select a target revision to analyze. Branch/PR uses the latest head at run time; Commit analyzes the exact 40‑character SHA you paste. Analysis is read‑only and never writes to the source repository.</p>
@@ -190,7 +191,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
           { key: 'time', label: 'ANALYSIS COMPLETED', children: date(report?.generated_at) }
         ]}/>
         <Space wrap className="runs">
-          <span>Reports checked: {date(lastRefresh)}</span><Button size="small" onClick={() => setRefreshTick(t => t + 1)}>Refresh results</Button>
+          <span>Reports checked: {date(lastRefresh)}</span><Button size="small" loading={refreshing} onClick={() => { setRefreshing(true); setRefreshTick(t => t + 1); message.loading({ content: 'Checking for a new report…', key: 'refresh', duration: 1.2 }); }}>{refreshing ? 'Refreshing…' : 'Refresh results'}</Button>
           {target?.scan_run_id && !report?.producer_runs.some(run => run.id === String(target.scan_run_id)) && <a href={`https://github.com/${index!.analysis_repository}/actions/runs/${target.scan_run_id}`} target="_blank" rel="noreferrer">Current scan #{target.scan_run_id}</a>}
           {index && <span>{index.targets.length} active targets | {index.targets.filter(t => t.status === 'queued').length} queued | {index.targets.filter(t => t.status === 'scanning').length} scanning</span>}
           {index?.report_storage && <span>Report storage: {humanBytes(index.report_storage.compressed_bytes)}</span>}
