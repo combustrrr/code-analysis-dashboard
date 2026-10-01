@@ -246,9 +246,17 @@ export async function applicationApi(request, env, session, helpers) {
     const source = await publicRepository(project.source_repository.full_name);
     const workflows = await Promise.all(['code-analysis-reconcile.yml','code-analysis-source.yml'].map(name=>github(`repos/${repo.full_name}/actions/workflows/${name}`,token)));
     const matches = source.id === project.source_repository.id;
+    // Resolve current manifest to expose storage usage quietly in the Connections panel
+    let storage={compressed_bytes:null,remaining_bytes:null,history_points:0};
+    try {
+      const u=new URL('/api/public/manifest',url);u.search=new URLSearchParams({repository:repo.full_name,project_id:project.id});
+      const resp=await publicReports(new Request(u),env);
+      if(resp.ok){const m=await resp.json();const used=Number(m?.metrics?.compressed_bytes||0);const budget=Number(project.report_budget_bytes||0);storage={compressed_bytes:used||0,remaining_bytes:(budget&&used)?Math.max(0,budget-used):null,history_points:Array.isArray(m?.report_storage_history)?m.report_storage_history.length:0};}
+    } catch {}
     return json({source_repository:source.full_name,analysis_repository:repo.full_name,publishing_repository:repo.full_name,
       workflow_branch:repo.default_branch,workflow_state:workflows.map(w=>`${w.name}: ${w.state}`).join('; '),
-      configuration_matches:matches,ready:matches && workflows.every(w=>w.state==='active'),enabled_scanners:project.enabled_scanners,checked_at:new Date().toISOString()});
+      configuration_matches:matches,ready:matches && workflows.every(w=>w.state==='active'),enabled_scanners:project.enabled_scanners,checked_at:new Date().toISOString(),
+      report_budget_bytes:project.report_budget_bytes, report_storage:storage, storage_backend:'cloudflare-r2'});
   }
   if (request.method === 'GET' && url.pathname === '/api/project-readiness') {
     const repo = await publicRepository(url.searchParams.get('repository')); await installation(repo);

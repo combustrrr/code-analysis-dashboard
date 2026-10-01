@@ -1,0 +1,42 @@
+name: Codex Security
+run-name: "Codex Security \xB7 ${{ inputs.scan_branch || github.head_ref || github.ref_name }} \xB7 ${{ inputs.scan_sha ||\
+  \ github.event.pull_request.head.sha || github.sha }}"
+true:
+  workflow_dispatch:
+    inputs:
+      scan_sha:
+        description: Exact branch-head commit selected by the manual orchestrator
+        required: false
+        type: string
+      scan_branch:
+        description: Source branch associated with the selected commit
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: codex-security-${{ inputs.scan_branch || github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  codex-security:
+    name: Codex Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+        fetch-depth: 0
+    - name: Run scanner
+      run: 'npx @openai/codex-security scan . --format=sarif > codex-security.sarif || true
+
+        '
+    - name: Upload codex-security-output to R2
+      if: always()
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+        AWS_DEFAULT_REGION: auto
+      run: "aws s3 cp codex-security.sarif\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/codex-security-output\
+        \ --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"

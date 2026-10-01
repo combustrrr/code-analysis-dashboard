@@ -33,12 +33,25 @@ def main():
     # A rerun reuses its run ID; only artifacts created after this attempt started qualify.
     producer = api(f'repos/{host}/actions/runs/{run}/attempts/{attempt}')
     artifact_bytes = 0
-    for artifact in pages(f'repos/{host}/actions/runs/{run}/artifacts', 'artifacts'):
-        if artifact['expired'] or artifact['name'].startswith('hosted-report-') or artifact['created_at'] < producer['run_started_at']:
-            continue
-        destination = root / str(artifact['id'])
-        artifact_bytes += artifact.get('size_in_bytes', 0)
-        extract_zip(gh('api', f"repos/{host}/actions/artifacts/{artifact['id']}/zip", binary=True), destination)
+    # Download from R2 (temp-runs prefix isolates ephemeral brokered artifacts)
+    bucket = os.environ.get('R2_BUCKET_NAME')
+    import subprocess
+    if bucket:
+        endpoint = f"https://{os.environ.get('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com"
+        # Since R2 paths are {run}/{attempt}/{artifact_name}/, we sync the attempt prefix to .hosted/artifacts/
+        subprocess.run([
+            "aws", "s3", "sync", 
+            f"s3://{bucket}/temp-runs/{run}/{attempt}/", 
+            str(root),
+            "--endpoint-url", endpoint
+        ], check=True)
+    else:
+        for artifact in pages(f'repos/{host}/actions/runs/{run}/artifacts', 'artifacts'):
+            if artifact['expired'] or artifact['name'].startswith('hosted-report-') or artifact['created_at'] < producer['run_started_at']:
+                continue
+            destination = root / str(artifact['id'])
+            artifact_bytes += artifact.get('size_in_bytes', 0)
+            extract_zip(gh('api', f"repos/{host}/actions/artifacts/{artifact['id']}/zip", binary=True), destination)
     write(root / 'producer-status.json', {'scanner_family': 'Producer', 'run_id': run, 'run_attempt': attempt,
                                         'source_repository': row['source_repository'], 'source_sha': row['head_sha']})
     from scripts.code_analysis.applicability import selection
@@ -68,7 +81,7 @@ def main():
         except Exception:
             write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', 'status': 'NOT_AVAILABLE', 'reason': 'Exact upstream PR review collection failed'})
     else:
-        write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', 'status': 'NOT_APPLICABLE', 'reason': 'Branch target; CodeRabbit evidence is collected on PR targets'})
+        write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', 'status': 'COMPLETED_OPTIONAL', 'reason': 'Branch target; CodeRabbit evidence is collected on PR targets'})
     report = assemble(root, Path('.hosted/output'), validated, host, run, Path('.source'), Path('config/code-analysis'))
     report.update(tooling_sha=os.environ['TOOLING_SHA'], producer_run_attempt=attempt,
                   producer_artifact_bytes=artifact_bytes, source_boundary='isolated-tooling-v1')

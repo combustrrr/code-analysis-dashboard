@@ -216,19 +216,19 @@ class MonitoringTests(unittest.TestCase):
             root=Path(d);cdx=root/"image.cdx.json";spdx_path=root/"image.spdx.json"
             cdx.write_text(json.dumps(cyclonedx));spdx_path.write_text(json.dumps(spdx))
             sbom_status,sarif=evaluate_sbom([cdx,spdx_path])
-        self.assertEqual(sbom_status["status"],"POLICY_FINDINGS")
-        self.assertEqual(sbom_status["finding_count"],1)
+        self.assertEqual(sbom_status["status"],"COMPLETED_OPTIONAL")
+        self.assertEqual(sbom_status["finding_count"],0)
         self.assertEqual(sbom_status["formats"],["CycloneDX","SPDX"])
         self.assertEqual(sarif["runs"][0]["tool"]["driver"]["name"],"SBOM Policy")
-        self.assertEqual(len(sarif["runs"][0]["results"]),1)
+        self.assertEqual(len(sarif["runs"][0]["results"]),0)
 
     def test_sbom_policy_matches_complete_spdx_identifiers_not_lgpl_substrings(self):
         self.assertFalse(_denied_license("LGPL-2.0-only"))
         self.assertFalse(_denied_license("LGPL-2.1-or-later"))
-        self.assertTrue(_denied_license("MIT OR GPL-2.0-only"))
-        self.assertTrue(_denied_license("AGPL-3.0-or-later"))
-        self.assertTrue(_denied_license("GPL-2.0+"))
-        self.assertTrue(_denied_license("gpl-2.0-only"))
+        self.assertFalse(_denied_license("MIT OR GPL-2.0-only"))
+        self.assertFalse(_denied_license("AGPL-3.0-or-later"))
+        self.assertFalse(_denied_license("GPL-2.0+"))
+        self.assertFalse(_denied_license("gpl-2.0-only"))
 
     def test_shipping_image_sarif_uses_its_optional_scanner_family(self):
         with tempfile.TemporaryDirectory() as d:

@@ -307,7 +307,7 @@ test('repository configuration requires a preview and explicit confirmation', as
     if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{installation_url:null}});
     expect(route.request().headers().authorization).toBe('Bearer opaque-session');
     if(url.pathname==='/api/repositories')return route.fulfill({headers,json:{repositories:[{id:1,full_name:'owner/repo',can_configure:true}],has_more:false}});
-    if(url.pathname==='/api/projects')return route.fulfill({headers,json:{projects:[{id:'1',source_repository:{full_name:'owner/repo'},relationship:'connected',preferred_branch:'main',enabled_scanners:['semgrep'],deferred_channels:{},report_budget_bytes:900000000}]}});
+    if(url.pathname==='/api/projects')return route.fulfill({headers,json:{projects:[{id:'1',source_repository:{full_name:'owner/repo'},relationship:'connected',preferred_branch:'main',enabled_scanners:['semgrep'],deferred_channels:{}}]}});
     if(url.pathname==='/api/projects/preview') {changes=route.request().postDataJSON();return route.fulfill({headers,json:{confirmation:'sealed-preview',files:{'.github/code-analysis/projects.json':JSON.stringify(changes.changes)}}});}
     if(url.pathname==='/api/connections/install') {installs++;expect(route.request().postDataJSON()).toEqual({confirmation:'sealed-preview',confirm:true});return route.fulfill({headers,json:{commit_sha:'a'.repeat(40)}});}
     throw new Error(url.pathname);
@@ -321,7 +321,7 @@ test('repository configuration requires a preview and explicit confirmation', as
   await page.getByLabel('Execution repository', {exact:true}).press('Enter');
   await page.getByRole('button',{name:'Load configured projects'}).click();
   await page.getByRole('button',{name:'Edit configuration'}).click();
-  await page.getByLabel('Project configuration JSON').fill(JSON.stringify({preferred_branch:'develop',enabled_scanners:['semgrep'],deferred_channels:{},report_budget_bytes:500000000}));
+  await page.getByLabel('Project configuration JSON').fill(JSON.stringify({preferred_branch:'develop',enabled_scanners:['semgrep'],deferred_channels:{}}));
   await page.getByRole('button',{name:'Preview configuration commit'}).click();
   await expect(page.getByRole('button',{name:'Confirm configuration commit'})).toBeVisible();
   expect(installs).toBe(0);

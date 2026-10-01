@@ -1,41 +1,29 @@
-# ============================================================
-# Layer 1: Code Quality — GitHub Actions Workflow
-# Agentic SOC external code-analysis service
-# Tools: Ruff (Python), Pyright (types), ESLint + tsc (TS/React), Bandit
-# ============================================================
-
 name: Code Quality
-run-name: Code Quality · ${{ inputs.scan_branch || github.head_ref || github.ref_name }} · ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
-
-on:
+run-name: "Code Quality \xB7 ${{ inputs.scan_branch || github.head_ref || github.ref_name }} \xB7 ${{ inputs.scan_sha || github.event.pull_request.head.sha\
+  \ || github.sha }}"
+true:
   workflow_dispatch:
     inputs:
       scan_sha:
-        description: "Exact branch-head commit selected by the manual orchestrator"
+        description: Exact branch-head commit selected by the manual orchestrator
         required: false
         type: string
       scan_branch:
-        description: "Source branch associated with the selected commit"
+        description: Source branch associated with the selected commit
         required: false
         type: string
       ensure_sonar_browse:
-        description: "Idempotently grant Browse to the SONAR_API_TOKEN user, then verify"
+        description: Idempotently grant Browse to the SONAR_API_TOKEN user, then verify
         required: false
         default: false
         type: boolean
-
-# Legacy manual scanner entry point; hourly upstream scans use workflows 10 and 11.
 permissions:
   contents: read
   pull-requests: read
-
-# Only the latest source-branch head is valuable to the external analysis service.
 concurrency:
   group: code-quality-${{ inputs.scan_branch || github.head_ref || github.ref_name }}
   cancel-in-progress: true
-
 jobs:
-  # Bounded optional comparison source; never part of the deterministic gate.
   sonarqube-cloud:
     name: SonarQube Cloud (Optional)
     runs-on: ubuntu-latest
@@ -44,449 +32,347 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
     steps:
-      - name: Checkout exact scan commit
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
+    - name: Checkout exact scan commit
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+        fetch-depth: 0
+    - name: Checkout trusted Sonar tooling
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ github.event.repository.default_branch }}
+        path: .analysis-tooling
+        sparse-checkout: 'scripts/code_analysis
 
-      - name: Checkout trusted Sonar tooling
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          path: .analysis-tooling
-          sparse-checkout: |
-            scripts/code_analysis
-            sonar-project.properties
-          sparse-checkout-cone-mode: false
+          sonar-project.properties
 
-      - name: Determine whether Sonar analysis is needed
-        id: sonar-scope
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          SCAN_SHA: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          should_scan=false
-          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
-            should_scan=true
-          else
-            base="$BEFORE_SHA"
-            if [[ "$EVENT_NAME" == pull_request ]]; then
-              base="$BASE_SHA"
-            fi
-            if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}"; then
-              should_scan=true
-            elif git diff --name-only "$base" "$SCAN_SHA" | grep -Eq \
-              '^(backend/app/|webui/src/|scripts/code_analysis/export_sonar_issues\.py$|sonar-project\.properties$|\.github/workflows/01-code-quality\.yml$)'; then
-              should_scan=true
-            fi
-          fi
-          printf 'should_scan=%s\n' "$should_scan" >> "$GITHUB_OUTPUT"
+          '
+        sparse-checkout-cone-mode: false
+    - name: Determine whether Sonar analysis is needed
+      id: sonar-scope
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        BEFORE_SHA: ${{ github.event.before }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        SCAN_SHA: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+      shell: bash
+      run: "set -euo pipefail\nshould_scan=false\nif [[ \"$EVENT_NAME\" == workflow_dispatch ]]; then\n  should_scan=true\n\
+        else\n  base=\"$BEFORE_SHA\"\n  if [[ \"$EVENT_NAME\" == pull_request ]]; then\n    base=\"$BASE_SHA\"\n  fi\n  if\
+        \ [[ -z \"$base\" || \"$base\" =~ ^0+$ ]] || ! git cat-file -e \"${base}^{commit}\"; then\n    should_scan=true\n\
+        \  elif git diff --name-only \"$base\" \"$SCAN_SHA\" | grep -Eq \\\n    '^(backend/app/|webui/src/|scripts/code_analysis/export_sonar_issues\\\
+        .py$|sonar-project\\.properties$|\\.github/workflows/01-code-quality\\.yml$)'; then\n    should_scan=true\n  fi\n\
+        fi\nprintf 'should_scan=%s\\n' \"$should_scan\" >> \"$GITHUB_OUTPUT\"\n"
+    - name: Probe Sonar credentials without exposing secrets
+      if: env.SONAR_TOKEN != '' || env.SONAR_API_TOKEN != ''
+      env:
+        SCAN_BRANCH: ${{ inputs.scan_branch || github.head_ref || github.ref_name }}
+      run: 'python .analysis-tooling/scripts/code_analysis/probe_sonar_access.py
 
-      - name: Probe Sonar credentials without exposing secrets
-        if: env.SONAR_TOKEN != '' || env.SONAR_API_TOKEN != ''
-        env:
-          SCAN_BRANCH: ${{ inputs.scan_branch || github.head_ref || github.ref_name }}
-        run: |
-          python .analysis-tooling/scripts/code_analysis/probe_sonar_access.py
-          cat sonar-access-probe.json
+        cat sonar-access-probe.json
 
-      - name: Ensure Browse for the verified Sonar API user
-        if: inputs.ensure_sonar_browse == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[ensure-sonar-browse]'))
-        env:
-          SCAN_BRANCH: ${{ inputs.scan_branch || github.head_ref || github.ref_name }}
-        run: |
-          python .analysis-tooling/scripts/code_analysis/ensure_sonar_browse.py
-          cat sonar-browse-grant.json
+        '
+    - name: Ensure Browse for the verified Sonar API user
+      if: inputs.ensure_sonar_browse == true || (github.event_name == 'push' && contains(github.event.head_commit.message,
+        '[ensure-sonar-browse]'))
+      env:
+        SCAN_BRANCH: ${{ inputs.scan_branch || github.head_ref || github.ref_name }}
+      run: 'python .analysis-tooling/scripts/code_analysis/ensure_sonar_browse.py
 
-      - name: Derive stable Sonar analysis branch
-        id: sonar-identity
-        env:
-          SOURCE_BRANCH: ${{ inputs.scan_branch || github.head_ref || github.ref_name }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          sonar_branch="$SOURCE_BRANCH"
-          if [[ "$SOURCE_BRANCH" != "$DEFAULT_BRANCH" ]]; then
-            branch_hash="$(printf '%s' "$SOURCE_BRANCH" | sha256sum | cut -c1-16)"
-            sonar_branch="branch-issue-wall-$branch_hash"
-          fi
-          printf 'sonar_branch=%s\n' "$sonar_branch" >> "$GITHUB_OUTPUT"
+        cat sonar-browse-grant.json
 
-      - name: Record unconfigured status
-        if: steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_TOKEN == ''
-        shell: bash
-        run: |
-          printf '%s\n' '{"schema_version":"1","scanner_family":"SonarQube Cloud","status":"NOT_CONFIGURED","reason":"SONAR_TOKEN is unavailable (expected for external fork pull requests)"}' > sonar-status.json
+        '
+    - name: Derive stable Sonar analysis branch
+      id: sonar-identity
+      env:
+        SOURCE_BRANCH: ${{ inputs.scan_branch || github.head_ref || github.ref_name }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      shell: bash
+      run: "set -euo pipefail\nsonar_branch=\"$SOURCE_BRANCH\"\nif [[ \"$SOURCE_BRANCH\" != \"$DEFAULT_BRANCH\" ]]; then\n\
+        \  branch_hash=\"$(printf '%s' \"$SOURCE_BRANCH\" | sha256sum | cut -c1-16)\"\n  sonar_branch=\"branch-issue-wall-$branch_hash\"\
+        \nfi\nprintf 'sonar_branch=%s\\n' \"$sonar_branch\" >> \"$GITHUB_OUTPUT\"\n"
+    - name: Record unconfigured status
+      if: steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_TOKEN == ''
+      shell: bash
+      run: 'printf ''%s\n'' ''{"schema_version":"1","scanner_family":"SonarQube Cloud","status":"NOT_CONFIGURED","reason":"SONAR_TOKEN
+        is unavailable (expected for external fork pull requests)"}'' > sonar-status.json
 
-      - name: Record out-of-scope status
-        if: steps.sonar-scope.outputs.should_scan != 'true'
-        shell: bash
-        run: |
-          printf '%s\n' '{"schema_version":"1","scanner_family":"SonarQube Cloud","status":"NOT_APPLICABLE","reason":"No product source or Sonar configuration changed"}' > sonar-status.json
+        '
+    - name: Record out-of-scope status
+      if: steps.sonar-scope.outputs.should_scan != 'true'
+      shell: bash
+      run: 'printf ''%s\n'' ''{"schema_version":"1","scanner_family":"SonarQube Cloud","status":"NOT_APPLICABLE","reason":"No
+        product source or Sonar configuration changed"}'' > sonar-status.json
 
-      - name: Analyze native push or pull-request event
-        id: sonar-native
-        if: steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_TOKEN != '' && github.event_name != 'workflow_dispatch'
-        continue-on-error: true
-        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
-        with:
-          args: >-
-            -Dproject.settings=.analysis-tooling/sonar-project.properties
-            ${{ github.event_name == 'push' && format('-Dsonar.branch.name={0} -Dsonar.scm.revision={1}', steps.sonar-identity.outputs.sonar_branch, github.sha) || '' }}
-        env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
-
-      - name: Analyze manually selected branch head
-        id: sonar-manual
-        if: steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_TOKEN != '' && github.event_name == 'workflow_dispatch'
-        continue-on-error: true
-        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
-        with:
-          args: >-
-            -Dproject.settings=.analysis-tooling/sonar-project.properties
-            -Dsonar.branch.name=${{ steps.sonar-identity.outputs.sonar_branch }}
-            -Dsonar.scm.revision=${{ inputs.scan_sha }}
-        env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
-
-      - name: Export native Sonar issues for Issue Wall
-        id: sonar-export
-        if: always() && steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_API_TOKEN != '' && (steps.sonar-native.outcome == 'success' || steps.sonar-manual.outcome == 'success')
-        continue-on-error: true
-        env:
-          SCAN_BRANCH: ${{ inputs.scan_branch || github.head_ref || github.ref_name }}
-          SCAN_SHA: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
-          PULL_REQUEST: ${{ github.event.pull_request.number }}
-          SONAR_BRANCH: ${{ steps.sonar-identity.outputs.sonar_branch }}
-        shell: bash
-        run: |
-          python .analysis-tooling/scripts/code_analysis/export_sonar_issues.py \
-            --report-task .scannerwork/report-task.txt \
-            --output sonar-native-issues.json \
-            --project combustrrr_Agentic-Kibana \
-            --branch "$SCAN_BRANCH" \
-            --sonar-branch "$SONAR_BRANCH" \
-            --commit "$SCAN_SHA" \
-            --pull-request "$PULL_REQUEST"
-
-      - name: Record configured scan status
-        if: always() && steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_TOKEN != ''
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          NATIVE_OUTCOME: ${{ steps.sonar-native.outcome }}
-          MANUAL_OUTCOME: ${{ steps.sonar-manual.outcome }}
-          EXPORT_OUTCOME: ${{ steps.sonar-export.outcome }}
-        shell: bash
-        run: |
-          outcome="$NATIVE_OUTCOME"
-          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
-            outcome="$MANUAL_OUTCOME"
-          fi
-          status=CONFIGURED_COMPLETE
-          reason=""
-          if [[ "$outcome" != success ]]; then
-            status=CONFIGURED_PARTIAL
-            reason="SonarQube Cloud analysis failed; inspect the scanner log"
-          elif [[ -z "$SONAR_API_TOKEN" ]]; then
-            status=CONFIGURED_PARTIAL
-            reason="SONAR_API_TOKEN with project Browse permission is not configured"
-          elif [[ "$EXPORT_OUTCOME" != success ]]; then
-            status=CONFIGURED_PARTIAL
-            reason="SonarQube Cloud analysis completed but native issue export failed"
-          fi
-          jq -n --arg status "$status" --arg reason "$reason" --arg outcome "$outcome" --arg export "$EXPORT_OUTCOME" \
-            '{schema_version:"1",scanner_family:"SonarQube Cloud",status:$status,reason:$reason,surfaces:{analysis:$outcome,native_issue_export:$export}}' \
-            > sonar-status.json
-
-      - name: Upload SonarQube Cloud status
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: sonar-results
-          path: |
-            sonar-status.json
-            sonar-access-probe.json
-            sonar-browse-grant.json
-            sonar-native-issues.json
-            .scannerwork/report-task.txt
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────
-  # Python: Ruff lint + extended security rules
-  # ─────────────────────────────────────────────
+        '
+    - name: Analyze native push or pull-request event
+      id: sonar-native
+      if: steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_TOKEN != '' && github.event_name != 'workflow_dispatch'
+      continue-on-error: true
+      uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f
+      with:
+        args: -Dproject.settings=.analysis-tooling/sonar-project.properties ${{ github.event_name == 'push' && format('-Dsonar.branch.name={0}
+          -Dsonar.scm.revision={1}', steps.sonar-identity.outputs.sonar_branch, github.sha) || '' }}
+      env:
+        SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+    - name: Analyze manually selected branch head
+      id: sonar-manual
+      if: steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_TOKEN != '' && github.event_name == 'workflow_dispatch'
+      continue-on-error: true
+      uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f
+      with:
+        args: -Dproject.settings=.analysis-tooling/sonar-project.properties -Dsonar.branch.name=${{ steps.sonar-identity.outputs.sonar_branch
+          }} -Dsonar.scm.revision=${{ inputs.scan_sha }}
+      env:
+        SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+    - name: Export native Sonar issues for Issue Wall
+      id: sonar-export
+      if: always() && steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_API_TOKEN != '' && (steps.sonar-native.outcome
+        == 'success' || steps.sonar-manual.outcome == 'success')
+      continue-on-error: true
+      env:
+        SCAN_BRANCH: ${{ inputs.scan_branch || github.head_ref || github.ref_name }}
+        SCAN_SHA: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+        PULL_REQUEST: ${{ github.event.pull_request.number }}
+        SONAR_BRANCH: ${{ steps.sonar-identity.outputs.sonar_branch }}
+      shell: bash
+      run: "python .analysis-tooling/scripts/code_analysis/export_sonar_issues.py \\\n  --report-task .scannerwork/report-task.txt\
+        \ \\\n  --output sonar-native-issues.json \\\n  --project combustrrr_Agentic-Kibana \\\n  --branch \"$SCAN_BRANCH\"\
+        \ \\\n  --sonar-branch \"$SONAR_BRANCH\" \\\n  --commit \"$SCAN_SHA\" \\\n  --pull-request \"$PULL_REQUEST\"\n"
+    - name: Record configured scan status
+      if: always() && steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_TOKEN != ''
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        NATIVE_OUTCOME: ${{ steps.sonar-native.outcome }}
+        MANUAL_OUTCOME: ${{ steps.sonar-manual.outcome }}
+        EXPORT_OUTCOME: ${{ steps.sonar-export.outcome }}
+      shell: bash
+      run: "outcome=\"$NATIVE_OUTCOME\"\nif [[ \"$EVENT_NAME\" == workflow_dispatch ]]; then\n  outcome=\"$MANUAL_OUTCOME\"\
+        \nfi\nstatus=CONFIGURED_COMPLETE\nreason=\"\"\nif [[ \"$outcome\" != success ]]; then\n  status=CONFIGURED_PARTIAL\n\
+        \  reason=\"SonarQube Cloud analysis failed; inspect the scanner log\"\nelif [[ -z \"$SONAR_API_TOKEN\" ]]; then\n\
+        \  status=CONFIGURED_PARTIAL\n  reason=\"SONAR_API_TOKEN with project Browse permission is not configured\"\nelif\
+        \ [[ \"$EXPORT_OUTCOME\" != success ]]; then\n  status=CONFIGURED_PARTIAL\n  reason=\"SonarQube Cloud analysis completed\
+        \ but native issue export failed\"\nfi\njq -n --arg status \"$status\" --arg reason \"$reason\" --arg outcome \"$outcome\"\
+        \ --arg export \"$EXPORT_OUTCOME\" \\\n  '{schema_version:\"1\",scanner_family:\"SonarQube Cloud\",status:$status,reason:$reason,surfaces:{analysis:$outcome,native_issue_export:$export}}'\
+        \ \\\n  > sonar-status.json\n"
+    - name: Upload sonar-results to R2
+      if: always()
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+        AWS_DEFAULT_REGION: auto
+      run: "aws s3 cp sonar-status.json\nsonar-access-probe.json\nsonar-browse-grant.json\nsonar-native-issues.json\n.scannerwork/report-task.txt\n\
+        \ s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/sonar-results --recursive --endpoint-url\
+        \ https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
   python-ruff:
-    name:  Ruff (Python Lint + Format)
+    name: Ruff (Python Lint + Format)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+        fetch-depth: 0
+    - name: Checkout trusted analysis tooling
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ github.event.repository.default_branch }}
+        path: .analysis-tooling
+        sparse-checkout: '.coderabbit.yaml
 
-      - name: Checkout trusted analysis tooling
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          path: .analysis-tooling
-          sparse-checkout: |
-            .coderabbit.yaml
-            .github/workflows
-            .ci
-            config/code-analysis/ruff.toml
-            config/code-analysis
-            deploy
-            scripts/code_analysis
-          sparse-checkout-cone-mode: false
+          .github/workflows
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: .analysis-tooling/.ci/requirements.txt
+          .ci
 
-      - name: Install pinned tools
-        run: python -m pip install --requirement .analysis-tooling/.ci/requirements.txt
+          config/code-analysis/ruff.toml
 
-      - name: Enforce code-analysis workflow policy
-        run: python .analysis-tooling/scripts/code_analysis/audit_workflows.py
+          config/code-analysis
 
-      - name: Ruff lint (default rules — matches existing python-static CI gate)
-        run: python -m ruff check backend/app backend/tests --exit-zero
+          deploy
 
-      - name: Ruff lint (extended rules — advisory for baseline phase)
-        run: |
-          python -m ruff check backend/ \
-            --config .analysis-tooling/config/code-analysis/ruff.toml \
-            --output-format=github \
-            --exit-zero
+          scripts/code_analysis
 
-      - name: Ruff format check (advisory)
-        run: |
-          python -m ruff format --check backend/ \
-            --config .analysis-tooling/config/code-analysis/ruff.toml \
-            || true
-
-      - name: Ruff lint (JSON for normalizer)
-        if: always()
-        run: |
-          python -m ruff check backend/ \
-            --config .analysis-tooling/config/code-analysis/ruff.toml \
-            --output-format=json \
-            --exit-zero \
-            --output-file ruff-results.json
-
-      - name: Upload Ruff results
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ruff-results
-          path: ruff-results.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────
-  # Python: Bandit security scanning
-  # NOTE: Bandit is initially advisory (--exit-zero) until a baseline
-  #       of existing findings is established and resolved.
-  #       Once baseline is clean, remove --exit-zero and --exit-non-zero-on-fix.
-  # ─────────────────────────────────────────────
+          '
+        sparse-checkout-cone-mode: false
+    - name: Set up Python 3.11
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.11'
+        cache: pip
+        cache-dependency-path: .analysis-tooling/.ci/requirements.txt
+    - name: Install pinned tools
+      run: python -m pip install --requirement .analysis-tooling/.ci/requirements.txt
+    - name: Enforce code-analysis workflow policy
+      run: python .analysis-tooling/scripts/code_analysis/audit_workflows.py
+    - name: "Ruff lint (default rules \u2014 matches existing python-static CI gate)"
+      run: python -m ruff check backend/app backend/tests --exit-zero
+    - name: "Ruff lint (extended rules \u2014 advisory for baseline phase)"
+      run: "python -m ruff check backend/ \\\n  --config .analysis-tooling/config/code-analysis/ruff.toml \\\n  --output-format=github\
+        \ \\\n  --exit-zero\n"
+    - name: Ruff format check (advisory)
+      run: "python -m ruff format --check backend/ \\\n  --config .analysis-tooling/config/code-analysis/ruff.toml \\\n  ||\
+        \ true\n"
+    - name: Ruff lint (JSON for normalizer)
+      if: always()
+      run: "python -m ruff check backend/ \\\n  --config .analysis-tooling/config/code-analysis/ruff.toml \\\n  --output-format=json\
+        \ \\\n  --exit-zero \\\n  --output-file ruff-results.json\n"
+    - name: Upload ruff-results to R2
+      if: always()
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+        AWS_DEFAULT_REGION: auto
+      run: aws s3 cp ruff-results.json s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/ruff-results
+        --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
   python-bandit:
-    name:  Bandit (Python Security)
+    name: Bandit (Python Security)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
       security-events: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+    - name: Checkout trusted analysis tooling
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ github.event.repository.default_branch }}
+        path: .analysis-tooling
+        sparse-checkout: '.ci
 
-      - name: Checkout trusted analysis tooling
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          path: .analysis-tooling
-          sparse-checkout: |
-            .ci
-            scripts/code_analysis
-          sparse-checkout-cone-mode: false
+          scripts/code_analysis
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: .analysis-tooling/.ci/requirements.txt
-
-      - name: Install tools
-        run: python -m pip install --requirement .analysis-tooling/.ci/requirements.txt
-
-      - name: Run Bandit (JSON, advisory for baseline)
-        run: |
-          bandit \
-            -r backend/ \
-            -c backend/pyproject.toml \
-            --format json \
-            --output bandit-results.json \
-            --exit-zero
-
-      - name: Normalize Bandit JSON to SARIF
-        run: |
-          mkdir -p bandit-scan-results
-          cp bandit-results.json bandit-scan-results/
-          python .analysis-tooling/scripts/code_analysis/normalizer.py \
-            --input-dir bandit-scan-results \
-            --output-dir bandit-normalized
-
-      - name: Report HIGH severity findings (informational)
-        if: always()
-        run: |
-          python - <<'PY'
-          import json
-          data = json.load(open("bandit-results.json", encoding="utf-8"))
-          results = data.get("results", [])
-          counts = {level: sum(r.get("issue_severity") == level for r in results)
-                    for level in ("CRITICAL", "HIGH", "MEDIUM", "LOW")}
-          print(f"Bandit findings: {len(results)} total ({counts})")
-          for finding in results:
-              if finding.get("issue_severity") in {"CRITICAL", "HIGH"}:
-                  print(f"  {finding.get('test_id', '')} | {finding.get('filename', '')}:"
-                        f"{finding.get('line_number', '')} | {finding.get('issue_text', '')[:100]}")
-          PY
-
-      - name: Build bounded GitHub Security SARIF view
-        run: |
-          python .analysis-tooling/scripts/code_analysis/bound_sarif.py \
-            --input bandit-normalized/normalized.sarif \
-            --output bandit-normalized/github-security.sarif \
-            --maximum 5000
-
-      - name: Upload SARIF to GitHub Security tab
-        if: always()
-        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v4
-        with:
-          sarif_file: bandit-normalized/github-security.sarif
-          category: "bandit"
-
-      - name: Upload Bandit results artifact
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: bandit-results
-          path: |
-            bandit-results.json
-            bandit-normalized/normalized.sarif
-
-  # ─────────────────────────────────────────────
-  # Python: Pyright type checking (advisory — full coverage)
-  # ─────────────────────────────────────────────
+          '
+        sparse-checkout-cone-mode: false
+    - name: Set up Python 3.11
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.11'
+        cache: pip
+        cache-dependency-path: .analysis-tooling/.ci/requirements.txt
+    - name: Install tools
+      run: python -m pip install --requirement .analysis-tooling/.ci/requirements.txt
+    - name: Run Bandit (JSON, advisory for baseline)
+      run: "bandit \\\n  -r backend/ \\\n  -c backend/pyproject.toml \\\n  --format json \\\n  --output bandit-results.json\
+        \ \\\n  --exit-zero\n"
+    - name: Normalize Bandit JSON to SARIF
+      run: "mkdir -p bandit-scan-results\ncp bandit-results.json bandit-scan-results/\npython .analysis-tooling/scripts/code_analysis/normalizer.py\
+        \ \\\n  --input-dir bandit-scan-results \\\n  --output-dir bandit-normalized\n"
+    - name: Report HIGH severity findings (informational)
+      if: always()
+      run: "python - <<'PY'\nimport json\ndata = json.load(open(\"bandit-results.json\", encoding=\"utf-8\"))\nresults = data.get(\"\
+        results\", [])\ncounts = {level: sum(r.get(\"issue_severity\") == level for r in results)\n          for level in\
+        \ (\"CRITICAL\", \"HIGH\", \"MEDIUM\", \"LOW\")}\nprint(f\"Bandit findings: {len(results)} total ({counts})\")\nfor\
+        \ finding in results:\n    if finding.get(\"issue_severity\") in {\"CRITICAL\", \"HIGH\"}:\n        print(f\"  {finding.get('test_id',\
+        \ '')} | {finding.get('filename', '')}:\"\n              f\"{finding.get('line_number', '')} | {finding.get('issue_text',\
+        \ '')[:100]}\")\nPY\n"
+    - name: Build bounded GitHub Security SARIF view
+      run: "python .analysis-tooling/scripts/code_analysis/bound_sarif.py \\\n  --input bandit-normalized/normalized.sarif\
+        \ \\\n  --output bandit-normalized/github-security.sarif \\\n  --maximum 5000\n"
+    - name: Upload SARIF to GitHub Security tab
+      if: always()
+      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      with:
+        sarif_file: bandit-normalized/github-security.sarif
+        category: bandit
+    - name: Upload bandit-results to R2
+      if: always()
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+        AWS_DEFAULT_REGION: auto
+      run: "aws s3 cp bandit-results.json\nbandit-normalized/normalized.sarif\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id\
+        \ }/${ github.run_attempt }/bandit-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
   python-types:
-    name:  Pyright (Python Type Checking)
+    name: Pyright (Python Type Checking)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+    - name: Set up Python 3.11
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.11'
+        cache: pip
+        cache-dependency-path: backend/requirements-dev.txt
+    - name: Install dependencies + Pyright
+      run: 'python -m pip install --upgrade pip
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: backend/requirements-dev.txt
+        pip install -r backend/requirements.txt
 
-      - name: Install dependencies + Pyright
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
-          pip install -r backend/requirements-dev.txt
-          pip install "pyright==1.1.411"
+        pip install -r backend/requirements-dev.txt
 
-      - name: Run Pyright (advisory)
-        run: |
-          pyright backend/app \
-            --outputjson > pyright-results.json \
-            || true
+        pip install "pyright==1.1.411"
 
-      - name: Upload Pyright results
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: pyright-results
-          path: pyright-results.json
-
-  # ─────────────────────────────────────────────
-  # TypeScript: ESLint + tsc type checking
-  # Uses existing webui eslint.config.js and tsconfig.json
-  # ─────────────────────────────────────────────
+        '
+    - name: Run Pyright (advisory)
+      run: "pyright backend/app \\\n  --outputjson > pyright-results.json \\\n  || true\n"
+    - name: Upload pyright-results to R2
+      if: always()
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+        AWS_DEFAULT_REGION: auto
+      run: aws s3 cp pyright-results.json s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/pyright-results
+        --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
   typescript-quality:
-    name:  ESLint + tsc (TypeScript/React)
+    name: ESLint + tsc (TypeScript/React)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: webui
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+    - name: Set up Node.js 22
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: webui/package-lock.json
+    - name: Install locked dependencies
+      run: npm ci
+    - name: TypeScript type check
+      shell: bash
+      run: 'set +e
 
-      - name: Set up Node.js 22
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: webui/package-lock.json
+        npx tsc --noEmit --pretty false 2>&1 | tee tsc-results.txt
 
-      - name: Install locked dependencies
-        run: npm ci
+        exit 0
 
-      - name: TypeScript type check
-        shell: bash
-        run: |
-          set +e
-          npx tsc --noEmit --pretty false 2>&1 | tee tsc-results.txt
-          exit 0
+        '
+    - name: ESLint lint (human-readable advisory output)
+      run: npx eslint "src/**/*.{ts,tsx}" --format stylish || true
+    - name: "ESLint lint (fail on error \u2014 matches existing webui-lint CI gate)"
+      continue-on-error: true
+      run: npx eslint "src/**/*.{ts,tsx}"
+    - name: Upload ESLint results (for normalizer)
+      if: always()
+      run: 'npx eslint "src/**/*.{ts,tsx}" --format json --output-file eslint-results.json || true
 
-      - name: ESLint lint (human-readable advisory output)
-        run: npx eslint "src/**/*.{ts,tsx}" --format stylish || true
-
-      - name: ESLint lint (fail on error — matches existing webui-lint CI gate)
-        continue-on-error: true
-        run: npx eslint "src/**/*.{ts,tsx}"
-
-      - name: Upload ESLint results (for normalizer)
-        if: always()
-        run: |
-          npx eslint "src/**/*.{ts,tsx}" --format json --output-file eslint-results.json || true
-
-      - name: Upload ESLint results artifact
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: eslint-results
-          path: webui/eslint-results.json
-
-      - name: Upload TypeScript results artifact
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: tsc-results
-          path: webui/tsc-results.txt
+        '
+    - name: Upload eslint-results to R2
+      if: always()
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+        AWS_DEFAULT_REGION: auto
+      run: aws s3 cp webui/eslint-results.json s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/eslint-results
+        --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+    - name: Upload tsc-results to R2
+      if: always()
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+        AWS_DEFAULT_REGION: auto
+      run: aws s3 cp webui/tsc-results.txt s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/tsc-results
+        --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com

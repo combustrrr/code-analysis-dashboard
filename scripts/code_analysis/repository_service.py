@@ -45,10 +45,8 @@ def recover_expired_evidence(config, row):
 
 def report_publication(config, state, report_release, document=None):
     """Publish all active targets together, then remove unreferenced assets."""
-    repo = config['analysis_repository']
-    previous = release_manifest.read(repo, report_release)
+    previous = release_manifest.read(config, report_release)
     prior = {row['id']: row for row in previous.get('targets', [])}
-    assets = {a['name']: a for a in github.pages(f"repos/{repo}/releases/{report_release['id']}/assets")}
     result = {**state, 'schema_version':'analysis-current-v1', 'targets':[]}
     pending = {}
     with tempfile.TemporaryDirectory(prefix='analysis-publication-') as directory:
@@ -75,7 +73,7 @@ def report_publication(config, state, report_release, document=None):
                     if latest is None or not accept(latest, report):
                         raise ValueError('Target changed before publication')
                     documents = {p.relative_to(destination).as_posix():json.loads(p.read_text(encoding='utf-8')) for p in destination.rglob('*.json')}
-                    manifest, blobs = shard(documents, budget=config['report_budget_bytes'])
+                    manifest, blobs = shard(documents)
                     pending.update(blobs)
                     entry.update(documents=manifest['documents'], assets=manifest['assets'],
                                  analyzed_sha=report['analyzed_sha'], collected_run=run_key,
@@ -103,22 +101,24 @@ def report_publication(config, state, report_release, document=None):
             result['targets'].append(entry)
         referenced = {name:meta for row in result['targets'] for name,meta in row.get('assets', {}).items()}
         size = sum(meta['bytes'] for meta in referenced.values())
-        if size > config['report_budget_bytes']:
-            raise ValueError('Current project capacity exceeded; previous published reports retained')
         for name in referenced:
-            if name not in assets:
-                if name not in pending:
-                    raise ValueError('Current report references a missing asset')
+            if name in pending:
                 path = Path(directory) / name
                 path.write_bytes(pending[name])
-                github.gh('release','upload',config['report_release'],str(path),'--repo',repo)
-        result['metrics'] = {'compressed_bytes':size, 'budget_bytes':config['report_budget_bytes'],
+                github.cf_api(config, f'/api/report/{config["report_release"]}/{name}', method='POST', data=path.read_bytes(), content_type='application/gzip')
+        result['metrics'] = {'compressed_bytes':size,
                              'queued':sum(r['status']=='queued' for r in result['targets']),
                              'scanning':sum(r['status']=='scanning' for r in result['targets'])}
-        release_manifest.write(repo, report_release, result)
-        for name, asset in assets.items():
-            if name.startswith('analysis-') and name not in referenced and release_manifest.expired_grace(asset):
-                github.api(f"repos/{repo}/releases/assets/{asset['id']}", method='DELETE')
+        # Track a small bounded history of compressed storage usage for free-tier monitoring.
+        history = previous.get('report_storage_history', [])
+        try:
+            # Append current point with timestamp; keep last 60 points (~rolling window via publisher cadence)
+            history = [h for h in history if isinstance(h, dict) and 'compressed_bytes' in h and 'at' in h]
+        except Exception:
+            history = []
+        history.append({'at': now(), 'compressed_bytes': size})
+        result['report_storage_history'] = history[-60:]
+        release_manifest.write(config, report_release, result)
     return result
 
 
@@ -144,8 +144,10 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
     summaries = []
     stored = {}
     for project in document['projects']:
-        rel = github.release(repository, 'analysis-state-' + project['id'], create=True)
-        stored[project['id']] = (rel, release_manifest.read(repository, rel))
+        rel = 'analysis-state-' + project['id']
+        config_tmp = service_config(document, project['id'], template)
+        config_tmp['launch_endpoint'] = template.get('launch_endpoint') or document.get('launch_endpoint')
+        stored[project['id']] = (rel, release_manifest.read(config_tmp, rel))
     projects = sorted(document['projects'], key=lambda p: not (p['id'] == project_id and selection or any(r.get('manual_refresh') for r in stored[p['id']][1].get('targets', []))))
     for project in projects:
         config = service_config(document, project['id'], template)
@@ -190,7 +192,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             row.update(profile_mode='portable' if project['profile'].get('mode') == 'portable' else 'agentic-soc', project_id=project['id'],request_id=uuid.uuid4().hex,status='dispatching',
                        tooling_sha=document['tooling_sha'], execution_sha=execution_sha)
             row.pop('manual_refresh',None)
-            release_manifest.write(repository,release,state)
+            release_manifest.write(config,release,state)
             dispatched = github.api(f'repos/{repository}/actions/workflows/code-analysis-source.yml/dispatches',
                 {'ref':repo['default_branch'],'return_run_details':True,'inputs':{
                     'target':json.dumps(row),'tooling_sha':document['tooling_sha'],'request_id':row['request_id']}})
@@ -199,7 +201,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             row['status']='scanning'
             running += 1
             project_dispatches += 1
-        release_manifest.write(repository,release,state)
+        release_manifest.write(config,release,state)
         if queued_asset is not None and project['id']==project_id and state.get('last_request_id')==request_id:
             github.api(f"repos/{repository}/releases/assets/{queued_asset['id']}",method='DELETE')
             queued_asset = None
@@ -207,9 +209,9 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             selected_row = next((r for r in state['targets'] if r.get('client_request_id') == receipt['request_id'] and r['head_sha'] == receipt['head_sha']), None)
             if selected_row and selected_row.get('scan_run_id'):
                 receipt.update({k:selected_row[k] for k in ('scan_run_id','run_attempt','execution_sha')})
-        current = github.release(repository,config['report_release'],create=True)
+        current = config['report_release']
         summaries.append(report_publication(config,state,current,document)['metrics'])
-        release_manifest.write(repository,release,state)  # Persist bounded evidence recovery intents.
+        release_manifest.write(config,release,state)  # Persist bounded evidence recovery intents.
     return summaries
 
 

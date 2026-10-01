@@ -63,9 +63,6 @@ def validate(document: dict) -> dict:
             from scripts.code_analysis.portable_profile import validate as validate_profile
             validate_profile(project['profile'])
         project['source_repository'] = source
-        project.setdefault('report_budget_bytes', 900_000_000)
-        if type(project['report_budget_bytes']) is not int or project['report_budget_bytes'] <= 0:
-            raise ValueError('Invalid report budget')
     result['execution_repository'] = execution
     if result.get('max_parallel_analyses', 2) != 2:
         raise ValueError('This version supports two analysis slots per execution repository')

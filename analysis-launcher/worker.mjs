@@ -71,8 +71,87 @@ async function route(request, env) {
     const response = await webhook(request, env);
     if (response) return response;
   }
-  settings(env);
   const url = new URL(request.url);
+  
+  if (url.pathname.startsWith('/api/state/') || url.pathname.startsWith('/api/report/')) {
+    if (request.headers.get('Authorization') !== `Bearer ${env.WORKER_API_TOKEN}`) {
+      throw new Failure(401, 'Unauthorized state access.');
+    }
+    const id = url.pathname.split('/').at(-1);
+    
+    if (url.pathname.startsWith('/api/state/')) {
+      if (!env.ANALYSIS_STATE) throw new Failure(500, 'KV binding not configured.');
+      if (request.method === 'GET') {
+        const val = await env.ANALYSIS_STATE.get(id);
+        return new Response(val || '{}', { headers: { 'Content-Type': 'application/json' } });
+      } else if (request.method === 'POST') {
+        const body = await request.text();
+        await env.ANALYSIS_STATE.put(id, body);
+        return new Response('OK');
+      }
+    }
+    
+    if (url.pathname.startsWith('/api/report/')) {
+      if (!env.ANALYSIS_REPORTS) throw new Failure(500, 'R2 binding not configured.');
+      if (request.method === 'GET') {
+        const obj = await env.ANALYSIS_REPORTS.get(id);
+        if (!obj) throw new Failure(404, 'Report not found.');
+        return new Response(obj.body, { headers: { 'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream' } });
+      } else if (request.method === 'POST') {
+        // Guardrails: prevent R2 overuse by bounding per-object size and manifest budget.
+        const contentType = request.headers.get('Content-Type') || 'application/octet-stream';
+        const lengthHeader = request.headers.get('Content-Length');
+        const maxAsset = parseInt(env.MAX_ASSET_BYTES || '104857600', 10);
+        const maxManifestCompressed = parseInt(env.MAX_MANIFEST_COMPRESSED_BYTES || '900000000', 10);
+        // If manifest JSON: enforce compressed_bytes budget and write validated JSON.
+        if (/\.json$/.test(id) && contentType.includes('application/json')) {
+          const text = await request.text();
+          try {
+            const manifest = JSON.parse(text);
+            const compressed = Number(manifest?.metrics?.compressed_bytes || 0);
+            if (!Number.isFinite(compressed) || compressed < 0 || compressed > maxManifestCompressed) {
+              throw new Failure(413, 'Manifest exceeds configured compressed-bytes budget.');
+            }
+          } catch (e) {
+            if (e instanceof Failure) throw e; else throw new Failure(400, 'Invalid manifest JSON.');
+          }
+          await env.ANALYSIS_REPORTS.put(id, text, { httpMetadata: { contentType: 'application/json' } });
+          return new Response('OK');
+        }
+        // Asset uploads: enforce per-object size (prefer Content-Length; otherwise, count stream).
+        if (lengthHeader && /^\d+$/.test(lengthHeader)) {
+          const n = parseInt(lengthHeader, 10);
+          if (n > maxAsset) throw new Failure(413, 'Asset exceeds configured size limit.');
+          await env.ANALYSIS_REPORTS.put(id, request.body, { httpMetadata: { contentType } });
+          return new Response('OK');
+        }
+        // No reliable length; count while streaming.
+        let total = 0;
+        const limiter = new TransformStream({
+          transform(chunk, controller) {
+            total += chunk.byteLength || 0;
+            if (total > maxAsset) {
+              controller.error(new Error('limit'));
+              return;  // stop
+            }
+            controller.enqueue(chunk);
+          }
+        });
+        const bounded = request.body?.pipeThrough(limiter);
+        try {
+          await env.ANALYSIS_REPORTS.put(id, bounded, { httpMetadata: { contentType } });
+        } catch (e) {
+          if ((e && String(e).includes('limit')) || String(e?.message || e).includes('limit')) {
+            throw new Failure(413, 'Asset exceeds configured size limit.');
+          }
+          throw e;
+        }
+        return new Response('OK');
+      }
+    }
+  }
+
+  settings(env);
   if (request.method === 'GET' && url.pathname === '/auth/login') {
     const nonce = url.searchParams.get('nonce');
     if (!/^[a-f0-9]{64}$/.test(nonce || '')) throw new Failure(400, 'Invalid login request.');

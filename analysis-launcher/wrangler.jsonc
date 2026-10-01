@@ -16,14 +16,29 @@
     "DASHBOARD_ACCESS": "collaborators",
     "TOOLING_FROM_SERVICE": "true",
     "TOOLING_SHA": "a0dcd02062a1dbfc24d085fcaea71e36b3ba3512",
-    "SAFE_API_LOGS": "true"
+    "SAFE_API_LOGS": "true",
+    "MAX_ASSET_BYTES": "104857600",
+    "MAX_MANIFEST_COMPRESSED_BYTES": "900000000"
   },
   "secrets": {
     "required": [
       "GITHUB_CLIENT_SECRET",
-      "SESSION_KEY"
+      "SESSION_KEY",
+      "WORKER_API_TOKEN"
     ]
   },
+  "kv_namespaces": [
+    {
+      "binding": "ANALYSIS_STATE",
+      "id": "e0b04c86ebf443bcaef13459e74d32cf"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ANALYSIS_REPORTS",
+      "bucket_name": "code-analysis-reports"
+    }
+  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,

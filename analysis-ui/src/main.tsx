@@ -14,7 +14,7 @@ import { Connections, RequestStatus } from './Integration';
 import { AnalysisLauncher, type LaunchRequest } from './AnalysisLauncher';
 
 type Target = { scan_run_id?: number; run_attempt?: number; tooling_sha?: string; id: string; label: string; repository: string; source_repository: string; head_sha: string; kind: string; branch: string; pr?: number; base_branch?: string; base_sha?: string; checked_at: string; status: string; report?: string; error?: string };
-type Index = { report_storage?: {compressed_bytes:number;budget_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
+type Index = { report_storage?: {compressed_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
 type Finding = { id: string; severity: string; message: string; file: string; line: number; scanners: string[]; rules: string[]; page: number };
 type Detail = Finding & { origins: { scanner_family: string; rule: string; file: string; start_line: number; raw_artifact: string; observation_id: string }[]; source: string | null; source_start: number; source_url: string | null };
 type Channel = { channel: string; name: string; class: string; status: string; findings: number | null; observation_count: number; reason: string; workflow: string };
@@ -22,15 +22,7 @@ type Report = { tooling_sha?: string; producer_run_attempt?: number; analyzed_sh
 const states: Record<string, string> = { current: 'Up to date', partial: 'Partial analysis', queued: 'Queued', scanning: 'Scanning', stale: 'Newer revision pending', failed: 'Analysis failed' };
 const ranks: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4, UNKNOWN: 5 };
 async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
-  if (hasRepositorySelection()) return repositoryJson<T>(path, signal);
-  const compressed = await fetch(`${path}.gz`, { signal, cache: 'no-store' });
-  if (compressed.ok) {
-    if (compressed.headers.get('content-encoding') === 'gzip') return compressed.json();
-    if (!compressed.body) throw new Error('Empty report response');
-    return new Response(compressed.body.pipeThrough(new DecompressionStream('gzip'))).json();
-  }
-  // Uncompressed local fixtures remain usable without a separate development server.
-  const r = await fetch(path, { signal, cache: 'no-store' }); if (!r.ok) throw new Error(`Report unavailable (${r.status}). Try again after the next publication.`); return r.json();
+  return repositoryJson<T>(path, signal);
 }
 function route() { const p = new URLSearchParams(location.hash.slice(1)); return { repository: p.get('repository') || '', project: p.get('project') || '', target: p.get('target') || '', tab: p.get('tab') || 'overview', issue: p.get('issue') || '' }; }
 function navigate(target: string, tab: string, issue = '') { const current = route(); location.hash = new URLSearchParams({ ...(current.repository ? { repository: current.repository, project: current.project } : {}), target, tab, ...(issue ? { issue } : {}) }).toString(); }
@@ -90,6 +82,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
   const localAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint);
   const launchAuth = viewerAuth || localAuth;
+  const [autoLaunchedTarget, setAutoLaunchedTarget] = useState<string>('');
   const launched = pendingLaunch && index?.targets.find(t => t.kind === pendingLaunch.kind && (t.kind === 'pr' ? String(t.pr) === pendingLaunch.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === pendingLaunch.ref.toLowerCase() : t.branch === pendingLaunch.ref));
   const newOutput = !!(launched?.report && launched.report !== pendingLaunch?.previousReport && ['current', 'partial'].includes(launched.status));
   const launchStatus = newOutput ? 'New report available for your selected target' : launched?.scan_run_id !== pendingLaunch?.previousRun && launched?.status === 'scanning' ? 'Analysis is running' : launched?.status === 'queued' ? 'Target is queued for analysis' : launched?.status === 'failed' && launched.scan_run_id !== pendingLaunch?.previousRun ? 'Analysis needs attention' : 'Request submitted — awaiting a new published result';
@@ -97,6 +90,26 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   useEffect(() => { setReport(undefined); setFindings([]); setDetail(undefined); setSource([]); setPage(0); setError(''); setLoading(false); if (!target?.report) return;
     const c = new AbortController(); setLoading(true); Promise.all([json<Report>(`data/${target.report}/report.json`, c.signal), json<Finding[]>(`data/${target.report}/findings.json`, c.signal)]).then(([a, b]) => { setReport(a); setFindings(b); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort();
   }, [target?.id, target?.report]);
+  // If there is no current report for the selected target and the user is signed in, automatically launch a fresh analysis once.
+  useEffect(() => {
+    if (!target || target.report || !launchAuth.session) return;
+    if (autoLaunchedTarget === target.id) return;
+    const repo = index?.source_repository || index?.targets[0]?.repository;
+    const kind = target.kind;
+    const ref = kind === 'pr' ? String(target.pr) : kind === 'commit' ? target.head_sha.toLowerCase() : target.branch;
+    if (!repo || !kind || !ref) return;
+    (async () => {
+      try {
+        const submittedAt = new Date().toISOString();
+        const result = await launchAuth.api<{ url: string; run_id?: number }>('launch', { repository: repo, kind, ref });
+        setPendingLaunch({ kind, ref, url: result.url, submittedAt, runId: result.run_id, previousReport: undefined, previousRun: undefined });
+        setAutoLaunchedTarget(target.id);
+        setRefreshTick(t => t + 1);
+      } catch (_) {
+        // Silent: if launch fails (no permission, quota), user can use Run analysis manually.
+      }
+    })();
+  }, [target?.id, target?.report, launchAuth.session]);
   useEffect(() => { setDetail(undefined); setSource([]); if (!r.issue || !target?.report) return; const f = findings.find(f => f.id === r.issue); if (!f) return; const c = new AbortController();
     json<Detail[]>(`data/${target.report}/details/${f.page}.json`, c.signal).then(async rows => { const d = rows.find(d => d.id === f.id); setDetail(d); if (d?.source) setSource(await json<string[]>(`data/${target.report}/${d.source}`, c.signal)); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); return () => c.abort();
   }, [r.issue, findings, target?.report]);
@@ -133,6 +146,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   }, [r.issue, screens.lg, target?.id]);
   const fresh = !!report && report.analyzed_sha === target?.head_sha;
   const completed = report?.channels.filter(c => ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(c.status)).length || 0;
+  const humanBytes=(n?:number)=>typeof n==='number'? (n>950_000_000? (n/1_000_000_000).toFixed(2)+' GB' : (n/1_000_000).toFixed(1)+' MB') : 'Unavailable';
   return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: { colorPrimary: appearance === 'dark' ? '#7bd0ff' : '#1765ad', colorLink: appearance === 'dark' ? '#7bd0ff' : '#1765ad', colorLinkHover: appearance === 'dark' ? '#b3e5ff' : '#124c85', colorBgBase: appearance === 'dark' ? '#071523' : '#f4f7fa', colorBgContainer: appearance === 'dark' ? '#102131' : '#ffffff', colorText: appearance === 'dark' ? '#dce8f5' : '#202d3d', colorTextSecondary: appearance === 'dark' ? '#a6b8c9' : '#52657a', colorBorder: appearance === 'dark' ? '#304459' : '#c9d4df', borderRadius: 6, fontFamily: 'Segoe UI, sans-serif' }, components: { Button: { primaryColor: appearance === 'dark' ? '#071523' : '#ffffff' } } }}>
     <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}{r.repository&&<ProjectPicker repository={r.repository} project={r.project}/>}<Segmented aria-label="Color theme" value={appearance} options={[{label:'Dark',value:'dark'},{label:'Light',value:'light'}]} onChange={setAppearance}/><Button type="primary" onClick={() => setRunOpen(true)}>Run analysis</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/code-analysis-dashboard'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
     {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} close={() => setRunOpen(false)}/>} 
@@ -167,6 +181,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
           <span>Reports checked: {date(lastRefresh)}</span><Button size="small" onClick={() => setRefreshTick(t => t + 1)}>Refresh results</Button>
           {target?.scan_run_id && !report?.producer_runs.some(run => run.id === String(target.scan_run_id)) && <a href={`https://github.com/${index!.analysis_repository}/actions/runs/${target.scan_run_id}`} target="_blank" rel="noreferrer">Current scan #{target.scan_run_id}</a>}
           {index && <span>{index.targets.length} active targets | {index.targets.filter(t => t.status === 'queued').length} queued | {index.targets.filter(t => t.status === 'scanning').length} scanning</span>}
+          {index?.report_storage && <span>Report storage: {humanBytes(index.report_storage.compressed_bytes)}</span>}
           {report?.tooling_sha && <span>Tooling <code title={report.tooling_sha}>{report.tooling_sha.slice(0, 12)}</code> | attempt {report.producer_run_attempt ?? 'Unavailable'}</span>}
           {report?.producer_runs.map(run => <a key={run.id} href={run.url} target="_blank" rel="noreferrer">Run #{run.id}</a>)}
         </Space>
@@ -232,7 +247,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
       <Drawer title="Issue detail" open={!!r.issue && r.tab === 'issues' && !screens.lg} onClose={() => navigate(target?.id || '', 'issues')} size="min(850px, 100vw)" destroyOnHidden>
         <Evidence detail={detail} source={source} error={error} findings={findings} openFinding={id => navigate(target?.id || '', 'issues', id)}/>
       </Drawer>
-      <footer>{index?.report_storage&&<p>Current project reports: {(index.report_storage.compressed_bytes/1000000).toFixed(1)} MB / {(index.report_storage.budget_bytes/1000000).toFixed(0)} MB budget. Stored in GitHub Releases; superseded assets are removed after publication.</p>}{index?.metrics && <Collapse ghost items={[{ key: 'storage', label: `Current reports and UI: ${(index.metrics.site_bytes / 1000000).toFixed(1)} MB (${(100 * index.metrics.site_bytes / index.metrics.site_limit_bytes).toFixed(1)}% of capacity)`, children: <><p>This is the size of the currently published website, not a growing history of every scan. It contains the latest report for each active branch and PR, plus one manual selection.</p><p>Each successful deployment removes unreferenced report assets. Temporary scanner artifacts expire according to the configured retention period. Re-running analysis does not require flushing reports or browser storage.</p><p>The {(index.metrics.site_limit_bytes / 1000000).toFixed(0)} MB safety limit preserves the last working site if a new collection is too large. Active reports are never silently deleted to make room.</p>{index.publishing_repository && <a href={`https://github.com/${index.publishing_repository}/actions`} target="_blank" rel="noreferrer">View publication and cleanup runs</a>}</> }]}/>}Findings are scanner observations, not confirmed defects.</footer>
+      <footer>Findings are scanner observations, not confirmed defects.</footer>
     </main>
   </ConfigProvider>;
 }
