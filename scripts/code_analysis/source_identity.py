@@ -33,7 +33,7 @@ def main():
     # A rerun reuses its run ID; only artifacts created after this attempt started qualify.
     producer = api(f'repos/{host}/actions/runs/{run}/attempts/{attempt}')
     artifact_bytes = 0
-    # Download from R2
+    # Download from R2 (temp-runs prefix isolates ephemeral brokered artifacts)
     bucket = os.environ.get('R2_BUCKET_NAME')
     import subprocess
     if bucket:
@@ -41,7 +41,7 @@ def main():
         # Since R2 paths are {run}/{attempt}/{artifact_name}/, we sync the attempt prefix to .hosted/artifacts/
         subprocess.run([
             "aws", "s3", "sync", 
-            f"s3://{bucket}/{run}/{attempt}/", 
+            f"s3://{bucket}/temp-runs/{run}/{attempt}/", 
             str(root),
             "--endpoint-url", endpoint
         ], check=True)

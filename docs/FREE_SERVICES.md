@@ -47,10 +47,19 @@ No frontend session replay or third-party analytics SDK is installed.
 | [Sonar OSS plan](https://docs.sonarsource.com/sonarqube-cloud/administering-sonarcloud/managing-subscription/subscription-plans) | Most relevant next entitlement: offers branch/PR analysis for eligible open-source organizations. Could address current branch_entitlement. Existing organization access has not changed; keep scanner partial until real evidence succeeds. |
 | [Sentry OSS sponsorship](https://sentry.io/for/open-source/) | Potential future browser error monitoring. Not needed for current Worker diagnostics; no account, SDK, replay or telemetry export added. Sponsorship is not assumed approved. |
 | Cloudflare Turnstile | Free bot checks exist, but adding a challenge to an already collaborator-gated launch flow is not currently necessary. Reconsider for public onboarding. |
-| R2 and KV | Provisioned to store tracking state (KV) and final reports (R2). Replaces GitHub Releases as the durable store to remove clutter from the repository's Releases page. |
+| R2 and KV | Provisioned to store tracking state (KV) and final reports (R2). Replaces GitHub Releases as the durable store to remove clutter from the repository's Releases page. A strict free-tier policy is enforced: (1) all producer artifacts are uploaded under the temp-runs/<run>/<attempt>/ prefix and must be deleted by a 1-day lifecycle rule; (2) per-object size is capped by the Worker (default 100 MB); (3) manifest compressed-bytes are capped by the Worker (default 900 MB). |
 | D1 and Queues | No new database or scheduler provisioned. |
 | Additional analytics, search, hosting and CI perks | No migration needed for this request. Current filters run locally and current hosting/CI already work. |
 
 Provider plan changes and application approvals require verification at activation.
 No credit card, paid upgrade, external message or upstream installation was submitted.
 This change does not remove Sonar/posture blockers or prove independent public onboarding.
+
+## R2 free-tier guardrails and required operator setup
+
+To ensure R2 usage never exceeds free-tier limits:
+
+- Enable a lifecycle rule on the analysis bucket to permanently delete objects older than 1 day under the prefix `temp-runs/`.
+- The Worker rejects asset uploads over `MAX_ASSET_BYTES` (default 100 MB) and manifest writes with `metrics.compressed_bytes` over `MAX_MANIFEST_COMPRESSED_BYTES` (default 900 MB). Adjust via wrangler.jsonc vars if needed.
+- Workflows upload only scanner artifacts (SARIF/JSON/logs) and never caches or large binary blobs. The generator and conversion scripts route uploads to `temp-runs/`.
+- Publication writes one current manifest per project (`analysis-current-<project>.json`) and compressed report shards under `analysis-current-<project>/`. Old shards can be garbage-collected via lifecycle policies when rotated, but current manifest should remain available.

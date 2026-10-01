@@ -16,7 +16,9 @@
     "DASHBOARD_ACCESS": "collaborators",
     "TOOLING_FROM_SERVICE": "true",
     "TOOLING_SHA": "a0dcd02062a1dbfc24d085fcaea71e36b3ba3512",
-    "SAFE_API_LOGS": "true"
+    "SAFE_API_LOGS": "true",
+    "MAX_ASSET_BYTES": "104857600",
+    "MAX_MANIFEST_COMPRESSED_BYTES": "900000000"
   },
   "secrets": {
     "required": [

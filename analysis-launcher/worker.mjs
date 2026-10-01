@@ -98,7 +98,54 @@ async function route(request, env) {
         if (!obj) throw new Failure(404, 'Report not found.');
         return new Response(obj.body, { headers: { 'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream' } });
       } else if (request.method === 'POST') {
-        await env.ANALYSIS_REPORTS.put(id, request.body, { httpMetadata: { contentType: request.headers.get('Content-Type') } });
+        // Guardrails: prevent R2 overuse by bounding per-object size and manifest budget.
+        const contentType = request.headers.get('Content-Type') || 'application/octet-stream';
+        const lengthHeader = request.headers.get('Content-Length');
+        const maxAsset = parseInt(env.MAX_ASSET_BYTES || '104857600', 10);
+        const maxManifestCompressed = parseInt(env.MAX_MANIFEST_COMPRESSED_BYTES || '900000000', 10);
+        // If manifest JSON: enforce compressed_bytes budget and write validated JSON.
+        if (/\.json$/.test(id) && contentType.includes('application/json')) {
+          const text = await request.text();
+          try {
+            const manifest = JSON.parse(text);
+            const compressed = Number(manifest?.metrics?.compressed_bytes || 0);
+            if (!Number.isFinite(compressed) || compressed < 0 || compressed > maxManifestCompressed) {
+              throw new Failure(413, 'Manifest exceeds configured compressed-bytes budget.');
+            }
+          } catch (e) {
+            if (e instanceof Failure) throw e; else throw new Failure(400, 'Invalid manifest JSON.');
+          }
+          await env.ANALYSIS_REPORTS.put(id, text, { httpMetadata: { contentType: 'application/json' } });
+          return new Response('OK');
+        }
+        // Asset uploads: enforce per-object size (prefer Content-Length; otherwise, count stream).
+        if (lengthHeader && /^\d+$/.test(lengthHeader)) {
+          const n = parseInt(lengthHeader, 10);
+          if (n > maxAsset) throw new Failure(413, 'Asset exceeds configured size limit.');
+          await env.ANALYSIS_REPORTS.put(id, request.body, { httpMetadata: { contentType } });
+          return new Response('OK');
+        }
+        // No reliable length; count while streaming.
+        let total = 0;
+        const limiter = new TransformStream({
+          transform(chunk, controller) {
+            total += chunk.byteLength || 0;
+            if (total > maxAsset) {
+              controller.error(new Error('limit'));
+              return;  // stop
+            }
+            controller.enqueue(chunk);
+          }
+        });
+        const bounded = request.body?.pipeThrough(limiter);
+        try {
+          await env.ANALYSIS_REPORTS.put(id, bounded, { httpMetadata: { contentType } });
+        } catch (e) {
+          if ((e && String(e).includes('limit')) || String(e?.message || e).includes('limit')) {
+            throw new Failure(413, 'Asset exceeds configured size limit.');
+          }
+          throw e;
+        }
         return new Response('OK');
       }
     }

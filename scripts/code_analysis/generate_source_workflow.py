@@ -70,7 +70,31 @@ def generate(config=None):
                         options.update(repository='${{ fromJSON(inputs.target).source_repository }}',
                                        ref='${{ fromJSON(inputs.target).head_sha }}')
                 if uses.startswith('actions/upload-artifact@'):
-                    step.setdefault('with', {})['retention-days'] = 7
+                    # Convert artifact uploads to Cloudflare R2 uploads when generating the
+                    # exact-source workflow. This avoids GitHub artifact zipping and pagination
+                    # overhead. The generated step uses the aws CLI and repository secrets:
+                    # R2_ACCESS_KEY, R2_SECRET_KEY, R2_ACCOUNT_ID, R2_BUCKET_NAME.
+                    options = step.setdefault('with', {})
+                    name = options.get('name', '').replace('\n', '')
+                    path = options.get('path', '.')
+                    # Create a run step that uploads the specified path to the R2 bucket
+                    # under the run/attempt prefix. Use --recursive so both files and
+                    # directories work. Keep the original if-condition if present.
+                    r2_run = {
+                        'name': f'Upload {name or path} to R2',
+                        'if': step.get('if', 'always()'),
+                        'env': {
+                            'AWS_ACCESS_KEY_ID': '${{ secrets.R2_ACCESS_KEY }}',
+                            'AWS_SECRET_ACCESS_KEY': '${{ secrets.R2_SECRET_KEY }}',
+                            'AWS_DEFAULT_REGION': 'auto'
+                        },
+                        'run': (
+                            f"aws s3 cp {path} s3://${{ secrets.R2_BUCKET_NAME }}/temp-runs/${{ github.run_id }}/${{ github.run_attempt }}/{name or ''} "
+                            "--recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+                        )
+                    }
+                    # Replace the upload-artifact step with our R2 run step.
+                    step = r2_run
                 if 'github/codeql-action/analyze@' in uses:
                     step.setdefault('with', {})['upload'] = False
                 # Gitleaks scanner-only operation: never runs the public PR commenting action.
