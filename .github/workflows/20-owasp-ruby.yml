@@ -1,46 +1,42 @@
 name: OWASP Brakeman
-run-name: OWASP Brakeman · ${{ inputs.scan_branch || github.head_ref || github.ref_name }} · ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
-
-on:
+run-name: "OWASP Brakeman \xB7 ${{ inputs.scan_branch || github.head_ref || github.ref_name }} \xB7 ${{ inputs.scan_sha ||\
+  \ github.event.pull_request.head.sha || github.sha }}"
+true:
   workflow_dispatch:
     inputs:
       scan_sha:
-        description: "Exact branch-head commit selected by the manual orchestrator"
+        description: Exact branch-head commit selected by the manual orchestrator
         required: false
         type: string
       scan_branch:
-        description: "Source branch associated with the selected commit"
+        description: Source branch associated with the selected commit
         required: false
         type: string
-
 permissions:
   contents: read
-
 concurrency:
   group: owasp-ruby-${{ inputs.scan_branch || github.head_ref || github.ref_name }}
   cancel-in-progress: true
-
 jobs:
   owasp-ruby:
     name: OWASP Brakeman
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
+    - name: Checkout
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}
+        fetch-depth: 0
+    - name: Run scanner
+      run: 'brakeman -f sarif -o brakeman.sarif || true
 
-      - name: Run scanner
-        run: |
-          brakeman -f sarif -o brakeman.sarif || true
-
-      - name: Upload artifact
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: owasp-ruby-output
-          path: |
-            brakeman.sarif
-          if-no-files-found: ignore
+        '
+    - name: Upload owasp-ruby-output to R2
+      if: always()
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+        AWS_DEFAULT_REGION: auto
+      run: "aws s3 cp brakeman.sarif\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/owasp-ruby-output\
+        \ --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
