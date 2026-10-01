@@ -5,7 +5,7 @@
   "publishing_repository": "combustrrr/code-analysis-dashboard",
   "preferred_branch": "Testing",
   "discovery_cron": "23 * * * *",
-  "max_parallel_analyses": 2,
+  "max_parallel_analyses": 0,
   "artifact_retention_days": 7,
   "site_limit_bytes": 900000000,
   "deferred_channels": {},
