@@ -89,8 +89,9 @@ def generate(config=None):
                             'AWS_DEFAULT_REGION': 'auto'
                         },
                         'run': (
-                            f"aws s3 cp {path} s3://${{ secrets.R2_BUCKET_NAME }}/temp-runs/${{ github.run_id }}/${{ github.run_attempt }}/{name or ''} "
-                            "--recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+                            'python -m pip install --disable-pip-version-check --upgrade pip awscli\n'
+                            + f"aws s3 cp {path} s3://${{ secrets.R2_BUCKET_NAME }}/temp-runs/${{ github.run_id }}/${{ github.run_attempt }}/{name or ''} "
+                            + "--recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
                         )
                     }
                     # Replace the upload-artifact step with our R2 run step.
