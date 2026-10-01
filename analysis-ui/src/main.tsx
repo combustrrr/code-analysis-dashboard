@@ -147,7 +147,18 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const fresh = !!report && report.analyzed_sha === target?.head_sha;
   const completed = report?.channels.filter(c => ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(c.status)).length || 0;
   const humanBytes=(n?:number)=>typeof n==='number'? (n>950_000_000? (n/1_000_000_000).toFixed(2)+' GB' : (n/1_000_000).toFixed(1)+' MB') : 'Unavailable';
-  return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: { colorPrimary: appearance === 'dark' ? '#7bd0ff' : '#1765ad', colorLink: appearance === 'dark' ? '#7bd0ff' : '#1765ad', colorLinkHover: appearance === 'dark' ? '#b3e5ff' : '#124c85', colorBgBase: appearance === 'dark' ? '#071523' : '#f4f7fa', colorBgContainer: appearance === 'dark' ? '#102131' : '#ffffff', colorText: appearance === 'dark' ? '#dce8f5' : '#202d3d', colorTextSecondary: appearance === 'dark' ? '#a6b8c9' : '#52657a', colorBorder: appearance === 'dark' ? '#304459' : '#c9d4df', borderRadius: 6, fontFamily: 'Segoe UI, sans-serif' }, components: { Button: { primaryColor: appearance === 'dark' ? '#071523' : '#ffffff' } } }}>
+  return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: {
+    colorPrimary: appearance === 'dark' ? '#7bd0ff' : '#1765ad',
+    colorLink: appearance === 'dark' ? '#7bd0ff' : '#1765ad',
+    colorLinkHover: appearance === 'dark' ? '#b3e5ff' : '#124c85',
+    colorBgBase: appearance === 'dark' ? '#071523' : '#f4f7fa',
+    colorBgContainer: appearance === 'dark' ? '#102131' : '#ffffff',
+    // Increase light-mode contrast for readability
+    colorText: appearance === 'dark' ? '#dce8f5' : '#1f2937',
+    colorTextSecondary: appearance === 'dark' ? '#a6b8c9' : '#475569',
+    colorBorder: appearance === 'dark' ? '#304459' : '#94a3b8',
+    borderRadius: 6, fontFamily: 'Segoe UI, sans-serif'
+  }, components: { Button: { primaryColor: appearance === 'dark' ? '#071523' : '#ffffff' } } }}>
     <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}{r.repository&&<ProjectPicker repository={r.repository} project={r.project}/>}<Segmented aria-label="Color theme" value={appearance} options={[{label:'Dark',value:'dark'},{label:'Light',value:'light'}]} onChange={setAppearance}/><Button type="primary" onClick={() => setRunOpen(true)}>Run analysis</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/code-analysis-dashboard'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
     {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} close={() => setRunOpen(false)}/>} 
     {runOpen && !(r.repository && r.project) && <AnalysisLauncher
@@ -170,6 +181,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
           <Select id="target" aria-label="Branch or pull request" showSearch optionFilterProp="label" value={target?.id} placeholder="Select a target" onChange={value => navigate(value, r.tab)} options={['branch', 'pr', 'commit'].map(kind => ({ label: kind === 'branch' ? 'Branches' : kind === 'pr' ? 'Pull requests' : 'Selected commit', options: index?.targets.filter(t => t.kind === kind).map(t => ({ value: t.id, label: t.label })) || [] }))}/>
           {target && <Badge value={target.status || 'queued'}/>}
         </div>
+        <p className="helper-text">Select a target revision to analyze. Branch/PR uses the latest head at run time; Commit analyzes the exact 40‑character SHA you paste. Analysis is read‑only and never writes to the source repository.</p>
         {target?.pr && <p>Source {target.source_repository}:{target.branch} to {target.base_branch} | head analysis, not merge validation</p>}
         <Descriptions className="identity" size="small" column={{ xs: 1, sm: 1, md: 2 }} items={[
           { key: 'head', label: 'DISCOVERED HEAD', children: <code>{target?.head_sha || 'Unavailable'}</code> },
@@ -186,7 +198,11 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
           {report?.producer_runs.map(run => <a key={run.id} href={run.url} target="_blank" rel="noreferrer">Run #{run.id}</a>)}
         </Space>
       </section>
-      {(error || index?.discovery_error || index?.publication_error || target?.error) && <Alert showIcon type="error" title="Report service error" description={error || index?.discovery_error || index?.publication_error || target?.error}/>}
+      {(error || index?.discovery_error || index?.publication_error || target?.error) && (() => {
+        const desc = error || index?.discovery_error || index?.publication_error || target?.error || '';
+        const isNoCurrent = typeof desc === 'string' && desc.toLowerCase().includes('report not found in storage');
+        return <Alert showIcon type={isNoCurrent ? 'info' : 'error'} title={isNoCurrent ? 'No current report yet' : 'Report service error'} description={isNoCurrent ? 'Run analysis to generate the first report for this target.' : desc}/>;
+      })()}
       {report && (!fresh || report.status === 'partial') && <Alert showIcon type="warning" title={!fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={!fresh ? 'These findings belong to the older analyzed commit shown above.' : `Available findings are shown. Incomplete scanners: ${report.channels.filter(c=>!['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE','DEFERRED'].includes(c.status)).map(c=>c.name).join(', ') || 'see Scanners for evidence details'}. Open Scanners for the failure reason.`}/>}
       <Tabs activeKey={r.tab} onChange={tab => navigate(target?.id || '', tab)} items={['overview', 'issues', 'scanners', 'provenance', 'connections', ...(import.meta.env.VITE_APPLICATION_MODE === 'repositories' ? ['repositories'] : [])].map(tab => ({ key: tab, label: tab[0].toUpperCase() + tab.slice(1) + (tab === 'issues' && report ? ` (${report.finding_count.toLocaleString()})` : '') }))}/>
       {r.tab === 'repositories' ? <Repositories auth={launchAuth} endpoint={applicationEndpoint || index?.launch_endpoint}/> : r.tab === 'connections' ? <Connections repository={r.repository} project={r.project} auth={launchAuth} source={index?.source_repository || index?.targets[0]?.repository} host={index?.analysis_repository} publisher={index?.publishing_repository} endpoint={applicationEndpoint || index?.launch_endpoint} start={() => setRunOpen(true)}/> : !report ? <div className="empty" role="status"><Empty description={loading ? 'Loading the selected report...' : r.target && !target ? 'Target no longer active' : 'No report available yet'}/></div> : <>
