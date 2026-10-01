@@ -19,6 +19,10 @@ export function Repositories({auth,endpoint}:{endpoint?:string;auth:ReturnType<t
   const [installed,setInstalled]=useState('');
   const [page,setPage]=useState(1);
   const [more,setMore]=useState(false);
+  const [quickProject,setQuickProject]=useState<{id:string;name:string}>();
+  const [quickKind,setQuickKind]=useState<'branch'|'pr'|'commit'>('branch');
+  const [quickRef,setQuickRef]=useState('');
+  const [targets,setTargets]=useState<{branches:{name:string;sha:string}[];prs:{number:number;head_sha:string;head_repository:string;base_sha:string;base_branch:string}[]}>();
   async function act(operation:()=>Promise<void>) {setBusy(true);setError('');try{await operation();}catch(e){setError(String(e));}finally{setBusy(false);}}
   async function list(next=1) {await act(async()=>{const result=await auth.api<{repositories:Repository[];has_more:boolean}>(`repositories?page=${next}`);setRepositories(old=>[...new Map((next===1?result.repositories:[...old,...result.repositories]).map(r=>[r.id,r])).values()]);setPage(next);setMore(result.has_more);});}
   useEffect(()=>{setRepositories([]);setProjects([]);setExecution('');setPreview(undefined);setEditing(undefined);setConfigurationPreview(undefined);setInstalled('');setMore(false);setError('');},[auth.session?.login]);
@@ -30,7 +34,12 @@ export function Repositories({auth,endpoint}:{endpoint?:string;auth:ReturnType<t
     {(error||auth.error)&&<Alert type="error" showIcon title="Connection needs attention" description={error||auth.error}/>}
     <label>Execution repository</label><Select style={{width:'100%'}} aria-label="Execution repository" disabled={busy||!auth.session} showSearch optionFilterProp="label" value={execution||undefined} placeholder="Choose an accessible execution repository" options={repositories.map(r=>({value:r.full_name,label:r.full_name+(r.can_configure?'':' (scan access; administrator required for setup)')}))} onChange={value=>{setExecution(value);setSource('');setError('');setProjects([]);setEditing(undefined);setConfigurationPreview(undefined);setPreview(undefined);setInstalled('');}}/>
     <Button disabled={busy||!execution||!auth.session} onClick={()=>void act(async()=>{setProjects((await auth.api<{projects:typeof projects}>('projects?repository='+encodeURIComponent(execution))).projects);})}>Load configured projects</Button>
-    <Table rowKey="id" dataSource={projects} columns={[{title:'Source',render:(_,p)=><a href={'#'+new URLSearchParams({repository:execution,project:p.id,tab:'overview'}).toString()}>{p.source_repository.full_name}</a>},{title:'Relationship',dataIndex:'relationship'},{title:'Configuration',render:(_,p)=><Button disabled={busy||!repositories.find(r=>r.full_name===execution)?.can_configure} onClick={()=>{setConfigurationPreview(undefined);setEditing({id:p.id,text:JSON.stringify({profile:p.profile,preferred_branch:p.preferred_branch,enabled_scanners:p.enabled_scanners,deferred_channels:p.deferred_channels},null,2)});}}>Edit configuration</Button>}]}/>
+    <Table rowKey="id" dataSource={projects} columns={[
+      {title:'Source',render:(_,p)=><a href={'#'+new URLSearchParams({repository:execution,project:p.id,tab:'overview'}).toString()}>{p.source_repository.full_name}</a>},
+      {title:'Relationship',dataIndex:'relationship'},
+      {title:'Quick analyze',render:(_,p)=><Button disabled={busy} onClick={()=>void act(async()=>{setQuickProject({id:p.id,name:p.source_repository.full_name});setTargets(await auth.api('project-targets?'+new URLSearchParams({repository:execution,project_id:p.id}).toString()));setQuickKind('branch');setQuickRef(p.preferred_branch);} )}>Analyze…</Button>},
+      {title:'Configuration',render:(_,p)=><Button disabled={busy||!repositories.find(r=>r.full_name===execution)?.can_configure} onClick={()=>{setConfigurationPreview(undefined);setEditing({id:p.id,text:JSON.stringify({profile:p.profile,preferred_branch:p.preferred_branch,enabled_scanners:p.enabled_scanners,deferred_channels:p.deferred_channels},null,2)});}}>Edit configuration</Button>}
+    ]}/>
     {more&&<Button disabled={busy} onClick={()=>void list(page+1)}>Load more repositories</Button>}
     <label>Source repository (optional)</label><Input aria-label="Source repository" disabled={busy||!auth.session} value={source} onChange={e=>{setSource(e.target.value);setPreview(undefined);}} placeholder="Leave blank to analyze the execution repository"/>
     <p>Another public owner/repository is treated as read-only. Installation adds workflow wrappers and configuration only to the execution repository.</p>
@@ -41,6 +50,25 @@ export function Repositories({auth,endpoint}:{endpoint?:string;auth:ReturnType<t
       <p>Confirming commits exactly these files to {execution}'s default branch. Protected branches are never bypassed.</p>
       <Button aria-label="Confirm installation commit" type="primary" loading={busy} onClick={()=>void act(async()=>{const result=await auth.api<{commit_sha:string}>('connections/install',{confirmation:preview.confirmation,confirm:true});setInstalled(result.commit_sha);setPreview(undefined);})}>Confirm installation commit</Button></>}
     {installed&&<Alert type="success" showIcon title="Configuration installed" description={<><Tag>{installed.slice(0,12)}</Tag><a href={`https://github.com/${execution}/actions`} target="_blank" rel="noreferrer">Verify Actions and start analysis</a></>}/>}
+    <Modal open={!!quickProject} title={`Analyze ${quickProject?.name||''}`} onCancel={()=>{if(busy)return;setQuickProject(undefined);setTargets(undefined);}} footer={null} width={680}>
+      {error&&<Alert type="error" title="Analysis request" description={error}/>}    
+      <p>Select a revision to analyze. Branch lists latest heads; PRs list open requests. You can also paste a full commit SHA.</p>
+      <div style={{display:'flex',gap:8,marginBottom:8}}>
+        <Select style={{minWidth:140}} aria-label="Revision kind" value={quickKind} options={[{value:'branch',label:'Branch'},{value:'pr',label:'Pull request'},{value:'commit',label:'Commit SHA'}]} onChange={v=>{setQuickKind(v);setQuickRef(v==='branch'?(targets?.branches?.[0]?.name||''):'');}}/>
+        {quickKind==='branch' && <Select showSearch style={{flex:1}} aria-label="Branches" value={quickRef||undefined} options={(targets?.branches||[]).map(b=>({value:b.name,label:`${b.name}`}))} onChange={setQuickRef}/>} 
+        {quickKind==='pr' && <Select showSearch style={{flex:1}} aria-label="Open PRs" value={quickRef||undefined} options={(targets?.prs||[]).map(p=>({value:String(p.number),label:`#${p.number} ${p.base_branch}←`}))} onChange={setQuickRef}/>} 
+        {quickKind==='commit' && <Input aria-label="Commit SHA" placeholder="40-character SHA" value={quickRef} onChange={e=>setQuickRef(e.target.value)}/>}
+      </div>
+      <Space>
+        <Button type="primary" disabled={!quickProject||!execution||busy|| (quickKind==='commit' ? !/^([a-fA-F0-9]{40})$/.test(quickRef) : !quickRef)} onClick={()=>void act(async()=>{
+          await auth.api('project-launch',{repository:execution,project_id:quickProject!.id,kind:quickKind,ref:quickKind==='commit'?quickRef.toLowerCase():quickRef});
+          // Navigate to project overview; auto-refresh will follow published results.
+          location.hash=new URLSearchParams({repository:execution,project:quickProject!.id,tab:'overview'}).toString();
+          setQuickProject(undefined); setTargets(undefined);
+        })}>Run analysis</Button>
+        <Button onClick={()=>{setQuickProject(undefined);setTargets(undefined);}}>Cancel</Button>
+      </Space>
+    </Modal>
     <Modal open={!!editing} title="Review project configuration" onCancel={()=>{if(busy)return;setEditing(undefined);setConfigurationPreview(undefined);}} footer={null} width={800}>
       <p>Edit the preferred branch, enabled scanners and explicit deferral reasons. The profile includes trusted execution commands; review command changes carefully before confirming. Source identity cannot be changed here.</p>
       {error&&<Alert type="error" title="Configuration needs attention" description={error}/>}
