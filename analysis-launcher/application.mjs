@@ -351,6 +351,8 @@ export async function applicationApi(request, env, session, helpers) {
     }
     const pending=await helpers.pages(`repos/${repo.full_name}/releases/${queue.id}/assets`,token);
     if(pending.filter(a=>a.name.startsWith('request-')).length>=100)throw new Failure(429,'This repository has 100 pending requests. Wait for reconciliation before submitting another.');
+    const existingRequest = pending.find(a => a.name === `request-${request_id}.json`);
+    if (existingRequest) return json({status:'queued',request_id,run_id:null,repository:repo.full_name,warning:'This deterministic analysis request is already persisted and awaiting reconciliation.'},202);
     const actor=await github('user',token);
     const intent={schema_version:'analysis-request-v1',request_id,execution_repository_id:repo.id,project_id:project.id,selection:{repository:source.full_name,kind:evaluation?'commit':input.kind,ref:evaluation?targetSha:input.ref},requested_selection:evaluation?{kind:input.kind,ref:input.ref}:undefined,target_sha:targetSha,idempotency_key:evaluationKey,actor_id:actor.id,created_at:new Date().toISOString()};
     const saved=await fetch(`https://uploads.github.com/repos/${repo.full_name}/releases/${queue.id}/assets?name=request-${request_id}.json`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','User-Agent':'code-analysis-application'},body:JSON.stringify(intent)});
