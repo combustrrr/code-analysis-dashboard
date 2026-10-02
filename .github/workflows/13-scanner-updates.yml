@@ -39,7 +39,7 @@ jobs:
         with:
           node-version: '24'
       - name: Install trusted generation dependencies
-        run: python -m pip install PyYAML==6.0.2
+        run: python -m pip install PyYAML==6.0.3
       - name: Propose and reconcile validated scanner updates
         env:
           RENOVATE_TOKEN: ${{ secrets.SCANNER_UPDATE_TOKEN }}

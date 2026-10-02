@@ -64,7 +64,7 @@ jobs:
         \ || true\n"
     - name: Run Gitleaks on canary suite
       run: "mkdir -p canary-gitleaks-input/canary/python\ncp tests/security_canary/python/hardcoded_secret.py canary-gitleaks-input/canary/python/\n\
-        docker run --rm -v \"$PWD:/repo\" zricethezav/gitleaks:v8.24.2 detect \\\n  --source /repo/canary-gitleaks-input \\\
+        docker run --rm -v \"$PWD:/repo\" zricethezav/gitleaks:v8.30.1 detect \\\n  --source /repo/canary-gitleaks-input \\\
         \n  --config /repo/.gitleaks.toml \\\n  --no-git \\\n  --report-format=sarif \\\n  --report-path /repo/canary-results-gitleaks.sarif\
         \ \\\n  --exit-code 0 || true\n"
     - name: Run OSV-Scanner on vulnerable canary dependencies
