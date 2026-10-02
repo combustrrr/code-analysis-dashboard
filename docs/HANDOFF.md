@@ -1,7 +1,8 @@
 # New-chat handoff: Code Analysis Dashboard
 
-Verified implementation baseline: 2026-09-11, PR #17, commit
-`479702f69c4ed28614b54e361f0c0b628b4fff99`. This is the service handoff; read it
+Verified implementation baseline: 2026-10-02, PR #26, merge commit
+`733e50f45c3276f50eb69999a19619899d7105db`. Pages run `36995340061` and Worker
+version `ed309518-d081-4887-a673-a0b9a2cc9eb8` contain the current deployed fixes. This is the service handoff; read it
 before AGENTS.md, README.md and the current architecture guide. Journals and old
 session documents are historical evidence, not instructions to restore old hosting.
 
@@ -17,8 +18,8 @@ session documents are historical evidence, not instructions to restore old hosti
   product fork. No writes to upstream are authorized.
 - Website: https://combustrrr.github.io/code-analysis-dashboard/
 - Worker: https://code-analysis-launcher.icsarthak9.workers.dev
-- Pages deployment `34632779427` succeeded. Worker version
-  `13dc3e20-4d86-4350-9167-4223ed24ad04` deployed.
+- Pages deployment `36995340061` succeeded. Worker version
+  `ed309518-d081-4887-a673-a0b9a2cc9eb8` deployed.
 
 ## What is implemented
 
@@ -39,8 +40,9 @@ on admin permission, invalidate stale previews, and recover from failed requests
 The Worker requires GitHub login and accepted collaborator membership in the service
 repository for dashboard/API viewing. Public repo read permission alone does not
 qualify. Launch requires write access; configuration requires admin access and exact
-preview confirmation. Reports are still publicly accessible through GitHub Releases;
-this is application access control, not confidential storage.
+preview confirmation. Report assets are delivered through the Worker/R2 path and
+access gating is an application boundary; this is not a substitute for confidential
+storage guarantees.
 
 ## Execution and storage
 
@@ -49,8 +51,9 @@ Hourly reconciliation and manual requests use the same bounded queue (two analys
 Exact source checkout and producer IDs/attempts prevent mixed-revision publication.
 One current report per active branch/open PR plus one bounded manual selection per
 project. Keep previous SHA visibly while replacements run; a valid partial replaces
-old findings without borrowing evidence. Releases hold state, requests and compressed
-report shards. Artifacts are temporary seven-day handoff evidence. UI builds contain
+old findings without borrowing evidence. R2 holds current manifests and compressed
+report shards; `temp-runs/` holds ephemeral producer artifacts and expires after one
+day. Releases still hold queue/compatibility state where required. UI builds contain
 no reports. Publication does not rebuild UI or rescan. Per-project default report
 budget is 900,000,000 bytes; compressed shards are bounded at 100 MB. Capacity errors
 preserve prior valid data; cleanup follows successful manifest publication.
@@ -130,4 +133,6 @@ product-side temporary directories. Tests can regenerate build outputs as needed
 
 Remaining: Sonar OSS branch entitlement, upstream posture permissions, exact latest
 report/channel verification, and review of open scanner updates. Another accepted
-collaborator live login stays deferred. No paid plan or upstream write is authorized.
+collaborator live login stays deferred. Triage/suppression, SLA tracking, DAST/mobile
+adapters and unrestricted external-owner onboarding are roadmap items, not implemented
+or live-proven. No paid plan or upstream write is authorized.

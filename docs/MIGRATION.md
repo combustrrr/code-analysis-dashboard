@@ -70,7 +70,8 @@ contents, with bounded metadata caching.
 
 Pages now builds only the application on UI/workflow changes or manual dispatch.
 No report data is bundled, and no report publication or cleanup runs in Pages.
-Current reports remain in per-project Releases and load through the Worker.
+Current report manifests and shards remain in Cloudflare R2 and load through the Worker;
+GitHub Releases retain only queue/compatibility state where required.
 Default project is upstream Testing; the source picker exposes all configured
 projects, and old fork-host links resolve to the service's migrated projects.
 Production build measured 1,075,537 bytes without a data directory. Browser preview
