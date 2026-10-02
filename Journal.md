@@ -28,6 +28,13 @@
 - Added reader-facing labels for `NOT_AVAILABLE`, `NOT_APPLICABLE`, and `DEFERRED` scanner states.
 - The dashboard suite now reaches its retained fixtures: 14 tests pass, 1 access test is skipped by design, and 3 unrelated retained-fixture assertions remain stale.
 
+### 2026-10-02 - Third testing observation fixes
+- Improved light/dark authentication and header contrast, including sign-in copy, sign-out controls, navigation text, and dashboard access surfaces.
+- Reworded evaluation-budget failures as an explicit temporary operational limit and clarified target queue scope/status with accessible explanations.
+- Derived storage remaining capacity when the configured budget and usage are available, and added an actionable empty state for the repositories table.
+- Accepted exact frozen-commit selections at reconciliation after the launcher converts the configured branch to its immutable SHA.
+- Build and 23 focused project/reconciliation/evaluation tests passed.
+
 ### 2026-10-02 - Reconciliation numeric project ID fix
 - Diagnosed job `110914704399`: reconciliation rejected the configured Kavach source because numeric `project_id` workflow inputs were compared strictly against string project IDs.
 - Normalized project ID matching in project configuration resolution; 21 focused project/reconciliation tests pass.

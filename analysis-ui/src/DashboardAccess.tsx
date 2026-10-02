@@ -21,7 +21,7 @@ export function DashboardAccess({children}:{children:(auth?:ReturnType<typeof us
  },[required,auth.session?.token]);
  if(!applicationEndpoint||required===false)return children();
  if(auth.session&&verified===auth.session.token)return children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}});
- return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm}}><main style={{minHeight:'100vh',display:'grid',placeItems:'center',background:dark?'#071523':'#f4f7fa',color:dark?'#dce8f5':'#202d3d'}}><section style={{maxWidth:480,padding:32}}>
+  return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm}}><main className={`dashboard-access ${dark?'dashboard-access-dark':'dashboard-access-light'}`}><section>
   <h1>Code Analysis</h1><p>Sign in with an authorized GitHub account to view repositories, findings and scanner activity.</p>
   <Space direction="vertical" size="middle"><Segmented aria-label="Color theme" value={dark?'Dark':'Light'} options={['Dark','Light']} onChange={v=>{setDark(v==='Dark');localStorage.setItem('analysis-theme',v.toLowerCase());}}/>
   {(error||auth.error)&&<Alert type="error" title="Dashboard access" description={error||auth.error}/>}

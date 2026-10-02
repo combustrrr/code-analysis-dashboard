@@ -17,7 +17,7 @@ export function ProjectLauncher({auth,repository,project,close}:{auth:Auth;repos
  const valid=kind==='commit'?/^[a-fA-F0-9]{40}$/.test(ref):!!ref;
  return <Modal open title="Run analysis" onCancel={close} footer={null} width={760}>
   {!auth.session&&<Button onClick={auth.signIn}>Sign in with GitHub</Button>}
-   {error&&<Alert type={request?'warning':'error'} title={request?'Publication status unavailable':'Analysis setup unavailable'} description={request?`${error} The request remains saved; use the workflow link to inspect execution.`:error} showIcon/>}
+   {error&&<Alert type={request?'warning':'error'} title={request?'Publication status unavailable':error.includes('Evaluation dispatch budget')?'Analysis temporarily unavailable':'Analysis setup unavailable'} description={request?`${error} The request remains saved; use the workflow link to inspect execution.`:error.includes('Evaluation dispatch budget')?'The evaluation dispatch limit has been reached. An operator reset is required before another analysis can be started.':error} showIcon/>}
   <Descriptions column={1} items={[{key:'execution',label:'Execution repository',children:repository},{key:'source',label:'Source',children:inventory?.repository||'Loading…'}]}/>
   {!request&&<>
    <><Radio.Group value={kind} onChange={e=>{setKind(e.target.value);setRef('');}} options={[{label:'Branch',value:'branch'},{label:'Pull request',value:'pr'},{label:'Commit SHA',value:'commit'}]}/>

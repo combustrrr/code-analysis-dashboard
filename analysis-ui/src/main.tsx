@@ -181,7 +181,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
         <div className="eyebrow">SOURCE REPOSITORY</div><h1>{target?.repository || 'Code quality dashboard'}</h1>
         <div className="target-row"><label htmlFor="target">What do you want to analyze?</label>
           <Select id="target" aria-label="Target revision" showSearch optionFilterProp="label" value={target?.id} placeholder="Choose branch, pull request, or commit" onChange={value => navigate(value, r.tab)} options={['branch', 'pr', 'commit'].map(kind => ({ label: kind === 'branch' ? 'Branches' : kind === 'pr' ? 'Pull requests' : 'Selected commit', options: index?.targets.filter(t => t.kind === kind).map(t => ({ value: t.id, label: t.label })) || [] }))}/>
-          {target && <Badge value={target.status || 'queued'}/>}
+           {target && <span title={target.status === 'queued' ? 'This target is recorded in the published inventory but has not been confirmed as running.' : target.status === 'scanning' ? 'A GitHub analysis run is currently associated with this target.' : 'Status reflects the latest published inventory.'}><Badge value={target.status || 'queued'}/></span>}
         </div>
         <p className="helper-text">Select a target revision to analyze. Branch/PR uses the latest head at run time; Commit analyzes the exact 40‑character SHA you paste. Analysis is read‑only and never writes to the source repository.</p>
         {target?.pr && <p>Source {target.source_repository}:{target.branch} to {target.base_branch} | head analysis, not merge validation</p>}
@@ -194,7 +194,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
         <Space wrap className="runs">
           <span>Reports checked: {date(lastRefresh)}</span><Button size="small" loading={refreshing} onClick={() => { setRefreshing(true); setRefreshTick(t => t + 1); message.loading({ content: 'Checking for a new report…', key: 'refresh', duration: 1.2 }); }}>{refreshing ? 'Refreshing…' : 'Refresh results'}</Button>
           {target?.scan_run_id && !report?.producer_runs.some(run => run.id === String(target.scan_run_id)) && <a href={`https://github.com/${index!.analysis_repository}/actions/runs/${target.scan_run_id}`} target="_blank" rel="noreferrer">Current scan #{target.scan_run_id}</a>}
-          {index && <span>{index.targets.length} active targets | {index.targets.filter(t => t.status === 'queued').length} queued | {index.targets.filter(t => t.status === 'scanning').length} scanning</span>}
+           {index && <span title="Counts are across all configured branch, pull-request, and commit targets in this repository inventory.">{index.targets.length} configured targets | {index.targets.filter(t => t.status === 'queued').length} queued | {index.targets.filter(t => t.status === 'scanning').length} scanning</span>}
           {index?.report_storage && <span>Report storage: {humanBytes(index.report_storage.compressed_bytes)}</span>}
           {report?.tooling_sha && <span>Tooling <code title={report.tooling_sha}>{report.tooling_sha.slice(0, 12)}</code> | attempt {report.producer_run_attempt ?? 'Unavailable'}</span>}
           {report?.producer_runs.map(run => <a key={run.id} href={run.url} target="_blank" rel="noreferrer">Run #{run.id}</a>)}
