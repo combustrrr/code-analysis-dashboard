@@ -17,6 +17,11 @@
 - Resolved the configured `Testing` branch to SHA `231bb41f7eb1b707e25113c258eb8d5c7356b743` and executed the real source workflow with request `231bb41f-7eb1-407e-8513-8c258eb8d5c7`.
 - The producer generated a real `hosted-report-37015397324-1` artifact containing `report.json`, `findings.json`, `threat-report.json`, `threat-report.md`, and detail pages. Scanner jobs preserved failures and incomplete evidence rather than fabricating findings.
 - Reconciliation collected the producer result; remaining scanner/R2 publication failures are explicit operational evidence in the captured run and are not represented as zero findings.
+
+### 2026-10-02 - Threat Report visual polish
+- Reworked the Threat Report view into a print-ready security evidence brief with a distinct hero, severity accents, coverage status tokens, readable metadata, responsive tables, and stronger finding hierarchy.
+- Added high-contrast light/dark screen styles and print-specific pagination, borders, typography, and color rules for professional PDF output.
+- UI production build passed after the redesign; existing Ant Design directive and bundle-size warnings remain.
 ### 2026-09-08 - Authenticated launch deployment: start
 - Synchronizing tested developer launch UI and trusted Worker/selection contracts from fork feature commit 87cf4f71.
 
