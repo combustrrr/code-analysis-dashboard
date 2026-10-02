@@ -24,4 +24,4 @@ bypasses are authorized.
 
 Dashboard login does not privatize the public GitHub Release assets. Keep scanner
 secret redaction and source/script credential isolation intact. See
-[access](DASHBOARD-ACCESS.md) and [architecture](SERVICE_ARCHITECTURE.md).
+[access](DASHBOARD-ACCESS.md) and [architecture](../architecture/SERVICE_ARCHITECTURE.md).

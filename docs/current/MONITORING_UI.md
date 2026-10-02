@@ -30,5 +30,5 @@ scan and configuration permissions are checked separately. Both themes are suppo
 
 Results refresh from published data, not directly from partially written scanner
 outputs. The static UI is not rebuilt for a report. Current assets are retained per
-active target, not per historical commit. See [architecture](SERVICE_ARCHITECTURE.md)
+active target, not per historical commit. See [architecture](../architecture/SERVICE_ARCHITECTURE.md)
 and [handoff](../HANDOFF.md) for boundaries and remaining verification.

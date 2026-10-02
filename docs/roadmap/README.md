@@ -2,7 +2,7 @@
 
 Future work is intentionally separated from current operational documentation.
 
-Read [ROADMAP.md](../ROADMAP.md) for the prioritized plan, including scanner
+Read [ROADMAP.md](ROADMAP.md) for the prioritized plan, including scanner
 expansion, triage/suppression, supply-chain views, DAST/mobile analysis, compliance
 SLAs, enforcement mode, and broader onboarding.
 

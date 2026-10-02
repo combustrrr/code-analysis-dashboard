@@ -33,7 +33,7 @@ VITE_LAUNCH_ENDPOINT. The Worker origin must match the configured dashboard orig
 Deploy the Worker with `npx --prefix analysis-launcher wrangler deploy --config
 analysis-launcher/wrangler.jsonc`; main UI changes trigger pages.yml.
 
-Read [dashboard access](DASHBOARD-ACCESS.md) before changing authorization.
+Read [dashboard access](../operations/DASHBOARD-ACCESS.md) before changing authorization.
 Repository writes require admin and exact preview confirmation; scan requests require
 write access. Current report assets are public on GitHub even though dashboard/API
 access requires collaborator login. Owner login and launch are verified; a second

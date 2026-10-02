@@ -4,7 +4,7 @@ The authoritative [new-chat handoff](../HANDOFF.md) records the verified deploym
 source projects, producer evidence, tests and remaining work as of 2026-10-02.
 
 Deployed: standalone Ant Design application, collaborator login, repository/profile
-configuration, direct branch/PR/full-SHA launch, durable bounded queue, current Release
+configuration, direct branch/PR/full-SHA launch, durable bounded queue, current R2
 reports, automatic selected-target results, issue filtering/grouping/provenance,
 selected-project connection verification, and validated immutable scanner adoption.
 
