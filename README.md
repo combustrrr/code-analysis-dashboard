@@ -60,9 +60,9 @@ read-only. Independent external-owner installation is outside the current scope 
 do not treat the second read-only source test as independent onboarding acceptance.
 
 See [migration status](docs/MIGRATION.md) and
-[authenticated launch setup](docs/code-analysis/AUTHENTICATED_LAUNCHING.md).
+[authenticated launch setup](docs/current/AUTHENTICATED_LAUNCHING.md).
 Future scanner, triage, compliance and onboarding work is tracked in
-[the roadmap](docs/ROADMAP.md); roadmap items are not current product guarantees.
+[the roadmap](docs/roadmap/ROADMAP.md); roadmap items are not current product guarantees.
 
 ## Finding filters and connection checks
 
@@ -77,5 +77,5 @@ evidence. Repositories allows scan users to inspect projects; administrator acce
 is required for setup or configuration commits. Changing the source invalidates
 an installation preview, and failed requests can be retried.
 
-See [free services and OSS perks](docs/FREE_SERVICES.md) for the Cloudflare operations
+See [free services and OSS perks](docs/operations/FREE_SERVICES.md) for the Cloudflare operations
 configuration, diagnostics privacy and evaluated optional programs.

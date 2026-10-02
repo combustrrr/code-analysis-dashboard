@@ -35,5 +35,5 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
 5. Do not retire an active host or alter an upstream repository without separate,
    explicit authorization.
 
-Roadmap proposals are documented in [ROADMAP.md](ROADMAP.md) and are not current
+Roadmap proposals are documented in [roadmap/ROADMAP.md](roadmap/ROADMAP.md) and are not current
 deployment requirements.

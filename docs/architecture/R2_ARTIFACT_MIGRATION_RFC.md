@@ -63,4 +63,3 @@ The following secrets must be provisioned in the GitHub Repository to authorize 
 - `R2_SECRET_KEY`: The accompanying secret key.
 - `R2_ACCOUNT_ID`: The Cloudflare Account ID.
 - `R2_BUCKET_NAME`: The target bucket name (e.g., `code-analysis-artifacts`).
-

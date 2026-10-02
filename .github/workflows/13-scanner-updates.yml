@@ -21,7 +21,7 @@ jobs:
           CONFIGURED: ${{ secrets.SCANNER_UPDATE_TOKEN != '' }}
         run: |
           if [[ "$CONFIGURED" != true ]]; then
-            echo 'Scanner updates blocked: configure repository-scoped SCANNER_UPDATE_TOKEN as documented in docs/code-analysis/SCANNER-MAINTENANCE.md. Existing scanner pins remain in use.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Scanner updates blocked: configure repository-scoped SCANNER_UPDATE_TOKEN as documented in docs/operations/SCANNER-MAINTENANCE.md. Existing scanner pins remain in use.' >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6

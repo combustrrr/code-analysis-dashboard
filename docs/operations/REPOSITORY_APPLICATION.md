@@ -1,7 +1,7 @@
 # Repository application and current instance
 
-Current implementation is deployed. See [handoff](HANDOFF.md) for evidence and
-[architecture](code-analysis/SERVICE_ARCHITECTURE.md) for execution/storage contracts.
+Current implementation is deployed. See [handoff](../HANDOFF.md) for evidence and
+[architecture](../architecture/SERVICE_ARCHITECTURE.md) for execution/storage contracts.
 The present instance is restricted to accepted service-repository collaborators and
 three configured projects. It is not accepted as unrestricted public self-service.
 
