@@ -1,0 +1,28 @@
+[pr_reviewer]
+enabled = true
+num_code_suggestions = 3
+persistent_comment = true
+inline_code_comments = true
+enable_review_labels_security = true
+extra_instructions = """
+Review as an advisory security and reliability reviewer. Never propose secrets,
+credentials, detected secret values, upstream repository writes, source-repository
+runtime copies, or branch-protection bypasses. Preserve exact source SHA, target,
+workflow run, attempt, and tooling provenance. Treat incomplete scanner evidence as
+incomplete; do not infer healthy results from a green workflow. Check Cloudflare Worker,
+GitHub Actions, R2/KV boundaries, read-only source execution, shell injection, path
+traversal, credential flow, and report-publication integrity. Do not auto-apply fixes.
+"""
+
+[pr_code_suggestions]
+enabled = true
+num_code_suggestions = 3
+
+[pr_description]
+enabled = true
+publish_labels = true
+use_bullet_points = true
+
+[github_app]
+handle_push_trigger = true
+publish_output = true
