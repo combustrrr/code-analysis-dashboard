@@ -80,8 +80,8 @@ jobs:
       shell: bash
       run: "set -euo pipefail\nshould_scan=false\nif [[ \"$EVENT_NAME\" == workflow_dispatch ]]; then\n  should_scan=true\n\
         else\n  base=\"$BEFORE_SHA\"\n  if [[ \"$EVENT_NAME\" == pull_request ]]; then\n    base=\"$BASE_SHA\"\n\
-        \  fi\n  if [[ -z \"$base\" || \"$base\" =~ ^0+$ ]] || ! git cat-file -e \"${base}^{commit}\"; then\n  \
-        \  should_scan=true\n  elif git diff --name-only \"$base\" \"$SCAN_SHA\" | grep -Eq \\\n    '^(backend/app/|webui/src/|scripts/code_analysis/export_sonar_issues\\\
+        \  fi\n  if [[ -z \"$base\" || \"$base\" =~ ^0+$ ]] || ! git cat-file -e \"${{ base }}^{commit}\"; then\n\
+        \    should_scan=true\n  elif git diff --name-only \"$base\" \"$SCAN_SHA\" | grep -Eq \\\n    '^(backend/app/|webui/src/|scripts/code_analysis/export_sonar_issues\\\
         .py$|sonar-project\\.properties$|\\.github/workflows/01-code-quality\\.yml$)'; then\n    should_scan=true\n\
         \  fi\nfi\nprintf 'should_scan=%s\\n' \"$should_scan\" >> \"$GITHUB_OUTPUT\"\n"
     - name: Ensure Browse for the verified Sonar API user
@@ -202,8 +202,8 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
       run: "aws s3 cp sonar-status.json\nsonar-access-probe.json\nsonar-browse-grant.json\nsonar-native-issues.json\n\
-        .scannerwork/report-task.txt\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt\
-        \ }/sonar-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        .scannerwork/report-task.txt\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt\
+        \ }}/sonar-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
     needs:
     - identity
     permissions:
@@ -265,8 +265,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp ruff-results.json s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
-        }/ruff-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp ruff-results.json s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/ruff-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     permissions:
@@ -334,9 +334,9 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp bandit-results.json\nbandit-normalized/normalized.sarif\n s3://${ secrets.R2_BUCKET_NAME }/${\
-        \ github.run_id }/${ github.run_attempt }/bandit-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
-        \ }}.r2.cloudflarestorage.com"
+      run: "aws s3 cp bandit-results.json\nbandit-normalized/normalized.sarif\n s3://${{ secrets.R2_BUCKET_NAME\
+        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/bandit-results --recursive --endpoint-url https://${{\
+        \ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-bandit') }}
@@ -377,8 +377,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp pyright-results.json s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
-        }/pyright-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp pyright-results.json s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/pyright-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     permissions:
@@ -449,16 +449,16 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp webui/eslint-results.json s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
-        }/eslint-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp webui/eslint-results.json s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/eslint-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     - name: Upload tsc-results to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp webui/tsc-results.txt s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
-        }/tsc-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp webui/tsc-results.txt s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/tsc-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     - name: Run repository JavaScript test profile
       if: always()
       run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile javascript-test
@@ -537,16 +537,17 @@ jobs:
       env:
         CODEQL_LANGUAGE: ${{ matrix.language }}
       run: "set -euo pipefail\nmapfile -d '' sarif_files < <(find codeql-output -type f -name '*.sarif' -print0)\n\
-        if (( ${#sarif_files[@]} != 1 )); then\n  echo \"::error::Expected exactly one CodeQL SARIF file, found\
-        \ ${#sarif_files[@]}\"\n  exit 1\nfi\ncp \"${sarif_files[0]}\" \"codeql-${CODEQL_LANGUAGE}.sarif\"\n"
+        if (( ${{ #sarif_files[@] }} != 1 )); then\n  echo \"::error::Expected exactly one CodeQL SARIF file, found\
+        \ ${{ #sarif_files[@] }}\"\n  exit 1\nfi\ncp \"${{ sarif_files[0] }}\" \"codeql-${{ CODEQL_LANGUAGE }}.sarif\"\
+        \n"
     - name: Upload codeql-${{ matrix.language }}-sarif to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp codeql-${{ matrix.language }}.sarif s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${
-        github.run_attempt }/codeql-${{ matrix.language }}-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID
+      run: aws s3 cp codeql-${{ matrix.language }}.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{
+        github.run_attempt }}/codeql-${{ matrix.language }}-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID
         }}.r2.cloudflarestorage.com
     needs:
     - identity
@@ -605,16 +606,16 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp semgrep-normalized/normalized.sarif s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${
-        github.run_attempt }/semgrep-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp semgrep-normalized/normalized.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{
+        github.run_attempt }}/semgrep-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     - name: Upload semgrep-results to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp semgrep-results.json s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
-        }/semgrep-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp semgrep-results.json s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/semgrep-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'semgrep') }}
@@ -696,7 +697,7 @@ jobs:
 
         snyk code test --sarif-file-output=snyk-code.sarif 2>&1 | tee snyk-code.log
 
-        scan_exit=${PIPESTATUS[0]}
+        scan_exit=${{ PIPESTATUS[0] }}
 
         set -e
 
@@ -728,8 +729,8 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
       run: "aws s3 cp snyk-status.json\nsnyk-open-source.sarif\nsnyk-code.sarif\nsnyk-open-source.log\nsnyk-code.log\n\
-        \ s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/snyk-results --recursive --endpoint-url\
-        \ https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        \ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt }}/snyk-results --recursive\
+        \ --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
     - name: Upload isolated resolver diagnostics
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -776,8 +777,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp osv-results.sarif s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
-        }/osv-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp osv-results.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/osv-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'osv-scanner') }}
@@ -808,8 +809,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp gitleaks-results.sarif s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
-        }/gitleaks-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp gitleaks-results.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/gitleaks-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'gitleaks') }}
@@ -851,8 +852,9 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp trivy-fs.sarif\ntrivy-config.sarif\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${\
-        \ github.run_attempt }/trivy-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+      run: "aws s3 cp trivy-fs.sarif\ntrivy-config.sarif\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id\
+        \ }}/${{ github.run_attempt }}/trivy-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
+        \ }}.r2.cloudflarestorage.com"
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'trivy') }}
@@ -884,8 +886,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp hadolint.sarif s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/hadolint-results
-        --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp hadolint.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/hadolint-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'hadolint') }}
@@ -916,18 +918,18 @@ jobs:
     - name: Canonicalize Checkov SARIF artifact
       shell: bash
       run: "set -euo pipefail\nif [[ -d checkov.sarif ]]; then\n  mapfile -d '' sarif_files < <(find checkov.sarif\
-        \ -type f -name '*.sarif' -print0)\n  if (( ${#sarif_files[@]} != 1 )); then\n    echo \"::error::Expected\
-        \ exactly one Checkov SARIF file, found ${#sarif_files[@]}\"\n    exit 1\n  fi\n  cp \"${sarif_files[0]}\"\
-        \ checkov-results.sarif\nelif [[ -f checkov.sarif ]]; then\n  cp checkov.sarif checkov-results.sarif\nelse\n\
-        \  echo \"::error::Checkov did not produce SARIF evidence\"\n  exit 1\nfi\n"
+        \ -type f -name '*.sarif' -print0)\n  if (( ${{ #sarif_files[@] }} != 1 )); then\n    echo \"::error::Expected\
+        \ exactly one Checkov SARIF file, found ${{ #sarif_files[@] }}\"\n    exit 1\n  fi\n  cp \"${{ sarif_files[0]\
+        \ }}\" checkov-results.sarif\nelif [[ -f checkov.sarif ]]; then\n  cp checkov.sarif checkov-results.sarif\n\
+        else\n  echo \"::error::Checkov did not produce SARIF evidence\"\n  exit 1\nfi\n"
     - name: Upload checkov-results to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp checkov-results.sarif s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
-        }/checkov-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp checkov-results.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/checkov-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'checkov') }}
@@ -967,9 +969,9 @@ jobs:
         SOURCE_SHA: ${{ fromJSON(inputs.target).head_sha }}
       shell: bash
       run: "set -euo pipefail\nbuild_date=\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"\ncommon=(--build-arg \"TLSOC_BUILD_SHA=$SOURCE_SHA\"\
-        \ --build-arg \"TLSOC_BUILD_DATE=$build_date\")\ndocker build \"${common[@]}\" -t agentic-soc-backend:analysis\
-        \ backend\ndocker build \"${common[@]}\" -t agentic-soc-webui:analysis -f webui/Dockerfile .\ndocker image\
-        \ inspect agentic-soc-backend:analysis agentic-soc-webui:analysis \\\n  > shipping-image-inspect.json\n"
+        \ --build-arg \"TLSOC_BUILD_DATE=$build_date\")\ndocker build \"${{ common[@] }}\" -t agentic-soc-backend:analysis\
+        \ backend\ndocker build \"${{ common[@] }}\" -t agentic-soc-webui:analysis -f webui/Dockerfile .\ndocker\
+        \ image inspect agentic-soc-backend:analysis agentic-soc-webui:analysis \\\n  > shipping-image-inspect.json\n"
     - name: Scan backend image vulnerabilities
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
       with:
@@ -1023,7 +1025,7 @@ jobs:
       run: "set -euo pipefail\npython $RUNNER_TEMP/analysis-tooling/scripts/code_analysis/validate_sbom.py \\\n\
         \  backend.cdx.json webui.cdx.json backend.spdx.json webui.spdx.json \\\n  --status sbom-policy-status.json\
         \ --sarif sbom-license-policy.sarif\njq -n \\\n  --arg repository \"$GITHUB_REPOSITORY\" --arg commit \"\
-        ${SOURCE_SHA,,}\" \\\n  --arg run_id \"$GITHUB_RUN_ID\" \\\n  --slurpfile images shipping-image-inspect.json\
+        ${{ SOURCE_SHA,, }}\" \\\n  --arg run_id \"$GITHUB_RUN_ID\" \\\n  --slurpfile images shipping-image-inspect.json\
         \ \\\n  '{_type:\"https://in-toto.io/Statement/v1\",subject:($images[0]|map({name:(.RepoTags[0]//\"local-image\"\
         ),digest:{sha256:(.Id|sub(\"^sha256:\";\"\"))}})),predicateType:\"https://slsa.dev/provenance/v1\",predicate:{buildDefinition:{buildType:\"\
         agentic-soc/github-actions-shipping-images/v1\",externalParameters:{repository:$repository,commit:$commit}},runDetails:{builder:{id:\"\
@@ -1040,8 +1042,8 @@ jobs:
         AWS_DEFAULT_REGION: auto
       run: "aws s3 cp trivy-backend-image.sarif\ntrivy-webui-image.sarif\nsbom-license-policy.sarif\nsbom-policy-status.json\n\
         backend.cdx.json\nwebui.cdx.json\nbackend.spdx.json\nwebui.spdx.json\nshipping-image-inspect.json\nshipping-image-provenance.intoto.json\n\
-        shipping-image-trivy-status.json\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt\
-        \ }/shipping-image-security --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        shipping-image-trivy-status.json\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt\
+        \ }}/shipping-image-security --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'shipping-image-security') }}
@@ -1081,10 +1083,10 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.SECURITY_POSTURE_TOKEN || github.token }}
       shell: bash
-      run: "set -euo pipefail\nrepo_json=\"$(gh api \"repos/${SOURCE_REPOSITORY}\")\"\nsecret_scanning=\"$(jq -r\
-        \ '.security_and_analysis.secret_scanning.status // \"UNAVAILABLE\"' <<<\"$repo_json\")\"\npush_protection=\"\
+      run: "set -euo pipefail\nrepo_json=\"$(gh api \"repos/${{ GITHUB_REPOSITORY }}\")\"\nsecret_scanning=\"$(jq\
+        \ -r '.security_and_analysis.secret_scanning.status // \"UNAVAILABLE\"' <<<\"$repo_json\")\"\npush_protection=\"\
         $(jq -r '.security_and_analysis.secret_scanning_push_protection.status // \"UNAVAILABLE\"' <<<\"$repo_json\"\
-        )\"\nalerts_status=UNAVAILABLE\nalert_count=null\nif gh api --paginate \"repos/${SOURCE_REPOSITORY}/secret-scanning/alerts?state=open&per_page=100\"\
+        )\"\nalerts_status=UNAVAILABLE\nalert_count=null\nif gh api --paginate \"repos/${{ GITHUB_REPOSITORY }}/secret-scanning/alerts?state=open&per_page=100\"\
         \ \\\n    --jq '.[].number' > secret-scanning-alert-numbers.txt 2>secret-scanning-api.log; then\n  alerts_status=OBSERVED\n\
         \  alert_count=\"$(wc -l < secret-scanning-alert-numbers.txt)\"\nelse\n  : > secret-scanning-alert-numbers.txt\n\
         fi\nposture_status=CONFIGURED_COMPLETE\nposture_reason=\"Secret scanning and push protection enabled; open-alert\
@@ -1104,8 +1106,8 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
       run: "aws s3 cp zizmor-results.sarif\nrepository-security-posture-status.json\nsecret-scanning-alert-numbers.txt\n\
-        secret-scanning-api.log\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/workflow-security-posture\
-        \ --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        secret-scanning-api.log\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt\
+        \ }}/workflow-security-posture --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'workflow-security-posture') }}
@@ -1231,8 +1233,9 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp radon-cc.json\nradon-mi.json\nxenon-results.txt\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id\
-        \ }/${ github.run_attempt }/radon-reports --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+      run: "aws s3 cp radon-cc.json\nradon-mi.json\nxenon-results.txt\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id\
+        \ }}/${{ github.run_attempt }}/radon-reports --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
+        \ }}.r2.cloudflarestorage.com"
     needs:
     - identity
     permissions:
@@ -1284,8 +1287,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp vulture-results.txt s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
-        }/vulture-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp vulture-results.txt s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/vulture-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     permissions:
@@ -1347,9 +1350,9 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp backend/coverage.xml\nbackend/coverage.json\nbackend/coverage-status.json\n s3://${ secrets.R2_BUCKET_NAME\
-        \ }/${ github.run_id }/${ github.run_attempt }/coverage-reports --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
-        \ }}.r2.cloudflarestorage.com"
+      run: "aws s3 cp backend/coverage.xml\nbackend/coverage.json\nbackend/coverage-status.json\n s3://${{ secrets.R2_BUCKET_NAME\
+        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/coverage-reports --recursive --endpoint-url https://${{\
+        \ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
     needs:
     - identity
     permissions:
@@ -1414,8 +1417,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp fuzzing-results.xml\nbackend/schema.json\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id\
-        \ }/${ github.run_attempt }/schemathesis-report --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
+      run: "aws s3 cp fuzzing-results.xml\nbackend/schema.json\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id\
+        \ }}/${{ github.run_attempt }}/schemathesis-report --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
         \ }}.r2.cloudflarestorage.com"
     - name: Upload fuzzing-findings to R2
       if: always()
@@ -1423,8 +1426,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp fuzzing-normalized/ s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
-        }/fuzzing-findings --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      run: aws s3 cp fuzzing-normalized/ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
+        }}/fuzzing-findings --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     permissions:
@@ -1492,8 +1495,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp atheris-status.json\nfuzz-crashes/\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${\
-        \ github.run_attempt }/atheris-state-fuzzing --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
+      run: "aws s3 cp atheris-status.json\nfuzz-crashes/\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id\
+        \ }}/${{ github.run_attempt }}/atheris-state-fuzzing --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
         \ }}.r2.cloudflarestorage.com"
     needs:
     - identity

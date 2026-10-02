@@ -7,6 +7,7 @@ from pathlib import Path
 import copy
 import json
 import re
+import re
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +44,18 @@ def generate(config=None):
                 # GitHub's host-PR gate is not an upstream-head scanner.
                 continue
             job = copy.deepcopy(original)
+            # Older generated scanner jobs used single-brace GitHub expressions in
+            # shell strings. Normalize those inputs while regenerating exact-source
+            # workflows so secrets and run metadata are evaluated by Actions.
+            def normalize_expressions(value):
+                if isinstance(value, str):
+                    return re.sub(r'\$\{\s*([^{}]+?)\s*\}', r'${{ \1 }}', value)
+                if isinstance(value, list):
+                    return [normalize_expressions(item) for item in value]
+                if isinstance(value, dict):
+                    return {key: normalize_expressions(item) for key, item in value.items()}
+                return value
+            job = normalize_expressions(job)
             job['needs'] = ['identity']
             job['permissions'] = {'contents': 'read'}
             job.pop('if', None)
@@ -90,7 +103,7 @@ def generate(config=None):
                         },
                         'run': (
                             'python -m pip install --disable-pip-version-check --upgrade pip awscli\n'
-                            + f"aws s3 cp {path} s3://${{ secrets.R2_BUCKET_NAME }}/temp-runs/${{ github.run_id }}/${{ github.run_attempt }}/{name or ''} "
+                            + f"aws s3 cp {path} s3://${{{{ secrets.R2_BUCKET_NAME }}}}/temp-runs/${{{{ github.run_id }}}}/${{{{ github.run_attempt }}}}/{name or ''} "
                             + "--recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
                         )
                     }
