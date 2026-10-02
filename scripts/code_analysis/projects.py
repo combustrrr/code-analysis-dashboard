@@ -72,7 +72,7 @@ def validate(document: dict) -> dict:
 
 def service_config(document: dict, project_id: str, template: dict) -> dict:
     document = validate(document)
-    project = next((p for p in document['projects'] if p['id'] == project_id), None)
+    project = next((p for p in document['projects'] if str(p['id']) == str(project_id)), None)
     if project is None:
         raise ValueError('Unknown project')
     execution = document['execution_repository']['full_name']

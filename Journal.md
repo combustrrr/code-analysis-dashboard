@@ -27,6 +27,10 @@
 - Restored the static `data/index.json` fallback when `VITE_LAUNCH_ENDPOINT` is intentionally absent, while repository-mode deployments continue using the configured Worker endpoint.
 - Added reader-facing labels for `NOT_AVAILABLE`, `NOT_APPLICABLE`, and `DEFERRED` scanner states.
 - The dashboard suite now reaches its retained fixtures: 14 tests pass, 1 access test is skipped by design, and 3 unrelated retained-fixture assertions remain stale.
+
+### 2026-10-02 - Reconciliation numeric project ID fix
+- Diagnosed job `110914704399`: reconciliation rejected the configured Kavach source because numeric `project_id` workflow inputs were compared strictly against string project IDs.
+- Normalized project ID matching in project configuration resolution; 21 focused project/reconciliation tests pass.
 ### 2026-09-08 - Authenticated launch deployment: start
 - Synchronizing tested developer launch UI and trusted Worker/selection contracts from fork feature commit 87cf4f71.
 
