@@ -101,7 +101,7 @@ def generate(config=None):
                 # Gitleaks scanner-only operation: never runs the public PR commenting action.
                 if uses.startswith('gitleaks/gitleaks-action@'):
                     step = {'name': 'Run pinned Gitleaks without PR mutation', 'run':
-                        'docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.2 detect --source=/repo --report-format=sarif --report-path=/repo/gitleaks-results.sarif --redact --exit-code=0'}
+                        'docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 detect --source=/repo --report-format=sarif --report-path=/repo/gitleaks-results.sarif --redact --exit-code=0'}
                 if step.get('name') == 'Validate and normalize Gitleaks output':
                     step = {'name': 'Validate redacted Gitleaks output', 'run': 'jq -e \'(.runs | type) == "array"\' gitleaks-results.sarif > /dev/null'}
                 if name == 'snyk':
@@ -258,7 +258,7 @@ def generate(config=None):
         'runs-on': 'ubuntu-latest', 'timeout-minutes': 30, 'permissions': {'contents': 'read', 'actions': 'read'},
         'steps': [{'uses': CHECKOUT, 'with': {'ref': '${{ inputs.tooling_sha }}', 'persist-credentials': False}},
             {'uses': PYTHON, 'with': {'python-version': '3.11'}},
-            {'name': 'Install trusted reporting dependencies', 'run': 'python -m pip install click==8.2.1 ruff==0.12.5'},
+            {'name': 'Install trusted reporting dependencies', 'run': 'python -m pip install click==8.5.0 ruff==0.16.9'},
             {'uses': CHECKOUT, 'with': {'repository': '${{ fromJSON(inputs.target).source_repository }}',
                 'ref': '${{ fromJSON(inputs.target).head_sha }}', 'path': '.source', 'persist-credentials': False}},
             {'name': 'Collect exact producer artifacts and assemble report',

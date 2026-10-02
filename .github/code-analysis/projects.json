@@ -213,8 +213,8 @@
                 "install",
                 "--no-save",
                 "--ignore-scripts",
-                "eslint@9.34.0",
-                "typescript-eslint@8.42.0"
+                "eslint@9.39.5",
+                "typescript-eslint@8.71.0"
               ]
             ],
             "argv": [
@@ -274,7 +274,7 @@
                 "-m",
                 "pip",
                 "install",
-                "pyright==1.1.405"
+                "pyright==1.1.414"
               ]
             ],
             "argv": [

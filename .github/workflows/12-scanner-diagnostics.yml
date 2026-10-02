@@ -236,7 +236,7 @@ jobs:
         '
     - name: Install pinned Snyk CLI
       if: env.SNYK_CONFIGURED == 'true'
-      run: npm install --global snyk@1.1306.4
+      run: npm install --global snyk@1.1307.4
     - name: Set up Python 3.11 for complete pip dependency trees
       if: env.SNYK_CONFIGURED == 'true'
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1

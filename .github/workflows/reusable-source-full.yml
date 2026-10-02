@@ -588,7 +588,7 @@ jobs:
       with:
         python-version: '3.11'
     - name: Install Semgrep
-      run: pip install semgrep==1.80.0 click==8.1.7 python-dateutil==2.9.0.post0
+      run: pip install semgrep==1.178.0 click==8.5.0 python-dateutil==2.9.0.post0
     - name: Validate custom Semgrep rules
       run: semgrep --validate --config=$RUNNER_TEMP/analysis-tooling/.github/semgrep-rules/
     - name: Run Semgrep (JSON output)
@@ -658,7 +658,7 @@ jobs:
         '
     - name: Install pinned Snyk CLI
       if: env.SNYK_CONFIGURED == 'true'
-      run: npm install --global snyk@1.1306.4
+      run: npm install --global snyk@1.1307.4
     - name: Set up Python 3.11 for complete pip dependency trees
       if: env.SNYK_CONFIGURED == 'true'
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -798,7 +798,7 @@ jobs:
         persist-credentials: false
         repository: ${{ fromJSON(inputs.target).source_repository }}
     - name: Run pinned Gitleaks without PR mutation
-      run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.2 detect --source=/repo --report-format=sarif
+      run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 detect --source=/repo --report-format=sarif
         --report-path=/repo/gitleaks-results.sarif --redact --exit-code=0
     - name: Validate redacted Gitleaks output
       run: jq -e '(.runs | type) == "array"' gitleaks-results.sarif > /dev/null
@@ -1551,7 +1551,7 @@ jobs:
       with:
         python-version: '3.11'
     - name: Install trusted reporting dependencies
-      run: python -m pip install click==8.2.1 ruff==0.12.5
+      run: python -m pip install click==8.5.0 ruff==0.16.9
     - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
         repository: ${{ fromJSON(inputs.target).source_repository }}

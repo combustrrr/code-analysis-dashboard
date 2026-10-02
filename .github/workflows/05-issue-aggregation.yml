@@ -48,7 +48,7 @@ jobs:
       with:
         python-version: '3.11'
     - name: Install pinned service dependencies
-      run: python -m pip install "click==8.2.1" "ruff==0.12.5"
+      run: python -m pip install "click==8.5.0" "ruff==0.16.9"
     - name: Download latest completed scanner artifacts for this branch
       env:
         GH_TOKEN: ${{ github.token }}
