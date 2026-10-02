@@ -11,12 +11,12 @@ indexes.
 
 ## Project layout
 
-- `analysis-ui/`: static dashboard, themes, issues, provenance, and direct scan launch.
-- `analysis-launcher/`: GitHub sign-in and authorized launching on Cloudflare.
-- `scripts/code_analysis/`: discovery, scanner adapters, normalization, publication.
-- `config/code-analysis/`: repository profile, scanner inventory, report contracts.
-- `.github/workflows/`: producers, discovery, compatibility, updates, Pages.
-- `tests/security_canary/`: scanner fixtures, never product runtime code.
+- `analysis-ui/`: static dashboard, themes, issues, provenance, and direct scan launch ([guide](analysis-ui/README.md)).
+- `analysis-launcher/`: GitHub sign-in and authorized launching on Cloudflare ([guide](analysis-launcher/README.md)).
+- `scripts/code_analysis/`: discovery, scanner adapters, normalization, publication ([guide](scripts/README.md)).
+- `config/code-analysis/`: repository profile, scanner inventory, report contracts ([guide](config/code-analysis/README.md)).
+- `.github/workflows/`: producers, discovery, compatibility, updates, Pages ([guide](.github/README.md)).
+- `tests/security_canary/`: scanner fixtures, never product runtime code ([guide](tests/README.md)).
 - `docs/`: current implementation, architecture, operations, governance, roadmap, and archive indexes.
 
 ## Local verification
