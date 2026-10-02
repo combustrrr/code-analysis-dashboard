@@ -9,7 +9,7 @@ description: Scanner credentials, evidence retention, failure behavior, and remo
 
 > **Scope:** release-facing inventory for the fork-only, read-only Issue Wall service.
 > **Evidence authority:** checked-in workflows, `SERVICE_ARCHITECTURE.md`, and
-> `EXTERNAL_ACTIVATION.md`. This inventory does not claim certification, complete
+> `HANDOFF.md`. This inventory does not claim certification, complete
 > vulnerability detection, or that the application is secure.
 
 ## Shared boundary

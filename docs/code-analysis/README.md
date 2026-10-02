@@ -17,8 +17,6 @@ Agentic SOC product runtime and its documentation site remain independent.
 | Acceptance limitations | [Readiness](PRODUCTION_READINESS.md) |
 | Extraction history | [Migration](../MIGRATION.md) |
 
-Older SESSION files preserve native evidence and historical decisions. Their offline
-Issue Wall, fork-runner, public-dashboard and multi-step launch descriptions do not
-define the deployed application. Reports retain canonical findings and observations;
-malformed/mixed-source evidence may not publish, valid partial evidence may publish,
-and unavailable counts remain unknown. All channels retain truthful status.
+Reports retain canonical findings and observations; malformed/mixed-source evidence
+may not publish, valid partial evidence may publish, and unavailable counts remain
+unknown. All channels retain truthful status.
