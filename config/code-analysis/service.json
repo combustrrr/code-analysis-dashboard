@@ -4,6 +4,7 @@
   "analysis_repository": "combustrrr/code-analysis-dashboard",
   "publishing_repository": "combustrrr/code-analysis-dashboard",
   "preferred_branch": "Testing",
+  "source_workflow": ".github/workflows/code-analysis-source.yml",
   "discovery_cron": "23 * * * *",
   "max_parallel_analyses": 0,
   "evaluation": {
