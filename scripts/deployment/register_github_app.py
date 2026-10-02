@@ -120,7 +120,7 @@ def main() -> None:
                             'NEXT_GITHUB_WEBHOOK_SECRET':app['webhook_secret']}.items():
             subprocess.run(['npx.cmd','--yes','wrangler@4.129.1','secret','put',name],
                            input=value+'\n', text=True, check=True)
-    config_path = Path(__file__).with_name("wrangler.jsonc")
+    config_path = Path(__file__).resolve().parents[2] / "analysis-launcher/wrangler.jsonc"
     config = json.loads(config_path.read_text(encoding="utf-8"))
     config["vars"]["NEXT_GITHUB_CLIENT_ID" if args.application else "GITHUB_CLIENT_ID"] = client_id
     if args.application:

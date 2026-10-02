@@ -39,7 +39,7 @@
       "scripts/code_analysis/bound_sarif.py",
       "scripts/code_analysis/validate_sbom.py",
       "scripts/code_analysis/dashboard.py",
-      "scripts/code_analysis/dashboard_template.html",
+      "config/code-analysis/templates/dashboard.html",
       "analysis-ui/src/main.tsx",
       "analysis-ui/src/style.css",
       "analysis-ui/src/AnalysisLauncher.tsx",
@@ -53,7 +53,7 @@
       "config/code-analysis/dashboard-pages.yml",
       "analysis-launcher/worker.mjs",
       "analysis-launcher/wrangler.jsonc",
-      "analysis-launcher/register_github_app.py"
+      "scripts/deployment/register_github_app.py"
     ],
     "verification": [
       "scripts/code_analysis/audit_workflows.py",

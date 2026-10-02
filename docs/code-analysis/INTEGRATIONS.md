@@ -206,7 +206,7 @@ The destination must not exist. This generates:
 - `launcher/wrangler.jsonc`: matching source/host/website identities and App client ID;
   install this beside the copied `worker.mjs` in `analysis-launcher/`.
 
-Register a dedicated GitHub App with `register_github_app.py --app-name` and the new
+Register a dedicated GitHub App with `scripts/deployment/register_github_app.py --app-name` and the new
 callback/website URLs. Apply the overlays to the corresponding new repositories,
 configure the App permissions and Worker secrets, and configure the publisher's
 existing repository-scoped access to its analysis host. Deploy the Worker, enable

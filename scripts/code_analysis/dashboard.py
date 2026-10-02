@@ -125,7 +125,7 @@ def generate(snapshot: dict, output: Path) -> None:
     """Render the current UI from the separately reviewable static template."""
     validate_snapshot(snapshot)
     payload = json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False).replace("<", "\\u003c")
-    template = Path(__file__).with_name("dashboard_template.html").read_text(encoding="utf-8")
+    template = (Path(__file__).resolve().parents[2] / "config/code-analysis/templates/dashboard.html").read_text(encoding="utf-8")
     output.write_text(template.replace("__PAYLOAD__", payload), encoding="utf-8")
 
 
