@@ -156,7 +156,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         config_tmp = service_config(document, project['id'], template)
         config_tmp['launch_endpoint'] = template.get('launch_endpoint') or document.get('launch_endpoint')
         stored[project['id']] = (rel, release_manifest.read(config_tmp, rel))
-    projects = sorted(document['projects'], key=lambda p: not (p['id'] == project_id and selection or any(r.get('manual_refresh') for r in stored[p['id']][1].get('targets', []))))
+    projects = sorted(document['projects'], key=lambda p: not (str(p['id']) == str(project_id) and selection or any(r.get('manual_refresh') for r in stored[p['id']][1].get('targets', []))))
     for project in projects:
         config = service_config(document, project['id'], template)
         config['source_workflow'] = WORKFLOW
@@ -166,7 +166,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         config['source_repository'] = source['full_name']
         release, old = stored[project['id']]
         rows = github.inventory(config, old)  # Fail closed on incomplete pagination.
-        if selection and project['id'] == project_id:
+        if selection and str(project['id']) == str(project_id):
             selected = github.resolve_selection(config, selection, rows)
             if not any(r['id'] == selected['id'] for r in rows):
                 manual = old.get('manual_target', {})
@@ -186,7 +186,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             state.setdefault('evaluation_dispatch_budget', int(evaluation.get('dispatch_budget', 1)))
             if evaluation.get('paused'):
                 state['evaluation_paused'] = True
-        if selection and project['id'] == project_id and request_id != old.get('last_request_id'):
+        if selection and str(project['id']) == str(project_id) and request_id != old.get('last_request_id'):
             github.request_refresh(state, selected['id'])
             state['last_request_id'] = request_id
             next(r for r in state['targets'] if r['id'] == selected['id'])['client_request_id'] = request_id
@@ -194,7 +194,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         state['targets'].sort(key=lambda row: not row.get('manual_refresh',False))
         project_dispatches = 0
         for row in state['targets']:
-            if evaluation_enabled and selection and project['id'] == project_id:
+            if evaluation_enabled and selection and str(project['id']) == str(project_id):
                 if row.get('branch') != evaluation.get('target_branch'):
                     state['evaluation_error'] = f"Evaluation only accepts the frozen {evaluation.get('target_branch')} branch."
                     continue
