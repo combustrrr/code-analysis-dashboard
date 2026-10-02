@@ -20,9 +20,9 @@ jobs:
     permissions:
       contents: read
       actions: read
-    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source.yml@ab957a3132527619d12b6cc384daa713131de05f
+    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source.yml@6ea59c76b40cb87ffbfd89369ac542a02218b043
     with:
-      tooling_sha: ab957a3132527619d12b6cc384daa713131de05f
+      tooling_sha: 6ea59c76b40cb87ffbfd89369ac542a02218b043
       target: ${{ inputs.target }}
       request_id: ${{ inputs.request_id }}
   configured-profile:
@@ -30,9 +30,9 @@ jobs:
     permissions:
       contents: read
       actions: read
-    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source-full.yml@ab957a3132527619d12b6cc384daa713131de05f
+    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source-full.yml@6ea59c76b40cb87ffbfd89369ac542a02218b043
     with:
-      tooling_sha: ab957a3132527619d12b6cc384daa713131de05f
+      tooling_sha: 6ea59c76b40cb87ffbfd89369ac542a02218b043
       target: ${{ inputs.target }}
       request_id: ${{ inputs.request_id }}
     secrets:
