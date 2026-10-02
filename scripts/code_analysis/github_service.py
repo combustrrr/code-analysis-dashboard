@@ -140,7 +140,12 @@ def resolve_selection(config: dict, selected: str, rows: list[dict]) -> dict:
         try:
             selection = json.loads(value)
         except (ValueError, TypeError) as exc:
-            raise ValueError('Invalid structured analysis selection') from exc
+            # GitHub workflow_dispatch can strip JSON quotes from nested form
+            # inputs. Accept only the fixed, non-shell grammar we emit.
+            loose = re.fullmatch(r'\{repository:([^,}]+),kind:(branch|pr|commit),ref:([^}]+)\}', value)
+            if not loose:
+                raise ValueError('Invalid structured analysis selection') from exc
+            selection = {'repository': loose.group(1), 'kind': loose.group(2), 'ref': loose.group(3)}
         if (not isinstance(selection, dict) or selection.get('repository') != repo
                 or selection.get('kind') not in {'branch', 'pr', 'commit'}
                 or not isinstance(selection.get('ref'), str)):
