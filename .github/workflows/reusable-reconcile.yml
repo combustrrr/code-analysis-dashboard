@@ -37,6 +37,7 @@ jobs:
       - name: Reconcile exact-source analyses and publish current reports
         env:
           GH_TOKEN: ${{ github.token }}
+          WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
           PROJECT_ID: ${{ inputs.project_id }}
           SELECTION: ${{ inputs.selection }}
           REQUEST_ID: ${{ inputs.request_id }}
