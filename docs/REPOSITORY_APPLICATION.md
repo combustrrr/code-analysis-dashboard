@@ -23,7 +23,9 @@ Source execution is isolated from write/vendor tokens. Owner launch and report
 round-trip are proven; another source layout was tested read-only, not through an
 independent owner's App installation. Parking monitoring has since been removed.
 
-GitHub Release assets are the only durable queue/report store. Cloudflare supplies
-authentication and API delivery; no D1/R2/VM/database was provisioned. Free services
-may be used within their limits; do not enable paid subscriptions automatically.
-See current vendor dashboards for quotas before changing infrastructure.
+Cloudflare R2 is the durable current-report store and the `temp-runs/` prefix is the
+ephemeral producer-artifact broker with a one-day lifecycle. GitHub Releases continue
+to hold the bounded request queue and compatibility state where required. Cloudflare
+KV holds service state; no D1/VM/database was provisioned. Free services may be used
+within their limits; do not enable paid subscriptions automatically. See current
+vendor dashboards for quotas before changing infrastructure.

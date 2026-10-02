@@ -58,6 +58,8 @@ do not treat the second read-only source test as independent onboarding acceptan
 
 See [migration status](docs/MIGRATION.md) and
 [authenticated launch setup](docs/code-analysis/AUTHENTICATED_LAUNCHING.md).
+Future scanner, triage, compliance and onboarding work is tracked in
+[the roadmap](docs/ROADMAP.md); roadmap items are not current product guarantees.
 
 ## Finding filters and connection checks
 

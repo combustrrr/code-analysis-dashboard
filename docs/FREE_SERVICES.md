@@ -13,7 +13,7 @@ activated by this change.
 | Workers Logs | Sanitized API failure diagnostics and sampled successful requests | One custom event at most per API request; no OAuth events |
 | Built-in Workers metrics | Request volume, errors, CPU and resource-limit investigation | View in the existing Worker dashboard; no new tracking script |
 | GitHub Pages | Static Ant Design application | UI builds only; no report data bundled |
-| Public GitHub Actions and Releases | Scanner execution, bounded request queue, current reports | Existing quotas and retention still apply |
+| Public GitHub Actions and Releases | Scanner execution, bounded request queue and compatibility state | Existing quotas and retention still apply; current report assets are in R2 |
 
 Workers Free has a 100,000-request daily account limit. Workers Logs on Free includes
 200,000 events daily with three-day retention. These are shared account limits, not
