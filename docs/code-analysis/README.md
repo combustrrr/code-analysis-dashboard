@@ -1,6 +1,6 @@
 # Code Analysis Dashboard documentation
 
-Start with the [new-chat handoff](../HANDOFF.md). This is an external service;
+Start with the [documentation index](../README.md), then read the [new-chat handoff](../HANDOFF.md). This is an external service;
 Agentic SOC product runtime and its documentation site remain independent.
 
 | Topic | Current guide |
