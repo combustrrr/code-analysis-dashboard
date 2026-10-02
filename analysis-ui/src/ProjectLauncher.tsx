@@ -3,7 +3,8 @@ import {refreshRepositoryReports} from './repositoryReports';
 import {Alert,Button,Descriptions,Input,Modal,Radio,Select,Space,Collapse,Table,Tag} from 'antd';
 import {useLaunchAuth} from './useLaunchAuth';
 type Auth=ReturnType<typeof useLaunchAuth>;
-type Inventory={repository:string;checked_at:string;branches:{name:string;sha:string}[];prs:{number:number;head_sha:string;base_sha:string;head_repository:string;base_branch:string}[]};
+ type Inventory={repository:string;checked_at:string;branches:{name:string;sha:string}[];prs:{number:number;head_sha:string;base_sha:string;head_repository:string;base_branch:string}[]};
+ const phaseCopy:Record<string,string>={queued:'Analysis queued successfully. Waiting for GitHub Actions.',scanning:'Scanner workflow is running.',publishing:'Analysis completed. Publishing the report.',published:'Report published successfully.',failed:'Analysis failed.',superseded:'This request was superseded by a newer request.'};
 export function ProjectLauncher({auth,repository,project,close}:{auth:Auth;repository:string;project:string;close:()=>void}) {
  const [readiness,setReadiness]=useState<{channels:{channel:string;status:string;reason:string}[];tooling_sha:string}>();
  const [inventory,setInventory]=useState<Inventory>();const [kind,setKind]=useState('branch');const [ref,setRef]=useState('');
@@ -16,7 +17,7 @@ export function ProjectLauncher({auth,repository,project,close}:{auth:Auth;repos
  const valid=kind==='commit'?/^[a-fA-F0-9]{40}$/.test(ref):!!ref;
  return <Modal open title="Run analysis" onCancel={close} footer={null} width={760}>
   {!auth.session&&<Button onClick={auth.signIn}>Sign in with GitHub</Button>}
-  {error&&<Alert type="error" title="Analysis request needs attention" description={error} showIcon/>}
+   {error&&<Alert type={request?'warning':'error'} title={request?'Publication status unavailable':'Analysis setup unavailable'} description={request?`${error} The request remains saved; use the workflow link to inspect execution.`:error} showIcon/>}
   <Descriptions column={1} items={[{key:'execution',label:'Execution repository',children:repository},{key:'source',label:'Source',children:inventory?.repository||'Loading…'}]}/>
   {!request&&<>
    <><Radio.Group value={kind} onChange={e=>{setKind(e.target.value);setRef('');}} options={[{label:'Branch',value:'branch'},{label:'Pull request',value:'pr'},{label:'Commit SHA',value:'commit'}]}/>
@@ -26,6 +27,6 @@ export function ProjectLauncher({auth,repository,project,close}:{auth:Auth;repos
    <p>Branches resolve to their latest head when queued. PRs retain their head and base context. A commit scan analyzes exactly the full SHA entered.</p>
    <Button type="primary" disabled={!valid||!auth.session} loading={busy} onClick={async()=>{setBusy(true);setError('');try{setRequest(await auth.api('project-launch',{repository,project_id:project,kind,ref:kind==='commit'?ref.toLowerCase():ref}));}catch(e){setError(String(e));}finally{setBusy(false);}}}>Run analysis</Button>
   </>}
-  {request&&<Alert type="success" title="Request submitted" description={<><p>{status?.phase || 'Request saved; awaiting scheduling'}</p><p>Request {request.request_id}</p>{status?.source_sha&&<p>Resolved commit: <code>{status.source_sha}</code></p>}{status?.producer&&<p><a href={status.producer.url} target="_blank" rel="noreferrer">Scanner workflow ? attempt {status.producer.attempt}</a> ? {status.producer.status}</p>}{status?.completeness&&<p>Report: {status.completeness} ? <a href={`#repository=${encodeURIComponent(repository)}&project=${project}&tab=overview`} onClick={close}>View results</a></p>}{status?.error&&<p>{status.error}</p>}<a href={`https://github.com/${repository}/actions${request.run_id?`/runs/${request.run_id}`:''}`} target="_blank" rel="noreferrer">Track in GitHub Actions</a><p>Workflow status and current published results update separately.</p></>}/>}
+   {request&&<Alert type={status?.phase==='failed'?'error':status?.phase==='published'?'success':'info'} title={status?.phase?phaseCopy[status.phase]||`Analysis status: ${status.phase}`:'Analysis queued successfully'} description={<><p>{status?.phase?phaseCopy[status.phase]||`Current stage: ${status.phase}`:'Request saved and awaiting scheduling.'}</p><p>Request {request.request_id}</p>{status?.source_sha&&<p>Resolved commit: <code>{status.source_sha}</code></p>}{status?.producer&&<p><a href={status.producer.url} target="_blank" rel="noreferrer">Scanner workflow, attempt {status.producer.attempt}</a> ({status.producer.status})</p>}{status?.completeness&&<p>Report: {status.completeness} <a href={`#repository=${encodeURIComponent(repository)}&project=${project}&tab=overview`} onClick={close}>View results</a></p>}{status?.error&&<p>{status.error}</p>}<a href={`https://github.com/${repository}/actions${request.run_id?`/runs/${request.run_id}`:''}`} target="_blank" rel="noreferrer">Track in GitHub Actions</a><p>Request, scanner execution, publication, and report availability are tracked separately.</p></>}/>}
  </Modal>;
 }

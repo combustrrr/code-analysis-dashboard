@@ -15,7 +15,7 @@ GROUPS = {
     'openssf-scorecard': ['openssf-scorecard'], 'complexity': ['radon', 'xenon'],
     'dead-code': ['vulture'], 'test-coverage': ['coverage'],
     'schemathesis-fuzz': ['schemathesis'], 'atheris-state-machine': ['atheris'],
-        'coderabbit', 'codex-security', 'alibaba-ocr', 'flounder-audit', 'vulnagent-triage', 'owasp-jvm', 'owasp-go', 'owasp-js', 'owasp-ruby', 'owasp-iac-secrets': ['coderabbit-ai-advisory'],
+    'coderabbit': ['coderabbit-ai-advisory'],
     'codex-security': ['codex-security'],
     'alibaba-ocr': ['alibaba-ocr'],
     'flounder-audit': ['flounder-audit'],

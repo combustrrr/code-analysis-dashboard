@@ -16,7 +16,8 @@ export function Connections({ auth, source, host, publisher, endpoint, start, re
     setConfiguration(undefined); setError(''); setBusy(!!auth.session);
     if (auth.session) auth.api<Configuration>(repository && project ? `project-integration?${new URLSearchParams({repository,project_id:project})}` : 'integration').then(value => {
       if (!active) return;
-      if (value.source_repository !== source || value.analysis_repository !== host || publisher && value.publishing_repository !== publisher) throw Error('Published dashboard and live service configuration disagree. Check the repository configuration before launching.');
+      const mismatch = (source && value.source_repository !== source) || (host && value.analysis_repository !== host) || (publisher && value.publishing_repository !== publisher);
+      if (mismatch) throw Error('Published dashboard and live service configuration disagree. Check the repository configuration before launching.');
       setConfiguration(value);
     }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };

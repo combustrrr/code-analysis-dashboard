@@ -24,8 +24,9 @@ export function Repositories({auth,endpoint}:{endpoint?:string;auth:ReturnType<t
   const [quickRef,setQuickRef]=useState('');
   const [targets,setTargets]=useState<{branches:{name:string;sha:string}[];prs:{number:number;head_sha:string;head_repository:string;base_sha:string;base_branch:string}[]}>();
   async function act(operation:()=>Promise<void>) {setBusy(true);setError('');try{await operation();}catch(e){setError(String(e));}finally{setBusy(false);}}
-  async function list(next=1) {await act(async()=>{const result=await auth.api<{repositories:Repository[];has_more:boolean}>(`repositories?page=${next}`);setRepositories(old=>[...new Map((next===1?result.repositories:[...old,...result.repositories]).map(r=>[r.id,r])).values()]);setPage(next);setMore(result.has_more);});}
-  useEffect(()=>{setRepositories([]);setProjects([]);setExecution('');setPreview(undefined);setEditing(undefined);setConfigurationPreview(undefined);setInstalled('');setMore(false);setError('');},[auth.session?.login]);
+   async function list(next=1) {await act(async()=>{const result=await auth.api<{repositories:Repository[];has_more:boolean}>(`repositories?page=${next}`);setRepositories(old=>[...new Map((next===1?result.repositories:[...old,...result.repositories]).map(r=>[r.id,r])).values()]);setPage(next);setMore(result.has_more);});}
+   useEffect(()=>{setRepositories([]);setProjects([]);setExecution('');setPreview(undefined);setEditing(undefined);setConfigurationPreview(undefined);setInstalled('');setMore(false);setError('');},[auth.session?.login]);
+   useEffect(()=>{if(auth.session) void list();},[auth.session?.login]);
   return <section className="connections-panel" aria-label="Connect repository">
     <h2>Repositories</h2><p>Run analysis in a repository you control. A read-only source is analyzed without changing that source repository.</p>
     <Steps current={installed?3:preview?2:execution?1:0} items={[{title:'Connect GitHub'},{title:'Select codebase'},{title:'Review installation'},{title:'Ready'}]}/>
