@@ -20,7 +20,10 @@ async function response(path:string,signal?:AbortSignal) {
  const r=await reportFetch(path,{signal});if(!r.ok){let reason='Report unavailable';try{reason=(await r.json()).error||reason;}catch{}throw new Error(reason);}return r;
 }
 export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise<T> {
-  const {repository,project,target}=selection();
+  // Public fixture builds intentionally omit the Worker endpoint; retain the
+  // static report contract used by local previews and Playwright fixtures.
+  if(!applicationEndpoint)return (await response(path,signal)).json() as Promise<T>;
+   const {repository,project,target}=selection();
   const base=`${applicationEndpoint}/api/public/`;
   const query=new URLSearchParams({repository:repository!,project_id:project!});
   const key=query.toString();

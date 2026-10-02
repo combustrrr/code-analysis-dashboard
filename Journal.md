@@ -22,6 +22,11 @@
 - Reworked the Threat Report view into a print-ready security evidence brief with a distinct hero, severity accents, coverage status tokens, readable metadata, responsive tables, and stronger finding hierarchy.
 - Added high-contrast light/dark screen styles and print-specific pagination, borders, typography, and color rules for professional PDF output.
 - UI production build passed after the redesign; existing Ant Design directive and bundle-size warnings remain.
+
+### 2026-10-02 - Dashboard test fixture endpoint
+- Restored the static `data/index.json` fallback when `VITE_LAUNCH_ENDPOINT` is intentionally absent, while repository-mode deployments continue using the configured Worker endpoint.
+- Added reader-facing labels for `NOT_AVAILABLE`, `NOT_APPLICABLE`, and `DEFERRED` scanner states.
+- The dashboard suite now reaches its retained fixtures: 14 tests pass, 1 access test is skipped by design, and 3 unrelated retained-fixture assertions remain stale.
 ### 2026-09-08 - Authenticated launch deployment: start
 - Synchronizing tested developer launch UI and trusted Worker/selection contracts from fork feature commit 87cf4f71.
 
