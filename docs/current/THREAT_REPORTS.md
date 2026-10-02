@@ -25,6 +25,11 @@ private links, JSON download, Markdown download, and browser print/save-to-PDF.
 Reports preserve secret redaction and treat scanner-controlled values as untrusted
 text. Incomplete channels remain visible and are not interpreted as zero findings.
 
+The screen is optimized for review and print: severity colors, coverage status tokens,
+responsive tables, high-contrast light/dark themes, and print-specific pagination are
+provided by the Threat Report view. PDF output is browser print/save-to-PDF from the
+report view; controls and navigation are hidden in print media.
+
 ## Evaluation Guardrails
 
 The configured Kavach evaluation accepts only the `Testing` branch, freezes its
@@ -35,6 +40,11 @@ The durable evaluation state records `evaluation_target_sha`,
 The one-dispatch budget remains consumed after completion, failure, timeout, or an
 uncertain dispatch; an operator must reset it explicitly. Normal non-evaluation
 projects retain the general two-slot reconciliation policy.
+
+Refreshing or reopening the dashboard is read-only. Only an explicit Run analysis
+action can consume this budget. If a deterministic request asset already exists in the
+analysis request release, the Worker returns it as queued instead of uploading a
+duplicate. A reset clears only the evaluation lock; it does not delete report evidence.
 
 Older reports may receive a bounded `legacy-runtime` fallback. It is explicitly marked
 non-immutable and must not be treated as equivalent to a publication-time report. If

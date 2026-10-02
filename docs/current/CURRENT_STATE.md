@@ -5,8 +5,10 @@ source projects, producer evidence, tests and remaining work as of 2026-10-02.
 
 Deployed: standalone Ant Design application, collaborator login, repository/profile
 configuration, direct branch/PR/full-SHA launch, durable bounded queue, current R2
-reports, automatic selected-target results, issue filtering/grouping/provenance,
-selected-project connection verification, and validated immutable scanner adoption.
+reports, explicit selected-target results, issue filtering/grouping/provenance,
+selected-project connection verification, Threat Report JSON/Markdown/PDF exports,
+and validated immutable scanner adoption. Dashboard refresh is read-only; launches
+require an explicit user action.
 
 Execution/storage: service repository only. Kavach upstream and Agentic-Kibana fork
 are read-only sources; service-self is connected. Scanner execution remains in Actions.
@@ -19,7 +21,8 @@ Another collaborator's live login is deferred; independent external-owner instal
 is not live-proven and is outside the current Kavach-focused scope. Do not restore
 superseded fork installation or claim every scanner has usable evidence.
 
-Latest UI/API rollout: PR #26, merge `733e50f45c3276f50eb69999a19619899d7105db`,
-Pages run `36995340061`, Worker version
-`ed309518-d081-4887-a673-a0b9a2cc9eb8`. Latest verified adopted tooling: PR #16,
-7cc92da3ecb6229359e364d163d42a70c305c096. Read live profiles before reusing a pin.
+Latest documented main rollout: commit `056eee4`; Worker version
+`182cde64-8a94-4bca-b1a2-a92854ca8fca` contains the request-idempotency fix. Pages
+deployments are triggered from main. Read the live project profile before reusing a
+tooling pin; the configured evaluation target is Kavach `Testing` at the frozen SHA
+`231bb41f7eb1b707e25113c258eb8d5c7356b743`.

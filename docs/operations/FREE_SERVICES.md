@@ -13,7 +13,7 @@ activated by this change.
 | Workers Logs | Sanitized API failure diagnostics and sampled successful requests | One custom event at most per API request; no OAuth events |
 | Built-in Workers metrics | Request volume, errors, CPU and resource-limit investigation | View in the existing Worker dashboard; no new tracking script |
 | GitHub Pages | Static Ant Design application | UI builds only; no report data bundled |
-| Public GitHub Actions and Releases | Scanner execution, bounded request queue and compatibility state | Existing quotas and retention still apply; current report assets are in R2 |
+| Public GitHub Actions and Releases | Scanner execution, bounded request queue and compatibility state | Existing quotas and retention still apply; current report assets are in R2; deterministic duplicate request assets are reused |
 
 Workers Free has a 100,000-request daily account limit. Workers Logs on Free includes
 200,000 events daily with three-day retention. These are shared account limits, not
@@ -47,7 +47,7 @@ No frontend session replay or third-party analytics SDK is installed.
 | [Sonar OSS plan](https://docs.sonarsource.com/sonarqube-cloud/administering-sonarcloud/managing-subscription/subscription-plans) | Most relevant next entitlement: offers branch/PR analysis for eligible open-source organizations. Could address current branch_entitlement. Existing organization access has not changed; keep scanner partial until real evidence succeeds. |
 | [Sentry OSS sponsorship](https://sentry.io/for/open-source/) | Potential future browser error monitoring. Not needed for current Worker diagnostics; no account, SDK, replay or telemetry export added. Sponsorship is not assumed approved. |
 | Cloudflare Turnstile | Free bot checks exist, but adding a challenge to an already collaborator-gated launch flow is not currently necessary. Reconsider for public onboarding. |
-| R2 and KV | Provisioned to store tracking state (KV) and final reports (R2). Replaces GitHub Releases as the durable store to remove clutter from the repository's Releases page. A strict free-tier policy is enforced: (1) all producer artifacts are uploaded under the temp-runs/<run>/<attempt>/ prefix and must be deleted by a 1-day lifecycle rule; (2) per-object size is capped by the Worker (default 100 MB); (3) manifest compressed-bytes are capped by the Worker (default 900 MB). |
+| R2 and KV | Provisioned to store tracking state (KV) and final reports (R2). KV also stores the bounded Kavach evaluation lock. A strict free-tier policy is enforced: (1) all producer artifacts are uploaded under the temp-runs/<run>/<attempt>/ prefix and must be deleted by a 1-day lifecycle rule; (2) per-object size is capped by the Worker (default 100 MB); (3) manifest compressed-bytes are capped by the Worker (default 900 MB). |
 | D1 and Queues | No new database or scheduler provisioned. |
 | Additional analytics, search, hosting and CI perks | No migration needed for this request. Current filters run locally and current hosting/CI already work. |
 

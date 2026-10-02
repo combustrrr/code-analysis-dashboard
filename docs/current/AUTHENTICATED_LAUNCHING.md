@@ -12,6 +12,20 @@ and dispatches `code-analysis-reconcile.yml`. Reconciliation queues
 `code-analysis-source.yml` with immutable source/tooling identity under the two-slot
 limit. The UI follows exact request/run/attempt and opens the published target.
 Hourly reconciliation recovers missed work; submission is not scanner completion.
+The dashboard never launches automatically on refresh. A launch is explicit, and a
+duplicate deterministic request returns the already-persisted queue asset rather than
+creating a second dispatch.
+
+## Evaluation mode
+
+The Kavach evaluation is a bounded exception to the normal queue policy: the configured
+`Testing` branch is resolved once to an immutable SHA, and the Worker stores a durable
+lock in the `ANALYSIS_STATE` KV namespace under
+`evaluation:v1:<lowercase-source-repository>`. The lock records the frozen SHA,
+tooling/profile idempotency key, request ID, pause state, and dispatch count. A failed,
+timed-out, or uncertain dispatch still consumes the one-dispatch budget. Operators reset
+the key only after inspecting the associated request/run state; deleting the key is the
+explicit reset operation. Dashboard refreshes and report reads do not touch the budget.
 
 ## Deployment configuration
 
@@ -30,6 +44,8 @@ permission changes require GitHub's approval flow; do not install on upstream.
 
 Pages builds with VITE_APPLICATION_MODE=repositories and the matching
 VITE_LAUNCH_ENDPOINT. The Worker origin must match the configured dashboard origin.
+Fixture builds may omit VITE_LAUNCH_ENDPOINT and use the static `data/index.json`
+contract; repository mode must configure the Worker endpoint.
 Deploy the Worker with `npx --prefix analysis-launcher wrangler deploy --config
 analysis-launcher/wrangler.jsonc`; main UI changes trigger pages.yml.
 

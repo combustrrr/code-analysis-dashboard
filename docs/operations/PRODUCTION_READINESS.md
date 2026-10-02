@@ -1,7 +1,7 @@
 # Acceptance and remaining limitations
 
 The [handoff](../HANDOFF.md) is the current deployment/evidence record. The UI/API
-rollout from PR #26 is deployed; full scanner acceptance is not claimed.
+rollout is deployed; full scanner acceptance is not claimed.
 
 Verified: product/service separation, current-release storage, exact producer/source
 provenance, login/launch/report round trip, correctly scoped connected native SARIF,

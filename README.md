@@ -44,11 +44,12 @@ projects to review scanner commands and credentials, then open the project and
 choose **Run analysis**. Select a branch, PR number, or full 40-character commit SHA.
 The activity view distinguishes queued execution from published results.
 
-Each execution repository runs its own Actions and stores current reports in
-managed Release assets. Small wrappers reference immutable shared workflows in
-this service repository. Scanner credentials are supplied by that repository's
-owner; configuration alone does not prove usable scanner evidence. Source-only
-observer projects do not upload checks or security findings to the source.
+Each execution repository runs its own Actions. GitHub Releases retain the bounded
+request queue and compatibility state; current reports and temporary producer
+artifacts are stored in Cloudflare R2. Small wrappers reference immutable shared
+workflows in this service repository. Scanner credentials are supplied by that
+repository's owner; configuration alone does not prove usable scanner evidence.
+Source-only observer projects do not upload checks or security findings to the source.
 
 ## Deployment
 
@@ -74,6 +75,11 @@ shortcuts and target changes clear unrelated filters.
 The Threat Report view adds deterministic catalog explanations, potential impact,
 remediation steps, coverage limitations, private links, JSON/Markdown downloads, and
 print-to-PDF output without changing the underlying scanner evidence.
+
+Evaluation mode is enabled only for the configured Kavach `Testing` branch. It freezes
+one exact commit SHA and permits one durable dispatch budget. Refreshing the dashboard
+does not launch work; only an explicit **Run analysis** action can consume that budget.
+Duplicate request assets are idempotent and return the existing queued request.
 
 Connections verifies the selected project identity, current App access and both
 execution workflows. A successful connection check does not imply complete scanner

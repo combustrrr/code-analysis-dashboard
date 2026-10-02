@@ -1,10 +1,10 @@
 # New-chat handoff: Code Analysis Dashboard
 
-Verified implementation baseline: 2026-10-02, PR #26, merge commit
-`733e50f45c3276f50eb69999a19619899d7105db`. Pages run `36995340061` and Worker
-version `ed309518-d081-4887-a673-a0b9a2cc9eb8` contain the current deployed fixes. This is the service handoff; read it
-before AGENTS.md, README.md and the current architecture guide. Journals and old
-session documents are historical evidence, not instructions to restore old hosting.
+Verified implementation baseline: 2026-10-02, main commit `056eee4`. Worker version
+`182cde64-8a94-4bca-b1a2-a92854ca8fca` contains the current deployed request-idempotency
+fix. This is the service handoff; read it
+before AGENTS.md, README.md and the current architecture guide. Old session documents
+are historical evidence, not instructions to restore old hosting.
 
 ## Repository and deployment boundaries
 
@@ -18,8 +18,8 @@ session documents are historical evidence, not instructions to restore old hosti
   product fork. No writes to upstream are authorized.
 - Website: https://combustrrr.github.io/code-analysis-dashboard/
 - Worker: https://code-analysis-launcher.icsarthak9.workers.dev
-- Pages deployment `36995340061` succeeded. Worker version
-  `ed309518-d081-4887-a673-a0b9a2cc9eb8` deployed.
+- Pages deployment is triggered by the main branch workflow. Worker version
+  `182cde64-8a94-4bca-b1a2-a92854ca8fca` deployed.
 
 ## What is implemented
 
@@ -28,6 +28,9 @@ provenance, overview charts, issues, scanners, connections and repository setup.
 Run analysis is a single form: select branch, PR or full 40-character SHA, then
 Run analysis. Readiness expands optionally. Polling follows the request, exact
 scanner run/attempt and publication; published output opens the selected target.
+Threat Reports add deterministic JSON/Markdown/PDF exports, severity-aware UI,
+raw/normalized channel coverage, finding provenance, and explicit limitations.
+Dashboard refresh is read-only; analysis starts only after an explicit user action.
 
 Issues combines text, severity, scanner, rule, file, directory, source-location and
 scanner-overlap filters. Clear filters and overview shortcuts reset unrelated
@@ -97,7 +100,8 @@ Kavach-focused scope. Do not claim unrestricted self-service acceptance.
 
 Next chat: read live profile/run/Release state, keep named scanner limitations honest,
 and implement new requested work only in the service unless product work is explicit.
-Preserve unrelated local edits, never log secrets, and journal work at start/end.
+Preserve unrelated local edits, never log secrets, and record material operational
+changes in the relevant current/operations documentation.
 See README.md for validation commands and docs/README.md for guides.
 
 ## 2026-09-12 free-service operations update
