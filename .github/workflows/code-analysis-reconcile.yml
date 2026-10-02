@@ -34,3 +34,4 @@ jobs:
       project_id: ${{ inputs.project_id || '' }}
       selection: ${{ inputs.selection || '' }}
       request_id: ${{ inputs.request_id || '' }}
+    secrets: inherit
