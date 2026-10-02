@@ -182,7 +182,17 @@
         "vulture",
         "xenon"
       ],
-      "deferred_channels": {},
+      "deferred_channels": {
+        "alibaba-ocr": "No configured adapter in the Kavach evaluation profile.",
+        "codex-security": "No configured adapter in the Kavach evaluation profile.",
+        "flounder-audit": "No configured adapter in the Kavach evaluation profile.",
+        "owasp-go": "No configured adapter in the Kavach evaluation profile.",
+        "owasp-iac-secrets": "No configured adapter in the Kavach evaluation profile.",
+        "owasp-js": "No configured adapter in the Kavach evaluation profile.",
+        "owasp-jvm": "No configured adapter in the Kavach evaluation profile.",
+        "owasp-ruby": "No configured adapter in the Kavach evaluation profile.",
+        "vulnagent-triage": "No configured adapter in the Kavach evaluation profile."
+      },
       "preferred_branch": "Testing",
       "report_budget_bytes": 900000000
     },
