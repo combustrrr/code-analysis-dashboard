@@ -191,20 +191,15 @@ jobs:
         fi\njq -n --arg status \"$status\" --arg reason \"$reason\" --arg outcome \"$outcome\" --arg export \"$EXPORT_OUTCOME\"\
         \ \\\n  '{schema_version:\"1\",scanner_family:\"SonarQube Cloud\",status:$status,reason:$reason,surfaces:{analysis:$outcome,native_issue_export:$export}}'\
         \ \\\n  > sonar-status.json\n"
-    - name: Upload sonar-results to Cloudflare R2
+    - name: Upload sonar-results to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/sonar-results\nwhile read -r p; do\n  [ -z \"$p\" ] && continue\n\
-        \  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/sonar-results/ || true\n  elif [ -f \"$p\"\
-        \ ]; then\n    cp \"$p\" /tmp/r2-upload/sonar-results/ || true\n  fi\ndone <<< \"sonar-status.json\nsonar-access-probe.json\n\
-        sonar-browse-grant.json\nsonar-native-issues.json\n.scannerwork/report-task.txt\n\"\naws s3 cp /tmp/r2-upload/sonar-results/\
-        \ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt }}/sonar-results/ --recursive\
-        \ --exclude \"*\" --include \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include\
-        \ \"*.channel-evidence\"\n"
+      run: "aws s3 cp sonar-status.json\nsonar-access-probe.json\nsonar-browse-grant.json\nsonar-native-issues.json\n\
+        .scannerwork/report-task.txt\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt\
+        \ }/sonar-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
     needs:
     - identity
     permissions:
@@ -304,34 +299,23 @@ jobs:
         \nfi\njq -n \\\n  --arg status \"$status\" \\\n  --arg reason \"$reason\" \\\n  --arg sca \"$SCA_OUTCOME\"\
         \ \\\n  --arg code \"$CODE_OUTCOME\" \\\n  '{schema_version:\"1\",scanner_family:\"Snyk\",status:$status,reason:$reason,surfaces:{sca:$sca,code:$code}}'\
         \ \\\n  > snyk-status.json\n"
-    - name: Upload snyk-results to Cloudflare R2
+    - name: Upload snyk-results to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/snyk-results\nwhile read -r p; do\n  [ -z \"$p\" ] && continue\n\
-        \  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/snyk-results/ || true\n  elif [ -f \"$p\" ];\
-        \ then\n    cp \"$p\" /tmp/r2-upload/snyk-results/ || true\n  fi\ndone <<< \"snyk-status.json\nsnyk-open-source.sarif\n\
-        snyk-code.sarif\nsnyk-open-source.log\nsnyk-code.log\n\"\naws s3 cp /tmp/r2-upload/snyk-results/ s3://${{\
-        \ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt }}/snyk-results/ --recursive --exclude\
-        \ \"*\" --include \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"\
-        *.channel-evidence\"\n"
-    - name: Upload snyk-resolver-diagnostics to Cloudflare R2
+      run: "aws s3 cp snyk-status.json\nsnyk-open-source.sarif\nsnyk-code.sarif\nsnyk-open-source.log\nsnyk-code.log\n\
+        \ s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/snyk-results --recursive --endpoint-url\
+        \ https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+    - name: Upload isolated resolver diagnostics
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/snyk-resolver-diagnostics\nwhile read -r p; do\n  [ -z \"\
-        $p\" ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/snyk-resolver-diagnostics/\
-        \ || true\n  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/snyk-resolver-diagnostics/ || true\n\
-        \  fi\ndone <<< \"${{ runner.temp }}/snyk-resolver-error.json\"\naws s3 cp /tmp/r2-upload/snyk-resolver-diagnostics/\
-        \ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt }}/snyk-resolver-diagnostics/\
-        \ --recursive --exclude \"*\" --include \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"\
-        *.txt\" --include \"*.channel-evidence\"\n"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: snyk-resolver-diagnostics
+        path: ${{ runner.temp }}/snyk-resolver-error.json
+        if-no-files-found: ignore
+        retention-days: 7
     needs:
     - identity
     permissions:

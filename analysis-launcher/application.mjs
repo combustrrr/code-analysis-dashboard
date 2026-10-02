@@ -346,7 +346,7 @@ export async function applicationApi(request, env, session, helpers) {
     if(!project || !/^[a-f0-9-]{36}$/.test(id||''))throw new Failure(400,'Choose a project and request.');
     const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repo.full_name,project_id:project.id});
     const response=await publicReports(new Request(reportUrl),env);
-    if(!response.ok)throw new Failure(502,'Publication status is temporarily unavailable. Your queued request is retained.');
+    if(!response.ok)return json({phase:'queued',request_id:id,checked_at:new Date().toISOString(),publication_status:'unavailable',message:'Request is queued successfully. Publication status is temporarily unavailable; the request remains retained.'},202);
     const manifest=await response.json();
     const receipt=manifest.requests?.find(r=>r.request_id===id);
     const row=manifest.targets.find(t=>t.client_request_id===id&&(!receipt||t.head_sha===receipt.head_sha));

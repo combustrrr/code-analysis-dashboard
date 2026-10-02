@@ -98,20 +98,15 @@ jobs:
       run: "set -euo pipefail\nmapfile -d '' sarif_files < <(find codeql-output -type f -name '*.sarif' -print0)\n\
         if (( ${#sarif_files[@]} != 1 )); then\n  echo \"::error::Expected exactly one CodeQL SARIF file, found\
         \ ${#sarif_files[@]}\"\n  exit 1\nfi\ncp \"${sarif_files[0]}\" \"codeql-${CODEQL_LANGUAGE}.sarif\"\n"
-    - name: Upload codeql-${{ matrix.language }}-sarif to Cloudflare R2
+    - name: Upload codeql-${{ matrix.language }}-sarif to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/codeql-${{ matrix.language }}-sarif\nwhile read -r p; do\n\
-        \  [ -z \"$p\" ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/codeql-${{ matrix.language\
-        \ }}-sarif/ || true\n  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/codeql-${{ matrix.language\
-        \ }}-sarif/ || true\n  fi\ndone <<< \"codeql-${{ matrix.language }}.sarif\"\naws s3 cp /tmp/r2-upload/codeql-${{\
-        \ matrix.language }}-sarif/ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt\
-        \ }}/codeql-${{ matrix.language }}-sarif/ --recursive --exclude \"*\" --include \"*.sarif\" --include \"\
-        *.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\n"
+      run: aws s3 cp codeql-${{ matrix.language }}.sarif s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${
+        github.run_attempt }/codeql-${{ matrix.language }}-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID
+        }}.r2.cloudflarestorage.com
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'codeql') }}
@@ -160,32 +155,22 @@ jobs:
     - name: Normalize Semgrep JSON to SARIF
       run: "mkdir -p semgrep-scan-results\ncp semgrep-results.json semgrep-scan-results/\npython $RUNNER_TEMP/analysis-tooling/scripts/code_analysis/normalizer.py\
         \ \\\n  --input-dir semgrep-scan-results \\\n  --output-dir semgrep-normalized\n"
-    - name: Upload semgrep-sarif to Cloudflare R2
+    - name: Upload semgrep-sarif to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/semgrep-sarif\nwhile read -r p; do\n  [ -z \"$p\" ] && continue\n\
-        \  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/semgrep-sarif/ || true\n  elif [ -f \"$p\"\
-        \ ]; then\n    cp \"$p\" /tmp/r2-upload/semgrep-sarif/ || true\n  fi\ndone <<< \"semgrep-normalized/normalized.sarif\"\
-        \naws s3 cp /tmp/r2-upload/semgrep-sarif/ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt\
-        \ }}/semgrep-sarif/ --recursive --exclude \"*\" --include \"*.sarif\" --include \"*.json\" --include \"\
-        *.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\n"
-    - name: Upload semgrep-results to Cloudflare R2
+      run: aws s3 cp semgrep-normalized/normalized.sarif s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${
+        github.run_attempt }/semgrep-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+    - name: Upload semgrep-results to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/semgrep-results\nwhile read -r p; do\n  [ -z \"$p\" ] &&\
-        \ continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/semgrep-results/ || true\n  elif\
-        \ [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/semgrep-results/ || true\n  fi\ndone <<< \"semgrep-results.json\"\
-        \naws s3 cp /tmp/r2-upload/semgrep-results/ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{\
-        \ github.run_attempt }}/semgrep-results/ --recursive --exclude \"*\" --include \"*.sarif\" --include \"\
-        *.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\n"
+      run: aws s3 cp semgrep-results.json s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
+        }/semgrep-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'semgrep') }}
@@ -210,19 +195,14 @@ jobs:
         --report-path=/repo/gitleaks-results.sarif --redact --exit-code=0
     - name: Validate redacted Gitleaks output
       run: jq -e '(.runs | type) == "array"' gitleaks-results.sarif > /dev/null
-    - name: Upload gitleaks-results to Cloudflare R2
+    - name: Upload gitleaks-results to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/gitleaks-results\nwhile read -r p; do\n  [ -z \"$p\" ] &&\
-        \ continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/gitleaks-results/ || true\n  elif\
-        \ [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/gitleaks-results/ || true\n  fi\ndone <<< \"gitleaks-results.sarif\"\
-        \naws s3 cp /tmp/r2-upload/gitleaks-results/ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{\
-        \ github.run_attempt }}/gitleaks-results/ --recursive --exclude \"*\" --include \"*.sarif\" --include \"\
-        *.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\n"
+      run: aws s3 cp gitleaks-results.sarif s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
+        }/gitleaks-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'gitleaks') }}
@@ -258,19 +238,14 @@ jobs:
         format: sarif
         output: trivy-config.sarif
         severity: CRITICAL,HIGH
-    - name: Upload trivy-results to Cloudflare R2
+    - name: Upload trivy-results to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/trivy-results\nwhile read -r p; do\n  [ -z \"$p\" ] && continue\n\
-        \  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/trivy-results/ || true\n  elif [ -f \"$p\"\
-        \ ]; then\n    cp \"$p\" /tmp/r2-upload/trivy-results/ || true\n  fi\ndone <<< \"trivy-fs.sarif\ntrivy-config.sarif\n\
-        \"\naws s3 cp /tmp/r2-upload/trivy-results/ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{\
-        \ github.run_attempt }}/trivy-results/ --recursive --exclude \"*\" --include \"*.sarif\" --include \"*.json\"\
-        \ --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\n"
+      run: "aws s3 cp trivy-fs.sarif\ntrivy-config.sarif\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${\
+        \ github.run_attempt }/trivy-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'trivy') }}
@@ -305,19 +280,14 @@ jobs:
         \ exactly one Checkov SARIF file, found ${#sarif_files[@]}\"\n    exit 1\n  fi\n  cp \"${sarif_files[0]}\"\
         \ checkov-results.sarif\nelif [[ -f checkov.sarif ]]; then\n  cp checkov.sarif checkov-results.sarif\nelse\n\
         \  echo \"::error::Checkov did not produce SARIF evidence\"\n  exit 1\nfi\n"
-    - name: Upload checkov-results to Cloudflare R2
+    - name: Upload checkov-results to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/checkov-results\nwhile read -r p; do\n  [ -z \"$p\" ] &&\
-        \ continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/checkov-results/ || true\n  elif\
-        \ [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/checkov-results/ || true\n  fi\ndone <<< \"checkov-results.sarif\"\
-        \naws s3 cp /tmp/r2-upload/checkov-results/ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{\
-        \ github.run_attempt }}/checkov-results/ --recursive --exclude \"*\" --include \"*.sarif\" --include \"\
-        *.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\n"
+      run: aws s3 cp checkov-results.sarif s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt
+        }/checkov-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'checkov') }}
@@ -373,21 +343,15 @@ jobs:
         \ protection \"$push_protection\" --arg alerts \"$alerts_status\" \\\n  --argjson count \"$alert_count\"\
         \ \\\n  '{schema_version:\"1\",scanner_family:\"Repository Security Posture\",status:$status,reason:$reason,secret_scanning:$scanning,push_protection:$protection,alerts_status:$alerts,open_alert_count:$count,finding_count:0,observation_count:0}'\
         \ \\\n  > repository-security-posture-status.json\n"
-    - name: Upload workflow-security-posture to Cloudflare R2
+    - name: Upload workflow-security-posture to R2
       if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/workflow-security-posture\nwhile read -r p; do\n  [ -z \"\
-        $p\" ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/workflow-security-posture/\
-        \ || true\n  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/workflow-security-posture/ || true\n\
-        \  fi\ndone <<< \"zizmor-results.sarif\nrepository-security-posture-status.json\nsecret-scanning-alert-numbers.txt\n\
-        secret-scanning-api.log\n\"\naws s3 cp /tmp/r2-upload/workflow-security-posture/ s3://${{ secrets.R2_BUCKET_NAME\
-        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/workflow-security-posture/ --recursive --exclude \"\
-        *\" --include \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\
-        \n"
+      run: "aws s3 cp zizmor-results.sarif\nrepository-security-posture-status.json\nsecret-scanning-alert-numbers.txt\n\
+        secret-scanning-api.log\n s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/workflow-security-posture\
+        \ --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'workflow-security-posture') }}
@@ -439,20 +403,16 @@ jobs:
       run: "if [[ \"$OUTCOME\" != success ]]; then\n  jq -n '{scanner_family:\"OpenSSF Scorecard\",status:\"OPERATIONAL_FAILURE\"\
         ,reason:\"Native Scorecard execution or source identity validation failed\"}' > scorecard-status.json\n\
         fi"
-    - name: Upload openssf-scorecard to Cloudflare R2
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/openssf-scorecard\nwhile read -r p; do\n  [ -z \"$p\" ] &&\
-        \ continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/openssf-scorecard/ || true\n  elif\
-        \ [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/openssf-scorecard/ || true\n  fi\ndone <<< \"openssf-scorecard.sarif\n\
-        scorecard-status.json\nscorecard-native.json\"\naws s3 cp /tmp/r2-upload/openssf-scorecard/ s3://${{ secrets.R2_BUCKET_NAME\
-        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/openssf-scorecard/ --recursive --exclude \"*\" --include\
-        \ \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\
-        \n"
+      with:
+        name: openssf-scorecard
+        path: 'openssf-scorecard.sarif
+
+          scorecard-status.json
+
+          scorecard-native.json'
+        retention-days: 7
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'openssf-scorecard') }}
@@ -493,20 +453,13 @@ jobs:
         persist-credentials: false
     - name: Run reviewed bandit adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner bandit --source .source --output portable-output/bandit
-    - name: Upload portable-python-bandit to Cloudflare R2
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/portable-python-bandit\nwhile read -r p; do\n  [ -z \"$p\"\
-        \ ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/portable-python-bandit/ ||\
-        \ true\n  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/portable-python-bandit/ || true\n  fi\n\
-        done <<< \"portable-output/\"\naws s3 cp /tmp/r2-upload/portable-python-bandit/ s3://${{ secrets.R2_BUCKET_NAME\
-        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/portable-python-bandit/ --recursive --exclude \"*\"\
-        \ --include \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\
-        \n"
+      with:
+        name: portable-python-bandit
+        path: portable-output/
+        retention-days: 7
+        if-no-files-found: error
   portable-python-ruff:
     name: Portable python-ruff
     needs:
@@ -542,20 +495,13 @@ jobs:
         persist-credentials: false
     - name: Run reviewed ruff adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner ruff --source .source --output portable-output/ruff
-    - name: Upload portable-python-ruff to Cloudflare R2
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/portable-python-ruff\nwhile read -r p; do\n  [ -z \"$p\"\
-        \ ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/portable-python-ruff/ || true\n\
-        \  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/portable-python-ruff/ || true\n  fi\ndone <<<\
-        \ \"portable-output/\"\naws s3 cp /tmp/r2-upload/portable-python-ruff/ s3://${{ secrets.R2_BUCKET_NAME }}/${{\
-        \ github.run_id }}/${{ github.run_attempt }}/portable-python-ruff/ --recursive --exclude \"*\" --include\
-        \ \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\
-        \n"
+      with:
+        name: portable-python-ruff
+        path: portable-output/
+        retention-days: 7
+        if-no-files-found: error
   portable-complexity:
     name: Portable complexity
     needs:
@@ -593,20 +539,13 @@ jobs:
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner radon --source .source --output portable-output/radon
     - name: Run reviewed xenon adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner xenon --source .source --output portable-output/xenon
-    - name: Upload portable-complexity to Cloudflare R2
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/portable-complexity\nwhile read -r p; do\n  [ -z \"$p\" ]\
-        \ && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/portable-complexity/ || true\n\
-        \  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/portable-complexity/ || true\n  fi\ndone <<< \"\
-        portable-output/\"\naws s3 cp /tmp/r2-upload/portable-complexity/ s3://${{ secrets.R2_BUCKET_NAME }}/${{\
-        \ github.run_id }}/${{ github.run_attempt }}/portable-complexity/ --recursive --exclude \"*\" --include\
-        \ \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\
-        \n"
+      with:
+        name: portable-complexity
+        path: portable-output/
+        retention-days: 7
+        if-no-files-found: error
   portable-dead-code:
     name: Portable dead-code
     needs:
@@ -642,19 +581,13 @@ jobs:
         persist-credentials: false
     - name: Run reviewed vulture adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner vulture --source .source --output portable-output/vulture
-    - name: Upload portable-dead-code to Cloudflare R2
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/portable-dead-code\nwhile read -r p; do\n  [ -z \"$p\" ]\
-        \ && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/portable-dead-code/ || true\n\
-        \  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/portable-dead-code/ || true\n  fi\ndone <<< \"\
-        portable-output/\"\naws s3 cp /tmp/r2-upload/portable-dead-code/ s3://${{ secrets.R2_BUCKET_NAME }}/${{\
-        \ github.run_id }}/${{ github.run_attempt }}/portable-dead-code/ --recursive --exclude \"*\" --include \"\
-        *.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\n"
+      with:
+        name: portable-dead-code
+        path: portable-output/
+        retention-days: 7
+        if-no-files-found: error
   portable-typescript-quality:
     name: Portable typescript-quality
     needs:
@@ -693,20 +626,13 @@ jobs:
     - name: Run reviewed typescript adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner typescript --source .source --output
         portable-output/typescript
-    - name: Upload portable-typescript-quality to Cloudflare R2
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/portable-typescript-quality\nwhile read -r p; do\n  [ -z\
-        \ \"$p\" ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/portable-typescript-quality/\
-        \ || true\n  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/portable-typescript-quality/ || true\n\
-        \  fi\ndone <<< \"portable-output/\"\naws s3 cp /tmp/r2-upload/portable-typescript-quality/ s3://${{ secrets.R2_BUCKET_NAME\
-        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/portable-typescript-quality/ --recursive --exclude \"\
-        *\" --include \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\
-        \n"
+      with:
+        name: portable-typescript-quality
+        path: portable-output/
+        retention-days: 7
+        if-no-files-found: error
   portable-test-coverage:
     name: Portable test-coverage
     needs:
@@ -742,20 +668,13 @@ jobs:
         persist-credentials: false
     - name: Run reviewed coverage adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner coverage --source .source --output portable-output/coverage
-    - name: Upload portable-test-coverage to Cloudflare R2
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/portable-test-coverage\nwhile read -r p; do\n  [ -z \"$p\"\
-        \ ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/portable-test-coverage/ ||\
-        \ true\n  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/portable-test-coverage/ || true\n  fi\n\
-        done <<< \"portable-output/\"\naws s3 cp /tmp/r2-upload/portable-test-coverage/ s3://${{ secrets.R2_BUCKET_NAME\
-        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/portable-test-coverage/ --recursive --exclude \"*\"\
-        \ --include \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\
-        \n"
+      with:
+        name: portable-test-coverage
+        path: portable-output/
+        retention-days: 7
+        if-no-files-found: error
   portable-atheris-state-machine:
     name: Portable atheris-state-machine
     needs:
@@ -791,20 +710,13 @@ jobs:
         persist-credentials: false
     - name: Run reviewed atheris adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner atheris --source .source --output portable-output/atheris
-    - name: Upload portable-atheris-state-machine to Cloudflare R2
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/portable-atheris-state-machine\nwhile read -r p; do\n  [\
-        \ -z \"$p\" ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/portable-atheris-state-machine/\
-        \ || true\n  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/portable-atheris-state-machine/ || true\n\
-        \  fi\ndone <<< \"portable-output/\"\naws s3 cp /tmp/r2-upload/portable-atheris-state-machine/ s3://${{\
-        \ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt }}/portable-atheris-state-machine/\
-        \ --recursive --exclude \"*\" --include \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"\
-        *.txt\" --include \"*.channel-evidence\"\n"
+      with:
+        name: portable-atheris-state-machine
+        path: portable-output/
+        retention-days: 7
+        if-no-files-found: error
   portable-schemathesis-fuzz:
     name: Portable schemathesis-fuzz
     needs:
@@ -841,20 +753,13 @@ jobs:
     - name: Run reviewed schemathesis adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner schemathesis --source .source --output
         portable-output/schemathesis
-    - name: Upload portable-schemathesis-fuzz to Cloudflare R2
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/portable-schemathesis-fuzz\nwhile read -r p; do\n  [ -z \"\
-        $p\" ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/portable-schemathesis-fuzz/\
-        \ || true\n  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/portable-schemathesis-fuzz/ || true\n\
-        \  fi\ndone <<< \"portable-output/\"\naws s3 cp /tmp/r2-upload/portable-schemathesis-fuzz/ s3://${{ secrets.R2_BUCKET_NAME\
-        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/portable-schemathesis-fuzz/ --recursive --exclude \"\
-        *\" --include \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\
-        \n"
+      with:
+        name: portable-schemathesis-fuzz
+        path: portable-output/
+        retention-days: 7
+        if-no-files-found: error
   portable-python-types:
     name: Portable python-types
     needs:
@@ -890,20 +795,13 @@ jobs:
         persist-credentials: false
     - name: Run reviewed pyright adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner pyright --source .source --output portable-output/pyright
-    - name: Upload portable-python-types to Cloudflare R2
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/portable-python-types\nwhile read -r p; do\n  [ -z \"$p\"\
-        \ ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/portable-python-types/ || true\n\
-        \  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/portable-python-types/ || true\n  fi\ndone <<<\
-        \ \"portable-output/\"\naws s3 cp /tmp/r2-upload/portable-python-types/ s3://${{ secrets.R2_BUCKET_NAME\
-        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/portable-python-types/ --recursive --exclude \"*\" --include\
-        \ \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"*.channel-evidence\"\
-        \n"
+      with:
+        name: portable-python-types
+        path: portable-output/
+        retention-days: 7
+        if-no-files-found: error
   report:
     needs:
     - identity
@@ -960,21 +858,12 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         IS_REUSABLE_ANALYSIS: 'true'
       run: python -m scripts.code_analysis.source_identity --assemble
-    - name: Upload hosted-report-${{ github.run_id }}-${{ github.run_attempt }} to Cloudflare R2
-      if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-        AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      run: "set -euo pipefail\nmkdir -p /tmp/r2-upload/hosted-report-${{ github.run_id }}-${{ github.run_attempt\
-        \ }}\nwhile read -r p; do\n  [ -z \"$p\" ] && continue\n  if [ -d \"$p\" ]; then\n    cp -r \"$p\"/* /tmp/r2-upload/hosted-report-${{\
-        \ github.run_id }}-${{ github.run_attempt }}/ || true\n  elif [ -f \"$p\" ]; then\n    cp \"$p\" /tmp/r2-upload/hosted-report-${{\
-        \ github.run_id }}-${{ github.run_attempt }}/ || true\n  fi\ndone <<< \".hosted/report/\"\naws s3 cp /tmp/r2-upload/hosted-report-${{\
-        \ github.run_id }}-${{ github.run_attempt }}/ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{\
-        \ github.run_attempt }}/hosted-report-${{ github.run_id }}-${{ github.run_attempt }}/ --recursive --exclude\
-        \ \"*\" --include \"*.sarif\" --include \"*.json\" --include \"*.xml\" --include \"*.txt\" --include \"\
-        *.channel-evidence\"\n"
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: hosted-report-${{ github.run_id }}-${{ github.run_attempt }}
+        path: .hosted/report/
+        if-no-files-found: error
+        retention-days: 7
 'on':
   workflow_call:
     inputs:

@@ -42,6 +42,10 @@ def sync(root: Path):
     path = root / 'scripts/code_analysis/generate_source_workflow.py'
     content = path.read_text(encoding='utf-8')
     for constant, name in [('CHECKOUT', 'actions/checkout'), ('UPLOAD', 'actions/upload-artifact'), ('PYTHON', 'actions/setup-python')]:
+        if name not in actions:
+            # R2-backed workflows no longer invoke upload-artifact. Keep the
+            # existing pinned constant for compatibility with the generator.
+            continue
         content, count = re.subn(rf"^{constant} = '[^']+'$", f"{constant} = '{actions[name]}'", content, flags=re.M)
         if count != 1:
             raise ValueError('Missing generator action constant')

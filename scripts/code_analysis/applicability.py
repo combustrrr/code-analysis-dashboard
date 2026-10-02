@@ -15,7 +15,7 @@ GROUPS = {
     'openssf-scorecard': ['openssf-scorecard'], 'complexity': ['radon', 'xenon'],
     'dead-code': ['vulture'], 'test-coverage': ['coverage'],
     'schemathesis-fuzz': ['schemathesis'], 'atheris-state-machine': ['atheris'],
-        'coderabbit', 'codex-security', 'alibaba-ocr', 'flounder-audit', 'vulnagent-triage', 'owasp-jvm', 'owasp-go', 'owasp-js', 'owasp-ruby', 'owasp-iac-secrets': ['coderabbit-ai-advisory'],
+    'coderabbit': ['coderabbit-ai-advisory'],
     'codex-security': ['codex-security'],
     'alibaba-ocr': ['alibaba-ocr'],
     'flounder-audit': ['flounder-audit'],
@@ -26,7 +26,7 @@ GROUPS = {
     'owasp-ruby': ['owasp-ruby'],
     'owasp-iac-secrets': ['owasp-iac-secrets'],
 }
-PORTABLE_JOBS = {'semgrep', 'gitleaks', 'trivy', 'checkov', 'openssf-scorecard', 'workflow-security-posture', 'coderabbit', 'codex-security', 'alibaba-ocr', 'flounder-audit', 'vulnagent-triage', 'owasp-jvm', 'owasp-go', 'owasp-js', 'owasp-ruby', 'owasp-iac-secrets'}
+PORTABLE_JOBS = {'semgrep', 'gitleaks', 'trivy', 'checkov', 'openssf-scorecard', 'workflow-security-posture', 'coderabbit'}
 
 PYTHON_JOBS = {'python-ruff', 'python-bandit', 'python-types', 'complexity',
                'dead-code', 'test-coverage', 'schemathesis-fuzz', 'atheris-state-machine'}
