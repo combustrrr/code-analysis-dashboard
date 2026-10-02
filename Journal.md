@@ -28,6 +28,10 @@
 - Added reader-facing labels for `NOT_AVAILABLE`, `NOT_APPLICABLE`, and `DEFERRED` scanner states.
 - The dashboard suite now reaches its retained fixtures: 14 tests pass, 1 access test is skipped by design, and 3 unrelated retained-fixture assertions remain stale.
 
+### 2026-10-02 - Idempotent request persistence
+- Diagnosed `Could not persist the analysis request` as a duplicate deterministic request asset already present in the `analysis-requests` release queue.
+- Updated the Worker to return the existing queued request instead of attempting a second upload; application tests (14) pass and Worker version `182cde64-8a94-4bca-b1a2-a92854ca8fca` is deployed.
+
 ### 2026-10-02 - Third testing observation fixes
 - Improved light/dark authentication and header contrast, including sign-in copy, sign-out controls, navigation text, and dashboard access surfaces.
 - Reworded evaluation-budget failures as an explicit temporary operational limit and clarified target queue scope/status with accessible explanations.
