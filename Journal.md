@@ -35,6 +35,10 @@
 - Accepted exact frozen-commit selections at reconciliation after the launcher converts the configured branch to its immutable SHA.
 - Build and 23 focused project/reconciliation/evaluation tests passed.
 
+### 2026-10-02 - Remote evaluation lock reset
+- Diagnosed the recurring budget message as the Worker remote KV lock `evaluation:v1:arydestroyer/kavach-agenticsoc`; the report inventory reset did not clear this separate launch guard.
+- Deleted the exhausted remote KV key through the configured `ANALYSIS_STATE` namespace. Verification returned 404, confirming the lock is cleared and the next frozen evaluation can initialize a fresh one-dispatch budget.
+
 ### 2026-10-02 - Reconciliation numeric project ID fix
 - Diagnosed job `110914704399`: reconciliation rejected the configured Kavach source because numeric `project_id` workflow inputs were compared strictly against string project IDs.
 - Normalized project ID matching in project configuration resolution; 21 focused project/reconciliation tests pass.
