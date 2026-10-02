@@ -12,12 +12,10 @@ the index directories below classify the material by audience and lifecycle.
 - [Operations index](operations/README.md): deployment, access, maintenance, and free-tier controls.
 - [Governance index](governance/README.md): repository onboarding, security policy, and acceptance gates.
 - [Roadmap](roadmap/README.md): planned work and explicit non-goals.
-- [Archive index](archive/README.md): historical migrations, sessions, and superseded designs.
 
 ## Documentation Rules
 
 - Current behavior belongs in `current/`, `architecture/`, `operations/`, or `governance/`.
 - Proposed work belongs in `roadmap/` and must be labeled planned.
-- Historical evidence is retained under `archive/` or marked historical in place.
 - `HANDOFF.md` and `MIGRATION.md` remain stable root compatibility entry points.
 - A document must identify its status when it describes behavior that is not deployed.

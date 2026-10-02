@@ -110,12 +110,8 @@ programs assessed. No paid plans, credit programs or third-party accounts activa
 
 ## 2026-09-12 synchronization and branch cleanup
 
-Fork Testing ccc711e3 includes upstream Testing 231bb41f; fork main already matched
-upstream main. Source backend/webui match upstream, with independent fork docs/CI
-and external analysis ownership preserved. Dashboard obsolete implementation branches
-were removed after merge/tree verification; main and two open scanner-update PR
-branches remain. Future merged PR branches are automatically deleted. See
-[cleanup audit](BRANCH_CLEANUP_2026-09-12.md) for exact deleted refs and recovery proof.
+Fork Testing and upstream remain read-only observer boundaries. The service owns its
+execution, report publication, and deployment workflows.
 
 ## Final cleanup checkpoint (2026-09-12)
 
