@@ -145,7 +145,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.17
     - name: Install Semgrep
       run: pip install semgrep==1.80.0 click==8.1.7 python-dateutil==2.9.0.post0
     - name: Validate custom Semgrep rules
@@ -267,7 +267,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: 3.11.17
     - name: Install Checkov
       run: pip install "checkov==3.2.468"
     - name: Run Checkov
