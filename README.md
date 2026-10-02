@@ -3,8 +3,11 @@
 A standalone code-analysis application: React/Ant Design dashboard, Cloudflare
 authentication, GitHub Actions orchestration, scanner adapters, and current reports.
 
-Start a new chat with [docs/HANDOFF.md](docs/HANDOFF.md). Current operational guides
-are indexed in [docs/code-analysis/README.md](docs/code-analysis/README.md).
+Start with the [documentation index](docs/README.md), then read
+[docs/HANDOFF.md](docs/HANDOFF.md). Current operational guides are grouped under
+the [current](docs/current/README.md), [architecture](docs/architecture/README.md),
+[operations](docs/operations/README.md), and [governance](docs/governance/README.md)
+indexes.
 
 ## Project layout
 
@@ -14,7 +17,7 @@ are indexed in [docs/code-analysis/README.md](docs/code-analysis/README.md).
 - `config/code-analysis/`: repository profile, scanner inventory, report contracts.
 - `.github/workflows/`: producers, discovery, compatibility, updates, Pages.
 - `tests/security_canary/`: scanner fixtures, never product runtime code.
-- `docs/code-analysis/`: architecture, integrations, and operations.
+- `docs/`: current implementation, architecture, operations, governance, roadmap, and archive indexes.
 
 ## Local verification
 
