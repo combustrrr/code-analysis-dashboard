@@ -19,6 +19,14 @@ from scripts.code_analysis.evaluation import can_dispatch, consume, idempotency_
 WORKFLOW = '.github/workflows/code-analysis-source.yml'
 
 
+def queued_selection(intent):
+    """Return the canonical repository-qualified selection from a queued request."""
+    selection = intent.get('selection')
+    if not isinstance(selection, dict):
+        raise ValueError('Queued request selection is invalid')
+    return json.dumps(selection)
+
+
 def load_projects(repository):
     repo = github.api('repos/' + repository)
     blob = github.api(f"repos/{repository}/contents/.github/code-analysis/projects.json?ref={quote(repo['default_branch'], safe='')}")
@@ -142,7 +150,10 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             intent = json.loads(github.gh('api',f"repos/{repository}/releases/assets/{queued_asset['id']}",'-H','Accept: application/octet-stream',binary=True))
             if intent.get('schema_version')!='analysis-request-v1' or intent.get('execution_repository_id')!=repo['id'] or not any(p['id']==intent.get('project_id') for p in document['projects']):
                 raise ValueError('Queued request identity is invalid or project was removed')
-            project_id, selection, request_id = intent['project_id'], json.dumps(intent.get('requested_selection') or intent['selection']), intent['request_id']
+            # `selection` is the canonical, repository-qualified revision. The
+            # optional requested_selection records the user's original UI
+            # choice and, in evaluation mode, intentionally omits repository.
+            project_id, selection, request_id = intent['project_id'], queued_selection(intent), intent['request_id']
     template = json.loads((Path(__file__).resolve().parents[2] / 'config/code-analysis/service.json').read_text(encoding='utf-8-sig'))
     evaluation = template.get('evaluation', {})
     runs = github.pages(f'repos/{repository}/actions/workflows/code-analysis-source.yml/runs', 'workflow_runs')

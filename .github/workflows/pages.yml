@@ -33,7 +33,7 @@ jobs:
           VITE_APPLICATION_MODE: repositories
           VITE_LAUNCH_ENDPOINT: https://code-analysis-launcher.icsarthak9.workers.dev
           VITE_DEFAULT_EXECUTION_REPOSITORY: combustrrr/code-analysis-dashboard
-          VITE_DEFAULT_PROJECT_ID: '1267340546'
+          VITE_DEFAULT_PROJECT_ID: '1360051890'
         run: |
           npm ci --ignore-scripts
           npm run build

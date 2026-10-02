@@ -256,7 +256,7 @@ if(import.meta.env.VITE_APPLICATION_MODE==='repositories') {
  }
  if(!parameters.has('repository')) {
   parameters.set('repository',import.meta.env.VITE_DEFAULT_EXECUTION_REPOSITORY||'combustrrr/code-analysis-dashboard');
-  parameters.set('project',import.meta.env.VITE_DEFAULT_PROJECT_ID||'1267340546');
+  parameters.set('project',import.meta.env.VITE_DEFAULT_PROJECT_ID||'1360051890');
   history.replaceState(null,'','#'+parameters.toString());
  }
 }

@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest.mock import patch
 from scripts.code_analysis.test_projects import config
@@ -7,6 +8,14 @@ from scripts.code_analysis.repository_service import report_publication
 from pathlib import Path
 
 class RepositoryExecutionTests(unittest.TestCase):
+    def test_queued_evaluation_uses_canonical_repository_qualified_selection(self):
+        from scripts.code_analysis.repository_service import queued_selection
+        intent = {
+            'selection': {'repository': 'owner/source', 'kind': 'commit', 'ref': 'a' * 40},
+            'requested_selection': {'kind': 'branch', 'ref': 'Testing'},
+        }
+        self.assertEqual(json.loads(queued_selection(intent)), intent['selection'])
+
     def test_generated_producer_is_current(self):
         self.assertEqual(reusable_source(),Path('.github/workflows/reusable-source.yml').read_text(encoding='utf-8-sig'))
 
