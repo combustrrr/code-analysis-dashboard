@@ -49,7 +49,7 @@ def generate(config=None):
             # workflows so secrets and run metadata are evaluated by Actions.
             def normalize_expressions(value):
                 if isinstance(value, str):
-                    return re.sub(r'\$\{\s*([^{}]+?)\s*\}', r'${{ \1 }}', value)
+                    return re.sub(r'\$\{\s*((?:secrets|github)\.[^{}]+?)\s*\}', r'${{ \1 }}', value)
                 if isinstance(value, list):
                     return [normalize_expressions(item) for item in value]
                 if isinstance(value, dict):

@@ -76,8 +76,8 @@ jobs:
       shell: bash
       run: "set -euo pipefail\nshould_scan=false\nif [[ \"$EVENT_NAME\" == workflow_dispatch ]]; then\n  should_scan=true\n\
         else\n  base=\"$BEFORE_SHA\"\n  if [[ \"$EVENT_NAME\" == pull_request ]]; then\n    base=\"$BASE_SHA\"\n\
-        \  fi\n  if [[ -z \"$base\" || \"$base\" =~ ^0+$ ]] || ! git cat-file -e \"${{ base }}^{commit}\"; then\n\
-        \    should_scan=true\n  elif git diff --name-only \"$base\" \"$SCAN_SHA\" | grep -Eq \\\n    '^(backend/app/|webui/src/|scripts/code_analysis/export_sonar_issues\\\
+        \  fi\n  if [[ -z \"$base\" || \"$base\" =~ ^0+$ ]] || ! git cat-file -e \"${base}^{commit}\"; then\n  \
+        \  should_scan=true\n  elif git diff --name-only \"$base\" \"$SCAN_SHA\" | grep -Eq \\\n    '^(backend/app/|webui/src/|scripts/code_analysis/export_sonar_issues\\\
         .py$|sonar-project\\.properties$|\\.github/workflows/01-code-quality\\.yml$)'; then\n    should_scan=true\n\
         \  fi\nfi\nprintf 'should_scan=%s\\n' \"$should_scan\" >> \"$GITHUB_OUTPUT\"\n"
     - name: Ensure Browse for the verified Sonar API user
@@ -274,7 +274,7 @@ jobs:
 
         snyk code test --sarif-file-output=snyk-code.sarif 2>&1 | tee snyk-code.log
 
-        scan_exit=${{ PIPESTATUS[0] }}
+        scan_exit=${PIPESTATUS[0]}
 
         set -e
 

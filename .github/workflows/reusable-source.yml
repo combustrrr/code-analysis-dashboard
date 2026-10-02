@@ -96,9 +96,8 @@ jobs:
       env:
         CODEQL_LANGUAGE: ${{ matrix.language }}
       run: "set -euo pipefail\nmapfile -d '' sarif_files < <(find codeql-output -type f -name '*.sarif' -print0)\n\
-        if (( ${{ #sarif_files[@] }} != 1 )); then\n  echo \"::error::Expected exactly one CodeQL SARIF file, found\
-        \ ${{ #sarif_files[@] }}\"\n  exit 1\nfi\ncp \"${{ sarif_files[0] }}\" \"codeql-${{ CODEQL_LANGUAGE }}.sarif\"\
-        \n"
+        if (( ${#sarif_files[@]} != 1 )); then\n  echo \"::error::Expected exactly one CodeQL SARIF file, found\
+        \ ${#sarif_files[@]}\"\n  exit 1\nfi\ncp \"${sarif_files[0]}\" \"codeql-${CODEQL_LANGUAGE}.sarif\"\n"
     - name: Upload codeql-${{ matrix.language }}-sarif to R2
       if: always()
       env:
@@ -278,10 +277,10 @@ jobs:
     - name: Canonicalize Checkov SARIF artifact
       shell: bash
       run: "set -euo pipefail\nif [[ -d checkov.sarif ]]; then\n  mapfile -d '' sarif_files < <(find checkov.sarif\
-        \ -type f -name '*.sarif' -print0)\n  if (( ${{ #sarif_files[@] }} != 1 )); then\n    echo \"::error::Expected\
-        \ exactly one Checkov SARIF file, found ${{ #sarif_files[@] }}\"\n    exit 1\n  fi\n  cp \"${{ sarif_files[0]\
-        \ }}\" checkov-results.sarif\nelif [[ -f checkov.sarif ]]; then\n  cp checkov.sarif checkov-results.sarif\n\
-        else\n  echo \"::error::Checkov did not produce SARIF evidence\"\n  exit 1\nfi\n"
+        \ -type f -name '*.sarif' -print0)\n  if (( ${#sarif_files[@]} != 1 )); then\n    echo \"::error::Expected\
+        \ exactly one Checkov SARIF file, found ${#sarif_files[@]}\"\n    exit 1\n  fi\n  cp \"${sarif_files[0]}\"\
+        \ checkov-results.sarif\nelif [[ -f checkov.sarif ]]; then\n  cp checkov.sarif checkov-results.sarif\nelse\n\
+        \  echo \"::error::Checkov did not produce SARIF evidence\"\n  exit 1\nfi\n"
     - name: Upload checkov-results to R2
       if: always()
       env:
@@ -329,10 +328,10 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.SECURITY_POSTURE_TOKEN || github.token }}
       shell: bash
-      run: "set -euo pipefail\nrepo_json=\"$(gh api \"repos/${{ GITHUB_REPOSITORY }}\")\"\nsecret_scanning=\"$(jq\
-        \ -r '.security_and_analysis.secret_scanning.status // \"UNAVAILABLE\"' <<<\"$repo_json\")\"\npush_protection=\"\
+      run: "set -euo pipefail\nrepo_json=\"$(gh api \"repos/${SOURCE_REPOSITORY}\")\"\nsecret_scanning=\"$(jq -r\
+        \ '.security_and_analysis.secret_scanning.status // \"UNAVAILABLE\"' <<<\"$repo_json\")\"\npush_protection=\"\
         $(jq -r '.security_and_analysis.secret_scanning_push_protection.status // \"UNAVAILABLE\"' <<<\"$repo_json\"\
-        )\"\nalerts_status=UNAVAILABLE\nalert_count=null\nif gh api --paginate \"repos/${{ GITHUB_REPOSITORY }}/secret-scanning/alerts?state=open&per_page=100\"\
+        )\"\nalerts_status=UNAVAILABLE\nalert_count=null\nif gh api --paginate \"repos/${SOURCE_REPOSITORY}/secret-scanning/alerts?state=open&per_page=100\"\
         \ \\\n    --jq '.[].number' > secret-scanning-alert-numbers.txt 2>secret-scanning-api.log; then\n  alerts_status=OBSERVED\n\
         \  alert_count=\"$(wc -l < secret-scanning-alert-numbers.txt)\"\nelse\n  : > secret-scanning-alert-numbers.txt\n\
         fi\nposture_status=CONFIGURED_COMPLETE\nposture_reason=\"Secret scanning and push protection enabled; open-alert\
