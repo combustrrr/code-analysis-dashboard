@@ -11,6 +11,12 @@
 - Added Worker and reconciliation boundary enforcement, exact target-SHA launch resolution, bounded activity cache headers, provenance fields, and finding-level observation provenance.
 - Live preflight confirmed GitHub authentication, GitHub core rate limit 4,994/5,000 remaining, R2 bucket `code-analysis-reports`, KV namespace `ANALYSIS_STATE`, and `temp-runs/` expiration after one day. No credentials or secret values were logged.
 - Focused service validation (75 tests), launcher validation (29 tests), workflow policy audit, Worker dry-run, and UI build passed. The full legacy service suite retains three pre-existing generated-workflow expectation failures unrelated to these changes; no upstream or remote deployment was modified.
+
+### 2026-10-02 - Real Kavach evaluation
+- Committed and pushed the Threat Report/evaluation implementation and successive workflow rollout fixes.
+- Resolved the configured `Testing` branch to SHA `231bb41f7eb1b707e25113c258eb8d5c7356b743` and executed the real source workflow with request `231bb41f-7eb1-407e-8513-8c258eb8d5c7`.
+- The producer generated a real `hosted-report-37015397324-1` artifact containing `report.json`, `findings.json`, `threat-report.json`, `threat-report.md`, and detail pages. Scanner jobs preserved failures and incomplete evidence rather than fabricating findings.
+- Reconciliation collected the producer result; remaining scanner/R2 publication failures are explicit operational evidence in the captured run and are not represented as zero findings.
 ### 2026-09-08 - Authenticated launch deployment: start
 - Synchronizing tested developer launch UI and trusted Worker/selection contracts from fork feature commit 87cf4f71.
 
