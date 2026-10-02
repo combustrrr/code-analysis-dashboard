@@ -348,7 +348,7 @@ jobs:
 
         pip install -r backend/requirements-dev.txt
 
-        pip install "pyright==1.1.411"
+        pip install "pyright==1.1.414"
 
         '
     - name: Run Pyright (advisory)
