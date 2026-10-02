@@ -3,6 +3,9 @@
 Python implementation for discovery, scanner execution, normalization, provenance,
 publication, workflow generation, and verification.
 
+Administrative registration utilities live separately in `deployment/`; they are not
+part of scanner execution or Worker runtime.
+
 `code_analysis/` intentionally keeps stable top-level compatibility entry points
 because GitHub Actions and trusted profiles invoke these paths directly. The logical
 layers are documented in `code_analysis/README.md` and `config/code-analysis/service-layout.json`;
