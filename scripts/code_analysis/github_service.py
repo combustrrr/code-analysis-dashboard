@@ -85,7 +85,7 @@ def cf_api(config: dict, path: str, method: str = 'GET', data: bytes | None = No
         raise ValueError("launch_endpoint is required to store state in Cloudflare")
     url = endpoint.rstrip('/') + path
     token = os.environ.get('WORKER_API_TOKEN', '')
-    headers = {'Authorization': f'Bearer {token}'}
+    headers = {'Authorization': f'Bearer {token}', 'User-Agent': 'code-analysis-dashboard-reconciler/1', 'Accept': 'application/json'}
     if data is not None:
         headers['Content-Type'] = content_type
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
