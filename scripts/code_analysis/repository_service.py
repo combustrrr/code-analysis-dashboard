@@ -195,7 +195,8 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         project_dispatches = 0
         for row in state['targets']:
             if evaluation_enabled and selection and str(project['id']) == str(project_id):
-                if row.get('branch') != evaluation.get('target_branch'):
+                frozen_sha = state.get('evaluation_target_sha') or evaluation.get('target_sha')
+                if row.get('branch') != evaluation.get('target_branch') and row.get('head_sha') != frozen_sha:
                     state['evaluation_error'] = f"Evaluation only accepts the frozen {evaluation.get('target_branch')} branch."
                     continue
             key = analysis_key(row, document['tooling_sha'], config)
