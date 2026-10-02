@@ -33,7 +33,8 @@ def gh(*args: str, payload: object | None = None, binary: bool = False):
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     if result.returncode:
         # Never echo authenticated commands, environment, or arbitrary response bodies.
-        raise RuntimeError(f"GitHub request failed ({result.returncode}): {' '.join(args[:2])}")
+        detail = result.stderr.decode(errors='replace').replace('\n', ' ')[:300]
+        raise RuntimeError(f"GitHub request failed ({result.returncode}): {' '.join(args[:2])}: {detail}")
     if binary:
         return result.stdout
     return json.loads(result.stdout) if result.stdout.strip() else None
