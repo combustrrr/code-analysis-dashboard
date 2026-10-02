@@ -16,6 +16,11 @@
     "DASHBOARD_ACCESS": "collaborators",
     "TOOLING_FROM_SERVICE": "true",
     "TOOLING_SHA": "a0dcd02062a1dbfc24d085fcaea71e36b3ba3512",
+    "EVALUATION_MODE": "true",
+    "EVALUATION_SOURCE_REPOSITORY": "ARYDESTROYER/Kavach-AgenticSOC",
+    "EVALUATION_TARGET_BRANCH": "Testing",
+    "EVALUATION_TARGET_SHA": "231bb41f7eb1b707e25113c258eb8d5c7356b743",
+    "EVALUATION_PAUSED": "false",
     "SAFE_API_LOGS": "true",
     "MAX_ASSET_BYTES": "104857600",
     "MAX_MANIFEST_COMPRESSED_BYTES": "900000000"
@@ -30,7 +35,7 @@
   "kv_namespaces": [
     {
       "binding": "ANALYSIS_STATE",
-      "id": "e0b04c86ebf443bcaef13459e74d32cf"
+      "id": "c62eec3859794af5af38db282b0f69d5"
     }
   ],
   "r2_buckets": [

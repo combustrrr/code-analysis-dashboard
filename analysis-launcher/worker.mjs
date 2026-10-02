@@ -65,7 +65,7 @@ async function viewer(env, token) {
   if(env.DASHBOARD_ACCESS === 'collaborators' && !await isCollaborator(env,user.login)) throw new Failure(403, 'Only collaborators of the analysis repository may view this dashboard.');
   return user;
 }
-const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } });
+const json = (value, status = 200, extra = {}) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json', ...extra } });
 async function route(request, env) {
   if (env.APPLICATION_MODE === 'repositories') {
     const response = await webhook(request, env);

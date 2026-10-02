@@ -1,4 +1,16 @@
+?
 
+### 2026-10-02 - Threat Report generation and coverage contract
+- Read the threat report implementation plan and repository handoff before reviewing the existing uncommitted implementation.
+- Added immutable publication-time JSON/Markdown Threat Reports, deterministic guidance enrichment, authenticated legacy fallback, and dashboard export/print controls.
+- Added raw-to-normalized channel status presentation with explicit completed, failed, unavailable, not-assessed, and partial coverage categories while preserving raw statuses and reasons.
+- Focused service tests (43), Worker tests (15), workflow audit, and UI production build passed. The UI build retains existing Ant Design module-directive and chunk-size warnings.
+
+### 2026-10-02 - Evaluation guardrails and live preflight
+- Added configuration-controlled evaluation mode for the Kavach source: `Testing` is frozen to `231bb41f7eb1b707e25113c258eb8d5c7356b743`, with one durable dispatch budget, pause support, deterministic source/SHA/tooling/profile idempotency, and uncertain-dispatch recovery without repeat dispatch.
+- Added Worker and reconciliation boundary enforcement, exact target-SHA launch resolution, bounded activity cache headers, provenance fields, and finding-level observation provenance.
+- Live preflight confirmed GitHub authentication, GitHub core rate limit 4,994/5,000 remaining, R2 bucket `code-analysis-reports`, KV namespace `ANALYSIS_STATE`, and `temp-runs/` expiration after one day. No credentials or secret values were logged.
+- Focused service validation (75 tests), launcher validation (29 tests), workflow policy audit, Worker dry-run, and UI build passed. The full legacy service suite retains three pre-existing generated-workflow expectation failures unrelated to these changes; no upstream or remote deployment was modified.
 ### 2026-09-08 - Authenticated launch deployment: start
 - Synchronizing tested developer launch UI and trusted Worker/selection contracts from fork feature commit 87cf4f71.
 

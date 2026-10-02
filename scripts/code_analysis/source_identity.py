@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from scripts.code_analysis.github_service import api, gh, extract_zip, pages
-from scripts.code_analysis.hosted import target, write
+from scripts.code_analysis.hosted import load, target, write
 from scripts.code_analysis.hosted_pipeline import assemble
 
 
@@ -86,6 +86,11 @@ def main():
     report.update(tooling_sha=os.environ['TOOLING_SHA'], producer_run_attempt=attempt,
                   producer_artifact_bytes=artifact_bytes, source_boundary='isolated-tooling-v1')
     write(Path('.hosted/output/report/report.json'), report)
+    from scripts.code_analysis.threat_report import enrich, markdown
+    snapshot = load(Path('.hosted/output/snapshot.json'))
+    threat = enrich(snapshot, validated, report)
+    write(Path('.hosted/output/report/threat-report.json'), threat)
+    Path('.hosted/output/report/threat-report.md').write_text(markdown(threat), encoding='utf-8')
     Path('.hosted/output/report').rename('.hosted/report')
 
 

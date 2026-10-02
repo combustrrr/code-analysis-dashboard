@@ -160,3 +160,21 @@ test('project connection verification uses current project identity and both wor
  const revoked=configuredHelpers({'user/installations?per_page=100&page=1':{installations:[]}});
  await assert.rejects(()=>applicationApi(new Request('https://worker.example'+path),env,{token:'test'},revoked),e=>e.status===403);
 });
+
+test('evaluation launch freezes the branch SHA and consumes one durable dispatch budget',async()=>{
+ const source={id:1267340546,full_name:'ARYDESTROYER/Kavach-AgenticSOC',private:false,default_branch:'Testing'};
+ const projectConfig={schema_version:'analysis-projects-v1',execution_repository:{id:1},tooling_sha:'a'.repeat(40),projects:[{id:'1',source_repository:{id:1267340546,full_name:source.full_name},profile:{mode:'portable'},preferred_branch:'Testing',enabled_scanners:['semgrep'],deferred_channels:{}}]};
+ const blob={content:Buffer.from(JSON.stringify(projectConfig)).toString('base64')};
+ const state={store:new Map(),async get(key,format){const value=this.store.get(key);return format==='json'&&value?JSON.parse(value):value||null;},async put(key,value){this.store.set(key,value);}};
+ const h=helpers({'repos/owner/repo':{...repo},['repos/'+source.full_name]:source,['repos/'+source.full_name+'/branches/Testing']:{commit:{sha:'c'.repeat(40)}},['repos/owner/repo/contents/.github/code-analysis/projects.json?ref=main']:blob,['repos/owner/repo/releases']:[{id:9,tag_name:'analysis-requests'}],['repos/owner/repo/releases/9/assets']:[],['repos/owner/repo/actions/workflows/code-analysis-reconcile.yml/dispatches']:{workflow_run_id:77}});
+ h.pages=async path=>path.endsWith('/releases')?[{id:9,tag_name:'analysis-requests'}]:path.endsWith('/assets')?[]:[];
+ const evaluationEnv={...env,EVALUATION_MODE:'true',EVALUATION_SOURCE_REPOSITORY:source.full_name,EVALUATION_TARGET_BRANCH:'Testing',ANALYSIS_STATE:state};
+ const originalFetch=globalThis.fetch; globalThis.fetch=async url=>String(url).includes('uploads.github.com')?new Response('{}',{status:201}):originalFetch(url);
+ try {
+  const first=await applicationApi(request('/api/project-launch',{repository:'owner/repo',project_id:'1',kind:'branch',ref:'Testing'}),evaluationEnv,{token:'test'},h);
+  const firstBody=await first.json(); assert.equal(first.status,202); assert.match(firstBody.request_id,/^[a-f0-9-]{36}$/);
+  const second=await applicationApi(request('/api/project-launch',{repository:'owner/repo',project_id:'1',kind:'branch',ref:'Testing'}),evaluationEnv,{token:'test'},h);
+  assert.equal(second.status,202); assert.equal((await second.json()).request_id,firstBody.request_id);
+  assert.equal(h.calls.filter(call=>call.path.endsWith('/dispatches')).length,1);
+ } finally { globalThis.fetch=originalFetch; }
+});

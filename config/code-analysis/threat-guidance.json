@@ -1,0 +1,104 @@
+{
+  "schema_version": "threat-guidance-v1",
+  "catalog_version": "2026.10.0",
+  "categories": ["security", "dependency", "infrastructure", "quality", "reliability", "advisory", "unknown"],
+  "severities": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "UNKNOWN"],
+  "rules": {
+    "hardcoded-secret": {
+      "category": "security",
+      "title": "Potential secret exposed in source",
+      "summary": "A scanner identified text that may contain a credential or other sensitive secret.",
+      "impact": "If the value is active, unauthorized users could access the associated system or data.",
+      "remediation_steps": [
+        "Revoke or rotate the exposed credential using the owning provider.",
+        "Remove the secret from source and replace it with an approved secret store or runtime binding.",
+        "Check repository history and deployment logs for other exposed copies."
+      ],
+      "references": ["https://owasp.org/www-community/vulnerabilities/Use_of_hard-coded_password"]
+    },
+    "default-security": {
+      "category": "security",
+      "title": "Security condition requires review",
+      "summary": "A security scanner identified a condition that may weaken confidentiality, integrity, or availability.",
+      "impact": "The practical impact depends on reachable code, inputs, deployment configuration, and available controls.",
+      "remediation_steps": [
+        "Inspect the exact source location and trace relevant inputs and callers.",
+        "Apply the scanner or rule documentation guidance after confirming the runtime context.",
+        "Add or update a regression test covering the corrected behavior."
+      ],
+      "references": ["https://owasp.org/www-project-top-ten/"]
+    },
+    "default-dependency": {
+      "category": "dependency",
+      "title": "Dependency or component requires review",
+      "summary": "A dependency scanner identified a package or component that may need attention.",
+      "impact": "Impact depends on whether the component is deployed, reachable, and affected by the reported condition.",
+      "remediation_steps": [
+        "Confirm the dependency is used in the deployed artifact and identify the affected path.",
+        "Upgrade to a reviewed fixed version or apply the vendor mitigation.",
+        "Re-run dependency tests and verify the lockfile and generated artifacts."
+      ],
+      "references": ["https://owasp.org/www-project-dependency-check/"]
+    },
+    "default-infrastructure": {
+      "category": "infrastructure",
+      "title": "Infrastructure configuration requires review",
+      "summary": "An infrastructure or container rule identified a configuration that may be unsafe or fragile.",
+      "impact": "The condition may increase attack surface or cause insecure deployment behavior if reachable in production.",
+      "remediation_steps": [
+        "Confirm the affected resource and its production exposure.",
+        "Apply the least-privilege or hardened configuration recommended by the rule.",
+        "Validate the deployment plan and repeat the infrastructure scan."
+      ],
+      "references": ["https://owasp.org/www-project-top-ten/2017/A6_2017-Security_Misconfiguration"]
+    },
+    "default-quality": {
+      "category": "quality",
+      "title": "Code quality condition requires review",
+      "summary": "A code-quality scanner identified a maintainability, correctness, or style condition.",
+      "impact": "The condition can increase defect risk or make future changes harder to review and test.",
+      "remediation_steps": [
+        "Confirm the finding reflects the intended behavior rather than an accepted project pattern.",
+        "Refactor the smallest safe unit and preserve the existing behavior with tests.",
+        "Re-run the relevant quality checks before publishing the change."
+      ],
+      "references": []
+    },
+    "default-reliability": {
+      "category": "reliability",
+      "title": "Reliability signal requires review",
+      "summary": "A reliability or runtime-evidence check identified a condition worth investigating.",
+      "impact": "The condition may contribute to failures, unsafe edge cases, or reduced operational confidence.",
+      "remediation_steps": [
+        "Reproduce or validate the condition with the relevant test or runtime evidence.",
+        "Correct the failure path and add coverage for the observed edge case.",
+        "Repeat the check against the exact analyzed revision."
+      ],
+      "references": []
+    },
+    "default-advisory": {
+      "category": "advisory",
+      "title": "Analysis advisory requires review",
+      "summary": "An advisory source provided a recommendation or observation for developer review.",
+      "impact": "The impact is context-dependent and is not independently confirmed by this report.",
+      "remediation_steps": [
+        "Review the supporting observation and exact source context.",
+        "Validate the recommendation against project requirements and tests.",
+        "Record the decision if the recommendation is intentionally not applied."
+      ],
+      "references": []
+    },
+    "default-unknown": {
+      "category": "unknown",
+      "title": "Finding requires developer review",
+      "summary": "The available scanner metadata does not identify a more specific guidance category.",
+      "impact": "Potential impact cannot be classified reliably from the retained evidence alone.",
+      "remediation_steps": [
+        "Inspect the scanner message, rule documentation, and exact source location.",
+        "Determine whether the condition affects production behavior or security posture.",
+        "Add a regression test or document the accepted risk before closing the finding."
+      ],
+      "references": []
+    }
+  }
+}

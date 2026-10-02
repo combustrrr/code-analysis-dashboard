@@ -71,6 +71,10 @@ scanner-overlap filters, plus free-text search and Clear filters. Multiple scann
 means supporting scanner families, not proof of a shared root cause. Overview
 shortcuts and target changes clear unrelated filters.
 
+The Threat Report view adds deterministic catalog explanations, potential impact,
+remediation steps, coverage limitations, private links, JSON/Markdown downloads, and
+print-to-PDF output without changing the underlying scanner evidence.
+
 Connections verifies the selected project identity, current App access and both
 execution workflows. A successful connection check does not imply complete scanner
 evidence. Repositories allows scan users to inspect projects; administrator access

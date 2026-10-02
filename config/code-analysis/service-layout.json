@@ -6,7 +6,8 @@
     "contracts": [
       "config/code-analysis/required-channels.json",
       "config/code-analysis/proposal-tool-catalog.json",
-      "config/code-analysis/service.json"
+      "config/code-analysis/service.json",
+      "config/code-analysis/threat-guidance.json"
     ],
     "ingestion_adapters": [
       "scripts/code_analysis/normalizer.py",
@@ -17,7 +18,8 @@
     ],
     "domain": [
       "scripts/code_analysis/monitoring.py",
-      "scripts/code_analysis/hosted.py"
+      "scripts/code_analysis/hosted.py",
+      "scripts/code_analysis/threat_report.py"
     ],
     "application": [
       "scripts/code_analysis/evidence_contract.py",
@@ -41,6 +43,8 @@
       "scripts/code_analysis/dashboard.py",
       "config/code-analysis/templates/dashboard.html",
       "analysis-ui/src/main.tsx",
+      "analysis-ui/src/ThreatReport.tsx",
+      "analysis-ui/src/repositoryReports.ts",
       "analysis-ui/src/style.css",
       "analysis-ui/src/AnalysisLauncher.tsx",
       "analysis-ui/src/useLaunchAuth.ts"

@@ -120,7 +120,7 @@ test('exact request status remains confined to the configured discovery workflow
 test('allowlisted reports require authentication before any report fetch',async t=>{
  const calls=t.mock.method(globalThis,'fetch',()=>{throw new Error('No upstream access expected');});
  const restricted={...env,APPLICATION_MODE:'repositories',DASHBOARD_ACCESS:'allowlist',DASHBOARD_ALLOWED_USERS:'combustrrr'};
- for(const path of ['projects','manifest','asset']){
+  for(const path of ['projects','manifest','asset','threat-report']){
   const r=await worker.fetch(new Request('https://launcher.example/api/public/'+path+'?repository=host/scanners&project_id=1',{headers:{Origin:env.DASHBOARD_ORIGIN}}),restricted);
   assert.equal(r.status,401);assert.equal(r.headers.get('Cache-Control'),'private, no-store');
  }

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import hashlib
 import os
 from pathlib import Path
 import tempfile
@@ -13,6 +14,7 @@ from scripts.code_analysis import github_service as github, release_manifest
 from scripts.code_analysis.hosted import analysis_key, reconcile, now, accept
 from scripts.code_analysis.projects import validate, service_config, native_feedback_allowed
 from scripts.code_analysis.report_assets import shard
+from scripts.code_analysis.evaluation import can_dispatch, consume, idempotency_key, profile_digest
 
 WORKFLOW = '.github/workflows/code-analysis-source.yml'
 
@@ -72,7 +74,12 @@ def report_publication(config, state, report_release, document=None):
                         latest = github.resolve_selection(config, row['head_sha'], [])
                     if latest is None or not accept(latest, report):
                         raise ValueError('Target changed before publication')
-                    documents = {p.relative_to(destination).as_posix():json.loads(p.read_text(encoding='utf-8')) for p in destination.rglob('*.json')}
+                    documents = {}
+                    for p in destination.rglob('*'):
+                        if p.suffix == '.json':
+                            documents[p.relative_to(destination).as_posix()] = json.loads(p.read_text(encoding='utf-8'))
+                        elif p.suffix == '.md':
+                            documents[p.relative_to(destination).as_posix()] = p.read_text(encoding='utf-8')
                     manifest, blobs = shard(documents)
                     pending.update(blobs)
                     entry.update(documents=manifest['documents'], assets=manifest['assets'],
@@ -135,8 +142,9 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             intent = json.loads(github.gh('api',f"repos/{repository}/releases/assets/{queued_asset['id']}",'-H','Accept: application/octet-stream',binary=True))
             if intent.get('schema_version')!='analysis-request-v1' or intent.get('execution_repository_id')!=repo['id'] or not any(p['id']==intent.get('project_id') for p in document['projects']):
                 raise ValueError('Queued request identity is invalid or project was removed')
-            project_id, selection, request_id = intent['project_id'], json.dumps(intent['selection']), intent['request_id']
+            project_id, selection, request_id = intent['project_id'], json.dumps(intent.get('requested_selection') or intent['selection']), intent['request_id']
     template = json.loads((Path(__file__).resolve().parents[2] / 'config/code-analysis/service.json').read_text(encoding='utf-8-sig'))
+    evaluation = template.get('evaluation', {})
     runs = github.pages(f'repos/{repository}/actions/workflows/code-analysis-source.yml/runs', 'workflow_runs')
     running = sum(run['status'] != 'completed' for run in runs)
     by_id = {run['id']:run for run in runs}
@@ -169,6 +177,15 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         state.update(project_id=project['id'], source_repository=source['full_name'],
                      analysis_repository=repository, relationship=project['relationship'],
                      preferred_branch=project['preferred_branch'])
+        evaluation_enabled = bool(evaluation.get('enabled')) and source['full_name'].lower() == str(evaluation.get('source_repository', '')).lower()
+        if evaluation_enabled:
+            state.setdefault('evaluation_mode', True)
+            state.setdefault('evaluation_target_sha', None)
+            state.setdefault('evaluation_dispatches_used', 0)
+            state.setdefault('evaluation_paused', bool(evaluation.get('paused', False)))
+            state.setdefault('evaluation_dispatch_budget', int(evaluation.get('dispatch_budget', 1)))
+            if evaluation.get('paused'):
+                state['evaluation_paused'] = True
         if selection and project['id'] == project_id and request_id != old.get('last_request_id'):
             github.request_refresh(state, selected['id'])
             state['last_request_id'] = request_id
@@ -177,6 +194,10 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         state['targets'].sort(key=lambda row: not row.get('manual_refresh',False))
         project_dispatches = 0
         for row in state['targets']:
+            if evaluation_enabled and selection and project['id'] == project_id:
+                if row.get('branch') != evaluation.get('target_branch'):
+                    state['evaluation_error'] = f"Evaluation only accepts the frozen {evaluation.get('target_branch')} branch."
+                    continue
             key = analysis_key(row, document['tooling_sha'], config)
             if row.get('analysis_key') != key:
                 row.update(analysis_key=key,status='queued')
@@ -187,9 +208,31 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                     row.update(scan_run_id=run['id'],run_attempt=run['run_attempt'],
                                status='collected' if run['status']=='completed' else 'scanning',run_conclusion=run['conclusion'])
                 continue  # Never retry a dispatch with an uncertain outcome.
-            if running >= 2 or (len(projects)>1 and project_dispatches>=1):
+            if running >= (1 if evaluation_enabled else 2) or (not evaluation_enabled and len(projects)>1 and project_dispatches>=1):
                 continue
-            row.update(profile_mode='portable' if project['profile'].get('mode') == 'portable' else 'agentic-soc', project_id=project['id'],request_id=uuid.uuid4().hex,status='dispatching',
+            if evaluation_enabled:
+                # Evaluation dispatches are request-driven and consume their budget before
+                # the external dispatch. Reconciliation can recover this request, but never
+                # infer that an uncertain dispatch was absent and issue another one.
+                if not selection or project['id'] != project_id:
+                    continue
+                if not state.get('evaluation_target_sha'):
+                    state['evaluation_target_sha'] = row.get('head_sha')
+                allowed, reason = can_dispatch(state, row.get('head_sha'))
+                if not allowed:
+                    state['evaluation_error'] = reason
+                    continue
+                scanner_digest = profile_digest(project)
+                evaluation_key = idempotency_key(source['full_name'], row['head_sha'], document['tooling_sha'], scanner_digest)
+                duplicate = next((candidate for candidate in state['targets'] if candidate.get('evaluation_idempotency_key') == evaluation_key), None)
+                if duplicate:
+                    continue
+                request_id = hashlib.sha256(evaluation_key.encode()).hexdigest()[:32]
+                row['evaluation_idempotency_key'] = evaluation_key
+                state.update(consume(state, request_id, evaluation_key))
+            else:
+                request_id = uuid.uuid4().hex
+            row.update(profile_mode='portable' if project['profile'].get('mode') == 'portable' else 'agentic-soc', project_id=project['id'],request_id=request_id,status='dispatching',
                        tooling_sha=document['tooling_sha'], execution_sha=execution_sha)
             row.pop('manual_refresh',None)
             release_manifest.write(config,release,state)

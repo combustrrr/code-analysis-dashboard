@@ -19,3 +19,5 @@
 /* Header readability adjustments */
 .topbar span{color:#dce8f5}
 [data-theme=light] .topbar span{color:#eef2f7}
+ .threat-report{display:grid;gap:16px}.report-actions{justify-content:flex-end}.threat-summary{margin:0}.threat-finding{break-inside:avoid}.threat-finding a{display:block;overflow-wrap:anywhere}.threat-identity code{overflow-wrap:anywhere}
+@media print{body{background:#fff!important;color:#000!important}.ant-layout-header,.ant-tabs-nav,.report-actions,button,.ant-btn,.ant-alert-close-icon{display:none!important}.threat-report{display:block}.threat-report>*{margin-bottom:18px}.threat-finding{break-inside:avoid;border:1px solid #aaa!important;box-shadow:none!important}.threat-report a{color:#000;text-decoration:underline}.threat-report code{color:#000}}
