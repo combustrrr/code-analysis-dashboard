@@ -17,7 +17,7 @@ permissions:
   contents: read
 concurrency:
   group: scanner-diagnostics
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   identity:
     runs-on: ubuntu-latest

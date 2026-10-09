@@ -21,7 +21,11 @@ def generate(config=None):
     inputs = {k: {'required': True, 'type': 'string'} for k in ('target', 'tooling_sha', 'request_id')}
     document = {'name': 'Exact Source Analysis', 'run-name': 'Source analysis ${{ inputs.request_id }}',
                 'on': {'workflow_dispatch': {'inputs': inputs}}, 'permissions': {'contents': 'read'},
-                'concurrency': {'group': 'source-${{ fromJSON(inputs.target).id }}', 'cancel-in-progress': True}, 'jobs': {}}
+                 # Every explicit launch gets its own producer artifact.  A
+                 # newer request may supersede the dashboard target, but it
+                 # must not cancel the earlier run before its evidence/report
+                 # artifact is assembled.
+                 'concurrency': {'group': 'source-${{ fromJSON(inputs.target).id }}', 'cancel-in-progress': False}, 'jobs': {}}
     jobs = document['jobs']
     jobs['identity'] = {'runs-on': 'ubuntu-latest', 'timeout-minutes': 5,
         'outputs': {'jobs': '${{ steps.identity.outputs.jobs }}', 'languages': '${{ steps.identity.outputs.languages }}'},
