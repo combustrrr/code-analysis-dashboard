@@ -65,6 +65,22 @@ class TrustedBootstrapTests(unittest.TestCase):
 
 
 class PublicationRecoveryTests(unittest.TestCase):
+    def test_completed_report_artifact_recovers_lost_dispatch_receipt(self):
+        from scripts.code_analysis.repository_service import recover_completed_producer_run
+        row = {'request_id': 'request', 'execution_sha': 'a' * 40}
+        runs = [{
+            'id': 42, 'path': '.github/workflows/code-analysis-source.yml',
+            'head_sha': 'a' * 40, 'status': 'completed', 'run_attempt': 1,
+            'created_at': '2026-10-09T17:00:00Z',
+        }]
+        with patch('scripts.code_analysis.repository_service.github.pages', return_value=[
+            {'name': 'hosted-report-42-1', 'expired': False},
+        ]):
+            self.assertEqual(
+                recover_completed_producer_run({'analysis_repository': 'owner/repo'}, row, runs),
+                runs[0],
+            )
+
     def test_native_buckets_preserve_all_results_and_have_stable_categories(self):
         from scripts.code_analysis.native_feedback import security_shards
         import gzip, base64, json

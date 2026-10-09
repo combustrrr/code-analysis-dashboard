@@ -53,6 +53,39 @@ def recover_expired_evidence(config, row):
     return True
 
 
+def recover_completed_producer_run(config, row, runs):
+    """Recover a completed producer whose dispatch receipt was lost.
+
+    GitHub can accept a workflow dispatch while the state-release write is
+    being retried.  In that window the producer still creates a durable,
+    exact-named report artifact, but the next reconciliation has no
+    ``scan_run_id`` to follow.  Match only completed source-workflow runs for
+    the exact execution SHA and require the canonical report artifact before
+    associating one with the target.
+    """
+    execution_sha = row.get('execution_sha')
+    if not execution_sha or row.get('request_id') is None:
+        return None
+    candidates = sorted(
+        (run for run in runs
+         if run.get('status') == 'completed'
+         and run.get('path') == WORKFLOW
+         and run.get('head_sha') == execution_sha),
+        key=lambda run: (run.get('created_at', ''), run.get('id', 0)),
+        reverse=True,
+    )
+    for run in candidates:
+        attempt = run.get('run_attempt', 1)
+        expected = f"hosted-report-{run['id']}-{attempt}"
+        artifacts = github.pages(
+            f"repos/{config['analysis_repository']}/actions/runs/{run['id']}/artifacts",
+            'artifacts',
+        )
+        if any(a.get('name') == expected and not a.get('expired') for a in artifacts):
+            return run
+    return None
+
+
 def report_publication(config, state, report_release, document=None):
     """Publish all active targets together, then remove unreferenced assets."""
     previous = release_manifest.read(config, report_release)
@@ -230,7 +263,9 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                 row.update(analysis_key=key,status='queued')
                 row.pop('request_id',None); row.pop('scan_run_id',None)
             if row.get('request_id'):
-                run = by_id.get(row.get('scan_run_id')) or by_nonce.get('Source analysis ' + row['request_id'])
+                run = (by_id.get(row.get('scan_run_id'))
+                       or by_nonce.get('Source analysis ' + row['request_id'])
+                       or recover_completed_producer_run(config, row, runs))
                 if run and run['head_sha'] == row.get('execution_sha'):
                     row.update(scan_run_id=run['id'],run_attempt=run['run_attempt'],
                                status='collected' if run['status']=='completed' else 'scanning',run_conclusion=run['conclusion'])
