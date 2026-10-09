@@ -40,7 +40,7 @@ upstream/target pair and the service has no non-mutating conflict-analysis bound
 ## Recent maintenance
 
 The source-analysis pipeline now uses an immutable artifact-first workflow revision
-(`747980e9451b9e28c558968f52536fcf4cc3b18e`). Source runs no longer cancel an
+(`df50ec7a8c40ea29818e65be5cc43ea0086ab5fb`). Source runs no longer cancel an
 earlier explicit launch for the same target, scanner jobs publish GitHub artifacts
 instead of attempting source-side R2 uploads, and the report job always assembles
 `hosted-report-{workflow_run_id}-{run_attempt}` after identity validation. The
