@@ -64,6 +64,7 @@ class ProjectTests(unittest.TestCase):
 class AssetTests(unittest.TestCase):
     def test_shards_round_trip_and_integrity(self):
         documents = {f'details/{i}.json': {'value': str(i) * 20} for i in range(20)}
+        documents['threat-report.md'] = '# Threat report\n'
         manifest, assets = shard(documents, asset_limit=120)
         self.assertGreater(len(assets), 1)
         recovered = {}

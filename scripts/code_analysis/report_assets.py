@@ -14,7 +14,8 @@ def safe_path(name: str) -> bool:
         return False
     path = PurePosixPath(name)
     return (bool(name) and not path.is_absolute() and '..' not in path.parts
-            and '\\' not in name and ':' not in name and name == path.as_posix() and name.endswith('.json'))
+            and '\\' not in name and ':' not in name and name == path.as_posix()
+            and path.suffix in {'.json', '.md'})
 
 
 def encode(documents: dict) -> bytes:
