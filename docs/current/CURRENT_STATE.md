@@ -48,6 +48,13 @@ reconciler is triggered by source completion, scheduled recovery, or an explicit
 request; it recovers completed runs with a lost dispatch receipt by exact source SHA
 and canonical artifact name, then publishes the partial/current report to R2.
 
+The legacy scanner workflow files had been serialized with `true:` instead of the
+GitHub trigger key `'on':`, which made GitHub register push runs with zero jobs.
+Those triggers are repaired and the workflow audit now rejects that serialization.
+GitHub Pages was rebuilt successfully, and the Cloudflare Worker was redeployed as
+version `1328c287-6a7a-4670-9846-009883f31528`; its R2 bindings and origin-protected
+public configuration endpoint are live.
+
 Portable-profile detection and validation were moved into the dedicated
 `analysis-launcher/profile-policy.mjs` module; the former duplicate inline policy and
 dead code were removed from the application module. The UI lockfile now resolves the
