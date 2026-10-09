@@ -261,15 +261,16 @@ def scan(config: dict, refresh_target: str | None = None) -> None:
             if run:
                 row['scan_run_id'] = run['id']
                 row['run_attempt'] = run['run_attempt']
-                # A completed Actions run is not evidence of a usable producer
-                # report.  Keep failed runs visible and only enter collection when
-                # GitHub itself reports success; the collector performs the stricter
-                # artifact/schema checks below.
-                row['status'] = 'scanning' if run['status'] != 'completed' else ('collected' if run.get('conclusion') == 'success' else 'failed')
+                # The workflow conclusion includes optional scanner failures. A
+                # completed run is collectible when its exact producer handoff
+                # exists; the collector performs the stricter schema/evidence
+                # checks. Do not discard a valid partial report just because one
+                # scanner job failed.
+                row['status'] = 'scanning' if run['status'] != 'completed' else 'collected'
                 row['run_conclusion'] = run['conclusion']
             # A durable published report survives artifact expiry. If handoff
             # expired before publication, make the target discoverable for retry.
-            if run and run['status'] == 'completed' and run.get('conclusion') == 'success' and f"{run['id']}-{run['run_attempt']}" not in retained:
+            if run and run['status'] == 'completed' and f"{run['id']}-{run['run_attempt']}" not in retained:
                 if run['id'] not in artifact_cache:
                     artifact_cache[run['id']] = pages(f"repos/{host}/actions/runs/{run['id']}/artifacts", 'artifacts')
                 expected = f"hosted-report-{run['id']}-{run['run_attempt']}"
