@@ -150,7 +150,7 @@ def report_publication(config, state, report_release, document=None):
             if entry.get('native_feedback', {}).get('status') == 'security_processing':
                 from scripts.code_analysis.native_feedback import processing
                 try:
-                    entry['native_feedback'] = processing(repo, entry['native_feedback'])
+                    entry['native_feedback'] = processing(config['analysis_repository'], entry['native_feedback'])
                 except (ValueError, RuntimeError) as error:
                     entry['native_feedback']['processing_error'] = str(error)
             result['targets'].append(entry)
