@@ -101,6 +101,11 @@ class ReportTests(unittest.TestCase):
         self.assertIsNone(r['channels'][1]['findings'])
         service.validate_bundle(self.root / 'report', r)
 
+    def test_report_generation_timestamp_is_distinct_from_analysis_timestamp(self):
+        r = self.build()
+        self.assertEqual(r['generated_at'], snapshot()['generated_at'])
+        self.assertNotEqual(r['report_generation_timestamp'], r['generated_at'])
+
     def test_missing_hosted_detail_page_cannot_publish(self):
         report = self.build()
         (self.root / 'report/details/0.json').unlink()
@@ -179,6 +184,13 @@ class ReportTests(unittest.TestCase):
                 {'name': 'hosted-report-123-1', 'expired': False},
                 {'name': 'hosted-report-123-2', 'expired': True}]):
             with self.assertRaisesRegex(ValueError, 'missing or expired'):
+                service.collect({'analysis_repository': 'service/host'}, row, self.root)
+
+    def test_missing_exact_artifact_is_unavailable(self):
+        row = {**self.identity, 'scan_run_id': 123, 'tooling_sha': 'd' * 40, 'run_attempt': 2}
+        run = {'path': '.github/workflows/11-source-analysis.yml', 'head_sha': 'd' * 40, 'status': 'completed'}
+        with patch.object(service, 'api', return_value=run), patch.object(service, 'pages', return_value=[]):
+            with self.assertRaisesRegex(ValueError, r'exact producer report missing'):
                 service.collect({'analysis_repository': 'service/host'}, row, self.root)
 
 

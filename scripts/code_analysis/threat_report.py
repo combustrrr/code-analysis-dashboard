@@ -191,6 +191,8 @@ def enrich(snapshot: dict[str, Any], identity: dict[str, Any], report: dict[str,
         "pr": (report.get("target") or identity).get("pr"),
         "target_sha": report["analyzed_sha"],
         "analysis_timestamp": report["generated_at"],
+        "analysis_id": report.get("analysis_id") or (report.get("target") or identity).get("id"),
+        "report_generation_timestamp": report.get("report_generation_timestamp") or report["generated_at"],
         "tooling_sha": report.get("tooling_sha"),
         "generated_at": report["generated_at"],
         "guidance_catalog_version": catalog["catalog_version"],
@@ -218,6 +220,11 @@ def enrich(snapshot: dict[str, Any], identity: dict[str, Any], report: dict[str,
         ] + (["One or more analysis channels are incomplete or unavailable."] if incomplete else []),
         "metrics": {"findings_total": len(enriched), "findings_by_category": dict(Counter(r["category"] for r in enriched)), "findings_by_severity": dict(Counter(r["severity"] for r in enriched)), "advisories_total": sum("ai_advisory" in r["evidence_sources"] for r in enriched), "guidance_matched": matched["catalog"], "guidance_fallback": matched["fallback"]},
         "findings": enriched,
+        "scanner_evidence": [
+            {"finding_id": row.get("stable_id"), "scanner": row.get("supporting_scanner_families", []),
+             "observation_ids": row.get("observation_ids", []), "message": _text(row.get("message") or row.get("description"))}
+            for row in findings
+        ],
     }
     serialized = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     if len(serialized) > MAX_OUTPUT_BYTES:

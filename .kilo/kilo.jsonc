@@ -1,0 +1,13 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "indexing": {
+    "provider": "openai",
+    "model": "text-embedding-3-small",
+    "searchMinScore": 0.4,
+    "searchMaxResults": 40,
+    "scannerMaxBatchRetries": 3,
+    "embeddingBatchSize": 60,
+    "enabled": true,
+    "openai": {}
+  }
+}

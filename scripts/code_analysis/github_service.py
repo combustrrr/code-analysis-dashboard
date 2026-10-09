@@ -261,20 +261,29 @@ def scan(config: dict, refresh_target: str | None = None) -> None:
             if run:
                 row['scan_run_id'] = run['id']
                 row['run_attempt'] = run['run_attempt']
-                row['status'] = 'scanning' if run['status'] != 'completed' else 'collected'
+                # A completed Actions run is not evidence of a usable producer
+                # report.  Keep failed runs visible and only enter collection when
+                # GitHub itself reports success; the collector performs the stricter
+                # artifact/schema checks below.
+                row['status'] = 'scanning' if run['status'] != 'completed' else ('collected' if run.get('conclusion') == 'success' else 'failed')
                 row['run_conclusion'] = run['conclusion']
             # A durable published report survives artifact expiry. If handoff
             # expired before publication, make the target discoverable for retry.
-            if run and run['status'] == 'completed' and f"{run['id']}-{run['run_attempt']}" not in retained:
+            if run and run['status'] == 'completed' and run.get('conclusion') == 'success' and f"{run['id']}-{run['run_attempt']}" not in retained:
                 if run['id'] not in artifact_cache:
                     artifact_cache[run['id']] = pages(f"repos/{host}/actions/runs/{run['id']}/artifacts", 'artifacts')
-                expired = any(a['name'] == f"hosted-report-{run['id']}-{run['run_attempt']}" and a['expired']
-                              for a in artifact_cache[run['id']])
-                if expired:
+                expected = f"hosted-report-{run['id']}-{run['run_attempt']}"
+                matches = [a for a in artifact_cache[run['id']] if a.get('name') == expected]
+                usable = [a for a in matches if not a.get('expired')]
+                # Do not leave a completed run stuck in collection forever when
+                # its exact durable handoff was never produced.
+                if len(usable) != 1:
                     expired_runs.add(run['id'])
                     row.pop('request_id', None)
                     row.pop('scan_run_id', None)
-                    row.update(status='queued', retry_reason='Report handoff expired before durable publication')
+                    row.pop('run_attempt', None)
+                    row.update(status='queued', retry_reason=('Report handoff expired before durable publication'
+                                                              if matches else 'Report handoff was not produced'))
                 else:
                     continue
             else:
@@ -344,9 +353,15 @@ def collect(config: dict, row: dict, destination: Path) -> dict:
     if run['path'] != config.get('source_workflow', '.github/workflows/11-source-analysis.yml') or run['head_sha'] != row.get('execution_sha', row['tooling_sha']) or run['status'] != 'completed':
         raise ValueError('producer workflow identity mismatch')
     artifacts = pages(f'repos/{host}/actions/runs/{run_id}/artifacts', 'artifacts')
-    candidates = [a for a in artifacts if a['name'] == f"hosted-report-{run_id}-{row['run_attempt']}" and not a['expired']]
+    expected = f"hosted-report-{run_id}-{row['run_attempt']}"
+    candidates = [a for a in artifacts if a.get('name') == expected and not a.get('expired')]
     if len(candidates) != 1:
-        raise ValueError('exact producer report missing or expired')
+        # Keep the diagnostic actionable without logging artifact contents or
+        # credentials.  This distinguishes naming/attempt drift from expiry.
+        matching = [a for a in artifacts if a.get('name') == expected]
+        state = 'expired' if matching and all(a.get('expired') for a in matching) else 'missing'
+        raise ValueError(f'exact producer report missing or expired ({state}): expected={expected}; '
+                         f'available={len(artifacts)}; matching={len(matching)}')
     archive = gh('api', f"repos/{host}/actions/artifacts/{candidates[0]['id']}/zip", binary=True)
     extract_zip(archive, destination)
     report = load(destination / 'report.json')

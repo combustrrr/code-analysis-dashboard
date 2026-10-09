@@ -12,7 +12,7 @@ export type ThreatFinding = {
   uncertainty_notice?: boolean;
 };
 export type ThreatReportData = {
-  schema_version: string; report_id: string; immutable: boolean; source_repository?: string; ref?: string; pr?: number; target_sha: string; analysis_timestamp?: string; tooling_sha?: string; generated_at: string;
+  schema_version: string; report_id: string; analysis_id?: string; immutable: boolean; source_repository?: string; ref?: string; pr?: number; target_sha: string; analysis_timestamp?: string; report_generation_timestamp?: string; tooling_sha?: string; generated_at: string;
   guidance_catalog_version: string; generator_version: string; status: string; limitations: string[];
   coverage: { status: string; expected_channels: string[]; available_channels: string[]; incomplete_channels: string[]; positioning_statement?: string; summary?: Record<string, number>; channel_matrix?: Array<{ channel: string; name: string; raw_status: string; normalized_status: string; reason: string; finding_count: number | null }> };
   metrics: { findings_total: number; findings_by_category: Record<string, number>; findings_by_severity: Record<string, number>; advisories_total: number; guidance_matched: number; guidance_fallback: number };
@@ -58,9 +58,9 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
        <Typography.Paragraph>{report.coverage.positioning_statement}</Typography.Paragraph>
       <Typography.Paragraph><strong>What was analyzed:</strong> {report.source_repository || 'Unavailable'} · {report.ref || (report.pr ? `PR #${report.pr}` : 'exact commit')} · read-only analysis</Typography.Paragraph>
       <Typography.Paragraph><strong>Analyzed commit:</strong> <code>{report.target_sha || targetSha || 'Unavailable'}</code></Typography.Paragraph>
-      <Typography.Paragraph><strong>Analyzed:</strong> {new Date(report.analysis_timestamp || report.generated_at).toLocaleString()} · <strong>Status:</strong> <Tag>{report.status}</Tag></Typography.Paragraph>
+       <Typography.Paragraph><strong>Analyzed:</strong> {new Date(report.analysis_timestamp || report.generated_at).toLocaleString()} · <strong>Report generated:</strong> {new Date(report.report_generation_timestamp || report.generated_at).toLocaleString()} · <strong>Status:</strong> <Tag>{report.status}</Tag></Typography.Paragraph>
       <Typography.Paragraph><strong>Tooling:</strong> <code>{report.tooling_sha || 'Unavailable'}</code></Typography.Paragraph>
-      <Typography.Paragraph><strong>Report:</strong> <code>{report.report_id}</code> · <strong>Catalog:</strong> <code>{report.guidance_catalog_version}</code> · <strong>Generator:</strong> <code>{report.generator_version}</code></Typography.Paragraph>
+       <Typography.Paragraph><strong>Analysis:</strong> <code>{report.analysis_id || 'Unavailable'}</code> · <strong>Report:</strong> <code>{report.report_id}</code> · <strong>Catalog:</strong> <code>{report.guidance_catalog_version}</code> · <strong>Generator:</strong> <code>{report.generator_version}</code></Typography.Paragraph>
     </Card>
      <Row gutter={[12, 12]} className="threat-summary">
        <Col xs={12} md={6}><Card className="report-metric metric-findings"><Statistic title="Findings" value={report.metrics.findings_total} /></Card></Col>

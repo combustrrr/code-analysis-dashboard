@@ -107,6 +107,10 @@ def build(snapshot: dict, identity: dict, output: Path, *, producer_repository: 
             raise ValueError("invalid producer run")
         runs.append({"id": str(run), "url": f"https://github.com/{producer_repository}/actions/runs/{run}"})
     report = {"schema_version": "hosted-report-v1", "target": identity,
+              "analysis_id": identity.get("client_request_id") or identity.get("request_id") or identity.get("id"),
+              # The snapshot timestamp identifies analysis generation; this value
+              # is captured when the durable hosted envelope is assembled.
+              "report_generation_timestamp": now(),
               "analyzed_sha": snapshot["commit_sha"], "generated_at": snapshot["generated_at"],
               "tooling_sha": tooling_sha, "producer_runs": runs,
               "status": "partial" if incomplete else "current", "incomplete_channels": incomplete,

@@ -11,10 +11,16 @@ infrastructure, quality, reliability, advisory, and unknown findings.
 - Catalog-backed explanation, potential impact, and remediation steps
 - Scanner/AI evidence provenance and catalog/fallback guidance provenance
 - Coverage, incomplete-channel warnings, report identity, and limitations
+- Analysis request identity and report-generation timestamp
 
 Reports are generated during publication from the existing normalized canonical
 findings. The report layer does not rediscover or deduplicate findings. Guidance is
 advisory and does not generate or apply patches.
+
+Completed producer runs are collected only when the exact run/attempt handoff
+artifact is present and usable. Missing or expired handoffs are reported with the
+expected artifact identity and re-queued through the bounded recovery path instead
+of remaining indefinitely in collection.
 
 ## Identity and exports
 

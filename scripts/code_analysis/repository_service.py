@@ -63,6 +63,9 @@ def report_publication(config, state, report_release, document=None):
         project_dispatches = 0
         for row in state['targets']:
             entry = {**row}
+            entry['lifecycle_status'] = ('collecting' if row.get('status') == 'collected' else
+                                         'running' if row.get('status') == 'scanning' else
+                                         row.get('status', 'queued'))
             old = prior.get(row['id'], {})
             for key in ('documents', 'assets', 'analyzed_sha', 'collected_run', 'report_status', 'native_feedback'):
                 if key in old:
@@ -74,6 +77,7 @@ def report_publication(config, state, report_release, document=None):
             run_key = f"{row.get('scan_run_id')}-{row.get('run_attempt')}"
             native_upgrade = old.get('native_feedback', {}).get('reason', '').startswith('Native SARIF exceeds') and old.get('native_feedback', {}).get('adapter_version') != 2
             if row.get('status') == 'collected' and (old.get('collected_run') != run_key or native_upgrade):
+                entry['lifecycle_status'] = 'collecting'
                 try:
                     destination = Path(directory) / row['id']
                     report = github.collect(config, row, destination)
@@ -90,9 +94,11 @@ def report_publication(config, state, report_release, document=None):
                             documents[p.relative_to(destination).as_posix()] = p.read_text(encoding='utf-8')
                     manifest, blobs = shard(documents)
                     pending.update(blobs)
+                    entry['lifecycle_status'] = 'publishing'
                     entry.update(documents=manifest['documents'], assets=manifest['assets'],
                                  analyzed_sha=report['analyzed_sha'], collected_run=run_key,
                                  status=report['status'], report_status=report['status'])
+                    entry['lifecycle_status'] = 'completed_partial' if report['status'] == 'partial' else 'completed'
                     entry.pop('error', None)
                     if document is not None:
                         from scripts.code_analysis.native_feedback import publish
@@ -102,7 +108,7 @@ def report_publication(config, state, report_release, document=None):
                         except (ValueError, RuntimeError) as error:
                             entry['native_feedback'] = {'status':'failed', 'reason':str(error)}
                 except (ValueError, RuntimeError) as error:
-                    entry.update(status='failed', error=str(error))
+                    entry.update(status='failed', lifecycle_status='failed', error=str(error))
                     try:
                         if recover_expired_evidence(config, row):
                             entry['recovery_reason'] = row['recovery_reason']
