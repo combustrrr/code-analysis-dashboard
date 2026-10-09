@@ -1,6 +1,6 @@
 name: Code Analysis Dashboard
 run-name: "Dashboard \xB7 ${{ inputs.scan_branch }} \xB7 ${{ inputs.scan_sha }}"
-true:
+'on':
   workflow_call:
     inputs:
       scan_branch:

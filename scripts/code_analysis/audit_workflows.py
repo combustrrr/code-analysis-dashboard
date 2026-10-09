@@ -169,6 +169,8 @@ def audit() -> list[str]:
         except yaml.YAMLError as exc:
             errors.append(f"{relative}: invalid YAML: {exc}")
             continue
+        if "true" in document or True in document:
+            errors.append(f"{relative}: trigger key was serialized as boolean true; quote 'on'")
         if not isinstance(document, dict) or not isinstance(document.get("jobs"), dict):
             errors.append(f"{relative}: workflow must contain a jobs mapping")
             continue

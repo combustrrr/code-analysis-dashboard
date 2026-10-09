@@ -16,7 +16,7 @@
     "DASHBOARD_ACCESS": "collaborators",
     "GITHUB_OAUTH_SCOPES": "public_repo",
     "TOOLING_FROM_SERVICE": "true",
-    "TOOLING_SHA": "a0dcd02062a1dbfc24d085fcaea71e36b3ba3512",
+    "TOOLING_SHA": "df50ec7a8c40ea29818e65be5cc43ea0086ab5fb",
     "EVALUATION_MODE": "true",
     "EVALUATION_SOURCE_REPOSITORY": "ARYDESTROYER/Kavach-AgenticSOC",
     "EVALUATION_TARGET_BRANCH": "Testing",

@@ -1,5 +1,5 @@
 name: API Fuzzing & Reliability
-true:
+'on':
   workflow_dispatch: null
 permissions:
   contents: read

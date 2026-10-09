@@ -1,7 +1,7 @@
 name: Codex Security
 run-name: "Codex Security \xB7 ${{ inputs.scan_branch || github.head_ref || github.ref_name }} \xB7 ${{ inputs.scan_sha ||\
   \ github.event.pull_request.head.sha || github.sha }}"
-true:
+'on':
   workflow_dispatch:
     inputs:
       scan_sha:

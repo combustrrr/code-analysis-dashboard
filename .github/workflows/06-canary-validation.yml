@@ -1,5 +1,5 @@
 name: Canary Coverage Validation
-true:
+'on':
   workflow_dispatch: null
   push:
     branches:
