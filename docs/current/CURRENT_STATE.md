@@ -39,6 +39,15 @@ upstream/target pair and the service has no non-mutating conflict-analysis bound
 
 ## Recent maintenance
 
+The source-analysis pipeline now uses an immutable artifact-first workflow revision
+(`747980e9451b9e28c558968f52536fcf4cc3b18e`). Source runs no longer cancel an
+earlier explicit launch for the same target, scanner jobs publish GitHub artifacts
+instead of attempting source-side R2 uploads, and the report job always assembles
+`hosted-report-{workflow_run_id}-{run_attempt}` after identity validation. The
+reconciler is triggered by source completion, scheduled recovery, or an explicit
+request; it recovers completed runs with a lost dispatch receipt by exact source SHA
+and canonical artifact name, then publishes the partial/current report to R2.
+
 Portable-profile detection and validation were moved into the dedicated
 `analysis-launcher/profile-policy.mjs` module; the former duplicate inline policy and
 dead code were removed from the application module. The UI lockfile now resolves the
