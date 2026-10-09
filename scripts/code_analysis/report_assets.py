@@ -7,6 +7,8 @@ import json
 from pathlib import PurePosixPath
 
 ASSET_LIMIT = 100_000_000
+DOCUMENT_UNPACKED_LIMIT = 64_000_000
+BATCH_UNPACKED_LIMIT = 64_000_000
 
 
 def safe_path(name: str) -> bool:
@@ -48,12 +50,12 @@ def shard(documents: dict, *, asset_limit: int = 4_000_000) -> tuple[dict, dict]
         if not safe_path(path):
             raise ValueError('Unsafe report document path')
         raw_bytes=len(json.dumps({path:value}, ensure_ascii=False, allow_nan=False).encode())
-        if raw_bytes>16_000_000:
+        if raw_bytes > DOCUMENT_UNPACKED_LIMIT:
             raise ValueError('Report document exceeds unpacked delivery limit; paginate producer output')
         size=len(encode({path:value}))
         if size>asset_limit:
             raise ValueError('Report detail exceeds asset limit; paginate producer output')
-        if current and (estimated+size>asset_limit or unpacked+raw_bytes>24_000_000):
+        if current and (estimated + size > asset_limit or unpacked + raw_bytes > BATCH_UNPACKED_LIMIT):
             emit(current);current={};estimated=0;unpacked=0
         current[path]=value;estimated+=size;unpacked+=raw_bytes
     emit(current)
