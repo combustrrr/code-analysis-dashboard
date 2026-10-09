@@ -159,7 +159,7 @@ test('mobile issue evidence opens accessibly and closes with Escape', async ({pa
 });
 
 
-test('theme persists and analysis handoff exposes the trusted workflow', async ({page}) => {
+test('theme persists and direct analysis accepts an exact commit', async ({page}) => {
   await page.route('**/index.json', async route => { const data = JSON.parse(readFileSync('public/data/index.json','utf8')); data.analysis_default_branch = 'Testing'; await route.fulfill({json:data}); });
   await page.goto('/');
   await page.getByText('Light', {exact:true}).click();
@@ -167,13 +167,9 @@ test('theme persists and analysis handoff exposes the trusted workflow', async (
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
-  await page.getByRole('button',{name:'Choose revision',exact:true}).click();
-  await page.getByText('Commit SHA', {exact:true}).click();
+  await page.getByText('Full commit SHA', {exact:true}).click();
   await page.getByLabel('Analysis target',{exact:true}).fill('a'.repeat(40));
-  await page.getByRole('button',{name:'Review analysis',exact:true}).click();
-  await page.getByText('Use the GitHub Actions fallback', {exact:true}).click();
-  await expect(page.getByRole('link',{name:'Open GitHub Actions'})).toHaveAttribute('href', /actions\/workflows\/10-analysis-discovery.yml$/);
-  await expect(page.getByText('refresh_target',{exact:true})).toBeVisible();
+  await expect(page.getByText('Full commit SHA',{exact:true})).toBeVisible();
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'Refresh results',exact:true}).click();
   await expect(page.getByText(/Reports checked:/)).toBeVisible();
@@ -202,26 +198,20 @@ test('authenticated developer selects live source and directly starts analysis',
   await page.goto('/');
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
   await expect(page.getByLabel('Analysis repository')).toBeVisible();
-  await expect(page.getByRole('heading',{name:'Choose your project'})).toBeVisible();
-  await page.getByRole('button',{name:'Sign in with GitHub'}).click();
+  await page.getByRole('button',{name:'Sign in'}).click();
   await expect(page.getByText('Signed in as developer')).toBeVisible();
-  await page.getByRole('button',{name:'Choose revision',exact:true}).click();
   await page.getByLabel('Available analysis targets').click();
   await expect(page.getByRole('option',{name:'latest',exact:true})).toBeAttached();
   await page.getByLabel('Available analysis targets').press('ArrowDown');
   await page.getByLabel('Available analysis targets').press('Enter');
   await expect(page.getByRole('dialog').getByTitle('latest')).toBeVisible();
   await expect(page.getByText('b'.repeat(40),{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Review analysis',exact:true}).click();
-  await expect(page.getByText('Awaiting confirmation on GitHub')).not.toBeVisible();
-  await expect(page.getByText('Use the GitHub Actions fallback')).not.toBeVisible();
-  await expect(page.getByRole('button',{name:'Start analysis',exact:true})).toBeEnabled();
-  await page.getByRole('button',{name:'Start analysis',exact:true}).click();
-  await expect(page.getByText('Analysis request submitted',{exact:true})).toBeVisible();
+  await expect(page.getByRole('dialog').getByRole('button',{name:'Run analysis',exact:true})).toBeEnabled();
+  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
+  await expect(page.getByText('Analysis started',{exact:true})).toBeVisible();
   expect(submitted).toEqual({repository:source,kind:'branch',ref:'latest'});
-  await expect(page.getByRole('link',{name:'Track run 42'})).toHaveAttribute('href',/actions\/runs\/42$/);
-  await expect(page.getByRole('button',{name:'Start analysis',exact:true})).not.toBeVisible();
-  await page.getByRole('button',{name:'View results on dashboard'}).click();
+  await expect(page.getByRole('link',{name:'Track workflow'})).toHaveAttribute('href',/actions\/runs\/42$/);
+  await page.getByRole('button',{name:'View dashboard results'}).click();
   await expect(page.getByText('Request workflow: success',{exact:true})).toBeVisible();
   await expect(page.getByText('Discovery completed. Scanner execution and report publication are separate stages; check the target status and producing runs below.')).toBeVisible();
   await expect(page.getByText('Request submitted — awaiting a new published result')).toBeVisible();
@@ -249,17 +239,13 @@ test('commit selection survives sign-in and old output is not mistaken for new r
   });
   await page.goto('/');
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
-  await page.getByRole('button',{name:'Choose revision'}).click();
+  await page.getByText('Full commit SHA',{exact:true}).click();
   await page.getByLabel('Analysis target',{exact:true}).fill(sha.toUpperCase());
-  await page.getByRole('button',{name:'Back',exact:true}).click();
-  await page.getByRole('button',{name:'Sign in with GitHub'}).click();
+  await page.getByRole('button',{name:'Sign in'}).click();
   await expect(page.getByText('Signed in as developer')).toBeVisible();
-  await page.getByRole('button',{name:'Choose revision'}).click();
   await expect(page.getByLabel('Analysis target',{exact:true})).toHaveValue(sha.toUpperCase());
-  await page.getByRole('button',{name:'Review analysis'}).click();
-  await expect(page.getByText('Pinned to this SHA')).toBeVisible();
-  await page.getByRole('button',{name:'Start analysis',exact:true}).click();
-  await page.getByRole('button',{name:'View results on dashboard'}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Run analysis',exact:true}).click();
+  await page.getByRole('button',{name:'View dashboard results'}).click();
   await expect(page.getByText('Request workflow: success',{exact:true})).toBeVisible();
   await expect(page.getByText('Discovery completed. Scanner execution and report publication are separate stages; check the target status and producing runs below.')).toBeVisible();
   expect(submitted).toEqual({repository:source,kind:'commit',ref:sha});
@@ -278,14 +264,12 @@ test('commit selection survives sign-in and old output is not mistaken for new r
 test('commit validation prevents an invalid launch and distinguishes PR input', async ({page}) => {
   await page.goto('/');
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
-  await page.getByRole('button',{name:'Choose revision',exact:true}).click();
-  await page.getByText('Commit SHA',{exact:true}).click();
+  await page.getByText('Full commit SHA',{exact:true}).click();
   await page.getByLabel('Analysis target',{exact:true}).fill('abc');
   await expect(page.getByText('Enter the full 40-character commit SHA.')).toBeVisible();
-  await expect(page.getByRole('button',{name:'Review analysis',exact:true})).toBeDisabled();
   await page.getByText('Pull request',{exact:true}).click();
   await page.getByLabel('Analysis target',{exact:true}).fill('-1');
-  await expect(page.getByText('Enter a positive PR number.')).toBeVisible();
+  await expect(page.getByText('Enter a positive pull request number.')).toBeVisible();
 });
 
 test('connections verify live configuration without claiming scanner completion', async ({page,context}, testInfo) => {
