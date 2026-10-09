@@ -131,7 +131,14 @@ def report_publication(config, state, report_release, document=None):
                               method='POST', data=path.read_bytes(), content_type='application/gzip')
         result['metrics'] = {'compressed_bytes':size,
                              'queued':sum(r['status']=='queued' for r in result['targets']),
-                             'scanning':sum(r['status']=='scanning' for r in result['targets'])}
+                             'scanning':sum(r['status']=='scanning' for r in result['targets']),
+                             'published':sum(r.get('lifecycle_status') in {'completed','completed_partial'} for r in result['targets']),
+                             'failed':sum(r.get('lifecycle_status') == 'failed' for r in result['targets']),
+                             # Include bounded, non-secret publication diagnostics
+                             # in the job summary so a failed handoff is not
+                             # indistinguishable from an empty report.
+                             'report_errors':[{'target_id':r.get('id'),'reason':r.get('error')}
+                                              for r in result['targets'] if r.get('error')][:20]}
         # Track a small bounded history of compressed storage usage for free-tier monitoring.
         history = previous.get('report_storage_history', [])
         try:
