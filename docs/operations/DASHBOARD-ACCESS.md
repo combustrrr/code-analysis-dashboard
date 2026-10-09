@@ -12,6 +12,13 @@ collaborator membership on every protected request. Missing App access or GitHub
 API failures deny access. The repository owner qualifies through the same check.
 Responses use private, no-store caching. View permission does not grant launch or
 repository configuration permission: existing write/admin checks still apply.
+The OAuth authorization request intentionally omits a `scope` parameter. The OAuth
+grant is used for sign-in identity (and legacy source-mode checks); repository-mode
+repository reads, collaborator checks, launches, and report access use the installed
+GitHub App token scoped to the configured execution repository. Do not infer broader
+OAuth access from a successful sign-in, and do not add scopes without reviewing the
+credential boundary and authorization flow.
+
 The UI loads reports only after session verification, polls access while visible,
 and clears in-memory reports on sign-out or denial. Refreshing requires sign-in.
 

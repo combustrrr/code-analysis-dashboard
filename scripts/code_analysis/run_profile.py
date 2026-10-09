@@ -11,13 +11,39 @@ from pathlib import Path
 
 from scripts.code_analysis.hosted import load, write
 
+SERVICE_CONFIG = Path(__file__).resolve().parents[2] / 'config/code-analysis/service.json'
+TASK_PROFILE_FIELDS = {
+    'python-install': ('python_root', 'python_requirements'),
+    'python-test': ('python_root', 'python_test_command'),
+    'javascript-install': ('javascript_root', 'javascript_install_command'),
+    'javascript-test': ('javascript_root', 'javascript_test_command'),
+    'api': ('python_root', 'api_command'),
+    'api-fuzz': ('python_root', 'api_command', 'openapi_url'),
+}
+
+
+def load_profile(task):
+    if not SERVICE_CONFIG.is_file():
+        raise SystemExit(f'Explicit service profile configuration is required: {SERVICE_CONFIG}')
+    try:
+        config = load(SERVICE_CONFIG)
+    except (OSError, ValueError) as error:
+        raise SystemExit(f'Unable to load explicit service profile configuration: {error}') from error
+    profile = config.get('profile') if isinstance(config, dict) else None
+    if not isinstance(profile, dict) or not profile:
+        raise SystemExit('Explicit service profile configuration is missing a non-empty profile')
+    missing = [field for field in TASK_PROFILE_FIELDS[task] if field not in profile]
+    if missing:
+        raise SystemExit(f'Explicit profile is missing required field(s) for {task}: {", ".join(missing)}')
+    return profile
+
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('task', choices=['python-install', 'python-test', 'javascript-install', 'javascript-test', 'api', 'api-fuzz'])
     p.add_argument('--source', type=Path, required=True)
     a = p.parse_args()
-    profile = load(Path(__file__).resolve().parents[2] / 'config/code-analysis/service.json')['profile']
+    profile = load_profile(a.task)
     root = a.source.resolve(strict=True)
     cwd = root / profile['javascript_root' if a.task.startswith('javascript') else 'python_root']
     if not cwd.resolve().is_relative_to(root):

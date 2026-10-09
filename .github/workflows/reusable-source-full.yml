@@ -43,10 +43,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
       SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     steps:
+    - name: Derive Sonar project identity
+      id: sonar-project
+      shell: bash
+      run: "set -euo pipefail\nIFS=/ read -r organization repository <<< \"$SOURCE_REPOSITORY\"\nif [[ -z \"$organization\"\
+        \ || -z \"$repository\" || \"$SOURCE_REPOSITORY\" != \"$organization/$repository\" ]]; then\n  echo \"SOURCE_REPOSITORY\
+        \ must be an owner/repository identity\" >&2\n  exit 1\nfi\nprintf \"organization=%s\nproject_key=%s_%s\n\
+        \" \"$organization\" \"$organization\" \"$repository\" >> \"$GITHUB_OUTPUT\""
     - name: Checkout exact scan commit
       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
@@ -141,8 +146,9 @@ jobs:
       continue-on-error: true
       uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f
       with:
-        args: -Dproject.settings=${{ runner.temp }}/analysis-tooling/sonar-project.properties ${{ github.event_name
-          == 'push' && format('-Dsonar.branch.name={0} -Dsonar.scm.revision={1}', steps.sonar-identity.outputs.sonar_branch,
+        args: -Dproject.settings=${{ runner.temp }}/analysis-tooling/sonar-project.properties -Dsonar.organization=${{
+          steps.sonar-project.outputs.organization }} -Dsonar.projectKey=${{ steps.sonar-project.outputs.project_key
+          }} ${{ github.event_name == 'push' && format('-Dsonar.branch.name={0} -Dsonar.scm.revision={1}', steps.sonar-identity.outputs.sonar_branch,
           github.sha) || '' }}
       env:
         SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
@@ -153,8 +159,9 @@ jobs:
       continue-on-error: true
       uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f
       with:
-        args: -Dproject.settings=${{ runner.temp }}/analysis-tooling/sonar-project.properties -Dsonar.branch.name=${{
-          steps.sonar-identity.outputs.sonar_branch }} -Dsonar.scm.revision=${{ fromJSON(inputs.target).head_sha
+        args: -Dproject.settings=${{ runner.temp }}/analysis-tooling/sonar-project.properties -Dsonar.organization=${{
+          steps.sonar-project.outputs.organization }} -Dsonar.projectKey=${{ steps.sonar-project.outputs.project_key
+          }} -Dsonar.branch.name=${{ steps.sonar-identity.outputs.sonar_branch }} -Dsonar.scm.revision=${{ fromJSON(inputs.target).head_sha
           }}
       env:
         SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
@@ -168,9 +175,10 @@ jobs:
         SCAN_SHA: ${{ fromJSON(inputs.target).head_sha }}
         PULL_REQUEST: ${{ github.event.pull_request.number }}
         SONAR_BRANCH: ${{ steps.sonar-identity.outputs.sonar_branch }}
+        SONAR_PROJECT_KEY: ${{ steps.sonar-project.outputs.project_key }}
       shell: bash
       run: "python $RUNNER_TEMP/analysis-tooling/scripts/code_analysis/export_sonar_issues.py \\\n  --report-task\
-        \ .scannerwork/report-task.txt \\\n  --output sonar-native-issues.json \\\n  --project combustrrr_Agentic-Kibana\
+        \ .scannerwork/report-task.txt \\\n  --output sonar-native-issues.json \\\n  --project $SONAR_PROJECT_KEY\
         \ \\\n  --branch \"$SCAN_BRANCH\" \\\n  --sonar-branch \"$SONAR_BRANCH\" \\\n  --commit \"$SCAN_SHA\" \\\
         \n  --pull-request \"$PULL_REQUEST\"\n"
     - name: Record configured scan status
@@ -195,15 +203,22 @@ jobs:
         fi\njq -n --arg status \"$status\" --arg reason \"$reason\" --arg outcome \"$outcome\" --arg export \"$EXPORT_OUTCOME\"\
         \ \\\n  '{schema_version:\"1\",scanner_family:\"SonarQube Cloud\",status:$status,reason:$reason,surfaces:{analysis:$outcome,native_issue_export:$export}}'\
         \ \\\n  > sonar-status.json\n"
-    - name: Upload sonar-results to R2
+    - name: Upload sonar-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp sonar-status.json\nsonar-access-probe.json\nsonar-browse-grant.json\nsonar-native-issues.json\n\
-        .scannerwork/report-task.txt\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt\
-        \ }}/sonar-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: sonar-results
+        path: 'sonar-status.json
+
+          sonar-access-probe.json
+
+          sonar-browse-grant.json
+
+          sonar-native-issues.json
+
+          .scannerwork/report-task.txt'
+        if-no-files-found: error
+        retention-days: 7
     needs:
     - identity
     permissions:
@@ -259,21 +274,21 @@ jobs:
       if: always()
       run: "python -m ruff check backend/ \\\n  --config $RUNNER_TEMP/analysis-tooling/config/code-analysis/ruff.toml\
         \ \\\n  --output-format=json \\\n  --exit-zero \\\n  --output-file ruff-results.json\n"
-    - name: Upload ruff-results to R2
+    - name: Upload ruff-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp ruff-results.json s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/ruff-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: ruff-results
+        path: ruff-results.json
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     permissions:
       contents: read
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-ruff') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-1-python-bandit:
     name: Bandit (Python Security)
     runs-on: ubuntu-latest
@@ -328,20 +343,21 @@ jobs:
     - name: Build bounded GitHub Security SARIF view
       run: "python $RUNNER_TEMP/analysis-tooling/scripts/code_analysis/bound_sarif.py \\\n  --input bandit-normalized/normalized.sarif\
         \ \\\n  --output bandit-normalized/github-security.sarif \\\n  --maximum 5000\n"
-    - name: Upload bandit-results to R2
+    - name: Upload bandit-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp bandit-results.json\nbandit-normalized/normalized.sarif\n s3://${{ secrets.R2_BUCKET_NAME\
-        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/bandit-results --recursive --endpoint-url https://${{\
-        \ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: bandit-results
+        path: 'bandit-results.json
+
+          bandit-normalized/normalized.sarif'
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-bandit') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-1-python-types:
     name: Pyright (Python Type Checking)
     runs-on: ubuntu-latest
@@ -371,21 +387,21 @@ jobs:
         '
     - name: Run Pyright (advisory)
       run: "pyright backend/app \\\n  --outputjson > pyright-results.json \\\n  || true\n"
-    - name: Upload pyright-results to R2
+    - name: Upload pyright-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp pyright-results.json s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/pyright-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: pyright-results
+        path: pyright-results.json
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     permissions:
       contents: read
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-types') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-1-typescript-quality:
     name: ESLint + tsc (TypeScript/React)
     runs-on: ubuntu-latest
@@ -443,22 +459,22 @@ jobs:
       run: 'npx eslint "src/**/*.{ts,tsx}" --format json --output-file eslint-results.json || true
 
         '
-    - name: Upload eslint-results to R2
+    - name: Upload eslint-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp webui/eslint-results.json s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/eslint-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-    - name: Upload tsc-results to R2
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: eslint-results
+        path: webui/eslint-results.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Upload tsc-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp webui/tsc-results.txt s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/tsc-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: tsc-results
+        path: webui/tsc-results.txt
+        if-no-files-found: error
+        retention-days: 7
     - name: Run repository JavaScript test profile
       if: always()
       run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile javascript-test
@@ -469,13 +485,13 @@ jobs:
         name: typescript-tests
         path: typescript-test-status.json
         retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     permissions:
       contents: read
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'typescript-quality') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-2-codeql:
     name: CodeQL (Semantic SAST)
     runs-on: ubuntu-latest
@@ -539,20 +555,19 @@ jobs:
       run: "set -euo pipefail\nmapfile -d '' sarif_files < <(find codeql-output -type f -name '*.sarif' -print0)\n\
         if (( ${#sarif_files[@]} != 1 )); then\n  echo \"::error::Expected exactly one CodeQL SARIF file, found\
         \ ${#sarif_files[@]}\"\n  exit 1\nfi\ncp \"${sarif_files[0]}\" \"codeql-${CODEQL_LANGUAGE}.sarif\"\n"
-    - name: Upload codeql-${{ matrix.language }}-sarif to R2
+    - name: Upload codeql-${{ matrix.language }}-sarif as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp codeql-${{ matrix.language }}.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{
-        github.run_attempt }}/codeql-${{ matrix.language }}-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID
-        }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: codeql-${{ matrix.language }}-sarif
+        path: codeql-${{ matrix.language }}.sarif
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'codeql') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-2-semgrep:
     name: Semgrep (Pattern Analysis)
     runs-on: ubuntu-latest
@@ -599,34 +614,34 @@ jobs:
     - name: Normalize Semgrep JSON to SARIF
       run: "mkdir -p semgrep-scan-results\ncp semgrep-results.json semgrep-scan-results/\npython $RUNNER_TEMP/analysis-tooling/scripts/code_analysis/normalizer.py\
         \ \\\n  --input-dir semgrep-scan-results \\\n  --output-dir semgrep-normalized\n"
-    - name: Upload semgrep-sarif to R2
+    - name: Upload semgrep-sarif as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp semgrep-normalized/normalized.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{
-        github.run_attempt }}/semgrep-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-    - name: Upload semgrep-results to R2
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: semgrep-sarif
+        path: semgrep-normalized/normalized.sarif
+        if-no-files-found: error
+        retention-days: 7
+    - name: Upload semgrep-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp semgrep-results.json s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/semgrep-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: semgrep-results
+        path: semgrep-results.json
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'semgrep') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-snyk:
     name: Snyk (Optional SCA + Code)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
-      SNYK_CONFIGURED: ${{ secrets.SNYK_TOKEN != '' }}
+      SNYK_CONFIGURED: 'false'
     steps:
     - name: Checkout
       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -685,8 +700,6 @@ jobs:
       run: 'set -o pipefail
 
         python -I $RUNNER_TEMP/analysis-tooling/scripts/code_analysis/snyk_scan.py 2>&1 | tee snyk-open-source.log'
-      env:
-        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     - name: Scan source code
       id: snyk-code
       if: env.SNYK_CONFIGURED == 'true'
@@ -705,8 +718,6 @@ jobs:
         [[ "$scan_exit" -le 1 ]] || exit "$scan_exit"
 
         '
-      env:
-        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     - name: Record configured scan status
       if: always() && env.SNYK_CONFIGURED == 'true'
       env:
@@ -721,15 +732,22 @@ jobs:
         \nfi\njq -n \\\n  --arg status \"$status\" \\\n  --arg reason \"$reason\" \\\n  --arg sca \"$SCA_OUTCOME\"\
         \ \\\n  --arg code \"$CODE_OUTCOME\" \\\n  '{schema_version:\"1\",scanner_family:\"Snyk\",status:$status,reason:$reason,surfaces:{sca:$sca,code:$code}}'\
         \ \\\n  > snyk-status.json\n"
-    - name: Upload snyk-results to R2
+    - name: Upload snyk-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp snyk-status.json\nsnyk-open-source.sarif\nsnyk-code.sarif\nsnyk-open-source.log\nsnyk-code.log\n\
-        \ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt }}/snyk-results --recursive\
-        \ --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: snyk-results
+        path: 'snyk-status.json
+
+          snyk-open-source.sarif
+
+          snyk-code.sarif
+
+          snyk-open-source.log
+
+          snyk-code.log'
+        if-no-files-found: error
+        retention-days: 7
     - name: Upload isolated resolver diagnostics
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -770,19 +788,19 @@ jobs:
           --format=sarif
 
           --output=osv-results.sarif'
-    - name: Upload osv-results to R2
+    - name: Upload osv-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp osv-results.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/osv-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: osv-results
+        path: osv-results.sarif
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'osv-scanner') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-gitleaks:
     name: Gitleaks (Secrets Detection)
     runs-on: ubuntu-latest
@@ -802,19 +820,19 @@ jobs:
         --report-path=/repo/gitleaks-results.sarif --redact --exit-code=0
     - name: Validate redacted Gitleaks output
       run: jq -e '(.runs | type) == "array"' gitleaks-results.sarif > /dev/null
-    - name: Upload gitleaks-results to R2
+    - name: Upload gitleaks-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp gitleaks-results.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/gitleaks-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: gitleaks-results
+        path: gitleaks-results.sarif
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'gitleaks') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-trivy:
     name: Trivy (Filesystem & Container Security)
     runs-on: ubuntu-latest
@@ -845,20 +863,21 @@ jobs:
         format: sarif
         output: trivy-config.sarif
         severity: CRITICAL,HIGH
-    - name: Upload trivy-results to R2
+    - name: Upload trivy-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp trivy-fs.sarif\ntrivy-config.sarif\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id\
-        \ }}/${{ github.run_attempt }}/trivy-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
-        \ }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: trivy-results
+        path: 'trivy-fs.sarif
+
+          trivy-config.sarif'
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'trivy') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-hadolint:
     name: Hadolint (Dockerfile Lint)
     runs-on: ubuntu-latest
@@ -879,19 +898,19 @@ jobs:
         format: sarif
         output-file: hadolint.sarif
         no-fail: true
-    - name: Upload hadolint-results to R2
+    - name: Upload hadolint-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp hadolint.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/hadolint-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: hadolint-results
+        path: hadolint.sarif
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'hadolint') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-checkov:
     name: Checkov (IaC Security)
     runs-on: ubuntu-latest
@@ -921,19 +940,19 @@ jobs:
         \ exactly one Checkov SARIF file, found ${#sarif_files[@]}\"\n    exit 1\n  fi\n  cp \"${sarif_files[0]}\"\
         \ checkov-results.sarif\nelif [[ -f checkov.sarif ]]; then\n  cp checkov.sarif checkov-results.sarif\nelse\n\
         \  echo \"::error::Checkov did not produce SARIF evidence\"\n  exit 1\nfi\n"
-    - name: Upload checkov-results to R2
+    - name: Upload checkov-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp checkov-results.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/checkov-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: checkov-results
+        path: checkov-results.sarif
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'checkov') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-shipping-image-security:
     name: Shipping Images (CVEs + SBOM + License Policy)
     runs-on: ubuntu-latest
@@ -1033,21 +1052,39 @@ jobs:
         jq -n --argjson findings \"$image_findings\" \\\n  '{schema_version:\"1\",scanner_family:\"Shipping Image\
         \ Trivy\",status:\"COMPLETED_OPTIONAL\",reason:\"Both exact-commit shipping images were built and scanned\"\
         ,finding_count:$findings,observation_count:$findings}' \\\n  > shipping-image-trivy-status.json\n"
-    - name: Upload shipping-image-security to R2
+    - name: Upload shipping-image-security as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp trivy-backend-image.sarif\ntrivy-webui-image.sarif\nsbom-license-policy.sarif\nsbom-policy-status.json\n\
-        backend.cdx.json\nwebui.cdx.json\nbackend.spdx.json\nwebui.spdx.json\nshipping-image-inspect.json\nshipping-image-provenance.intoto.json\n\
-        shipping-image-trivy-status.json\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt\
-        \ }}/shipping-image-security --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: shipping-image-security
+        path: 'trivy-backend-image.sarif
+
+          trivy-webui-image.sarif
+
+          sbom-license-policy.sarif
+
+          sbom-policy-status.json
+
+          backend.cdx.json
+
+          webui.cdx.json
+
+          backend.spdx.json
+
+          webui.spdx.json
+
+          shipping-image-inspect.json
+
+          shipping-image-provenance.intoto.json
+
+          shipping-image-trivy-status.json'
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'shipping-image-security') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-workflow-security-posture:
     name: Workflow Security (zizmor + Scorecard + Secret Posture)
     runs-on: ubuntu-latest
@@ -1080,7 +1117,7 @@ jobs:
         '
     - name: Observe GitHub secret-scanning posture
       env:
-        GH_TOKEN: ${{ secrets.SECURITY_POSTURE_TOKEN || github.token }}
+        GH_TOKEN: ${{ github.token }}
       shell: bash
       run: "set -euo pipefail\nrepo_json=\"$(gh api \"repos/${SOURCE_REPOSITORY}\")\"\nsecret_scanning=\"$(jq -r\
         \ '.security_and_analysis.secret_scanning.status // \"UNAVAILABLE\"' <<<\"$repo_json\")\"\npush_protection=\"\
@@ -1098,20 +1135,25 @@ jobs:
         \ protection \"$push_protection\" --arg alerts \"$alerts_status\" \\\n  --argjson count \"$alert_count\"\
         \ \\\n  '{schema_version:\"1\",scanner_family:\"Repository Security Posture\",status:$status,reason:$reason,secret_scanning:$scanning,push_protection:$protection,alerts_status:$alerts,open_alert_count:$count,finding_count:0,observation_count:0}'\
         \ \\\n  > repository-security-posture-status.json\n"
-    - name: Upload workflow-security-posture to R2
+    - name: Upload workflow-security-posture as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp zizmor-results.sarif\nrepository-security-posture-status.json\nsecret-scanning-alert-numbers.txt\n\
-        secret-scanning-api.log\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt\
-        \ }}/workflow-security-posture --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: workflow-security-posture
+        path: 'zizmor-results.sarif
+
+          repository-security-posture-status.json
+
+          secret-scanning-alert-numbers.txt
+
+          secret-scanning-api.log'
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'workflow-security-posture') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-openssf-scorecard:
     name: OpenSSF Scorecard (Repository Supply Chain)
     runs-on: ubuntu-latest
@@ -1168,11 +1210,11 @@ jobs:
 
           scorecard-native.json'
         retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'openssf-scorecard') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-4-complexity:
     name: Radon + Xenon (Code Complexity)
     runs-on: ubuntu-latest
@@ -1226,22 +1268,25 @@ jobs:
       run: "# Fail if any module exceeds:\n# --max-average B  (allow avg up to B)\n# --max-modules B  (allow any\
         \ module up to B)\n# --max-absolute C (hard stop at C \u2014 very complex)\nxenon \\\n  --max-average B\
         \ \\\n  --max-modules B \\\n  --max-absolute C \\\n  backend/ 2>&1 | tee xenon-results.txt || true\n"
-    - name: Upload radon-reports to R2
+    - name: Upload radon-reports as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp radon-cc.json\nradon-mi.json\nxenon-results.txt\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id\
-        \ }}/${{ github.run_attempt }}/radon-reports --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
-        \ }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: radon-reports
+        path: 'radon-cc.json
+
+          radon-mi.json
+
+          xenon-results.txt'
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     permissions:
       contents: read
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'complexity') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-4-dead-code:
     name: Vulture (Dead Code Detection)
     runs-on: ubuntu-latest
@@ -1280,21 +1325,21 @@ jobs:
     - name: Run Vulture
       run: "vulture backend/ \\\n  --min-confidence 80 \\\n  > vulture-results.txt || true\n# Print human-readable\
         \ summary\nvulture backend/ --min-confidence 80 || true\n"
-    - name: Upload vulture-results to R2
+    - name: Upload vulture-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp vulture-results.txt s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/vulture-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: vulture-results
+        path: vulture-results.txt
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     permissions:
       contents: read
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'dead-code') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-4-test-coverage:
     name: Coverage.py (Test Coverage)
     runs-on: ubuntu-latest
@@ -1343,22 +1388,25 @@ jobs:
         python -m coverage xml -o coverage.xml || true
 
         '
-    - name: Upload coverage-reports to R2
+    - name: Upload coverage-reports as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp backend/coverage.xml\nbackend/coverage.json\nbackend/coverage-status.json\n s3://${{ secrets.R2_BUCKET_NAME\
-        \ }}/${{ github.run_id }}/${{ github.run_attempt }}/coverage-reports --recursive --endpoint-url https://${{\
-        \ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: coverage-reports
+        path: 'backend/coverage.xml
+
+          backend/coverage.json
+
+          backend/coverage-status.json'
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     permissions:
       contents: read
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'test-coverage') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-7-schemathesis-fuzz:
     name: Schemathesis API Fuzzer
     runs-on: ubuntu-latest
@@ -1410,30 +1458,31 @@ jobs:
       id: schemathesis
       run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile api-fuzz
         --source "$GITHUB_WORKSPACE"
-    - name: Upload schemathesis-report to R2
+    - name: Upload schemathesis-report as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp fuzzing-results.xml\nbackend/schema.json\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id\
-        \ }}/${{ github.run_attempt }}/schemathesis-report --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
-        \ }}.r2.cloudflarestorage.com"
-    - name: Upload fuzzing-findings to R2
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: schemathesis-report
+        path: 'fuzzing-results.xml
+
+          backend/schema.json'
+        if-no-files-found: error
+        retention-days: 7
+    - name: Upload fuzzing-findings as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp fuzzing-normalized/ s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/fuzzing-findings --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: fuzzing-findings
+        path: fuzzing-normalized/
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     permissions:
       contents: read
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'schemathesis-fuzz') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-7-atheris-state-machine:
     name: Atheris (Bounded Decision-State Fuzzing)
     runs-on: ubuntu-latest
@@ -1488,24 +1537,63 @@ jobs:
       run: "jq -n '{schema_version:\"1\",scanner_family:\"Atheris\",status:\"OPERATIONAL_FAILURE\",reason:\"The\
         \ bounded Atheris campaign did not complete; inspect the job log and retained crash input.\",finding_count:0,observation_count:0}'\
         \ \\\n  > atheris-status.json\n"
-    - name: Upload atheris-state-fuzzing to R2
+    - name: Upload atheris-state-fuzzing as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp atheris-status.json\nfuzz-crashes/\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id\
-        \ }}/${{ github.run_attempt }}/atheris-state-fuzzing --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
-        \ }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: atheris-state-fuzzing
+        path: 'atheris-status.json
+
+          fuzz-crashes/'
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+      ANALYSIS_BACKEND_ROOT: ${{ github.workspace }}/backend
+      ANALYSIS_SOURCE_SHA: ${{ fromJSON(inputs.target).head_sha }}
     needs:
     - identity
     permissions:
       contents: read
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'atheris-state-machine') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
-      ANALYSIS_BACKEND_ROOT: ${{ github.workspace }}/backend
-      ANALYSIS_SOURCE_SHA: ${{ fromJSON(inputs.target).head_sha }}
+  ext-github-security-advisories:
+    name: GitHub Security Advisories
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'ext-github-security-advisories') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: agentic-soc
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.11'
+    - name: Run trusted scanner adapter
+      env:
+        TARGET_JSON: ${{ inputs.target }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        IS_REUSABLE_ANALYSIS: 'true'
+      run: python -m scripts.code_analysis.extension_runner ext-github-security-advisories
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: ext-github-security-advisories
+        path: .extension-output/ext-github-security-advisories.channel-evidence
+        retention-days: 7
+        if-no-files-found: error
   report:
     needs:
     - identity
@@ -1530,6 +1618,7 @@ jobs:
     - scanner-4-test-coverage
     - scanner-7-schemathesis-fuzz
     - scanner-7-atheris-state-machine
+    - ext-github-security-advisories
     if: ${{ always() && needs.identity.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1585,14 +1674,4 @@ jobs:
       request_id:
         required: true
         type: string
-    secrets:
-      R:
-        required: false
-      SECURITY_POSTURE_TOKEN:
-        required: false
-      SNYK_TOKEN:
-        required: false
-      SONAR_API_TOKEN:
-        required: false
-      SONAR_TOKEN:
-        required: false
+    secrets: {}

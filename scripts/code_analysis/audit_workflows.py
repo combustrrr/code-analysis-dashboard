@@ -146,6 +146,20 @@ def audit_runtime_isolation() -> list[str]:
     return errors
 
 
+def audit_source_credentials(relative: str, document: dict[str, Any]) -> list[str]:
+    """Source-executing generated jobs must use GitHub artifacts, not credentials."""
+    if Path(relative).name not in {"11-source-analysis.yml", "12-scanner-diagnostics.yml"}:
+        return []
+    errors: list[str] = []
+    for job_name, job in (document.get("jobs") or {}).items():
+        serialized = json.dumps(job, sort_keys=True)
+        if "fromJSON(inputs.target).source_repository" not in serialized:
+            continue
+        for forbidden in ("secrets.", "R2_ACCESS_KEY", "R2_SECRET_KEY", "R2_ACCOUNT_ID", "R2_BUCKET_NAME"):
+            if forbidden in serialized:
+                errors.append(f"{relative}: source job {job_name} receives forbidden credential reference {forbidden}")
+    return errors
+
 def audit() -> list[str]:
     errors = [*audit_service_layout(), *audit_runtime_isolation()]
     for path in sorted(WORKFLOWS.glob("*.y*ml")):
@@ -158,6 +172,7 @@ def audit() -> list[str]:
         if not isinstance(document, dict) or not isinstance(document.get("jobs"), dict):
             errors.append(f"{relative}: workflow must contain a jobs mapping")
             continue
+        errors.extend(audit_source_credentials(relative, document))
         for job_name, job in document["jobs"].items():
             if "runs-on" in job and "timeout-minutes" not in job:
                 errors.append(f"{relative}: job {job_name} has no timeout-minutes")

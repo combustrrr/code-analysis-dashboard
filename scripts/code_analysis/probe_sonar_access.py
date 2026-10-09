@@ -8,6 +8,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+try:
+    from .sonar_identity import environment_identity
+except ImportError:
+    from sonar_identity import environment_identity
+
 
 
 def _request(url: str, token: str) -> tuple[int, object | None]:
@@ -29,7 +34,7 @@ def _request(url: str, token: str) -> tuple[int, object | None]:
 
 def probe(output: Path) -> dict[str, object]:
     server = "https://sonarcloud.io"
-    project = "combustrrr_Agentic-Kibana"
+    _, project = environment_identity()
     branch = os.environ.get("SCAN_BRANCH", "")
     issue_query = urllib.parse.urlencode(
         {"componentKeys": project, "branch": branch, "p": 1, "ps": 1}

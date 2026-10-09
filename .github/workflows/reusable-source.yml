@@ -98,20 +98,19 @@ jobs:
       run: "set -euo pipefail\nmapfile -d '' sarif_files < <(find codeql-output -type f -name '*.sarif' -print0)\n\
         if (( ${#sarif_files[@]} != 1 )); then\n  echo \"::error::Expected exactly one CodeQL SARIF file, found\
         \ ${#sarif_files[@]}\"\n  exit 1\nfi\ncp \"${sarif_files[0]}\" \"codeql-${CODEQL_LANGUAGE}.sarif\"\n"
-    - name: Upload codeql-${{ matrix.language }}-sarif to R2
+    - name: Upload codeql-${{ matrix.language }}-sarif as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp codeql-${{ matrix.language }}.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{
-        github.run_attempt }}/codeql-${{ matrix.language }}-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID
-        }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: codeql-${{ matrix.language }}-sarif
+        path: codeql-${{ matrix.language }}.sarif
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'codeql') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-2-semgrep:
     name: Semgrep (Pattern Analysis)
     runs-on: ubuntu-latest
@@ -155,27 +154,27 @@ jobs:
     - name: Normalize Semgrep JSON to SARIF
       run: "mkdir -p semgrep-scan-results\ncp semgrep-results.json semgrep-scan-results/\npython $RUNNER_TEMP/analysis-tooling/scripts/code_analysis/normalizer.py\
         \ \\\n  --input-dir semgrep-scan-results \\\n  --output-dir semgrep-normalized\n"
-    - name: Upload semgrep-sarif to R2
+    - name: Upload semgrep-sarif as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp semgrep-normalized/normalized.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{
-        github.run_attempt }}/semgrep-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-    - name: Upload semgrep-results to R2
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: semgrep-sarif
+        path: semgrep-normalized/normalized.sarif
+        if-no-files-found: error
+        retention-days: 7
+    - name: Upload semgrep-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp semgrep-results.json s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/semgrep-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: semgrep-results
+        path: semgrep-results.json
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'semgrep') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-gitleaks:
     name: Gitleaks (Secrets Detection)
     runs-on: ubuntu-latest
@@ -195,19 +194,19 @@ jobs:
         --report-path=/repo/gitleaks-results.sarif --redact --exit-code=0
     - name: Validate redacted Gitleaks output
       run: jq -e '(.runs | type) == "array"' gitleaks-results.sarif > /dev/null
-    - name: Upload gitleaks-results to R2
+    - name: Upload gitleaks-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp gitleaks-results.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/gitleaks-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: gitleaks-results
+        path: gitleaks-results.sarif
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'gitleaks') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-trivy:
     name: Trivy (Filesystem & Container Security)
     runs-on: ubuntu-latest
@@ -238,20 +237,21 @@ jobs:
         format: sarif
         output: trivy-config.sarif
         severity: CRITICAL,HIGH
-    - name: Upload trivy-results to R2
+    - name: Upload trivy-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp trivy-fs.sarif\ntrivy-config.sarif\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id\
-        \ }}/${{ github.run_attempt }}/trivy-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID\
-        \ }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: trivy-results
+        path: 'trivy-fs.sarif
+
+          trivy-config.sarif'
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'trivy') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-checkov:
     name: Checkov (IaC Security)
     runs-on: ubuntu-latest
@@ -281,19 +281,19 @@ jobs:
         \ exactly one Checkov SARIF file, found ${#sarif_files[@]}\"\n    exit 1\n  fi\n  cp \"${sarif_files[0]}\"\
         \ checkov-results.sarif\nelif [[ -f checkov.sarif ]]; then\n  cp checkov.sarif checkov-results.sarif\nelse\n\
         \  echo \"::error::Checkov did not produce SARIF evidence\"\n  exit 1\nfi\n"
-    - name: Upload checkov-results to R2
+    - name: Upload checkov-results as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: aws s3 cp checkov-results.sarif s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt
-        }}/checkov-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: checkov-results
+        path: checkov-results.sarif
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'checkov') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-workflow-security-posture:
     name: Workflow Security (zizmor + Scorecard + Secret Posture)
     runs-on: ubuntu-latest
@@ -326,7 +326,7 @@ jobs:
         '
     - name: Observe GitHub secret-scanning posture
       env:
-        GH_TOKEN: ${{ secrets.SECURITY_POSTURE_TOKEN || github.token }}
+        GH_TOKEN: ${{ github.token }}
       shell: bash
       run: "set -euo pipefail\nrepo_json=\"$(gh api \"repos/${SOURCE_REPOSITORY}\")\"\nsecret_scanning=\"$(jq -r\
         \ '.security_and_analysis.secret_scanning.status // \"UNAVAILABLE\"' <<<\"$repo_json\")\"\npush_protection=\"\
@@ -344,20 +344,25 @@ jobs:
         \ protection \"$push_protection\" --arg alerts \"$alerts_status\" \\\n  --argjson count \"$alert_count\"\
         \ \\\n  '{schema_version:\"1\",scanner_family:\"Repository Security Posture\",status:$status,reason:$reason,secret_scanning:$scanning,push_protection:$protection,alerts_status:$alerts,open_alert_count:$count,finding_count:0,observation_count:0}'\
         \ \\\n  > repository-security-posture-status.json\n"
-    - name: Upload workflow-security-posture to R2
+    - name: Upload workflow-security-posture as artifact
       if: always()
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-        AWS_DEFAULT_REGION: auto
-      run: "aws s3 cp zizmor-results.sarif\nrepository-security-posture-status.json\nsecret-scanning-alert-numbers.txt\n\
-        secret-scanning-api.log\n s3://${{ secrets.R2_BUCKET_NAME }}/${{ github.run_id }}/${{ github.run_attempt\
-        \ }}/workflow-security-posture --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: workflow-security-posture
+        path: 'zizmor-results.sarif
+
+          repository-security-posture-status.json
+
+          secret-scanning-alert-numbers.txt
+
+          secret-scanning-api.log'
+        if-no-files-found: error
+        retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'workflow-security-posture') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   scanner-3-openssf-scorecard:
     name: OpenSSF Scorecard (Repository Supply Chain)
     runs-on: ubuntu-latest
@@ -414,11 +419,11 @@ jobs:
 
           scorecard-native.json'
         retention-days: 7
+    env:
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'openssf-scorecard') }}
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
   portable-python-bandit:
     name: Portable python-bandit
     needs:
@@ -877,8 +882,4 @@ jobs:
       request_id:
         required: true
         type: string
-    secrets:
-      R:
-        required: false
-      SECURITY_POSTURE_TOKEN:
-        required: false
+    secrets: {}

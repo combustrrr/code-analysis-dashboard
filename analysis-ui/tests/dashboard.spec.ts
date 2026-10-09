@@ -1,6 +1,24 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
+// This suite intentionally runs against the explicit Vite fixtures build.
+test.describe('local fixture build', () => {
+
+test('favicon is served from the configured base path', async ({ page }) => {
+  await page.goto('/');
+  const href = await page.locator('link[rel="icon"]').getAttribute('href');
+  expect(href).toBe('./favicon.svg');
+  const response = await page.request.get(new URL(href!, page.url()).toString());
+  expect(response.ok()).toBe(true);
+  expect(response.headers()['content-type']).toContain('image/svg+xml');
+});
+
+test('selected repositories are not silently rewritten', async ({ page }) => {
+  await page.goto('/#repository=combustrrr%2FAgentic-Kibana&project=1278177697');
+  expect(new URL(page.url()).hash).toContain('repository=combustrrr%2FAgentic-Kibana');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Agentic-Kibana');
+});
+
 test('retained dataset preserves source identity, filters and issue provenance', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/');
@@ -31,12 +49,13 @@ test('developers can group findings by rule and inspect a relationship', async (
   await page.getByRole('tab', {name:/^Issues/}).click();
   await page.getByLabel('Group issues').click();
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'Group by rule'}).click();
+  // Wait for grouping to apply: the Collapse component renders after groupBy state updates
+  await expect(page.locator('.issue-groups')).toBeVisible({ timeout: 10000 });
   const group = page.locator('.issue-groups .ant-collapse-item').first();
-  await expect(group).toBeVisible();
+  await expect(group).toBeVisible({ timeout: 10000 });
   await group.locator('.ant-collapse-header').click();
   await expect(group.locator('.related-finding').first()).toBeVisible();
 });
-
 test('overview visualizes issue composition and offers cautious investigation priorities', async ({page}) => {
   await page.goto('/');
   await expect(page.getByRole('img', {name:'Finding distribution by severity'})).toBeVisible();
@@ -52,23 +71,30 @@ test('overview visualizes issue composition and offers cautious investigation pr
 
 test('scanner failures remain separate from findings and navigation works on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/'); await page.getByRole('tab', { name: 'Scanners', exact: true }).click();
-  await expect(page.getByText('Unavailable', { exact: true }).first()).toBeVisible();
+  await page.goto('/#tab=scanners');
+  await expect(page.getByText('Scanner execution and evidence')).toBeVisible();
+  await page.getByLabel('Execution status').click();
+  await expect(page.locator('.ant-select-dropdown:visible')).not.toHaveClass(/(?:enter|appear)-active/);
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'NOT AVAILABLE'}).click();
+  const rows = page.locator('.ant-table-tbody > tr.ant-table-row');
+  await expect(rows.first()).toBeVisible();
+  await expect(rows.first()).toContainText('Unavailable');
   await expect(page.getByText('Atheris', { exact: true })).toBeVisible();
   await expect(page.getByText('Schemathesis', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Branch or pull request')).toBeVisible();
+  await expect(page.getByLabel('Target revision')).toBeVisible();
 });
 
 test('untrusted messages render as text', async ({ page }) => {
   await page.route('**/findings.json', async route => {
     const response = await route.fetch(); const rows = await response.json();
     rows[0].message = '<img src=x onerror="window.injected=true">';
-    await route.fulfill({ response, json: rows });
+    await route.fulfill({ status: response.status(), headers: response.headers(), json: rows });
   });
   await page.goto('/'); await page.getByRole('tab', { name: /^Issues/ }).click();
   await page.getByLabel('Search issues').fill('window.injected');
   await expect(page.locator('.issue-link').first()).toContainText('<img');
   expect(await page.evaluate(() => (window as any).injected)).toBeUndefined();
+  await page.unrouteAll({ behavior: 'wait' });
 });
 
 test('Ant Design filters, pagination and responsive layout remain usable', async ({ page }, testInfo) => {
@@ -93,7 +119,7 @@ test('Ant Design filters, pagination and responsive layout remain usable', async
   await expect(page.getByRole('dialog')).not.toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('mobile.png'), fullPage: true });
-  await page.getByLabel('Branch or pull request').click();
+  await page.getByLabel('Target revision').click();
   await expect(page.getByRole('listbox')).toBeAttached();
   await page.keyboard.press('Escape');
 });
@@ -112,8 +138,8 @@ test('overview drilldown, scanner filters and provenance use retained evidence',
   await expect(page.locator('.ant-select-dropdown:visible')).not.toHaveClass(/(?:enter|appear)-active/);
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'NOT AVAILABLE'}).click();
   const rows=page.locator('.ant-table-tbody > tr.ant-table-row');
-  await expect(rows.first()).toContainText('NOT AVAILABLE');
-  for (const row of await rows.all()) await expect(row).toContainText('NOT AVAILABLE');
+  await expect(rows.first()).toContainText('Unavailable');
+  for (const row of await rows.all()) await expect(row).toContainText('Unavailable');
   await page.getByRole('tab', {name:'Provenance',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Analysis identity'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Producing workflows'})).toBeVisible();
@@ -352,8 +378,8 @@ test('simple analysis follows scanner attempt and opens published target',async(
  await page.getByLabel('Revision',{exact:true}).click();await page.getByLabel('Revision',{exact:true}).press('ArrowDown');await page.getByLabel('Revision',{exact:true}).press('Enter');
  await expect(page.getByRole('button',{name:'Continue',exact:true})).toHaveCount(0);
  await page.getByRole('dialog').getByRole('button',{name:'Run analysis',exact:true}).click();
- await expect(page.getByRole('link',{name:'Scanner workflow ? attempt 2'})).toHaveAttribute('href','https://github.com/owner/repo/actions/runs/11/attempts/2');
- await expect(page.getByText('scanning',{exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Scanner workflow, attempt 2'})).toHaveAttribute('href','https://github.com/owner/repo/actions/runs/11/attempts/2');
+ await expect(page.getByText('Scanner workflow is running.', { exact: true })).toBeVisible();
  await expect(page).toHaveURL(/target=selected-target/,{timeout:25000});
  await expect(page.getByRole('dialog')).toHaveCount(0);
  expect(polls).toBe(2);
@@ -408,4 +434,24 @@ test('repositories recover from failures and discard stale installation preview'
  await expect(page.getByRole('button',{name:'Confirm installation commit'})).not.toBeVisible();
  await page.getByRole('button',{name:'Sign out',exact:true}).click();
  await expect(page.getByRole('button',{name:'Preview setup',exact:true})).toBeDisabled();
+});
+test('unsafe source URLs are omitted from report links', async ({ page }) => {
+  const findings = JSON.parse(readFileSync('public/data/reports/retained/findings.json', 'utf8'));
+  const target = findings.find((finding: { file: string }) => finding.file === 'backend/app/middleware/security_headers.py');
+  if (!target) throw new Error('Expected retained unsafe-URL fixture finding is missing');
+  await page.route(`**/details/${target.page}.json`, async route => {
+    const response = await route.fetch(); const rows = await response.json();
+    const detail = rows.find((row: { id: string }) => row.id === target.id);
+    if (!detail) throw new Error(`Expected detail ${target.id} is missing from page ${target.page}`);
+    detail.source_url = 'javascript:alert(document.domain)';
+    await route.fulfill({ status: response.status(), headers: response.headers(), json: rows });
+  });
+  await page.goto('/');
+  await page.getByRole('tab', { name: /^Issues/ }).click();
+  await page.getByLabel('Search issues').fill(target.file);
+  await page.locator('.issue-link').first().click();
+  await expect(page.getByRole('link', { name: 'Open exact source revision' })).toHaveCount(0);
+  await page.unrouteAll({ behavior: 'wait' });
+});
+
 });

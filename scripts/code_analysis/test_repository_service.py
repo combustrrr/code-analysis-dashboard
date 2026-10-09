@@ -151,6 +151,31 @@ class IndependentSecurityChannelsTests(unittest.TestCase):
 
 
 class PublicationCompletenessTests(unittest.TestCase):
+    def test_report_assets_are_uploaded_under_repository_qualified_keys(self):
+        config = {'analysis_repository': 'Owner/Repo', 'report_release': 'analysis-current-1'}
+        state = {'targets': [{'id': 'one', 'head_sha': 'a' * 40, 'status': 'collected',
+                              'scan_run_id': 12, 'run_attempt': 1, 'kind': 'branch', 'branch': 'main'}]}
+        uploaded = []
+
+        def collect(_config, _row, destination):
+            destination.mkdir(parents=True, exist_ok=True)
+            (destination / 'findings.json').write_text('{"findings": []}', encoding='utf-8')
+            return {'analyzed_sha': 'a' * 40, 'status': 'complete'}
+
+        def upload(_config, path, **kwargs):
+            uploaded.append((path, kwargs))
+
+        with patch('scripts.code_analysis.repository_service.github.collect', side_effect=collect), \
+                patch('scripts.code_analysis.repository_service.github.discover', return_value=[state['targets'][0]]), \
+                patch('scripts.code_analysis.repository_service.github.cf_api', side_effect=upload), \
+                patch('scripts.code_analysis.repository_service.accept', return_value=True), \
+                patch('scripts.code_analysis.repository_service.release_manifest.read', return_value={}), \
+                patch('scripts.code_analysis.repository_service.release_manifest.write'):
+            report_publication(config, state, 'analysis-current-1')
+
+        self.assertEqual(len(uploaded), 1)
+        self.assertRegex(uploaded[0][0], r'^/api/report/repositories/owner/repo/analysis-current-1/analysis-[a-f0-9]{64}\.json\.gz$')
+
     def test_reconciliation_preserves_partial_and_never_deletes_before_upload(self):
         import json
         old={'id':'one','head_sha':'a'*40,'analyzed_sha':'a'*40,'collected_run':'12-1','report_status':'partial','assets':{},'documents':{}}

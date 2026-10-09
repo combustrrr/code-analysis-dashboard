@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema#",
+  "$id": "https://code-analysis-dashboard.example/channel-descriptor.schema.json",
+  "title": "Code Analysis Channel Descriptor",
+  "description": "Schema for declaring analysis channel metadata. Used by built-in scanners and extensions alike.",
+  "type": "object",
+  "required": [
+    "channel",
+    "tool",
+    "class",
+    "surface",
+    "workflow",
+    "evidence_source"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "channel": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,60}$",
+      "description": "Unique channel identifier (e.g., codeql, ruff, ext-my-scanner)"
+    },
+    "tool": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Human-readable tool name (e.g., CodeQL, Ruff, My Custom Scanner)"
+    },
+    "class": {
+      "type": "string",
+      "enum": [
+        "code",
+        "security",
+        "dependencies",
+        "infrastructure",
+        "reliability"
+      ],
+      "description": "Functional class for grouping and UI presentation"
+    },
+    "surface": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Analysis surface area (e.g., semantic-sast, python-quality, dependency)"
+    },
+    "workflow": {
+      "type": "string",
+      "pattern": "^\\d{2}-[a-z-]+\\.yml$",
+      "description": "Workflow file that produces this channel evidence"
+    },
+    "evidence_source": {
+      "type": "string",
+      "enum": [
+        "DETERMINISTIC",
+        "AI_ADVISORY"
+      ],
+      "description": "Evidence lane for provenance tracking"
+    },
+    "activation": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Human-readable activation requirements or notes"
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Additional notes about this channel"
+    },
+    "artifact_patterns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Glob patterns for discovering this channel evidence artifacts"
+    },
+    "scanner_family": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Scanner family name for grouping (defaults to tool if omitted)"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "source",
+        "vendor"
+      ],
+      "default": "vendor",
+      "description": "Execution mode: source runs against checked-out source, vendor calls external API"
+    },
+    "adapter": {
+      "type": "string",
+      "pattern": "^scripts/code_analysis/adapters/[a-z0-9_-]+\\.py$",
+      "description": "Path to trusted adapter script (required for extensions, optional for built-ins with standard SARIF/JSON output)"
+    },
+    "timeout_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 120,
+      "default": 15,
+      "description": "Adapter execution timeout in minutes"
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "description": "Environment variable to secret name mappings (vendor mode only)"
+    },
+    "deferred_reason": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Reason for deferral if this channel is not currently enabled"
+    },
+    "sensitive": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether findings may contain sensitive data that should be redacted in reports"
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Logical groups this channel belongs to for joint enablement (e.g., python-quality, security-sast)"
+    },
+    "portable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this channel is available in portable mode"
+    },
+    "languages": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "python",
+          "javascript-typescript",
+          "dockerfile",
+          "yaml",
+          "go",
+          "java",
+          "ruby",
+          "csharp"
+        ]
+      },
+      "description": "Programming languages this channel applies to"
+    },
+    "requires_docker": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this channel requires Docker to run"
+    },
+    "producer": {
+      "type": "string",
+      "enum": [
+        "github-actions",
+        "external-api",
+        "local-cli"
+      ],
+      "default": "github-actions",
+      "description": "Where the evidence is produced"
+    }
+  }
+}

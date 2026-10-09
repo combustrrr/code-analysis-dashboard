@@ -31,6 +31,8 @@ jobs:
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
+      SOURCE_REPOSITORY: ${{ github.repository }}
+      SONAR_PROJECT_KEY: ${{ github.repository_owner }}_${{ github.event.repository.name }}
     steps:
     - name: Checkout exact scan commit
       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -110,7 +112,7 @@ jobs:
       continue-on-error: true
       uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f
       with:
-        args: -Dproject.settings=.analysis-tooling/sonar-project.properties ${{ github.event_name == 'push' && format('-Dsonar.branch.name={0}
+        args: -Dproject.settings=.analysis-tooling/sonar-project.properties -Dsonar.organization=${{ github.repository_owner }} -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} ${{ github.event_name == 'push' && format('-Dsonar.branch.name={0}
           -Dsonar.scm.revision={1}', steps.sonar-identity.outputs.sonar_branch, github.sha) || '' }}
       env:
         SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
@@ -120,7 +122,7 @@ jobs:
       continue-on-error: true
       uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f
       with:
-        args: -Dproject.settings=.analysis-tooling/sonar-project.properties -Dsonar.branch.name=${{ steps.sonar-identity.outputs.sonar_branch
+        args: -Dproject.settings=.analysis-tooling/sonar-project.properties -Dsonar.organization=${{ github.repository_owner }} -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} -Dsonar.branch.name=${{ steps.sonar-identity.outputs.sonar_branch
           }} -Dsonar.scm.revision=${{ inputs.scan_sha }}
       env:
         SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
@@ -136,7 +138,7 @@ jobs:
         SONAR_BRANCH: ${{ steps.sonar-identity.outputs.sonar_branch }}
       shell: bash
       run: "python .analysis-tooling/scripts/code_analysis/export_sonar_issues.py \\\n  --report-task .scannerwork/report-task.txt\
-        \ \\\n  --output sonar-native-issues.json \\\n  --project combustrrr_Agentic-Kibana \\\n  --branch \"$SCAN_BRANCH\"\
+        \ \\\n  --output sonar-native-issues.json \\\n  --project $SONAR_PROJECT_KEY \\\n  --branch \"$SCAN_BRANCH\"\
         \ \\\n  --sonar-branch \"$SONAR_BRANCH\" \\\n  --commit \"$SCAN_SHA\" \\\n  --pull-request \"$PULL_REQUEST\"\n"
     - name: Record configured scan status
       if: always() && steps.sonar-scope.outputs.should_scan == 'true' && env.SONAR_TOKEN != ''

@@ -97,7 +97,8 @@ def report_publication(config, state, report_release, document=None):
                     if document is not None:
                         from scripts.code_analysis.native_feedback import publish
                         try:
-                            entry['native_feedback'] = publish(document, config['project_id'], row, report, documents['findings.json'], dashboard_url='https://combustrrr.github.io/code-analysis-dashboard/')
+                            dashboard_url = os.environ.get('DASHBOARD_URL') or config.get('dashboard_url', '') or 'https://combustrrr.github.io/code-analysis-dashboard/'
+                            entry['native_feedback'] = publish(document, config['project_id'], row, report, documents['findings.json'], dashboard_url=dashboard_url)
                         except (ValueError, RuntimeError) as error:
                             entry['native_feedback'] = {'status':'failed', 'reason':str(error)}
                 except (ValueError, RuntimeError) as error:
@@ -120,7 +121,8 @@ def report_publication(config, state, report_release, document=None):
             if name in pending:
                 path = Path(directory) / name
                 path.write_bytes(pending[name])
-                github.cf_api(config, f'/api/report/{config["report_release"]}/{name}', method='POST', data=path.read_bytes(), content_type='application/gzip')
+                github.cf_api(config, github.storage_path(config, 'report', f'{config["report_release"]}/{name}'),
+                              method='POST', data=path.read_bytes(), content_type='application/gzip')
         result['metrics'] = {'compressed_bytes':size,
                              'queued':sum(r['status']=='queued' for r in result['targets']),
                              'scanning':sum(r['status']=='scanning' for r in result['targets'])}

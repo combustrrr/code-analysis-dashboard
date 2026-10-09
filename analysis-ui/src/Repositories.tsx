@@ -22,7 +22,7 @@ export function Repositories({auth,endpoint}:{endpoint?:string;auth:ReturnType<t
   const [quickProject,setQuickProject]=useState<{id:string;name:string}>();
   const [quickKind,setQuickKind]=useState<'branch'|'pr'|'commit'>('branch');
   const [quickRef,setQuickRef]=useState('');
-  const [targets,setTargets]=useState<{branches:{name:string;sha:string}[];prs:{number:number;head_sha:string;head_repository:string;base_sha:string;base_branch:string}[]}>();
+  const [targets,setTargets]=useState<{branches:{name:string;sha:string}[];prs:{number:number;title:string;head_branch:string;head_sha:string;head_repository:string;base_sha:string;base_branch:string}[]}>();
   async function act(operation:()=>Promise<void>) {setBusy(true);setError('');try{await operation();}catch(e){setError(String(e));}finally{setBusy(false);}}
    async function list(next=1) {await act(async()=>{const result=await auth.api<{repositories:Repository[];has_more:boolean}>(`repositories?page=${next}`);setRepositories(old=>[...new Map((next===1?result.repositories:[...old,...result.repositories]).map(r=>[r.id,r])).values()]);setPage(next);setMore(result.has_more);});}
    useEffect(()=>{setRepositories([]);setProjects([]);setExecution('');setPreview(undefined);setEditing(undefined);setConfigurationPreview(undefined);setInstalled('');setMore(false);setError('');},[auth.session?.login]);
@@ -56,12 +56,12 @@ export function Repositories({auth,endpoint}:{endpoint?:string;auth:ReturnType<t
       <p>Select a revision to analyze. Branch lists latest heads; PRs list open requests. You can also paste a full commit SHA.</p>
       <div style={{display:'flex',gap:8,marginBottom:8}}>
         <Select style={{minWidth:140}} aria-label="Revision kind" value={quickKind} options={[{value:'branch',label:'Branch'},{value:'pr',label:'Pull request'},{value:'commit',label:'Commit SHA'}]} onChange={v=>{setQuickKind(v);setQuickRef(v==='branch'?(targets?.branches?.[0]?.name||''):'');}}/>
-        {quickKind==='branch' && <Select showSearch style={{flex:1}} aria-label="Branches" value={quickRef||undefined} options={(targets?.branches||[]).map(b=>({value:b.name,label:`${b.name}`}))} onChange={setQuickRef}/>} 
-        {quickKind==='pr' && <Select showSearch style={{flex:1}} aria-label="Open PRs" value={quickRef||undefined} options={(targets?.prs||[]).map(p=>({value:String(p.number),label:`#${p.number} ${p.base_branch}←`}))} onChange={setQuickRef}/>} 
+        {quickKind==='branch' && <Select showSearch style={{flex:1}} aria-label="Branches" value={quickRef||undefined} options={(targets?.branches||[]).map(b=>({value:b.name,label:`${b.name} · ${b.sha.slice(0,12)}`}))} onChange={setQuickRef}/>}
+        {quickKind==='pr' && <Select showSearch style={{flex:1}} aria-label="Open PRs" value={quickRef||undefined} options={(targets?.prs||[]).map(p=>({value:String(p.number),label:`#${p.number} ${p.title ? p.title.slice(0,40) : ''} · ${p.head_branch} → ${p.base_branch}`}))} onChange={setQuickRef}/>}
         {quickKind==='commit' && <Input aria-label="Commit SHA" placeholder="40-character SHA" value={quickRef} onChange={e=>setQuickRef(e.target.value)}/>}
       </div>
       <Space>
-        <Button type="primary" disabled={!quickProject||!execution||busy|| (quickKind==='commit' ? !/^([a-fA-F0-9]{40})$/.test(quickRef) : !quickRef)} onClick={()=>void act(async()=>{
+        <Button aria-label="Run analysis" type="primary" disabled={!quickProject||!execution||busy|| (quickKind==='commit' ? !/^([a-fA-F0-9]{40})$/.test(quickRef) : !quickRef)} onClick={()=>void act(async()=>{
           await auth.api('project-launch',{repository:execution,project_id:quickProject!.id,kind:quickKind,ref:quickKind==='commit'?quickRef.toLowerCase():quickRef});
           // Navigate to project overview; auto-refresh will follow published results.
           location.hash=new URLSearchParams({repository:execution,project:quickProject!.id,tab:'overview'}).toString();

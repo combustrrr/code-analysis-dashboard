@@ -41,11 +41,18 @@ bindings; the Worker uses those bindings in application mode. Never put App keys
 OAuth secrets, session keys or vendor credentials in browser code, logs or docs.
 Consult worker.mjs and wrangler.jsonc before changing bindings. App installation or
 permission changes require GitHub's approval flow; do not install on upstream.
+The sign-in redirect deliberately sends no OAuth `scope` parameter. Sign-in therefore
+does not request repository scopes. In repository mode, the resulting user token is
+used for identity/session establishment while repository inspection, collaborator
+authorization, launch, and report reads use the repository-scoped GitHub App
+installation token. Treat any scope change as an authorization-boundary change.
+
 
 Pages builds with VITE_APPLICATION_MODE=repositories and the matching
 VITE_LAUNCH_ENDPOINT. The Worker origin must match the configured dashboard origin.
-Fixture builds may omit VITE_LAUNCH_ENDPOINT and use the static `data/index.json`
-contract; repository mode must configure the Worker endpoint.
+Only an explicit `vite build --mode fixtures` test build may omit VITE_LAUNCH_ENDPOINT
+and use the static `data/index.json` contract. Normal and repository builds fail closed when
+the Worker endpoint is missing and exclude the checked-in `public/` report fixtures.
 Deploy the Worker with `npx --prefix analysis-launcher wrangler deploy --config
 analysis-launcher/wrangler.jsonc`; main UI changes trigger pages.yml.
 

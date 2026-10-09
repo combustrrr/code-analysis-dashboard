@@ -35,5 +35,20 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
 5. Do not retire an active host or alter an upstream repository without separate,
    explicit authorization.
 
+## Storage Key Compatibility
+
+New KV and R2 writes are qualified as `repositories/<owner>/<repo>/...` to prevent
+projects in different execution repositories from colliding. Public report routes and
+manifest schemas remain unchanged. Readers try the qualified key first and then the
+legacy unqualified key for ordinary manifest/state reads, so existing configured
+projects continue to work while their next normal reconciliation publishes qualified
+objects. Threat-report asset reads require the immutable asset to be present under the
+qualified key; a legacy-only asset is not served.
+
+The migration is write-forward, not a bulk copy: legacy objects are not fabricated or
+deleted automatically. A repository that never republishes remains legacy-backed for
+the reads that support fallback. Operators should confirm a successful qualified
+publication before removing legacy objects. The current repository identity is used
+directly; runtime repository remapping is not part of the storage migration.
 Roadmap proposals are documented in [roadmap/ROADMAP.md](roadmap/ROADMAP.md) and are not current
 deployment requirements.

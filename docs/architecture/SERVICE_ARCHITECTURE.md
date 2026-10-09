@@ -28,14 +28,23 @@ flowchart LR
 
 The Worker uses GitHub App/user authorization for repository inspection, reviewed
 installation/configuration, launch, activity and report access. It does not execute
-source code. R2 stores current reports and temporary producer artifacts; KV stores
-service state. Keep free-plan usage bounded; do not purchase services automatically.
+source code. GitHub reads are retried only for transient responses and detected
+secondary-rate-limit responses, up to two retries; `Retry-After` is honored but capped
+at 10 seconds per wait. R2 stores current reports and temporary producer artifacts; KV
+stores service state. Keep free-plan usage bounded; do not purchase services
+automatically.
 
 The default-branch `.github/code-analysis/projects.json` contains execution identity,
 source projects, profiles, scanner setup and immutable tooling. Installation writes
 small wrappers and a profile only after an owner reviews and confirms exact files.
 Admin is required for configuration, write permission for scan requests. Branch
 protection blocks a direct commit rather than being bypassed.
+
+The Worker application policy refactor keeps portable-profile detection and validation
+in `analysis-launcher/profile-policy.mjs`; `application.mjs` imports and re-exports
+that policy instead of carrying a second copy. The refactor also removes the obsolete
+inline/dead implementation. This is a code-organization change, not evidence that
+external repository onboarding is fully verified.
 
 Hourly complete paginated discovery, events and manual requests feed repository-local
 serialized reconciliation. Resolve branch heads at processing; validate full SHA
@@ -48,7 +57,9 @@ publication jobs remain separate.
 ## Current-report lifecycle
 
 GitHub/KV state holds scheduler/request state and R2 holds namespaced current-report
-assets. Each project keeps one report per active branch/open PR and one bounded manual
+assets. Storage keys are qualified by the execution repository as
+`repositories/<owner>/<repo>/...`; the public API route shape remains unchanged.
+Each project keeps one report per active branch/open PR and one bounded manual
 selection. Upload replacement assets before changing manifest references; delete
 unreferenced assets only afterward. Only a complete discovery pass removes deleted
 targets. Late/superseded or mixed-revision results cannot overwrite current heads.
@@ -66,3 +77,8 @@ requests every 15 seconds and reports about every minute, and shows workflow pro
 separately from published findings. Access and rate-limit failures remain explicit.
 See [access](../operations/DASHBOARD-ACCESS.md), [maintenance](../operations/SCANNER-MAINTENANCE.md), and
 [developer interface](../current/MONITORING_UI.md).
+
+The Actions-side GitHub CLI wrapper applies a 120-second timeout to each request and
+fails closed on timeout; it does not retry an ambiguous dispatch. Source-executing jobs
+receive read-only repository permissions. `security-events: write` is reserved for
+the explicitly scoped discovery/reconciliation or native-SARIF publication jobs.

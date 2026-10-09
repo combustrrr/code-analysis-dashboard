@@ -2,6 +2,7 @@
 const manifests = new Map<string, {at:number; value:any}>();
 const shards = new Map<string, Promise<Record<string, unknown>>>();
 export const applicationEndpoint = import.meta.env.VITE_LAUNCH_ENDPOINT as string | undefined;
+const fixtureBuild = import.meta.env.MODE === 'fixtures';
 export function refreshRepositoryReports(){manifests.clear();shards.clear();}
 let reportBearer: string | undefined;
 export function setReportSession(token?:string) {
@@ -17,12 +18,14 @@ export async function reportFetch(path:string,init:RequestInit={}) {
 function selection() {const p=new URLSearchParams(location.hash.slice(1));return {repository:p.get('repository'),project:p.get('project'),target:p.get('target')};}
 export function hasRepositorySelection() {const s=selection();return !!(applicationEndpoint&&s.repository&&s.project);}
 async function response(path:string,signal?:AbortSignal) {
- const r=await reportFetch(path,{signal});if(!r.ok){let reason='Report unavailable';try{reason=(await r.json()).error||reason;}catch{}throw new Error(reason);}return r;
+ const r=await reportFetch(path,{signal});if(!r.ok){let payload:{error?:string;code?:string}={};try{payload=await r.json();}catch{}const error=new Error(payload.error||'Report unavailable.') as Error & {status?:number;code?:string};error.status=r.status;error.code=payload.code;throw error;}return r;
 }
 export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise<T> {
-  // Public fixture builds intentionally omit the Worker endpoint; retain the
-  // static report contract used by local previews and Playwright fixtures.
-  if(!applicationEndpoint)return (await response(path,signal)).json() as Promise<T>;
+  // Only the explicitly named fixture build may read checked-in report data.
+  if(!applicationEndpoint) {
+   if(fixtureBuild)return (await response(path,signal)).json() as Promise<T>;
+   throw new Error('Live report endpoint is not configured.');
+  }
    const {repository,project,target}=selection();
   const base=`${applicationEndpoint}/api/public/`;
   const query=new URLSearchParams({repository:repository!,project_id:project!});

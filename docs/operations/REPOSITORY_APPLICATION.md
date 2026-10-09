@@ -16,6 +16,11 @@ Repository IDs identify execution/source projects. Source-only observer projects
 not write to the source; connected projects can publish correctly attributed native
 checks and supported SARIF. The current service App is installed only here. Do not
 reinstall analysis workflows in the Agentic SOC product fork or upstream.
+Repository identity is taken from the selected/configured repository and preserved in
+the request, report, and provenance data. The current repository-mode flow does not
+perform runtime repository remapping or silently substitute a publishing repository;
+configuration mismatches fail closed and require an explicit reviewed setup change.
+
 
 The Worker provides repository listing, project inspection/readiness/integration,
 reviewed setup/configuration, target validation, launch, activity and report access.
@@ -29,3 +34,7 @@ to hold the bounded request queue and compatibility state where required. Cloudf
 KV holds service state; no D1/VM/database was provisioned. Free services may be used
 within their limits; do not enable paid subscriptions automatically. See current
 vendor dashboards for quotas before changing infrastructure.
+
+## Authorization boundary
+
+Repository App mode does not use OAuth scopes. The worker omits the OAuth scope query parameter and relies on the installed App permissions for repository setup, read/launch APIs, and reconciliation webhook dispatch. Legacy OAuth mode is separate and requires the explicitly configured minimum public_repo scope; no credential or scope fallback is embedded in worker code.

@@ -14,6 +14,7 @@
     "NEXT_GITHUB_APP_SLUG": "code-analysis-dashboard",
     "APPLICATION_MODE": "repositories",
     "DASHBOARD_ACCESS": "collaborators",
+    "GITHUB_OAUTH_SCOPES": "public_repo",
     "TOOLING_FROM_SERVICE": "true",
     "TOOLING_SHA": "a0dcd02062a1dbfc24d085fcaea71e36b3ba3512",
     "EVALUATION_MODE": "true",
@@ -23,11 +24,19 @@
     "EVALUATION_PAUSED": "false",
     "SAFE_API_LOGS": "true",
     "MAX_ASSET_BYTES": "104857600",
-    "MAX_MANIFEST_COMPRESSED_BYTES": "900000000"
+    "MAX_MANIFEST_COMPRESSED_BYTES": "900000000",
+    "MAX_LAUNCH_BYTES": "2048",
+    "MAX_APPLICATION_JSON_BYTES": "65536",
+    "MAX_STATE_BYTES": "26214400",
+    "MAX_MANIFEST_JSON_BYTES": "16777216",
+    "MAX_REPORT_AGE_MS": "86400000"
   },
   "secrets": {
     "required": [
       "GITHUB_CLIENT_SECRET",
+      "NEXT_GITHUB_CLIENT_SECRET",
+      "NEXT_GITHUB_APP_PRIVATE_KEY",
+      "NEXT_GITHUB_WEBHOOK_SECRET",
       "SESSION_KEY",
       "WORKER_API_TOKEN"
     ]

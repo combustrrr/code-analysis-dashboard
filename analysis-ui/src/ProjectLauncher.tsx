@@ -3,7 +3,7 @@ import {refreshRepositoryReports} from './repositoryReports';
 import {Alert,Button,Descriptions,Input,Modal,Radio,Select,Space,Collapse,Table,Tag} from 'antd';
 import {useLaunchAuth} from './useLaunchAuth';
 type Auth=ReturnType<typeof useLaunchAuth>;
- type Inventory={repository:string;checked_at:string;branches:{name:string;sha:string}[];prs:{number:number;head_sha:string;base_sha:string;head_repository:string;base_branch:string}[]};
+ type Inventory={repository:string;checked_at:string;branches:{name:string;sha:string}[];prs:{number:number;title:string;head_branch:string;head_sha:string;base_sha:string;head_repository:string;base_branch:string}[]};
  const phaseCopy:Record<string,string>={queued:'Request saved. Waiting for the reconciliation workflow.',scanning:'Scanner workflow is running.',publishing:'Analysis completed. Publishing the report.',published:'Report published successfully.',failed:'Analysis failed.',superseded:'This request was superseded by a newer request.'};
 export function ProjectLauncher({auth,repository,project,close}:{auth:Auth;repository:string;project:string;close:()=>void}) {
  const [readiness,setReadiness]=useState<{channels:{channel:string;status:string;reason:string}[];tooling_sha:string}>();
@@ -21,7 +21,7 @@ export function ProjectLauncher({auth,repository,project,close}:{auth:Auth;repos
   <Descriptions column={1} items={[{key:'execution',label:'Execution repository',children:repository},{key:'source',label:'Source',children:inventory?.repository||'Loading…'}]}/>
   {!request&&<>
    <><Radio.Group value={kind} onChange={e=>{setKind(e.target.value);setRef('');}} options={[{label:'Branch',value:'branch'},{label:'Pull request',value:'pr'},{label:'Commit SHA',value:'commit'}]}/>
-    {kind==='commit'?<Input aria-label="Full commit SHA" value={ref} onChange={e=>setRef(e.target.value.trim())} placeholder="Full 40-character commit SHA"/>:<Select style={{width:'100%'}} showSearch aria-label="Revision" value={ref||undefined} onChange={setRef} options={kind==='branch'?inventory?.branches.map(b=>({value:b.name,label:`${b.name} · ${b.sha.slice(0,12)}`})):inventory?.prs.map(p=>({value:String(p.number),label:`PR #${p.number} · ${p.head_sha.slice(0,12)} → ${p.base_branch}`}))}/>}
+    {kind==='commit'?<Input aria-label="Full commit SHA" value={ref} onChange={e=>setRef(e.target.value.trim())} placeholder="Full 40-character commit SHA"/>:<Select style={{width:'100%'}} showSearch aria-label="Revision" value={ref||undefined} onChange={setRef} options={kind==='branch'?inventory?.branches.map(b=>({value:b.name,label:`${b.name} · ${b.sha.slice(0,12)}`})):inventory?.prs.map(p=>({value:String(p.number),label:`PR #${p.number} ${p.title ? ' · ' + p.title.slice(0,40) : ''} · ${p.head_branch} → ${p.base_branch}`}))}/>}
    </>
    <Collapse items={[{key:'readiness',label:'Scanner readiness (optional)',children:<><p>Tooling: {readiness?.tooling_sha || 'Loading'}. Unavailable scanners remain explicit in the report.</p><Table rowKey="channel" loading={!readiness} dataSource={readiness?.channels} pagination={{pageSize:8}} columns={[{title:'Scanner',dataIndex:'channel'},{title:'Readiness',dataIndex:'status',render:value=><Tag>{value}</Tag>},{title:'Details',dataIndex:'reason'}]}/></>}]} />
    <p>Branches resolve to their latest head when queued. PRs retain their head and base context. A commit scan analyzes exactly the full SHA entered.</p>

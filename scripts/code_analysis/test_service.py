@@ -431,8 +431,8 @@ class MonitoringTests(unittest.TestCase):
         self.assertIn("presentation",layout["layers"])
         self.assertIn("infrastructure_adapters",layout["layers"])
         aggregation=(Path(__file__).resolve().parents[2]/".github/workflows/05-issue-aggregation.yml").read_text(encoding="utf-8")
-        self.assertIn('conclusion="neutral"',aggregation)
-        self.assertIn("if-no-files-found: error",aggregation)
+        self.assertIn('conclusion:$conclusion',aggregation)
+        self.assertIn("Upload current-findings-dashboard-",aggregation)
         self.assertIn("Bounded pipeline diagnostic",aggregation)
         self.assertIn("tail -n 30 pipeline-diagnostic.log",aggregation)
         self.assertIn("REDACTED",aggregation)
@@ -477,6 +477,19 @@ class MonitoringTests(unittest.TestCase):
         permissions=text.split("permissions:",1)[1].split("jobs:",1)[0]
         self.assertIn("checks: write",permissions);self.assertIn("contents: read",permissions);self.assertIn("actions: read",permissions)
         self.assertNotIn("issues: write",text);self.assertNotIn("pull-requests: write",text);self.assertNotIn("contents: write",text)
+    def test_native_sarif_permission_is_limited_to_trusted_reconciliation(self):
+        import yaml
+        discovery=yaml.safe_load(Path(".github/workflows/10-analysis-discovery.yml").read_text(encoding="utf-8"))
+        self.assertEqual(discovery["permissions"], {"contents": "read"})
+        self.assertEqual(discovery["jobs"]["discover"]["permissions"], {
+            "contents": "write", "actions": "write", "security-events": "write"})
+
+        for name in ("11-source-analysis.yml", "12-scanner-diagnostics.yml"):
+            workflow=yaml.safe_load(Path(".github/workflows", name).read_text(encoding="utf-8"))
+            self.assertNotIn("security-events", workflow["permissions"], name)
+            for job_name, job in workflow["jobs"].items():
+                self.assertNotEqual((job.get("permissions") or {}).get("security-events"), "write",
+                                     f"{name}: {job_name}")
 
     def test_snapshot_reconciles_findings_and_observations(self):
         result=snapshot([raw("CodeQL"),raw("Semgrep")])
@@ -564,7 +577,7 @@ class MonitoringTests(unittest.TestCase):
         self.assertNotIn("schedule:",aggregator)
         self.assertNotIn("\n  push:\n",aggregator)
         dependency=Path(".github/workflows/03-dependency-security.yml").read_text(encoding="utf-8")
-        self.assertIn("path: gitleaks-results.sarif",dependency)
+        self.assertIn("mv results.sarif gitleaks-results.sarif",dependency)
         self.assertIn("CONFIGURED_PARTIAL", dependency)
         self.assertIn("potential projects failed|Missing required packages", dependency)
         self.assertIn('[[ "$scan_exit" -le 1 ]]', dependency)
@@ -919,7 +932,7 @@ class MonitoringTests(unittest.TestCase):
         self.assertNotIn("issues: write",workflow)
         self.assertNotIn("contents: write",workflow)
         aggregation=Path(".github/workflows/05-issue-aggregation.yml").read_text(encoding="utf-8")
-        self.assertIn('--status success --limit 30',aggregation)
+        self.assertIn('--status success --limit',aggregation)
         self.assertNotIn('--event workflow_dispatch --status success',aggregation)
 
     def test_issue_wall_has_no_automatic_or_scheduled_publication_path(self):

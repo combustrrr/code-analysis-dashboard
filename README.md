@@ -24,6 +24,7 @@ indexes.
 ```shell
 python -m pip install -r .ci/requirements.txt
 python -m unittest scripts.code_analysis.test_hosted scripts.code_analysis.test_extensions scripts.code_analysis.test_portability scripts.code_analysis.test_scanner_access scripts.code_analysis.test_scanner_updates
+python -m pytest scripts/deployment -v
 python -m scripts.code_analysis.audit_workflows
 node --test analysis-launcher/worker.test.mjs
 cd analysis-ui

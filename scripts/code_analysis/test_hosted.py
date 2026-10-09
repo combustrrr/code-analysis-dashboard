@@ -30,6 +30,14 @@ def snapshot():
                           'file': 'app.py', 'start_line': 2, 'raw_artifact': 'ruff.json'}], 'ai_advisories': []}
 
 
+class GithubServiceTests(unittest.TestCase):
+    def test_gh_timeout_is_bounded_and_fail_closed(self):
+        with patch.object(service.subprocess, 'run', side_effect=service.subprocess.TimeoutExpired(['gh', 'api'], service.GH_TIMEOUT_SECONDS)) as run:
+            with self.assertRaisesRegex(RuntimeError, r'GitHub request timed out after 120s: api repos/owner/repo'):
+                service.gh('api', 'repos/owner/repo')
+        self.assertEqual(run.call_args.kwargs['timeout'], service.GH_TIMEOUT_SECONDS)
+
+
 class IdentityTests(unittest.TestCase):
     def test_branch_pr_and_fork_identities_do_not_collide(self):
         branch = h.target('owner/repo', 'feature/x', 'a' * 40)

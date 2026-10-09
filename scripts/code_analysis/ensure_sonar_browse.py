@@ -8,6 +8,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+try:
+    from .sonar_identity import environment_identity, project_identity
+except ImportError:
+    from sonar_identity import environment_identity, project_identity
+
 
 
 def _request(url: str, token: str, data: bytes | None = None) -> tuple[int, object | None]:
@@ -27,10 +32,12 @@ def _request(url: str, token: str, data: bytes | None = None) -> tuple[int, obje
         return error.code, None
 
 
-def ensure(output: Path) -> dict[str, object]:
+def ensure(output: Path, source_repository: str | None = None) -> dict[str, object]:
     token = os.environ.get("SONAR_API_TOKEN", "")
     if not token:
         raise SystemExit("SONAR_API_TOKEN is required")
+    organization, project_key = (environment_identity() if source_repository is None
+                                 else project_identity(source_repository))
     server = "https://sonarcloud.io"
     user_status, user = _request(f"{server}/api/users/current", token)
     login = user.get("login") if isinstance(user, dict) else None
@@ -39,16 +46,16 @@ def ensure(output: Path) -> dict[str, object]:
     form = urllib.parse.urlencode(
         {
             "login": login,
-            "organization": "combustrrr",
+            "organization": organization,
             "permission": "user",
-            "projectKey": "combustrrr_Agentic-Kibana",
+            "projectKey": project_key,
         }
     ).encode("ascii")
     grant_status, _ = _request(f"{server}/api/permissions/add_user", token, form)
     branch = os.environ.get("SCAN_BRANCH", "")
     issue_query = urllib.parse.urlencode(
         {
-            "componentKeys": "combustrrr_Agentic-Kibana",
+            "componentKeys": project_key,
             "branch": branch,
             "p": 1,
             "ps": 1,
@@ -57,7 +64,7 @@ def ensure(output: Path) -> dict[str, object]:
     issue_status, _ = _request(f"{server}/api/issues/search?{issue_query}", token)
     result: dict[str, object] = {
         "schema_version": "1",
-        "project": "combustrrr_Agentic-Kibana",
+        "project": project_key,
         "current_user_login": login,
         "grant_http_status": grant_status,
         "browse_granted": grant_status in {200, 204},

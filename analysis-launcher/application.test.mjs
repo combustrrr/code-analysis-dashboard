@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {applicationApi, detectedProfile, wrappers} from './application.mjs';
+import {applicationApi, detectedProfile, validatePortableProfile, wrappers} from './application.mjs';
+import {validatePortableProfile as validateProfilePolicy} from './profile-policy.mjs';
 const env={ANALYSIS_REPOSITORY:'owner/service', TOOLING_SHA:'a'.repeat(40), SESSION_KEY:'unused'};
 class Failure extends Error {constructor(status,message){super(message);this.status=status;}}
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status});
@@ -42,6 +43,12 @@ test('private repository and truncated trees fail closed',async()=>{
  await assert.rejects(()=>applicationApi(request('/api/connections/preview',{execution_repository:'owner/repo'}),env,{token:'test'},h),e=>e.status===403);
  const t=helpers({['repos/owner/repo/git/trees/'+ 'c'.repeat(40)+'?recursive=1']:{tree:[],truncated:true}});
  await assert.rejects(()=>applicationApi(request('/api/connections/preview',{execution_repository:'owner/repo'}),env,{token:'test'},t),e=>e.status===422);
+});
+test('profile policy remains an isolated pure boundary',()=>{
+  const profile={mode:'portable',python_root:'.',commands:{eslint:{argv:['eslint','.'],cwd:'.'}}};
+  validatePortableProfile(profile);
+  validateProfilePolicy(profile);
+  assert.throws(()=>validateProfilePolicy({...profile,commands:{eslint:{argv:['eslint','.'],cwd:'../unsafe'}}}),/Invalid command adapter/);
 });
 test('wrappers are pinned and detected profiles never invent executable commands',()=>{
  assert.throws(()=>wrappers('owner/service','main'));
@@ -103,12 +110,13 @@ test('activity follows the exact scanner attempt through publication',async()=>{
  const originalEnvReports = env.ANALYSIS_REPORTS;
  env.ANALYSIS_REPORTS = {
    get: async (key) => {
-     if (key === 'analysis-current-1.json') return { json: async () => ({schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/repo',targets:[row]}) };
+     if (key === 'analysis-current-1.json') return { json: async () => ({schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/repo',checked_at:new Date().toISOString(),targets:[row]}) };
      return null;
    }
  };
  globalThis.fetch=async url=>{
-  if(url.endsWith('/repos/owner/repo'))return Response.json({full_name:'owner/repo',private:false});
+  if(url.endsWith('/repos/owner/repo'))return Response.json({id:1,full_name:'owner/repo',private:false,default_branch:'main'});
+   if(url.includes('/contents/.github/code-analysis/projects.json'))return Response.json({encoding:'base64',content:configBlob.content});
   throw new Error('Unexpected fetch');
  };
  try{
@@ -177,4 +185,34 @@ test('evaluation launch freezes the branch SHA and consumes one durable dispatch
   assert.equal(second.status,202); assert.equal((await second.json()).request_id,firstBody.request_id);
   assert.equal(h.calls.filter(call=>call.path.endsWith('/dispatches')).length,1);
  } finally { globalThis.fetch=originalFetch; }
+});
+
+
+test("project-targets exposes PR head branch and title", async () => {
+  const h = configuredHelpers();
+  h.pages = async (path) => path.endsWith("/branches") ? [{name: "main", commit: {sha: "a".repeat(40)}}] : [{number: 7, title: "Fix the thing", head: {ref: "feature-branch", sha: "d".repeat(40), repo: {full_name: "owner/repo"}}, base: {ref: "main", sha: "a".repeat(40)}}];
+  const result = await applicationApi(new Request("https://worker.example/api/project-targets?repository=owner/repo&project_id=1"), env, {token: "test"}, h);
+  const body = await result.json();
+  assert.equal(body.prs.length, 1);
+  assert.equal(body.prs[0].number, 7);
+  assert.equal(body.prs[0].title, "Fix the thing");
+  assert.equal(body.prs[0].head_branch, "feature-branch");
+  assert.equal(body.prs[0].head_sha, "d".repeat(40));
+  assert.equal(body.prs[0].base_branch, "main");
+});
+test('application JSON bodies are bounded per endpoint before any GitHub call',async()=>{
+  const h=helpers();
+  const padded={execution_repository:'owner/repo',padding:'x'.repeat(70000)};
+  await assert.rejects(()=>applicationApi(request('/api/connections/preview',padded),{...env,MAX_APPLICATION_JSON_BYTES:'4096'},{token:'test'},h),e=>e.status===413);
+  assert.equal(h.calls.length,0);
+  // The default budget still accepts ordinary configuration payloads.
+  const h2=helpers({['repos/owner/repo/git/trees/'+'c'.repeat(40)+'?recursive=1']:{tree:[],truncated:false}});
+  const accepted=await applicationApi(request('/api/connections/preview',{execution_repository:'owner/repo'}),env,{token:'test'},h2);
+  assert.equal(accepted.status,200);
+});
+test('upstream synchronization inspection is not exposed without a configured pair',async()=>{
+ const h=helpers();
+ const response=await applicationApi(new Request('https://worker.example/api/upstream-sync?repository=owner/repo'),env,{token:'test'},h);
+ assert.equal(response,null);
+ assert.equal(h.calls.length,0);
 });

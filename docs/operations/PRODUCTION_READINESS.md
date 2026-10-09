@@ -25,3 +25,20 @@ bypasses are authorized.
 Dashboard login does not privatize the public GitHub Release assets. Keep scanner
 secret redaction and source/script credential isolation intact. See
 [access](DASHBOARD-ACCESS.md) and [architecture](../architecture/SERVICE_ARCHITECTURE.md).
+
+## Smoke-test scope
+
+The repository deployment checks cover service tests, workflow policy, launcher tests,
+UI build/browser coverage, and configuration-level deployment validation. The live
+anonymous check confirms that sign-in is visible and that an unauthenticated
+project-integration request is denied; it is not a successful authenticated scan.
+Playwright runs are serialized with one worker against local fixture data, so those
+tests do not validate concurrent browser workers or prove the deployed Pages/Worker
+pair is healthy.
+
+External deployment verification remains outstanding where it requires credentials or
+provider state: an authorized owner must validate the installed GitHub App, Worker
+secrets and R2/KV bindings, Pages-to-Worker routing, and a real launch through
+publication. The resulting source repository, target revision, workflow run and
+attempt must be inspected before claiming external deployment success. Independent
+external-owner onboarding remains outside the current live-proven scope.

@@ -1,7 +1,7 @@
 import { DashboardAccess } from './DashboardAccess';
 import { reportFetch } from './repositoryReports';
 import { ProjectLauncher } from './ProjectLauncher';
-import { applicationEndpoint, hasRepositorySelection, repositoryJson } from './repositoryReports';
+import { applicationEndpoint, repositoryJson } from './repositoryReports';
 import { Repositories } from './Repositories';
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -13,6 +13,7 @@ import { useLaunchAuth } from './useLaunchAuth';
 import { Connections, RequestStatus } from './Integration';
 import { AnalysisLauncher, type LaunchRequest } from './AnalysisLauncher';
 import { ThreatReport } from './ThreatReport';
+import { safeGithubUrl } from './safeUrls';
 
 type Target = { scan_run_id?: number; run_attempt?: number; tooling_sha?: string; id: string; label: string; repository: string; source_repository: string; head_sha: string; kind: string; branch: string; pr?: number; base_branch?: string; base_sha?: string; checked_at: string; status: string; report?: string; error?: string };
 type Index = { report_storage?: {compressed_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
@@ -26,6 +27,7 @@ async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
   return repositoryJson<T>(path, signal);
 }
 function route() { const p = new URLSearchParams(location.hash.slice(1)); return { repository: p.get('repository') || '', project: p.get('project') || '', target: p.get('target') || '', tab: p.get('tab') || 'overview', issue: p.get('issue') || '' }; }
+function isRepositoryAvailabilityError(value: string) { return /retired|unsupported|not supported|project is unavailable|private reports are not supported/i.test(value); }
 function navigate(target: string, tab: string, issue = '') { const current = route(); location.hash = new URLSearchParams({ ...(current.repository ? { repository: current.repository, project: current.project } : {}), target, tab, ...(issue ? { issue } : {}) }).toString(); }
 function date(s?: string) { return s ? new Date(s).toLocaleString() : 'Unavailable'; }
 const colors: Record<string, string> = { CRITICAL: 'red', HIGH: 'volcano', MEDIUM: 'gold', LOW: 'blue', INFO: 'default', current: 'green', partial: 'orange', failed: 'red', scanning: 'blue', COMPLETED: 'green', CONFIGURED_COMPLETE: 'green', POLICY_FINDINGS: 'orange', NOT_AVAILABLE: 'orange', FAILED: 'red' };
@@ -52,7 +54,7 @@ function Evidence({ detail, source, error, findings, openFinding }: { detail?: D
   }, [detail, findings]);
   return <div className="evidence-content">{detail ? <><Badge value={detail.severity}/><h2>{detail.message}</h2><p className="path">{detail.file}:{detail.line}</p>
           <section className="explanation-block"><h3>Why this was reported</h3><p><strong>{detail.scanners.join(', ')}</strong> emitted {detail.rules.length ? <>rule <code>{detail.rules.join(', ')}</code></> : 'a finding'} at this source location. The message above is the scanner's retained explanation.</p><Alert type="info" showIcon title="Detected condition, not a proven root cause" description="Start with the highlighted code, then inspect its inputs, callers, configuration, and repeated uses before changing it. Similar findings below can reveal whether the condition is local or systematic."/></section>
-          {detail.source_url && <a href={detail.source_url} target="_blank" rel="noreferrer">Open exact source revision</a>}
+          {safeGithubUrl(detail.source_url) && <a href={safeGithubUrl(detail.source_url)} target="_blank" rel="noreferrer">Open exact source revision</a>}
           {source.length ? <pre className="source">{source.slice(Math.max(0, detail.line - 6), Math.max(0, detail.line - 6) + 16).map((line, i) => <div key={i} className={Math.max(1, detail.line - 5) + i === detail.line ? 'highlight' : ''}><span>{Math.max(1, detail.line - 5) + i}</span>{line}</div>)}</pre> : <p>Source preview unavailable or withheld. Use the immutable source link when available.</p>}
           <h3>Supporting observations</h3><p>These retained observations identify which scanner and rule produced the issue.</p>{detail.origins.map(o => <div className="origin" key={o.observation_id}><strong>{o.scanner_family} | {o.rule}</strong><small>{o.file}:{o.start_line}</small><small>Observation: {o.observation_id}</small><small>Artifact: {o.raw_artifact || 'Unavailable'}</small></div>)}
           <section className="relationships"><h3>Related findings</h3><p>Relationships are derived from the current report's scanner, rule, and source paths. They do not imply a shared defect.</p>{related.length ? related.map(relation => <div className="relation" key={relation.label}><div><strong>{relation.label}</strong><small>{relation.reason} · {relation.findings.length.toLocaleString()} related</small></div>{relation.findings.slice(0, 4).map(f => <Button type="link" className="related-finding" key={f.id} onClick={() => openFinding(f.id)}><Badge value={f.severity}/><span>{f.message}</span><small>{f.file}:{f.line}</small></Button>)}</div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No relationships found in the current report"/>}</section>
@@ -81,7 +83,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const [index, setIndex] = useState<Index>(); const [error, setError] = useState(''); const [r, setRoute] = useState(route());
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
   const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
-  useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(()=>setRefreshing(false)); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
+  useEffect(() => { const c = new AbortController(); const refresh = () => json<Index>('data/index.json', c.signal).then(value => { setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError') { setIndex(undefined); setError(e.message); } }).finally(()=>setRefreshing(false)); refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
   const localAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint);
   const launchAuth = viewerAuth || localAuth;
   const launched = pendingLaunch && index?.targets.find(t => t.kind === pendingLaunch.kind && (t.kind === 'pr' ? String(t.pr) === pendingLaunch.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === pendingLaunch.ref.toLowerCase() : t.branch === pendingLaunch.ref));
@@ -176,13 +178,14 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
            {index && <span title="Counts are across all configured branch, pull-request, and commit targets in this repository inventory.">{index.targets.length} configured targets | {index.targets.filter(t => t.status === 'queued').length} queued | {index.targets.filter(t => t.status === 'scanning').length} scanning</span>}
           {index?.report_storage && <span>Report storage: {humanBytes(index.report_storage.compressed_bytes)}</span>}
           {report?.tooling_sha && <span>Tooling <code title={report.tooling_sha}>{report.tooling_sha.slice(0, 12)}</code> | attempt {report.producer_run_attempt ?? 'Unavailable'}</span>}
-          {report?.producer_runs.map(run => <a key={run.id} href={run.url} target="_blank" rel="noreferrer">Run #{run.id}</a>)}
+          {report?.producer_runs.map(run => { const url = safeGithubUrl(run.url); return url ? <a key={run.id} href={url} target="_blank" rel="noreferrer">Run #{run.id}</a> : null; })}
         </Space>
       </section>
       {(error || index?.discovery_error || index?.publication_error || target?.error) && (() => {
         const desc = error || index?.discovery_error || index?.publication_error || target?.error || '';
         const isNoCurrent = typeof desc === 'string' && desc.toLowerCase().includes('report not found in storage');
-        return <Alert showIcon type={isNoCurrent ? 'info' : 'error'} title={isNoCurrent ? 'No current report yet' : 'Report service error'} description={isNoCurrent ? 'Run analysis to generate the first report for this target.' : desc}/>;
+        const isRepositoryUnavailable = !!applicationEndpoint && isRepositoryAvailabilityError(desc);
+         return <Alert showIcon type={isNoCurrent ? 'info' : 'error'} title={isRepositoryUnavailable ? 'Repository unavailable' : isNoCurrent ? 'No current report yet' : 'Report service error'} description={isRepositoryUnavailable ? (r.repository || 'This repository') + ' is retired or unsupported by the live analysis service. No other repository was selected.' : isNoCurrent ? 'Run analysis to generate the first report for this target.' : desc}/>;
       })()}
       {report && (!fresh || report.status === 'partial') && <Alert showIcon type="warning" title={!fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={!fresh ? 'These findings belong to the older analyzed commit shown above.' : `Available findings are shown. Incomplete scanners: ${report.channels.filter(c=>!['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE','DEFERRED'].includes(c.status)).map(c=>c.name).join(', ') || 'see Scanners for evidence details'}. Open Scanners for the failure reason.`}/>}
       <Tabs activeKey={r.tab} onChange={tab => navigate(target?.id || '', tab)} items={['overview', 'threat-report', 'issues', 'scanners', 'provenance', 'connections', ...(import.meta.env.VITE_APPLICATION_MODE === 'repositories' ? ['repositories'] : [])].map(tab => ({ key: tab, label: tab === 'threat-report' ? 'Threat Report' : tab[0].toUpperCase() + tab.slice(1) + (tab === 'issues' && report ? ` (${report.finding_count.toLocaleString()})` : '') }))}/>
@@ -208,7 +211,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
             {key:'attempt',label:'Producer attempt',children:report.producer_run_attempt ?? 'Unavailable'},
             {key:'schema',label:'Collection schema',children:index?.schema_version}
           ]}/></article>
-          <article className="panel"><h2>Producing workflows</h2><p>These exact runs produced the displayed report.</p>{report.producer_runs.map(run => <div className="origin" key={run.id}><GithubOutlined/> <a href={run.url} target="_blank" rel="noreferrer">Run #{run.id}</a></div>)}<h3>Evidence gate</h3><Tag color={report.publication_gate.satisfied ? 'green' : 'orange'}>{report.publication_gate.satisfied ? 'Passed' : 'Not satisfied'}</Tag><p>The evidence gate and scanner completeness are separate. {completed} of {report.channels.length} channels completed.</p><p>Individual finding details identify their source observations and retained artifact paths.</p></article>
+          <article className="panel"><h2>Producing workflows</h2><p>These exact runs produced the displayed report.</p>{report.producer_runs.map(run => { const url = safeGithubUrl(run.url); return url ? <div className="origin" key={run.id}><GithubOutlined/> <a href={url} target="_blank" rel="noreferrer">Run #{run.id}</a></div> : null; })}<h3>Evidence gate</h3><Tag color={report.publication_gate.satisfied ? 'green' : 'orange'}>{report.publication_gate.satisfied ? 'Passed' : 'Not satisfied'}</Tag><p>The evidence gate and scanner completeness are separate. {completed} of {report.channels.length} channels completed.</p><p>Individual finding details identify their source observations and retained artifact paths.</p></article>
         </section>}
         {r.tab === 'scanners' && <><Alert showIcon type="info" title="Scanner execution and evidence" description="Execution failures are separate from code findings. Unavailable counts are unknown; completed policy findings can still require attention."/>
           <div className="filters"><Select aria-label="Scanner category" value={category} onChange={setCategory} options={[{value:'',label:'All categories'}, ...[...new Set(report.channels.map(c => c.class))].sort().map(c => ({value:c,label:c}))]}/><Select aria-label="Execution status" value={channelStatus} onChange={setChannelStatus} options={[{value:'',label:'All statuses'}, ...[...new Set(report.channels.map(c => c.status))].sort().map(c => ({value:c,label:c.replaceAll('_',' ')}))]}/><span>{report.channels.filter(c => (!category || c.class === category) && (!channelStatus || c.status === channelStatus)).length} channels</span></div>
@@ -250,10 +253,6 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
 }
 if(import.meta.env.VITE_APPLICATION_MODE==='repositories') {
  const parameters=new URLSearchParams(location.hash.slice(1));
- if(parameters.get('repository')?.toLowerCase()==='combustrrr/agentic-kibana') {
-  parameters.set('repository','combustrrr/code-analysis-dashboard');
-  history.replaceState(null,'','#'+parameters.toString());
- }
  if(!parameters.has('repository')) {
   parameters.set('repository',import.meta.env.VITE_DEFAULT_EXECUTION_REPOSITORY||'combustrrr/code-analysis-dashboard');
   parameters.set('project',import.meta.env.VITE_DEFAULT_PROJECT_ID||'1360051890');

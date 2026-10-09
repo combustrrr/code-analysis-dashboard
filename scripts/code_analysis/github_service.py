@@ -20,17 +20,44 @@ from urllib.parse import quote
 
 from scripts.code_analysis.hosted import accept, analysis_key, digest, load, now, reconcile, target, write
 
+GH_TIMEOUT_SECONDS = 120
+
 
 class SupersededReport(ValueError):
     """A newer upstream identity appeared while a producer report downloaded."""
+
+def _storage_repository(config: dict) -> str | None:
+    repository = config.get('analysis_repository') or config.get('publishing_repository')
+    return repository.lower() if isinstance(repository, str) and re.fullmatch(r'[\w.-]+/[\w.-]+', repository) else None
+
+
+def storage_path(config: dict, kind: str, key: str) -> str:
+    """Return a repository-qualified path while retaining the legacy route shape."""
+    repository = _storage_repository(config)
+    prefix = f'/api/{kind}/repositories/{repository}/' if repository else f'/api/{kind}/'
+    return prefix + key
+
+
+def read_storage(config: dict, kind: str, key: str) -> bytes:
+    qualified = cf_api(config, storage_path(config, kind, key))
+    if qualified not in (b'{}', '{}'):
+        return qualified
+    return cf_api(config, f'/api/{kind}/{key}')
 
 
 def gh(*args: str, payload: object | None = None, binary: bool = False):
     command = ['gh', *args]
     if payload is not None:
         command += ['--input', '-']
-    result = subprocess.run(command, input=json.dumps(payload).encode() if payload is not None else None,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    try:
+        result = subprocess.run(command, input=json.dumps(payload).encode() if payload is not None else None,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+                                timeout=GH_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        # A hung GitHub request must not leave publication or queue state ambiguous.
+        raise RuntimeError(
+            f"GitHub request timed out after {GH_TIMEOUT_SECONDS}s: {' '.join(args[:2])}"
+        ) from exc
     if result.returncode:
         # Never echo authenticated commands, environment, or arbitrary response bodies.
         detail = result.stderr.decode(errors='replace').replace('\n', ' ')[:300]
@@ -196,7 +223,7 @@ def resolve_selection(config: dict, selected: str, rows: list[dict]) -> dict:
 
 def scan(config: dict, refresh_target: str | None = None) -> None:
     host = config['analysis_repository']
-    state = json.loads(cf_api(config, '/api/state/current-analysis-state.json'))
+    state = json.loads(read_storage(config, 'state', 'current-analysis-state.json'))
     # No mutation until full discovery succeeds.
     discovered = inventory(config, state)
     if refresh_target:
@@ -266,7 +293,7 @@ def scan(config: dict, refresh_target: str | None = None) -> None:
         request_id = uuid.uuid4().hex
         row.update(request_id=request_id, status='dispatching', tooling_sha=tooling)
         row.pop('manual_refresh', None)
-        cf_api(config, '/api/state/current-analysis-state.json', method='POST', data=json.dumps(state, separators=(',', ':')).encode())  # Intent persists before side effects.
+        cf_api(config, storage_path(config, 'state', 'current-analysis-state.json'), method='POST', data=json.dumps(state, separators=(',', ':')).encode())  # Intent persists before side effects.
         dispatched = api(f'repos/{host}/actions/workflows/11-source-analysis.yml/dispatches',
             {'ref': branch, 'return_run_details': True, 'inputs': {'target': json.dumps(row), 'tooling_sha': tooling,
                                       'request_id': request_id}})
@@ -276,7 +303,7 @@ def scan(config: dict, refresh_target: str | None = None) -> None:
         running += 1
     state.update(launch_endpoint=config.get('launch_endpoint'), source_repository=config['source_repository'], preferred_branch=config['preferred_branch'], analysis_repository=host,
                  analysis_default_branch=branch)
-    cf_api(config, '/api/state/current-analysis-state.json', method='POST', data=json.dumps(state, separators=(',', ':')).encode())
+    cf_api(config, storage_path(config, 'state', 'current-analysis-state.json'), method='POST', data=json.dumps(state, separators=(',', ':')).encode())
     print(json.dumps({'targets': len(state['targets']), 'running': running,
                       'queued': sum(r['status'] == 'queued' for r in state['targets'])}))
 
@@ -348,11 +375,11 @@ def collect(config: dict, row: dict, destination: Path) -> dict:
 def publish(config: dict, output: Path) -> None:
     host, repo = config['analysis_repository'], config['publishing_repository']
     
-    scan_state = json.loads(cf_api(config, '/api/state/current-analysis-state.json'))
+    scan_state = json.loads(read_storage(config, 'state', 'current-analysis-state.json'))
     if not scan_state:
         raise ValueError('analysis discovery state has not been initialized')
     
-    previous = json.loads(cf_api(config, '/api/report/current-reports.json'))
+    previous = json.loads(read_storage(config, 'report', 'current-reports.json'))
     state = reconcile(previous, inventory(config, scan_state), now())
     state.update(launch_endpoint=config.get('launch_endpoint'), source_repository=config['source_repository'], preferred_branch=config['preferred_branch'], analysis_repository=host,
                  analysis_default_branch=scan_state.get('analysis_default_branch'),
@@ -399,7 +426,7 @@ def publish(config: dict, output: Path) -> None:
                         bundle = work / name
                         bundle.write_bytes(packed)
                         if name not in uploaded:
-                            cf_api(config, f'/api/report/current-reports/{name}', method='POST', data=bundle.read_bytes(), content_type='application/gzip')
+                            cf_api(config, storage_path(config, 'report', f'current-reports/{name}'), method='POST', data=bundle.read_bytes(), content_type='application/gzip')
                             uploaded.add(name)
                         row.update(report='reports/' + name[7:-8], asset=name, collected_run=key,
                                    analyzed_sha=report['analyzed_sha'], status=report['status'])
@@ -417,7 +444,7 @@ def publish(config: dict, output: Path) -> None:
                 bundle = work / name
                 if not bundle.exists():
                     try:
-                        bundle.write_bytes(cf_api(config, f'/api/report/current-reports/{name}'))
+                        bundle.write_bytes(read_storage(config, 'report', f'current-reports/{name}'))
                     except Exception as e:
                         raise ValueError(f'manifest references a missing retained report: {e}')
                 unpacked = gzip.decompress(bundle.read_bytes())
@@ -449,18 +476,13 @@ def publish(config: dict, output: Path) -> None:
         if size >= config['site_limit_bytes']:
             raise ValueError(f'site capacity exceeded: {size} bytes; previous deployment retained')
         # Commit only after every referenced file is materialized and validated.
-        cf_api(config, '/api/report/current-reports.json', method='POST', data=json.dumps(state, separators=(',', ':')).encode())
+        cf_api(config, storage_path(config, 'report', 'current-reports.json'), method='POST', data=json.dumps(state, separators=(',', ':')).encode())
         print(json.dumps({'site_bytes': size, 'targets': len(state['targets'])}))
 
 
 def cleanup(config: dict) -> None:
-    repo = config['publishing_repository']
-    pass
-    return
-    
-    if False:
-        pass
-            
+    """Retain the command for workflow compatibility; publication owns cleanup."""
+    del config
 
 
 def main() -> None:

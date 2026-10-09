@@ -5,7 +5,9 @@ import argparse
 import html
 import json
 import secrets
+import shutil
 import subprocess
+import sys
 import threading
 import urllib.parse
 import urllib.request
@@ -14,12 +16,55 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
+def _find_npx() -> list[str]:
+    """Return the command to invoke npx cross-platform."""
+    npx = shutil.which("npx")
+    if npx:
+        return [npx]
+    if sys.platform == "win32":
+        npx_cmd = shutil.which("npx.cmd")
+        if npx_cmd:
+            return [npx_cmd]
+    return ["npx"]
+
+
+def _find_openssl() -> str | None:
+    """Find OpenSSL executable cross-platform."""
+    openssl = shutil.which("openssl")
+    if openssl:
+        return openssl
+    if sys.platform == "win32":
+        candidates = [
+            Path("C:/Program Files/Git/usr/bin/openssl.exe"),
+            Path("C:/Program Files (x86)/Git/usr/bin/openssl.exe"),
+            Path.home() / "scoop" / "apps" / "openssl" / "current" / "bin" / "openssl.exe",
+            Path("C:/OpenSSL-Win64/bin/openssl.exe"),
+            Path("C:/OpenSSL-Win32/bin/openssl.exe"),
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return str(candidate)
+    return None
+
+
+def _run_wrangler_secret_put(npx_cmd: list[str], secret_name: str, secret_value: str) -> None:
+    """Store a secret via wrangler."""
+    subprocess.run(
+        [*npx_cmd, "--yes", "wrangler@4.129.1", "secret", "put", secret_name],
+        input=secret_value + "\n",
+        text=True,
+        check=True,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker-origin", required=True)
     parser.add_argument("--dashboard-url", required=True)
     parser.add_argument("--app-name", default="Code Analysis Launcher")
-    parser.add_argument('--application', action='store_true', help='Register the public repository onboarding application')
+    parser.add_argument(
+        "--application", action="store_true", help="Register the public repository onboarding application"
+    )
     args = parser.parse_args()
     worker = urllib.parse.urlsplit(args.worker_origin)
     dashboard = urllib.parse.urlsplit(args.dashboard_url)
@@ -49,9 +94,6 @@ def main() -> None:
         },
     }
 
-    if args.application:
-        manifest['default_permissions']['workflows'] = 'write'
-
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, _format: str, *_args: object) -> None:
             return
@@ -80,7 +122,10 @@ def main() -> None:
                 body = "Not found"
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
-            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action https://github.com; base-uri 'none'; frame-ancestors 'none'")
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'none'; style-src 'unsafe-inline'; form-action https://github.com; base-uri 'none'; frame-ancestors 'none'",
+            )
             self.end_headers()
             self.wfile.write(body.encode())
 
@@ -100,32 +145,30 @@ def main() -> None:
     with urllib.request.urlopen(request, timeout=30) as response:
         app = json.load(response)
     client_id = app["client_id"]
-    subprocess.run(
-        ["npx.cmd", "--yes", "wrangler@4.129.1", "secret", "put", "NEXT_GITHUB_CLIENT_SECRET" if args.application else "GITHUB_CLIENT_SECRET"],
-        input=app["client_secret"] + "\n",
-        text=True,
-        check=True,
-    )
+
+    npx_cmd = _find_npx()
+    secret_name = "NEXT_GITHUB_CLIENT_SECRET" if args.application else "GITHUB_CLIENT_SECRET"
+    _run_wrangler_secret_put(npx_cmd, secret_name, app["client_secret"])
+
     if args.application:
-        import shutil
-        openssl = shutil.which('openssl')
+        openssl = _find_openssl()
         if not openssl:
-            candidate = Path('C:/Program Files/Git/usr/bin/openssl.exe')
-            openssl = str(candidate) if candidate.exists() else None
-        if not openssl:
-            raise SystemExit('OpenSSL is needed to prepare the App private key; no key was printed')
-        converted = subprocess.run([openssl, 'pkcs8', '-topk8', '-nocrypt'], input=app['pem'],
-                                   text=True, capture_output=True, check=True)
-        for name, value in {'NEXT_GITHUB_APP_PRIVATE_KEY':converted.stdout,
-                            'NEXT_GITHUB_WEBHOOK_SECRET':app['webhook_secret']}.items():
-            subprocess.run(['npx.cmd','--yes','wrangler@4.129.1','secret','put',name],
-                           input=value+'\n', text=True, check=True)
+            raise SystemExit("OpenSSL is needed to prepare the App private key; no key was printed")
+        converted = subprocess.run(
+            [openssl, "pkcs8", "-topk8", "-nocrypt"], input=app["pem"], text=True, capture_output=True, check=True
+        )
+        for name, value in {
+            "NEXT_GITHUB_APP_PRIVATE_KEY": converted.stdout,
+            "NEXT_GITHUB_WEBHOOK_SECRET": app["webhook_secret"],
+        }.items():
+            _run_wrangler_secret_put(npx_cmd, name, value)
+
     config_path = Path(__file__).resolve().parents[2] / "analysis-launcher/wrangler.jsonc"
     config = json.loads(config_path.read_text(encoding="utf-8"))
     config["vars"]["NEXT_GITHUB_CLIENT_ID" if args.application else "GITHUB_CLIENT_ID"] = client_id
     if args.application:
-        config['vars']['NEXT_GITHUB_APP_ID'] = str(app['id'])
-        config['vars']['NEXT_GITHUB_APP_SLUG'] = app['slug']
+        config["vars"]["NEXT_GITHUB_APP_ID"] = str(app["id"])
+        config["vars"]["NEXT_GITHUB_APP_SLUG"] = app["slug"]
     config["preview_urls"] = False
     config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     print(f"GitHub App created: {app['html_url']}")

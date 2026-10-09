@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker, { seal, unseal } from './worker.mjs';
 
-const env = { SOURCE_REPOSITORY: 'source/app', ANALYSIS_REPOSITORY: 'host/scanners', DASHBOARD_ORIGIN: 'https://owner.github.io', GITHUB_CLIENT_ID: 'app-id', GITHUB_CLIENT_SECRET: 'test-secret', SESSION_KEY: Buffer.alloc(32, 7).toString('base64url') };
+const env = { SOURCE_REPOSITORY: 'source/app', ANALYSIS_REPOSITORY: 'host/scanners', DASHBOARD_ORIGIN: 'https://owner.github.io', GITHUB_CLIENT_ID: 'app-id', GITHUB_CLIENT_SECRET: 'test-secret', GITHUB_OAUTH_SCOPES: 'public_repo', SESSION_KEY: Buffer.alloc(32, 7).toString('base64url') };
 const reply = value => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
 async function request(path, body, overrides = {}) {
   const session = await seal({ type: 'session', token: 'github-test-token', exp: Date.now() + 60000 }, env.SESSION_KEY);
@@ -71,6 +71,7 @@ test('OAuth binds callback to cookie and nonce, uses PKCE and exposes only encry
   assert.equal(login.status, 302);
   const location = new URL(login.headers.get('Location'));
   assert.equal(location.searchParams.get('code_challenge_method'), 'S256');
+  assert.equal(location.searchParams.get('scope'), 'public_repo');
   assert.ok(login.headers.get('Set-Cookie').includes('HttpOnly; SameSite=Lax'));
   const cookie = login.headers.get('Set-Cookie').split(';')[0];
   const wrong = await worker.fetch(new Request('https://launcher.example/auth/callback?code=x&state=wrong', { headers: { Cookie: cookie } }), env);
@@ -82,6 +83,12 @@ test('OAuth binds callback to cookie and nonce, uses PKCE and exposes only encry
   assert.ok(html.includes(nonce)); assert.ok(html.includes('https://owner.github.io'));
   assert.ok(response.headers.get('Content-Security-Policy').includes("default-src 'none'"));
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
+});
+test('repository App authorization omits OAuth scopes', async () => {
+  const mode = { ...env, APPLICATION_MODE: 'repositories', ANALYSIS_REPOSITORY: 'host/scanners', GITHUB_APP_SLUG: 'code-analysis-dashboard' };
+  const login = await worker.fetch(new Request(`https://launcher.example/auth/login?nonce=${'a'.repeat(64)}`), mode);
+  assert.equal(login.status, 302);
+  assert.equal(new URL(login.headers.get('Location')).searchParams.has('scope'), false);
 });
 test('GitHub dispatch errors are failures, never successful scan confirmations', async t => {
   t.mock.method(globalThis, 'fetch', async url => url.includes('dispatches') ? new Response('vendor-secret-error', { status: 500 }) : reply({ permissions: { push: true }, default_branch: 'main' }));
@@ -156,4 +163,120 @@ test('collaborator check accepts only membership and observes removal',async t=>
  status=403;await assert.rejects(isCollaborator(env,'viewer',token));
  status=200;await assert.rejects(isCollaborator(env,'viewer',token));
  await assert.rejects(isCollaborator(env,'viewer',async()=>undefined));
+});
+
+const workerApiEnv = {...env, WORKER_API_TOKEN: 'worker-api-token'};
+function apiRequest(path, body, overrides = {}) {
+  return new Request(`https://launcher.example${path}`, { method: 'POST', headers: { Authorization: `Bearer ${workerApiEnv.WORKER_API_TOKEN}`, 'Content-Type': 'application/json', ...overrides }, ...(body !== undefined ? { body, ...(typeof body === 'object' && body !== null && typeof body.pipeThrough === 'function' ? { duplex: 'half' } : {}) } : {}) });
+}
+test('state and report writes are bounded per endpoint', async () => {
+  const state = { store: new Map(), async get(key) { return this.store.get(key) || null; }, async put(key, value) { this.store.set(key, value); } };
+  const reports = { store: new Map(), async get(key) { return null; }, async put(key, value) { if (value && typeof value.pipeThrough === 'function') await new Response(value).arrayBuffer(); this.store.set(key, value); } };
+  const bounded = { ...workerApiEnv, ANALYSIS_STATE: state, ANALYSIS_REPORTS: reports, MAX_STATE_BYTES: '64', MAX_MANIFEST_JSON_BYTES: '128', MAX_ASSET_BYTES: '256' };
+  assert.equal((await worker.fetch(apiRequest('/api/state/ok.json', '{"a":1}'), bounded)).status, 200);
+  assert.equal(state.store.get('ok.json'), '{"a":1}');
+  const stateDenied = await worker.fetch(apiRequest('/api/state/big.json', 'x'.repeat(128)), bounded);
+  assert.equal(stateDenied.status, 413);
+  assert.equal((await stateDenied.json()).request_id, stateDenied.headers.get('X-Request-ID'));
+  assert.equal(state.store.has('big.json'), false);
+  // Streamed state writes without a declared length are counted and cancelled.
+  const stream = new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(32)); controller.enqueue(new Uint8Array(32)); controller.enqueue(new Uint8Array(32)); controller.close(); } });
+  assert.equal((await worker.fetch(apiRequest('/api/state/stream.json', stream), bounded)).status, 413);
+  assert.equal(state.store.has('stream.json'), false);
+  // Manifest JSON uploads are bounded before storage.
+  const manifest = JSON.stringify({ schema_version: 'analysis-current-v1', metrics: { compressed_bytes: 1 } });
+  assert.equal((await worker.fetch(apiRequest('/api/report/analysis-current-2.json', manifest), bounded)).status, 200);
+  const manifestDenied = await worker.fetch(apiRequest('/api/report/analysis-current-1.json', 'x'.repeat(256)), bounded);
+  assert.equal(manifestDenied.status, 413);
+  assert.equal(reports.store.has('analysis-current-1.json'), false);
+  // Asset uploads enforce the per-object budget.
+  const assetDenied = await worker.fetch(apiRequest('/api/report/analysis-current-1/analysis-' + 'a'.repeat(64) + '.json.gz', 'x'.repeat(512)), bounded);
+  assert.equal(assetDenied.status, 413);
+  assert.equal(reports.store.size, 1);
+});
+test('launch bodies above the endpoint budget are rejected', async t => {
+  t.mock.method(globalThis, 'fetch', async () => reply({ permissions: { push: true }, default_branch: 'main' }));
+  const response = await worker.fetch(await request('/api/launch', { repository: 'source/app', kind: 'branch', ref: 'x'.repeat(4096) }), env);
+  assert.equal(response.status, 413);
+  const body = await response.json();
+  assert.equal(body.request_id, response.headers.get('X-Request-ID'));
+  assert.equal(body.error.includes('2048'), true);
+});
+test('error responses carry the request id for correlation', async () => {
+  const response = await worker.fetch(new Request('https://launcher.example/api/launch', { method: 'POST', headers: { Origin: env.DASHBOARD_ORIGIN } }), env);
+  assert.equal(response.status, 401);
+  const body = await response.json();
+  assert.equal(body.request_id, response.headers.get('X-Request-ID'));
+  assert.equal(typeof body.error, 'string');
+});
+test('same-origin preflight keeps CORS and response safety headers', async () => {
+  const response = await worker.fetch(new Request('https://launcher.example/api/launch', {
+    method: 'OPTIONS', headers: { Origin: env.DASHBOARD_ORIGIN, 'Access-Control-Request-Method': 'POST' }
+  }), env);
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), env.DASHBOARD_ORIGIN);
+  assert.equal(response.headers.get('Access-Control-Allow-Methods'), 'GET, POST, OPTIONS');
+  assert.equal(response.headers.get('Access-Control-Allow-Headers'), 'Authorization, Content-Type');
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
+  assert.match(response.headers.get('X-Request-ID'), /^[a-f0-9-]{36}$/);
+});
+test('worker failures log classified error codes only', async t => {
+  const calls = t.mock.method(console, 'log', () => {});
+  const response = await worker.fetch(new Request('https://launcher.example/api/launch', { method: 'POST', headers: { Origin: env.DASHBOARD_ORIGIN } }), { ...env, SAFE_API_LOGS: 'true' });
+  assert.equal(response.status, 401);
+  assert.equal(calls.mock.calls.length, 1);
+  assert.match(calls.mock.calls[0].arguments[0], /"error_code":"session_invalid"/);
+  assert.ok(!calls.mock.calls[0].arguments[0].includes('Authorization'));
+});
+test('collaborator verification re-mints revoked installation tokens', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const pem = Buffer.from(await crypto.subtle.exportKey('pkcs8', pair.privateKey)).toString('base64');
+  const { isCollaborator } = await import('./viewer-access.mjs');
+  let mints = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    if (String(url).endsWith('/installation')) return Response.json({ id: 9 });
+    if (String(url).endsWith('/access_tokens')) { mints++; return Response.json({ token: `scoped-${mints}` }); }
+    assert.equal(String(url), 'https://api.github.com/repos/host/scanners/collaborators/viewer');
+    if (init.headers.Authorization === 'Bearer scoped-1') return new Response(null, { status: 401 });
+    return new Response(null, { status: 204 });
+  });
+  const viewerEnv = { ...env, ANALYSIS_REPOSITORY: 'host/scanners', GITHUB_APP_ID: 'viewer-app-mint', GITHUB_APP_PRIVATE_KEY: pem };
+  assert.equal(await isCollaborator(viewerEnv, 'viewer'), true);
+  assert.equal(mints, 2);
+});
+test('idempotent GitHub reads retry bounded transient and secondary-rate-limit failures', async t => {
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async url => {
+    calls++;
+    if (url.endsWith('repos/host/scanners')) {
+      if (calls < 3) return new Response('busy', { status: 502, headers: { 'Retry-After': '0' } });
+      return reply({ permissions: { push: true }, default_branch: 'main' });
+    }
+    return reply({ id: 1, path: '.github/workflows/10-analysis-discovery.yml' });
+  });
+  assert.equal((await worker.fetch(await request('/api/runs/42'), env)).status, 200);
+  assert.equal(calls, 4);
+});
+test('secondary-rate-limit reads retry, ordinary forbidden reads do not', async t => {
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async url => {
+    calls++;
+    if (url.endsWith('repos/host/scanners')) return calls === 1
+      ? new Response(JSON.stringify({ message: 'You have exceeded a secondary rate limit.' }), { status: 403, headers: { 'Retry-After': '0' } })
+      : reply({ permissions: { push: true } });
+    return reply({ id: 1, path: '.github/workflows/10-analysis-discovery.yml' });
+  });
+  assert.equal((await worker.fetch(await request('/api/runs/42'), env)).status, 200);
+  assert.equal(calls, 3);
+});
+test('dispatch POST failures are never retried', async t => {
+  let dispatches = 0;
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (url.includes('dispatches')) { dispatches++; return new Response('busy', { status: 503, headers: { 'Retry-After': '0' } }); }
+    if (url.endsWith('repos/host/scanners')) return reply({ permissions: { push: true }, default_branch: 'main' });
+    return reply({ commit: { sha: 'a'.repeat(40) } });
+  });
+  assert.equal((await worker.fetch(await request('/api/launch', { repository: 'source/app', kind: 'branch', ref: 'main' }), env)).status, 502);
+  assert.equal(dispatches, 1);
 });

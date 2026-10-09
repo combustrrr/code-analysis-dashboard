@@ -5,9 +5,8 @@ publication privileges, persisted checkout credentials, or source-inherited tool
 """
 from pathlib import Path
 import copy
+import re
 import json
-import re
-import re
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -44,6 +43,9 @@ def generate(config=None):
                 # GitHub's host-PR gate is not an upstream-head scanner.
                 continue
             job = copy.deepcopy(original)
+            # Source jobs may inspect public source, but never receive credentials.
+            job['env'] = {key: value for key, value in job.get('env', {}).items()
+                          if not (isinstance(value, str) and 'secrets.' in value)}
             # Older generated scanner jobs used single-brace GitHub expressions in
             # shell strings. Normalize those inputs while regenerating exact-source
             # workflows so secrets and run metadata are evaluated by Actions.
@@ -63,12 +65,21 @@ def generate(config=None):
             if name == 'codeql':
                 job['strategy']['matrix']['language'] = '${{ fromJSON(needs.identity.outputs.languages) }}'
             job.setdefault('env', {})['SOURCE_REPOSITORY'] = '${{ fromJSON(inputs.target).source_repository }}'
+            job['env'].pop('SONAR_PROJECT_KEY', None)
             if name == 'atheris-state-machine':
                 job['env'].update(ANALYSIS_BACKEND_ROOT='${{ github.workspace }}/' + profile['python_root'],
                                   ANALYSIS_SOURCE_SHA='${{ fromJSON(inputs.target).head_sha }}')
             steps = []
             for step in job['steps']:
                 uses = step.get('uses', '')
+                if 'R2_' in json.dumps(step):
+                    command = re.search(r'aws s3 cp\s+(.*?)\s+s3://', str(step.get('run', '')), re.S)
+                    if not command:
+                        raise ValueError('Cannot safely convert R2 upload in ' + str(step.get('name', 'unnamed')))
+                    paths = '\n'.join(line.strip().rstrip('\\\\') for line in command.group(1).splitlines() if line.strip())
+                    artifact_name = step.get('name', 'scanner-output').replace('Upload ', '').replace(' to R2', '').strip()
+                    step = {'name': 'Upload ' + artifact_name + ' as artifact', 'if': step.get('if', 'always()'), 'uses': UPLOAD, 'with': {'name': artifact_name, 'path': paths, 'if-no-files-found': 'error', 'retention-days': 7}}
+                    uses = UPLOAD
                 if 'upload-sarif@' in uses or step.get('name') in {'Parse Results for Aggregation', 'Upload Normalized Findings'}:
                     continue
                 if uses.startswith('actions/checkout@'):
@@ -82,33 +93,6 @@ def generate(config=None):
                     else:
                         options.update(repository='${{ fromJSON(inputs.target).source_repository }}',
                                        ref='${{ fromJSON(inputs.target).head_sha }}')
-                if uses.startswith('actions/upload-artifact@'):
-                    # Convert artifact uploads to Cloudflare R2 uploads when generating the
-                    # exact-source workflow. This avoids GitHub artifact zipping and pagination
-                    # overhead. The generated step uses the aws CLI and repository secrets:
-                    # R2_ACCESS_KEY, R2_SECRET_KEY, R2_ACCOUNT_ID, R2_BUCKET_NAME.
-                    options = step.setdefault('with', {})
-                    name = options.get('name', '').replace('\n', '')
-                    path = options.get('path', '.')
-                    # Create a run step that uploads the specified path to the R2 bucket
-                    # under the run/attempt prefix. Use --recursive so both files and
-                    # directories work. Keep the original if-condition if present.
-                    r2_run = {
-                        'name': f'Upload {name or path} to R2',
-                        'if': step.get('if', 'always()'),
-                        'env': {
-                            'AWS_ACCESS_KEY_ID': '${{ secrets.R2_ACCESS_KEY }}',
-                            'AWS_SECRET_ACCESS_KEY': '${{ secrets.R2_SECRET_KEY }}',
-                            'AWS_DEFAULT_REGION': 'auto'
-                        },
-                        'run': (
-                            'python -m pip install --disable-pip-version-check --upgrade pip awscli\n'
-                            + f"aws s3 cp {path} s3://${{{{ secrets.R2_BUCKET_NAME }}}}/temp-runs/${{{{ github.run_id }}}}/${{{{ github.run_attempt }}}}/{name or ''} "
-                            + "--recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
-                        )
-                    }
-                    # Replace the upload-artifact step with our R2 run step.
-                    step = r2_run
                 if 'github/codeql-action/analyze@' in uses:
                     step.setdefault('with', {})['upload'] = False
                 # Gitleaks scanner-only operation: never runs the public PR commenting action.
@@ -120,8 +104,6 @@ def generate(config=None):
                 if name == 'snyk':
                     if step.get('name') in {'Resolve Python dependency manifests for Snyk SCA'}:
                         step['run'] = 'python -I .analysis-tooling/scripts/code_analysis/snyk_metadata.py --source "$GITHUB_WORKSPACE" --destination "$RUNNER_TEMP/snyk-metadata"'
-                    if step.get('name') in {'Scan open-source dependencies', 'Scan source code'}:
-                        step.setdefault('env', {})['SNYK_TOKEN'] = '${{ secrets.SNYK_TOKEN }}'
                     if step.get('name') == 'Scan open-source dependencies':
                         step['run'] = 'set -o pipefail\npython -I .analysis-tooling/scripts/code_analysis/snyk_scan.py 2>&1 | tee snyk-open-source.log'
                 text = yaml.safe_dump(step, sort_keys=False)
@@ -144,7 +126,7 @@ def generate(config=None):
                 steps.append(step)
             if name == 'snyk':
                 job['env'].pop('SNYK_TOKEN', None)
-                job['env']['SNYK_CONFIGURED'] = "${{ secrets.SNYK_TOKEN != '' }}"
+                job['env']['SNYK_CONFIGURED'] = 'false'
                 steps.insert(1, {'uses': CHECKOUT, 'with': {'repository': '${{ github.repository }}',
                              'ref': '${{ inputs.tooling_sha }}', 'path': '.analysis-tooling', 'persist-credentials': False}})
             if name in {'test-coverage', 'typescript-quality'}:
@@ -239,6 +221,41 @@ def generate(config=None):
                     if 'run' in step and 'backend/ webui/src/' in step['run']:
                         step['run'] = 'semgrep --config=p/owasp-top-ten --config=p/secrets --json --output=semgrep-results.json .'
             job['steps'] = isolated
+            for source_step in job['steps']:
+                if 'env' in source_step:
+                    source_step['env'] = {key: value for key, value in source_step['env'].items()
+                                          if not (isinstance(value, str) and 'secrets.' in value)}
+                if source_step.get('name') == 'Observe GitHub secret-scanning posture':
+                    source_step['env'] = {'GH_TOKEN': '${{ github.token }}'}
+            if name == 'sonarqube-cloud':
+                identity_step = {
+                    'name': 'Derive Sonar project identity',
+                    'id': 'sonar-project',
+                    'shell': 'bash',
+                    'run': ('set -euo pipefail\n'
+                            'IFS=/ read -r organization repository <<< "$SOURCE_REPOSITORY"\n'
+                            'if [[ -z "$organization" || -z "$repository" || "$SOURCE_REPOSITORY" != "$organization/$repository" ]]; then\n'
+                            '  echo "SOURCE_REPOSITORY must be an owner/repository identity" >&2\n'
+                            '  exit 1\nfi\n'
+                            'printf "organization=%s\nproject_key=%s_%s\n" "$organization" "$organization" "$repository" >> "$GITHUB_OUTPUT"')}
+                job['steps'].insert(0, identity_step)
+                for sonar_step in job['steps']:
+                    if 'with' in sonar_step and 'args' in sonar_step['with']:
+                        args = sonar_step['with']['args']
+                        args = args.replace(
+                            '-Dsonar.organization=${{ github.repository_owner }} -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}',
+                            '-Dsonar.organization=${{ steps.sonar-project.outputs.organization }} -Dsonar.projectKey=${{ steps.sonar-project.outputs.project_key }}')
+                        if 'sonar.project.properties' in args and '-Dsonar.organization=' not in args:
+                            args = args.replace(
+                                '-Dproject.settings=',
+                                '-Dsonar.organization=${{ steps.sonar-project.outputs.organization }} -Dsonar.projectKey=${{ steps.sonar-project.outputs.project_key }} -Dproject.settings=', 1)
+                        sonar_step['with']['args'] = args
+                    if 'run' in sonar_step and '--project combustrrr_Agentic-Kibana' in sonar_step['run']:
+                        sonar_step['run'] = sonar_step['run'].replace('--project combustrrr_Agentic-Kibana', '--project ${{ steps.sonar-project.outputs.project_key }}')
+                    if 'run' in sonar_step and '--project ${{ github.repository_owner }}_${{ github.event.repository.name }}' in sonar_step['run']:
+                        sonar_step['run'] = sonar_step['run'].replace('--project ${{ github.repository_owner }}_${{ github.event.repository.name }}', '--project ${{ steps.sonar-project.outputs.project_key }}')
+                    if 'run' in sonar_step and '$SONAR_PROJECT_KEY' in sonar_step['run']:
+                        sonar_step.setdefault('env', {})['SONAR_PROJECT_KEY'] = '${{ steps.sonar-project.outputs.project_key }}'
             if name == 'snyk':
                 job['steps'].append({'name': 'Upload isolated resolver diagnostics', 'if': 'always()',
                                      'uses': UPLOAD, 'with': {'name': 'snyk-resolver-diagnostics',

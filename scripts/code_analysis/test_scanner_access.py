@@ -9,6 +9,8 @@ import sys
 import tempfile
 from unittest.mock import patch
 
+from scripts.code_analysis import ensure_sonar_browse as ensure_browse
+from scripts.code_analysis.sonar_identity import project_identity
 import yaml
 from scripts.code_analysis import probe_sonar_access as probe
 from scripts.code_analysis.generate_source_workflow import generate, diagnostics
@@ -58,6 +60,23 @@ class ScannerAccessTests(unittest.TestCase):
         self.assertEqual(steps[access]['env']['SCAN_BRANCH'], '${{ steps.sonar-identity.outputs.sonar_branch }}')
         status = next(s for s in steps if s.get('name')=='Record configured scan status')
         self.assertIn('branch_entitlement', status['run'])
+
+    def test_sonar_identity_is_source_scoped_and_rejects_missing_environment(self):
+        self.assertEqual(project_identity('owner/other-repo'), ('owner', 'owner_other-repo'))
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(SystemExit):
+                probe.probe(Path(tempfile.mkdtemp()) / 'probe.json')
+            with self.assertRaises(SystemExit):
+                ensure_browse.ensure(Path(tempfile.mkdtemp()) / 'grant.json')
+
+    def test_generated_sonar_jobs_use_dispatch_source_identity(self):
+        workflow = yaml.safe_load(generate())
+        job = workflow['jobs']['scanner-1-sonarqube-cloud']
+        self.assertEqual(job['env']['SOURCE_REPOSITORY'], '${{ fromJSON(inputs.target).source_repository }}')
+        self.assertEqual(next(step for step in job['steps'] if step.get('id') == 'sonar-project')['name'], 'Derive Sonar project identity')
+        sonar_text = yaml.safe_dump(job)
+        self.assertIn('steps.sonar-project.outputs.project_key', sonar_text)
+        self.assertNotIn('combustrrr_Agentic-Kibana', sonar_text)
 
 
 if __name__ == '__main__':

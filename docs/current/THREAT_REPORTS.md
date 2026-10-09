@@ -30,6 +30,20 @@ responsive tables, high-contrast light/dark themes, and print-specific paginatio
 provided by the Threat Report view. PDF output is browser print/save-to-PDF from the
 report view; controls and navigation are hidden in print media.
 
+## Publication and target boundaries
+
+Native SARIF publication is not a property of every scan. Only the explicitly
+scoped reconciliation/native-publication job receives `security-events: write`.
+Source-executing and diagnostic jobs are read-only; source-only observer projects
+do not upload checks or findings to the source repository. A connected project can
+publish supported native findings only to its configured execution repository.
+
+Reports are current-only: the Worker serves the current manifest and current
+assets, subject to identity and freshness checks. Superseded, stale, undated, or
+unpublished targets are not reconstructed and are not represented as zero findings.
+Targets must be a repository branch, open pull request, or full 40-character commit
+SHA; local working trees and uncommitted changes are unsupported.
+
 ## Evaluation Guardrails
 
 The configured Kavach evaluation accepts only the `Testing` branch, freezes its

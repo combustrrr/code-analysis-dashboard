@@ -63,3 +63,8 @@ To ensure R2 usage never exceeds free-tier limits:
 - The Worker rejects asset uploads over `MAX_ASSET_BYTES` (default 100 MB) and manifest writes with `metrics.compressed_bytes` over `MAX_MANIFEST_COMPRESSED_BYTES` (default 900 MB). Adjust via wrangler.jsonc vars if needed.
 - Workflows upload only scanner artifacts (SARIF/JSON/logs) and never caches or large binary blobs. The generator and conversion scripts route uploads to `temp-runs/`.
 - Publication writes one current manifest per project (`analysis-current-<project>.json`) and compressed report shards under `analysis-current-<project>/`. Old shards can be garbage-collected via lifecycle policies when rotated, but current manifest should remain available.
+
+The entries above describe configured boundaries or possible future programs; they
+do not establish an entitlement, reserved capacity, or successful live integration.
+Treat a scanner as operational only when the current report contains its actual
+evidence and provenance.

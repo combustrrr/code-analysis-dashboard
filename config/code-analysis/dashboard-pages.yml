@@ -38,6 +38,11 @@ jobs:
       - name: Build UI only on source changes or cache eviction
         if: steps.ui.outputs.cache-hit != 'true'
         working-directory: analysis-ui
+        env:
+          VITE_APPLICATION_MODE: repositories
+          VITE_LAUNCH_ENDPOINT: https://code-analysis-launcher.icsarthak9.workers.dev
+          VITE_DEFAULT_EXECUTION_REPOSITORY: combustrrr/code-analysis-dashboard
+          VITE_DEFAULT_PROJECT_ID: '1360051890'
         run: |
           npm ci --ignore-scripts
           npm run build

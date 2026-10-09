@@ -20,8 +20,24 @@ test('errors are logged, success is sampled and disabled logging stays silent',t
  assert.equal(config.observability.logs.invocation_logs,false);assert.equal(config.observability.traces.enabled,false);
 });
 test('request correlation keeps anonymous errors private and does not bypass authorization',async()=>{
- const env={SOURCE_REPOSITORY:'source/app',ANALYSIS_REPOSITORY:'host/scanners',DASHBOARD_ORIGIN:'https://owner.github.io',GITHUB_CLIENT_ID:'id',GITHUB_CLIENT_SECRET:'secret',SESSION_KEY:Buffer.alloc(32,7).toString('base64url')};
+ const env={SOURCE_REPOSITORY:'source/app',ANALYSIS_REPOSITORY:'host/scanners',DASHBOARD_ORIGIN:'https://owner.github.io',GITHUB_CLIENT_ID:'id',GITHUB_CLIENT_SECRET:'secret',GITHUB_OAUTH_SCOPES:'public_repo',SESSION_KEY:Buffer.alloc(32,7).toString('base64url')};
  const response=await worker.fetch(new Request('https://worker/api/launch',{method:'POST',headers:{Origin:env.DASHBOARD_ORIGIN}}),env);
  assert.equal(response.status,401);assert.match(response.headers.get('X-Request-ID'),/^[a-f0-9-]{36}$/);
  assert.match(response.headers.get('Cache-Control'),/no-store/);
+});
+
+test('diagnostic events carry classified error codes only',()=>{
+  const path='https://worker/api/project-launch';
+  const event=diagnosticEvent(new Request(path,{method:'POST'}),413,Date.now(),'id','request_too_large');
+  assert.equal(event.error_code,'request_too_large');
+  for(const code of ['upstream said "secret-token"','UNKNOWN','','x'.repeat(65),42,null,undefined]){
+    assert.equal(diagnosticEvent(new Request(path,{method:'POST'}),500,Date.now(),'id',code).error_code,undefined);
+  }
+  assert.ok(!JSON.stringify(event).includes('secret'));
+});
+test('emitDiagnostic logs the classified error code',t=>{
+  const calls=t.mock.method(console,'log',()=>{});
+  emitDiagnostic(new Request('https://worker/api/launch',{method:'POST'}),413,Date.now(),'id',{SAFE_API_LOGS:'true'},'request_too_large');
+  assert.equal(calls.mock.calls.length,1);
+  assert.match(calls.mock.calls[0].arguments[0],/"error_code":"request_too_large"/);
 });
