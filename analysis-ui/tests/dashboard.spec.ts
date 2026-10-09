@@ -140,6 +140,7 @@ test('overview drilldown, scanner filters and provenance use retained evidence',
   const rows=page.locator('.ant-table-tbody > tr.ant-table-row');
   await expect(rows.first()).toContainText('Unavailable');
   for (const row of await rows.all()) await expect(row).toContainText('Unavailable');
+  await page.getByRole('tab', {name:'Settings',exact:true}).click();
   await page.getByRole('tab', {name:'Provenance',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Analysis identity'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Producing workflows'})).toBeVisible();

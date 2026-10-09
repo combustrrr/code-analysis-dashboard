@@ -25,7 +25,10 @@ def main():
         jobs, _, languages = selection(json.loads(Path('config/code-analysis/service.json').read_text()), Path('.source'))
         with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
             output.write('jobs=' + json.dumps(jobs) + '\n')
-            output.write('languages=' + json.dumps(languages or ['python']) + '\n')
+            # An empty language result is meaningful: applicability excludes
+            # language-dependent scanners. Never invent Python evidence for a
+            # repository with no detected supported language.
+            output.write('languages=' + json.dumps(languages) + '\n')
         return
     host, run, attempt = os.environ['GITHUB_REPOSITORY'], os.environ['GITHUB_RUN_ID'], int(os.environ['GITHUB_RUN_ATTEMPT'])
     root = Path('.hosted/artifacts')

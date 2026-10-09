@@ -57,3 +57,8 @@ checks. It does not establish an end-to-end scan and publication for an independ
 owned external repository. External verification still requires a real authorized
 owner, installed App, configured Worker secrets/bindings, Pages and Worker rollout
 checks, and a live launch through publication with exact source/run/attempt evidence.
+
+The connected service-self project must explicitly enable or defer every scanner
+channel known by the pinned tooling revision. Reconciliation runs may occur both
+from an explicit request and from the durable recovery/scheduled pass; correlate
+them by request ID and persisted target state before treating them as duplicates.

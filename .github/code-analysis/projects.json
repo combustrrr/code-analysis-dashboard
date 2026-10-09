@@ -93,7 +93,17 @@
         "vulture",
         "xenon"
       ],
-      "deferred_channels": {},
+      "deferred_channels": {
+        "alibaba-ocr": "No configured adapter in the connected dashboard profile.",
+        "codex-security": "No configured adapter in the connected dashboard profile.",
+        "flounder-audit": "No configured adapter in the connected dashboard profile.",
+        "owasp-go": "No configured Go project in the connected dashboard profile.",
+        "owasp-iac-secrets": "No configured IaC secrets adapter in the connected dashboard profile.",
+        "owasp-js": "No configured JavaScript OWASP adapter in the connected dashboard profile.",
+        "owasp-jvm": "No configured JVM project in the connected dashboard profile.",
+        "owasp-ruby": "No configured Ruby project in the connected dashboard profile.",
+        "vulnagent-triage": "No configured adapter in the connected dashboard profile."
+      },
       "preferred_branch": "Testing",
       "report_budget_bytes": 900000000
     },
@@ -323,7 +333,17 @@
         "vulture",
         "xenon"
       ],
-      "deferred_channels": {},
+      "deferred_channels": {
+        "alibaba-ocr": "No configured adapter in the connected dashboard profile.",
+        "codex-security": "No configured adapter in the connected dashboard profile.",
+        "flounder-audit": "No configured adapter in the connected dashboard profile.",
+        "owasp-go": "No configured Go project in the connected dashboard profile.",
+        "owasp-iac-secrets": "No configured IaC secrets adapter in the connected dashboard profile.",
+        "owasp-js": "No configured JavaScript OWASP adapter in the connected dashboard profile.",
+        "owasp-jvm": "No configured JVM project in the connected dashboard profile.",
+        "owasp-ruby": "No configured Ruby project in the connected dashboard profile.",
+        "vulnagent-triage": "No configured adapter in the connected dashboard profile."
+      },
       "report_budget_bytes": 900000000
     }
   ]

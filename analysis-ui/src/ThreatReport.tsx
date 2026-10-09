@@ -1,7 +1,7 @@
 import { Alert, Button, Card, Col, Empty, Input, List, Row, Select, Space, Statistic, Table, Tag, Typography } from 'antd';
 import { CopyOutlined, DownloadOutlined, PrinterOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
-import { repositoryJson } from './repositoryReports';
+import { refreshRepositoryReports, repositoryJson } from './repositoryReports';
 import { safeGithubUrl } from './safeUrls';
 
 export type ThreatFinding = {
@@ -32,14 +32,15 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
   const [severity, setSeverity] = useState('');
   const [category, setCategory] = useState('');
   const [guidance, setGuidance] = useState('');
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
     const controller = new AbortController(); setReport(undefined); setMarkdown(''); setError('');
     Promise.all([repositoryJson<ThreatReportData>(`data/${reportPath}/threat-report.json`, controller.signal), repositoryJson<string>(`data/${reportPath}/threat-report.md`, controller.signal)])
       .then(([json, md]) => { setReport(json); setMarkdown(md); })
       .catch(e => { if (e.name !== 'AbortError') setError(e.message || 'Threat report unavailable.'); });
     return () => controller.abort();
-  }, [reportPath]);
-  if (error) return <Alert showIcon type="warning" title="Threat report unavailable" description={<>{error} <Button type="link" onClick={() => { const params = new URLSearchParams(location.hash.slice(1)); params.set('tab', 'overview'); location.hash = params.toString(); }}>Rerun analysis</Button></>} />;
+  }, [reportPath, retry]);
+  if (error) { const detail = error.toLowerCase(); const expired = detail.includes('expired') || detail.includes('freshness'); const missing = detail.includes('not found') || detail.includes('unavailable'); return <Alert showIcon type="warning" title={expired ? 'Report expired' : missing ? 'Report temporarily unavailable' : 'Threat report could not be retrieved'} description={<>{error} <Space><Button type="link" onClick={() => { refreshRepositoryReports(); setRetry(n => n + 1); }}>Refresh report</Button><Button type="link" onClick={() => { const params = new URLSearchParams(location.hash.slice(1)); params.set('tab', 'overview'); location.hash = params.toString(); }}>Rerun analysis</Button></Space></>} />; }
   if (!report) return <div className="empty" role="status"><Empty description="Loading threat report..." /></div>;
   const json = JSON.stringify(report, null, 2);
   const legacy = !report.immutable;
