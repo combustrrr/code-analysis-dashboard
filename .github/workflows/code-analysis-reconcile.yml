@@ -29,9 +29,9 @@ jobs:
       actions: write
       checks: write
       security-events: write
-    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-reconcile.yml@6cff66384ba087ac9cfc2302860a88cfa95ec2dd
+    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-reconcile.yml@0e3137779a8f14023050bff01af672af2c2ad7de
     with:
-      tooling_sha: 6cff66384ba087ac9cfc2302860a88cfa95ec2dd
+       tooling_sha: 0e3137779a8f14023050bff01af672af2c2ad7de
       project_id: ${{ inputs.project_id || '' }}
       selection: ${{ inputs.selection || '' }}
       request_id: ${{ inputs.request_id || '' }}
