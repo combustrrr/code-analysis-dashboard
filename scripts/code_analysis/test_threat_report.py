@@ -2,6 +2,7 @@ import copy
 import json
 import unittest
 
+import scripts.code_analysis.threat_report as threat_report
 from scripts.code_analysis.threat_report import enrich, load_catalog, markdown, normalize_channel
 
 
@@ -66,6 +67,22 @@ class ThreatReportTests(unittest.TestCase):
         self.assertEqual(report['coverage']['summary']['completed_no_findings'], 1)
         self.assertEqual(report['coverage']['channel_matrix'][0]['raw_status'], 'COMPLETED')
         self.assertIn('Channel Matrix', markdown(report))
+
+    def test_large_reports_are_bounded_without_losing_total_count(self):
+        snapshot = copy.deepcopy(self.snapshot)
+        snapshot['canonical_findings'] = [
+            {**self.snapshot['canonical_findings'][0], 'stable_id': f'f{i}', 'message': 'x' * 500}
+            for i in range(100)
+        ]
+        original_limit = threat_report.MAX_OUTPUT_BYTES
+        threat_report.MAX_OUTPUT_BYTES = 5_000
+        try:
+            report = enrich(snapshot, self.identity, self.report)
+        finally:
+            threat_report.MAX_OUTPUT_BYTES = original_limit
+        self.assertTrue(report['findings_truncated'])
+        self.assertEqual(report['metrics']['findings_total'], 100)
+        self.assertLess(report['metrics']['findings_retained'], 100)
 
 
 if __name__ == '__main__':

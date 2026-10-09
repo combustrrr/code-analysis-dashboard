@@ -228,7 +228,30 @@ def enrich(snapshot: dict[str, Any], identity: dict[str, Any], report: dict[str,
     }
     serialized = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     if len(serialized) > MAX_OUTPUT_BYTES:
-        raise ValueError("threat report output limit exceeded")
+        # Preserve the complete normalized evidence in the producer artifact,
+        # but keep the client-facing threat report publishable for repositories
+        # with very large finding volumes.  The retained prefix is stable
+        # because canonical findings are deterministically ordered upstream.
+        full_count = len(enriched)
+        low, high, retained = 0, full_count, 0
+        while low <= high:
+            middle = (low + high) // 2
+            candidate = dict(result)
+            candidate['findings'] = enriched[:middle]
+            candidate['scanner_evidence'] = result['scanner_evidence'][:middle]
+            candidate['limitations'] = list(result['limitations']) + [
+                f'Finding details are truncated to {middle} of {full_count}; complete normalized evidence remains in the producer artifact.'
+            ]
+            candidate['findings_truncated'] = middle < full_count
+            candidate['metrics'] = {**result['metrics'], 'findings_total': full_count, 'findings_retained': middle}
+            encoded = json.dumps(candidate, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            if len(encoded) <= MAX_OUTPUT_BYTES:
+                retained, serialized, result = middle, encoded, candidate
+                low = middle + 1
+            else:
+                high = middle - 1
+        if retained == 0 and len(serialized) > MAX_OUTPUT_BYTES:
+            raise ValueError("threat report metadata output limit exceeded")
     return result
 
 
