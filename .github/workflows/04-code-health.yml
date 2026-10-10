@@ -38,7 +38,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: '3.11.17'
         cache: pip
         cache-dependency-path: .analysis-tooling/.ci/requirements.txt
     - name: Install tools
@@ -88,7 +88,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: '3.11.17'
         cache: pip
         cache-dependency-path: .analysis-tooling/.ci/requirements.txt
     - name: Install tools
@@ -116,7 +116,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: '3.11.17'
         cache: pip
         cache-dependency-path: backend/requirements-dev.txt
     - name: Install dependencies
