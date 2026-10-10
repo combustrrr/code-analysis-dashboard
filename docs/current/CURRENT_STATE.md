@@ -86,9 +86,14 @@ enables the isolated OSV-Scanner producer, while absent inputs remain explicit
 publication credentials. Generic Dockerfile discovery is currently used for
 planning and remains pending a pinned multi-file Hadolint producer.
 
-The portable OSV producer and capability planner are pinned to
-`756990013f7213b2d39c14373183ca0baadfde22`; the Worker was redeployed as
-version `bb84f47e-5d4d-424e-8d22-2556a4c4b995` with that tooling revision.
+The portable OSV producer, credential boundary, and isolated vendor producer are
+pinned to `5621f89cb660781a87d2d776fcbbc8fa0c7c6d33`; the Worker was redeployed as
+version `3e4cdde4-4eb5-4e89-b24e-648a95c9a0b1` with that tooling revision.
+
+Portable source launches now run isolated Snyk and Sonar evidence jobs before
+source report assembly. They receive only exact target source and optional GitHub
+Environment secrets (`SNYK_TOKEN`, `SONAR_TOKEN`, `SONAR_API_TOKEN`); source jobs
+and publication jobs do not receive those credentials.
 
 Published reports now expose one canonical current target per repository
 project. The selected branch, pull request, or commit remains preserved as
