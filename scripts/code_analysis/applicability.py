@@ -1,6 +1,31 @@
 """Trusted scanner selection from explicit configuration and the checked-out tree."""
 from pathlib import Path
 
+
+IGNORED_DISCOVERY_DIRS = {'.git', '.venv', 'venv', 'node_modules', 'vendor',
+                          'dist', 'build', '.tox', '.mypy_cache', '.pytest_cache'}
+DEPENDENCY_MANIFEST_NAMES = {
+    'Cargo.lock', 'Gemfile.lock', 'composer.lock', 'go.mod', 'go.sum',
+    'gradle.lockfile', 'package-lock.json', 'pnpm-lock.yaml', 'poetry.lock',
+    'requirements.txt', 'requirements-dev.txt', 'requirements-test.txt',
+    'uv.lock', 'yarn.lock',
+}
+
+
+def discover_capabilities(source: Path) -> dict[str, list[str]]:
+    """Discover safe, repository-relative inputs for generic portable scanners."""
+    manifests, dockerfiles = [], []
+    for path in source.rglob('*'):
+        if any(part in IGNORED_DISCOVERY_DIRS for part in path.relative_to(source).parts):
+            continue
+        if path.is_file():
+            relative = path.relative_to(source).as_posix()
+            if path.name in DEPENDENCY_MANIFEST_NAMES:
+                manifests.append(relative)
+            if path.name == 'Dockerfile' or path.name.startswith('Dockerfile.'):
+                dockerfiles.append(relative)
+    return {'dependency_manifests': sorted(manifests), 'dockerfiles': sorted(dockerfiles)}
+
 # A shared producer must be enabled or deferred as a unit: partial disabling must
 # never silently discard observations produced by another channel in that job.
 GROUPS = {
@@ -49,6 +74,11 @@ def selection(config: dict, source: Path) -> tuple[list[str], dict, list[str]]:
     if portable:
         from scripts.code_analysis.portable_profile import readiness
         supported = readiness(profile)
+        capabilities = discover_capabilities(source)
+        if capabilities['dependency_manifests']:
+            supported.add('osv')
+        if capabilities['dockerfiles']:
+            supported.add('hadolint')
         languages = (['python'] if profile.get('python_root') and present(profile['python_root']) else []) + (['javascript-typescript'] if profile.get('javascript_root') and present(profile['javascript_root']) else [])
         absent = {job: 'Requires a reviewed source path, command adapter or vendor configuration.' for job, channels in GROUPS.items() if not all(c in supported for c in channels)}
         for job in PYTHON_JOBS:

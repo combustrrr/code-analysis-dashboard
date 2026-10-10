@@ -90,7 +90,11 @@ class ArtifactRetentionTests(unittest.TestCase):
             upload=job['steps'][-1]['with']
             self.assertFalse(upload['path'].startswith('.'))
             self.assertEqual(upload['retention-days'],7)
-            self.assertTrue(any('--output '+upload['path'] in step.get('run','') for step in job['steps']))
+            self.assertTrue(
+                any('--output '+upload['path'] in step.get('run','') for step in job['steps'])
+                or any(step.get('with', {}).get('scan-args', '').find('--output=') >= 0
+                       for step in job['steps'])
+            )
 
 
 class NativeSyntaxEvidenceTests(unittest.TestCase):

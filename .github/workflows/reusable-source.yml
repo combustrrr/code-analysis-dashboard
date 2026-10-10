@@ -808,6 +808,46 @@ jobs:
         path: portable-output/
         retention-days: 7
         if-no-files-found: error
+  portable-osv-scanner:
+    name: Portable osv-scanner
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'osv-scanner') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run portable OSV-Scanner
+      continue-on-error: true
+      uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67
+      with:
+        scan-args: --recursive --format=sarif --output=portable-output/osv/osv-results.sarif .source
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: portable-osv-scanner
+        path: portable-output/
+        retention-days: 7
+        if-no-files-found: error
   report:
     needs:
     - identity
@@ -827,6 +867,7 @@ jobs:
     - portable-atheris-state-machine
     - portable-schemathesis-fuzz
     - portable-python-types
+    - portable-osv-scanner
     if: ${{ always() && needs.identity.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30

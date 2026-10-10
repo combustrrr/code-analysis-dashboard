@@ -78,3 +78,10 @@ The connected service-self project must explicitly enable or defer every scanner
 channel known by the pinned tooling revision. Reconciliation runs may occur both
 from an explicit request and from the durable recovery/scheduled pass; correlate
 them by request ID and persisted target state before treating them as duplicates.
+
+Portable analysis now discovers repository-relative dependency manifests and
+Dockerfiles outside product-specific paths. A discovered dependency manifest
+enables the isolated OSV-Scanner producer, while absent inputs remain explicit
+`NOT_AVAILABLE` evidence; source-executing jobs still receive no vendor or
+publication credentials. Generic Dockerfile discovery is currently used for
+planning and remains pending a pinned multi-file Hadolint producer.

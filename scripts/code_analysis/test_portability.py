@@ -5,7 +5,7 @@ import unittest
 
 import yaml
 from scripts.code_analysis.configure_instance import configure, bundle
-from scripts.code_analysis.applicability import selection, PORTABLE_JOBS
+from scripts.code_analysis.applicability import selection, PORTABLE_JOBS, discover_capabilities
 from scripts.code_analysis.generate_source_workflow import generate
 from scripts.code_analysis.hosted import load
 
@@ -27,6 +27,30 @@ class PortabilityTests(unittest.TestCase):
                 self.assertEqual(set(jobs), PORTABLE_JOBS)
                 self.assertEqual(excluded['atheris']['status'], 'NOT_AVAILABLE')
                 self.assertNotIn('DEFERRED', {v['status'] for v in excluded.values()})
+
+    def test_portable_capabilities_discover_generic_manifests_and_dockerfiles(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'services/api/requirements.txt').parent.mkdir(parents=True)
+            (root / 'services/api/requirements.txt').touch()
+            (root / 'Dockerfile.release').touch()
+            (root / 'node_modules/ignored/package-lock.json').parent.mkdir(parents=True)
+            (root / 'node_modules/ignored/package-lock.json').touch()
+            self.assertEqual(discover_capabilities(root), {
+                'dependency_manifests': ['services/api/requirements.txt'],
+                'dockerfiles': ['Dockerfile.release'],
+            })
+
+    def test_portable_selection_enables_generic_scanners_from_capabilities(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'requirements.txt').touch()
+            (root / 'Dockerfile').touch()
+            jobs, excluded, _ = selection(self.config(), root)
+            self.assertIn('osv-scanner', jobs)
+            self.assertIn('hadolint', jobs)
+            self.assertNotIn('osv', excluded)
+            self.assertNotIn('hadolint', excluded)
 
     def test_portable_workflow_contains_no_original_project_harness(self):
         workflow = generate(self.config())
