@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from scripts.code_analysis.portable_profile import validate
 
-FAMILIES={'bandit':'Bandit','ruff':'Ruff','radon':'Radon','xenon':'Xenon','vulture':'Vulture','eslint':'ESLint','typescript':'TypeScript','coverage':'Coverage.py','atheris':'Atheris','schemathesis':'Schemathesis','pyright':'Pyright', 'coderabbit-ai-advisory': 'CodeRabbit', 'codex-security': 'Codex', 'alibaba-ocr': 'Alibaba', 'flounder-audit': 'Flounder', 'vulnagent-triage': 'VulnAgent', 'owasp-jvm': 'FindSecBugs', 'owasp-go': 'Gosec', 'owasp-js': 'njsscan', 'owasp-ruby': 'Brakeman', 'owasp-iac-secrets': 'TruffleHog'}
+FAMILIES={'bandit':'Bandit','ruff':'Ruff','radon':'Radon','xenon':'Xenon','vulture':'Vulture','eslint':'ESLint','typescript':'TypeScript','coverage':'Coverage.py','atheris':'Atheris','schemathesis':'Schemathesis','pyright':'Pyright','osv':'OSV-Scanner', 'coderabbit-ai-advisory': 'CodeRabbit', 'codex-security': 'Codex', 'alibaba-ocr': 'Alibaba', 'flounder-audit': 'Flounder', 'vulnagent-triage': 'VulnAgent', 'owasp-jvm': 'FindSecBugs', 'owasp-go': 'Gosec', 'owasp-js': 'njsscan', 'owasp-ruby': 'Brakeman', 'owasp-iac-secrets': 'TruffleHog'}
 OUTPUTS={'bandit':'bandit-results.json','ruff':'ruff-results.json','radon':'radon-cc.json','xenon':'xenon-results.txt','vulture':'vulture-results.txt','eslint':'eslint-results.json','typescript':'tsc-results.txt','coverage':'coverage.json','schemathesis':'fuzzing-results.xml','pyright':'pyright-results.json'}
 
 def execute(channel, profile, source, output):

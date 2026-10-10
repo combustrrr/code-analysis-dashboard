@@ -3,7 +3,7 @@ from pathlib import PurePosixPath
 
 COMMAND_CHANNELS = {'eslint', 'typescript', 'coverage', 'atheris', 'schemathesis', 'pyright'}
 STATIC_JOBS = {'python-bandit', 'python-ruff', 'complexity', 'dead-code'}
-ADAPTER_JOBS = STATIC_JOBS | {'typescript-quality', 'test-coverage', 'atheris-state-machine', 'schemathesis-fuzz', 'python-types'}
+ADAPTER_JOBS = STATIC_JOBS | {'typescript-quality', 'test-coverage', 'atheris-state-machine', 'schemathesis-fuzz', 'python-types', 'osv-scanner'}
 
 def path(value):
     if not isinstance(value,str) or not value or "\\" in value or PurePosixPath(value).is_absolute() or '..' in PurePosixPath(value).parts or ':' in value:
