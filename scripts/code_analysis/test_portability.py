@@ -48,9 +48,8 @@ class PortabilityTests(unittest.TestCase):
             (root / 'Dockerfile').touch()
             jobs, excluded, _ = selection(self.config(), root)
             self.assertIn('osv-scanner', jobs)
-            self.assertIn('hadolint', jobs)
             self.assertNotIn('osv', excluded)
-            self.assertNotIn('hadolint', excluded)
+            self.assertIn('hadolint', excluded)
 
     def test_portable_workflow_contains_no_original_project_harness(self):
         workflow = generate(self.config())

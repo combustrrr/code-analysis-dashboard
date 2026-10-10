@@ -77,8 +77,6 @@ def selection(config: dict, source: Path) -> tuple[list[str], dict, list[str]]:
         capabilities = discover_capabilities(source)
         if capabilities['dependency_manifests']:
             supported.add('osv')
-        if capabilities['dockerfiles']:
-            supported.add('hadolint')
         languages = (['python'] if profile.get('python_root') and present(profile['python_root']) else []) + (['javascript-typescript'] if profile.get('javascript_root') and present(profile['javascript_root']) else [])
         absent = {job: 'Requires a reviewed source path, command adapter or vendor configuration.' for job, channels in GROUPS.items() if not all(c in supported for c in channels)}
         for job in PYTHON_JOBS:
