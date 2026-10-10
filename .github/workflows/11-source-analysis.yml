@@ -1538,7 +1538,6 @@ jobs:
         persist-credentials: false
     - name: Collect exact producer artifacts and assemble report
       env:
-        GH_TOKEN: ${{ github.token }}
         TARGET_JSON: ${{ inputs.target }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
       run: python -m scripts.code_analysis.source_identity --assemble
