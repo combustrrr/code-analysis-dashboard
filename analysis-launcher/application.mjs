@@ -75,6 +75,7 @@ permissions:
 jobs:
   analyze:
     if: \${{ fromJSON(inputs.target).profile_mode == 'portable' }}
+    needs: isolated-vendor
     permissions:
       contents: read
       actions: read
@@ -98,6 +99,19 @@ jobs:
       SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
       SONAR_API_TOKEN: \${{ secrets.SONAR_API_TOKEN }}
       SONAR_TOKEN: \${{ secrets.SONAR_TOKEN }}
+  isolated-vendor:
+    if: \${{ fromJSON(inputs.target).profile_mode == 'portable' }}
+    permissions:
+      contents: read
+    uses: ${toolingRepository}/.github/workflows/reusable-vendor.yml@${sha}
+    with:
+      tooling_sha: ${sha}
+      target: \${{ inputs.target }}
+      request_id: \${{ inputs.request_id }}
+    secrets:
+      SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
+      SONAR_TOKEN: \${{ secrets.SONAR_TOKEN }}
+      SONAR_API_TOKEN: \${{ secrets.SONAR_API_TOKEN }}
 `,
   };
 }

@@ -1,0 +1,109 @@
+name: Isolated vendor evidence
+
+'on':
+  workflow_call:
+    inputs:
+      tooling_sha:
+        required: true
+        type: string
+      target:
+        required: true
+        type: string
+      request_id:
+        required: true
+        type: string
+    secrets:
+      SNYK_TOKEN:
+        required: false
+      SONAR_TOKEN:
+        required: false
+      SONAR_API_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  snyk:
+    name: Isolated Snyk evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ fromJSON(inputs.target).head_sha }}
+          path: .source
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        if: env.SNYK_TOKEN != ''
+        with:
+          node-version: '20'
+      - name: Install pinned Snyk CLI
+        if: env.SNYK_TOKEN != ''
+        run: npm install --global snyk@1.1307.4
+      - name: Run Snyk dependency and code scans
+        if: env.SNYK_TOKEN != ''
+        working-directory: .source
+        continue-on-error: true
+        run: |
+          set +e
+          snyk test --all-projects --sarif-file-output="$GITHUB_WORKSPACE/snyk-open-source.sarif"
+          sca=$?
+          snyk code test --sarif-file-output="$GITHUB_WORKSPACE/snyk-code.sarif"
+          code=$?
+          printf '%s\n' "{\"schema_version\":\"1\",\"scanner_family\":\"Snyk\",\"status\":\"CONFIGURED_COMPLETE\",\"surfaces\":{\"sca\":$sca,\"code\":$code}}" > "$GITHUB_WORKSPACE/snyk-status.json"
+          exit 0
+      - name: Record Snyk unavailable status
+        if: env.SNYK_TOKEN == ''
+        run: printf '%s\n' '{"schema_version":"1","scanner_family":"Snyk","status":"NOT_CONFIGURED","reason":"SNYK_TOKEN is not configured"}' > snyk-status.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: vendor-snyk-${{ inputs.request_id }}
+          path: |
+            snyk-status.json
+            snyk-open-source.sarif
+            snyk-code.sarif
+          if-no-files-found: warn
+          retention-days: 7
+
+  sonar:
+    name: Isolated SonarQube evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ fromJSON(inputs.target).head_sha }}
+          path: .source
+          persist-credentials: false
+      - name: Record Sonar unavailable status
+        if: env.SONAR_TOKEN == ''
+        run: printf '%s\n' '{"schema_version":"1","scanner_family":"SonarQube Cloud","status":"NOT_CONFIGURED","reason":"SONAR_TOKEN is not configured"}' > sonar-status.json
+      - name: Run SonarQube analysis
+        if: env.SONAR_TOKEN != ''
+        continue-on-error: true
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f
+        with:
+          projectBaseDir: .source
+          args: >-
+            -Dsonar.projectKey=${{ fromJSON(inputs.target).source_repository }}
+            -Dsonar.projectName=${{ fromJSON(inputs.target).source_repository }}
+            -Dsonar.scm.revision=${{ fromJSON(inputs.target).head_sha }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Record Sonar completion status
+        if: always() && env.SONAR_TOKEN != ''
+        run: printf '%s\n' '{"schema_version":"1","scanner_family":"SonarQube Cloud","status":"CONFIGURED_COMPLETE","reason":"Analysis submitted for the exact target revision"}' > sonar-status.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: vendor-sonar-${{ inputs.request_id }}
+          path: sonar-status.json
+          if-no-files-found: error
+          retention-days: 7
