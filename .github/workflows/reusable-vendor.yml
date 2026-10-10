@@ -19,6 +19,8 @@ name: Isolated vendor evidence
         required: false
       SONAR_API_TOKEN:
         required: false
+      CODERABBIT_GITHUB_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -128,4 +130,39 @@ jobs:
             sonar-status.json
             sonar-native-issues.json
           if-no-files-found: error
+          retention-days: 7
+
+  coderabbit:
+    name: Isolated CodeRabbit evidence
+    if: ${{ fromJSON(inputs.target).pr != '' && fromJSON(inputs.target).pr != null }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ inputs.tooling_sha }}
+          path: .analysis-tooling
+          sparse-checkout: scripts/code_analysis/collect_coderabbit.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Collect exact pull-request evidence
+        env:
+          COLLECTOR_SHA: ${{ inputs.tooling_sha }}
+        run: |
+          python .analysis-tooling/scripts/code_analysis/collect_coderabbit.py \
+            --repository "${{ fromJSON(inputs.target).source_repository }}" \
+            --branch "${{ fromJSON(inputs.target).branch }}" \
+            --commit "${{ fromJSON(inputs.target).head_sha }}" \
+            --pr-number "${{ fromJSON(inputs.target).pr }}" \
+            --base-sha "${{ fromJSON(inputs.target).base_sha }}" \
+            --base-branch "${{ fromJSON(inputs.target).base_branch }}" \
+            --output-dir coderabbit-evidence
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: vendor-coderabbit-${{ inputs.request_id }}
+          path: coderabbit-evidence/
+          if-no-files-found: warn
           retention-days: 7

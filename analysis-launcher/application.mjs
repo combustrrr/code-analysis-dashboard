@@ -98,6 +98,7 @@ jobs:
       SECURITY_POSTURE_TOKEN: \${{ secrets.SECURITY_POSTURE_TOKEN }}
       SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
       SONAR_API_TOKEN: \${{ secrets.SONAR_API_TOKEN }}
+      CODERABBIT_GITHUB_TOKEN: \${{ secrets.CODERABBIT_GITHUB_TOKEN }}
       SONAR_TOKEN: \${{ secrets.SONAR_TOKEN }}
   isolated-vendor:
     if: \${{ fromJSON(inputs.target).profile_mode == 'portable' }}
