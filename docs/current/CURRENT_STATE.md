@@ -87,8 +87,8 @@ publication credentials. Generic Dockerfile discovery is currently used for
 planning and remains pending a pinned multi-file Hadolint producer.
 
 The portable OSV producer, credential boundary, and isolated vendor producer are
-pinned to `5621f89cb660781a87d2d776fcbbc8fa0c7c6d33`; the Worker was redeployed as
-version `3e4cdde4-4eb5-4e89-b24e-648a95c9a0b1` with that tooling revision.
+pinned to `0ff77f8530c0f7c60b78f10c14d1ebe8216f2daf`; the Worker was redeployed as
+version `5e009396-1371-434f-9ec7-448b0c789957` with that tooling revision.
 
 Portable source launches now run isolated Snyk and Sonar evidence jobs before
 source report assembly. They receive only exact target source and optional GitHub
