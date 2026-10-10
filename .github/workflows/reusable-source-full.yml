@@ -603,7 +603,7 @@ jobs:
       with:
         python-version: '3.11'
     - name: Install Semgrep
-      run: pip install semgrep==1.178.0 click==8.5.0 python-dateutil==2.9.0.post0
+      run: pip install semgrep==1.178.0 click==8.4.2 python-dateutil==2.9.0.post0
     - name: Validate custom Semgrep rules
       run: semgrep --validate --config=$RUNNER_TEMP/analysis-tooling/.github/semgrep-rules/
     - name: Run Semgrep (JSON output)
