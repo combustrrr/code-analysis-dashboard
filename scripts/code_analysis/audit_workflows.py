@@ -164,6 +164,8 @@ def audit() -> list[str]:
     errors = [*audit_service_layout(), *audit_runtime_isolation()]
     for path in sorted(WORKFLOWS.glob("*.y*ml")):
         relative = path.relative_to(ROOT).as_posix()
+        if path.name == "code-analysis-source.yml" and "secrets: inherit" in path.read_text(encoding="utf-8"):
+            errors.append(f"{relative}: source workflow must not inherit repository secrets")
         try:
             document = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
         except yaml.YAMLError as exc:

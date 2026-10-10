@@ -25,7 +25,6 @@ jobs:
       tooling_sha: 756990013f7213b2d39c14373183ca0baadfde22
       target: ${{ inputs.target }}
       request_id: ${{ inputs.request_id }}
-    secrets: inherit
   configured-profile:
     if: ${{ fromJSON(inputs.target).profile_mode == 'agentic-soc' }}
     permissions:
@@ -36,4 +35,3 @@ jobs:
       tooling_sha: 756990013f7213b2d39c14373183ca0baadfde22
       target: ${{ inputs.target }}
       request_id: ${{ inputs.request_id }}
-    secrets: inherit
