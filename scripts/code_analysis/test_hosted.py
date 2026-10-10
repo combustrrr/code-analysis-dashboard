@@ -303,8 +303,8 @@ class ReportTests(unittest.TestCase):
         review = {'user': {'login': 'coderabbitai[bot]'}, 'commit_id': 'a' * 40}
         with patch.object(rabbit, 'request_json', return_value=pr), patch.object(rabbit, 'paged', side_effect=[[review], []]):
             evidence, status = rabbit.collect('owner/repo', 'feature', 'a' * 40, 'token', pr_number=110)
-        self.assertEqual(status['status'], 'COMPLETED_OPTIONAL')
-        self.assertEqual(evidence['pull_requests'], [110])
+        self.assertEqual(status['status'], 'NOT_AVAILABLE')
+        self.assertEqual(evidence['pull_requests'], [])
 
 
 class ManualSelectionTests(unittest.TestCase):

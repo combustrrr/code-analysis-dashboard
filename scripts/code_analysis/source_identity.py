@@ -78,11 +78,25 @@ def main():
     elif row.get('pr'):
         from scripts.code_analysis.collect_coderabbit import collect
         try:
-            evidence, status = collect(row['repository'], row['branch'], row['head_sha'], os.environ['GH_TOKEN'], pr_number=row['pr'])
+            evidence, status = collect(
+                row['repository'], row['branch'], row['head_sha'],
+                os.environ.get('CODERABBIT_GITHUB_TOKEN', ''),
+                pr_number=row['pr'], base_sha=row.get('base_sha'), base_branch=row.get('base_branch'),
+                provenance={'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+                            'workflow_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+                            'tooling_sha': os.environ['TOOLING_SHA'],
+                            'collector': 'collect_coderabbit.py',
+                            'collector_revision': os.environ.get('COLLECTOR_SHA', os.environ['TOOLING_SHA'])})
             write(root / 'coderabbit/coderabbit-advisories.json', evidence)
             write(root / 'coderabbit/coderabbit-status.json', status)
-        except Exception:
-            write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', 'status': 'NOT_AVAILABLE', 'reason': 'Exact upstream PR review collection failed'})
+        except Exception as exc:
+            write(root / 'coderabbit/coderabbit-status.json', {
+                'scanner_family': 'CodeRabbit', 'status': 'UNAVAILABLE',
+                'reason': f'Exact upstream PR review collection failed: {type(exc).__name__}',
+                'provenance': {'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+                               'workflow_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+                               'tooling_sha': os.environ['TOOLING_SHA']},
+            })
     else:
         write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', 'status': 'COMPLETED_OPTIONAL', 'reason': 'Branch target; CodeRabbit evidence is collected on PR targets'})
     report = assemble(root, Path('.hosted/output'), validated, host, run, Path('.source'), Path('config/code-analysis'))

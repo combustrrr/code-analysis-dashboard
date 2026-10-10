@@ -250,4 +250,15 @@ Each required manifest still needs valid SARIF; failures are not suppressed.
 Upstream secret-protection controls require upstream-authorized credentials; the
 fork owner's account has read-only upstream access. A token with only fork permissions
 cannot observe upstream settings. CodeRabbit requires an actual reviewed upstream PR
-head; a branch scan does not manufacture review evidence.
+ head; a branch scan does not manufacture review evidence.
+
+## CodeRabbit evidence boundary (2026-10-10)
+
+The collector accepts only the selected PR's exact same-repository base and head
+identity; fork PRs are rejected. Reviews and comments use a ten-page bound, and
+partial or unavailable reads retain an explicit reason rather than being treated as
+zero findings. Evidence and status retain the collector revision plus workflow
+run/attempt provenance. Collection uses the optional read-only
+`CODERABBIT_GITHUB_TOKEN` contract in aggregation jobs; source-executing jobs receive
+no CodeRabbit credential or Worker private key. Missing credentials produce
+`UNAVAILABLE` evidence status.

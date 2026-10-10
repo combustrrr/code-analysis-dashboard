@@ -967,6 +967,7 @@ class MonitoringTests(unittest.TestCase):
         commit="a"*40;repository="combustrrr/Agentic-Kibana";branch="feature/review"
         responses=[
             [{"number":7,"state":"open","head":{"sha":commit,"ref":branch,
+              "repo":{"full_name":repository}},"base":{"sha":"b"*40,"ref":"main",
               "repo":{"full_name":repository}}}],
             [{"id":11,"commit_id":commit,"user":{"login":"coderabbitai[bot]"}}],
             [{"id":21,"commit_id":commit,"in_reply_to_id":None,
@@ -1009,6 +1010,7 @@ class MonitoringTests(unittest.TestCase):
         commit="c"*40;repository="combustrrr/Agentic-Kibana";branch="feature/clean"
         responses=[
             [{"number":8,"state":"open","head":{"sha":commit,"ref":branch,
+              "repo":{"full_name":repository}},"base":{"sha":"b"*40,"ref":"main",
               "repo":{"full_name":repository}}}],
             [],
             [],
@@ -1033,5 +1035,29 @@ class MonitoringTests(unittest.TestCase):
             evidence,status=collect_coderabbit(repository,branch,commit,"token")
         self.assertEqual(status["status"],"NOT_APPLICABLE")
         self.assertEqual(evidence["completion_signals"],[])
+
+    def test_coderabbit_rejects_base_mismatch_and_preserves_provenance(self):
+        commit = "e" * 40
+        row = {"number": 10, "state": "open", "head": {"sha": commit, "ref": "feature",
+               "repo": {"full_name": "owner/repo"}}, "base": {"sha": "b" * 40,
+               "ref": "main", "repo": {"full_name": "owner/repo"}}}
+        with patch("scripts.code_analysis.collect_coderabbit.request_json", return_value=row):
+            evidence, status = collect_coderabbit("owner/repo", "feature", commit, "token",
+                                                  pr_number=10, base_sha="c" * 40,
+                                                  provenance={"workflow_run_id": "42", "workflow_run_attempt": "2"})
+        self.assertEqual(status["status"], "NOT_AVAILABLE")
+        self.assertIn("base/head identity", status["reason"])
+        self.assertEqual(evidence["provenance"]["workflow_run_id"], "42")
+
+    def test_coderabbit_bounded_pagination_is_explicitly_partial(self):
+        commit = "f" * 40
+        row = {"number": 11, "state": "open", "head": {"sha": commit, "ref": "feature",
+               "repo": {"full_name": "owner/repo"}}, "base": {"sha": "b" * 40,
+               "ref": "main", "repo": {"full_name": "owner/repo"}}}
+        with patch("scripts.code_analysis.collect_coderabbit.request_json",
+                   side_effect=[row] + [[{"id": i} for i in range(100)] for _ in range(10)] + [{"statuses": []}]):
+            _, status = collect_coderabbit("owner/repo", "feature", commit, "token", pr_number=11)
+        self.assertEqual(status["status"], "PARTIAL")
+        self.assertTrue(status["partial_reasons"])
 
 if __name__=="__main__": unittest.main()

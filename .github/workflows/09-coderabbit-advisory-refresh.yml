@@ -24,7 +24,7 @@ jobs:
     - name: Checkout trusted evidence collector
       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
-        ref: ${{ github.event.repository.default_branch }}
+        ref: 3ae87eba3982ee9fe74312c4a36ca91796f74caf
         sparse-checkout: scripts/code_analysis/collect_coderabbit.py
         sparse-checkout-cone-mode: false
     - name: Resolve exact pull-request head
@@ -39,9 +39,11 @@ jobs:
         \ \"$GITHUB_OUTPUT\"\n"
     - name: Collect exact-head CodeRabbit evidence
       env:
-        GH_TOKEN: ${{ github.token }}
+        CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
+        COLLECTOR_SHA: 3ae87eba3982ee9fe74312c4a36ca91796f74caf
         SCAN_BRANCH: ${{ steps.identity.outputs.branch }}
         SCAN_SHA: ${{ steps.identity.outputs.commit }}
+        PR_NUMBER: ${{ steps.identity.outputs.pr_number }}
       shell: bash
       run: "set -euo pipefail\npython scripts/code_analysis/collect_coderabbit.py \\\n  --repository \"$GITHUB_REPOSITORY\"\
         \ \\\n  --branch \"$SCAN_BRANCH\" \\\n  --commit \"$SCAN_SHA\" \\\n  --output-dir coderabbit-evidence\n"
