@@ -245,7 +245,7 @@ export async function applicationApi(request, env, session, helpers) {
     const document = await config(repo);
     const project = document.projects.find(p => p.id === url.searchParams.get('project_id'));
     if (!project) throw new Failure(404,'Unknown project.','unknown_project');
-    const portable = new Set(['semgrep','gitleaks','trivy','checkov','openssf-scorecard','github-secret-protection-posture','github-actions-security','coderabbit-ai-advisory']);
+  const portable = new Set(['semgrep','gitleaks','trivy','checkov','osv','openssf-scorecard','github-secret-protection-posture','github-actions-security','coderabbit-ai-advisory']);
     if(project.profile.python_root)['bandit','ruff','radon','xenon','vulture','codeql'].forEach(c=>portable.add(c));
     if(project.profile.javascript_root)portable.add('codeql');
     Object.keys(project.profile.commands||{}).forEach(c=>portable.add(c));
