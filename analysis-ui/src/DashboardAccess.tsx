@@ -19,7 +19,7 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
   void verify();const timer=window.setInterval(()=>{if(!document.hidden)void verify();},15000);window.addEventListener('analysis-access-denied',denied);
   return()=>{active=false;clearInterval(timer);window.removeEventListener('analysis-access-denied',denied);setReportSession(undefined);};
  },[required,auth.session?.token]);
-  if(!applicationEndpoint||required===false)return children(auth);
+  if(!applicationEndpoint||required===false)return children();
   if(auth.session&&verified===auth.session.token)return children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}});
   if(publicFallback)return publicFallback(auth);
   return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm}}><main className={`dashboard-access ${dark?'dashboard-access-dark':'dashboard-access-light'}`}><section>
