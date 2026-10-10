@@ -24,6 +24,13 @@ function publicationTime(manifest) {
   const time = typeof stamp === 'string' ? Date.parse(stamp) : NaN;
   return Number.isFinite(time) ? time : null;
 }
+export function canonicalReportTarget(manifest) {
+  if (!manifest || !Array.isArray(manifest.targets)) return null;
+  const id = manifest.current_target_id;
+  return (id && manifest.targets.find(target => target.id === id)) ||
+    (id && manifest.targets.find(target => target.canonical_target_id === id)) ||
+    (manifest.targets.length === 1 ? manifest.targets[0] : null);
+}
 export async function publicReports(request,env) {
   const url = new URL(request.url);
   if (request.method !== 'GET' || !['/api/public/manifest','/api/public/asset','/api/public/projects','/api/public/threat-report'].includes(url.pathname)) return null;
@@ -102,14 +109,15 @@ export async function publicReports(request,env) {
 
     if(url.pathname.endsWith('/threat-report')) {
       const targetId=url.searchParams.get('target_id');
-      const target=manifest.targets.find(row=>row.id===targetId);
-      if(!target) return Response.json({error:'Selected report target is unavailable.'},{status:404});
+      const target=canonicalReportTarget(manifest);
+      if(!target || (targetId !== target.id && targetId !== target.original_target_id)) return Response.json({error:'Selected report target is unavailable.'},{status:404});
       if(target.documents?.['threat-report.json']) return Response.json({error:'Stored threat report must be fetched as a verified asset.'},{status:409});
       return Response.json({error:'Threat Report unavailable; an immutable stored report asset has not been published. Rerun analysis.'},{status:404,headers:{'Cache-Control':'no-store'}});
     }
     
     const name = url.searchParams.get('asset');
-    if(!/^analysis-[a-f0-9]{64}\.json\.gz$/.test(name || '') || !manifest.targets.some(t=>t.assets?.[name])) return Response.json({error:'Asset is not part of the current report.'},{status:404});
+    const target=canonicalReportTarget(manifest);
+    if(!target || !/^analysis-[a-f0-9]{64}\.json\.gz$/.test(name || '') || !target.assets?.[name]) return Response.json({error:'Asset is not part of the current report.'},{status:404});
     
     let assetObj = await env.ANALYSIS_REPORTS.get(reportStorageKey(repo.full_name, project, name));
     if(!assetObj) throw new ReportFailure('Report asset missing or exceeds the delivery limit.', 502, 'report_asset_missing');

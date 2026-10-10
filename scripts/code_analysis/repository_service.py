@@ -87,11 +87,20 @@ def recover_completed_producer_run(config, row, runs):
 
 
 def report_publication(config, state, report_release, document=None):
-    """Publish all active targets together, then remove unreferenced assets."""
+    """Publish one canonical project report, then remove unreferenced assets."""
     previous = release_manifest.read(config, report_release)
-    prior = {row['id']: row for row in previous.get('targets', [])}
+    previous_targets = previous.get('targets', [])
+    prior = {row['id']: row for row in previous_targets}
+    prior_current = next((row for row in previous_targets
+                          if row.get('id') == previous.get('current_target_id')
+                          or row.get('canonical_target_id') == previous.get('current_target_id')), None)
+    if prior_current is None and previous_targets:
+        # Manifests written before the canonical identity was introduced had one
+        # target only in the common case; retain it as a safe fallback.
+        prior_current = previous_targets[0] if len(previous_targets) == 1 else None
     result = {**state, 'schema_version':'analysis-current-v1', 'targets':[]}
     pending = {}
+    entries = []
     with tempfile.TemporaryDirectory(prefix='analysis-publication-') as directory:
         project_dispatches = 0
         for row in state['targets']:
@@ -100,6 +109,8 @@ def report_publication(config, state, report_release, document=None):
                                          'running' if row.get('status') == 'scanning' else
                                          row.get('status', 'queued'))
             old = prior.get(row['id'], {})
+            if not old and prior_current and prior_current.get('original_target_id') == row.get('id'):
+                old = prior_current
             for key in ('documents', 'assets', 'analyzed_sha', 'collected_run', 'report_status', 'native_feedback'):
                 if key in old:
                     entry[key] = old[key]
@@ -131,6 +142,9 @@ def report_publication(config, state, report_release, document=None):
                     entry.update(documents=manifest['documents'], assets=manifest['assets'],
                                  analyzed_sha=report['analyzed_sha'], collected_run=run_key,
                                  status=report['status'], report_status=report['status'])
+                    for key in ('generated_at', 'report_generation_timestamp', 'producer_runs', 'tooling_sha'):
+                        if key in report:
+                            entry[key] = report[key]
                     entry['lifecycle_status'] = 'completed_partial' if report['status'] == 'partial' else 'completed'
                     entry.pop('error', None)
                     if document is not None:
@@ -153,7 +167,51 @@ def report_publication(config, state, report_release, document=None):
                     entry['native_feedback'] = processing(config['analysis_repository'], entry['native_feedback'])
                 except (ValueError, RuntimeError) as error:
                     entry['native_feedback']['processing_error'] = str(error)
-            result['targets'].append(entry)
+            entries.append(entry)
+
+        canonical_id = f"current:{config.get('project_id', state.get('project_id', 'unknown'))}"
+        valid = [entry for entry in entries
+                 if entry.get('lifecycle_status') in {'completed', 'completed_partial'}
+                 and entry.get('analyzed_sha') == entry.get('head_sha')
+                 and entry.get('documents') and entry.get('assets')]
+        requested_id = state.get('last_request_id')
+        requested = next((entry for entry in valid
+                          if requested_id and requested_id in {entry.get('client_request_id'), entry.get('request_id')}), None)
+
+        def newest(entry):
+            return (entry.get('report_generation_timestamp') or entry.get('generated_at') or
+                    entry.get('checked_at') or '', int(entry.get('scan_run_id') or 0),
+                    int(entry.get('run_attempt') or 0))
+
+        selected = requested or (max(valid, key=newest) if valid else None) or prior_current
+        if selected is not None:
+            canonical = {**selected, 'id': canonical_id,
+                         'canonical_target_id': canonical_id,
+                         'original_target_id': selected.get('original_target_id', selected.get('id'))}
+            if 'status' not in canonical and canonical.get('report_status'):
+                canonical['status'] = canonical['report_status']
+            result['targets'] = [canonical]
+            result['current_target_id'] = canonical_id
+
+        # Keep enough request/run history for activity polling without turning the
+        # current manifest back into a per-target inventory.
+        recent = list(previous.get('recent_runs', [])) if isinstance(previous.get('recent_runs'), list) else []
+        for entry in sorted(valid, key=newest, reverse=True):
+            recent.append({key: entry[key] for key in (
+                'request_id', 'client_request_id', 'original_target_id', 'head_sha',
+                'analyzed_sha', 'scan_run_id', 'run_attempt', 'execution_sha',
+                'collected_run', 'report_status', 'lifecycle_status', 'checked_at')
+                           if key in entry})
+        deduped = []
+        seen_runs = set()
+        for run in reversed(recent):
+            identity = (run.get('client_request_id') or run.get('request_id') or
+                        run.get('collected_run') or run.get('analyzed_sha'))
+            if not identity or identity in seen_runs:
+                continue
+            seen_runs.add(identity)
+            deduped.append(run)
+        result['recent_runs'] = list(reversed(deduped))[-10:]
         referenced = {name:meta for row in result['targets'] for name,meta in row.get('assets', {}).items()}
         size = sum(meta['bytes'] for meta in referenced.values())
         for name in referenced:
@@ -163,8 +221,8 @@ def report_publication(config, state, report_release, document=None):
                 github.cf_api(config, github.storage_path(config, 'report', f'{config["report_release"]}/{name}'),
                               method='POST', data=path.read_bytes(), content_type='application/gzip')
         result['metrics'] = {'compressed_bytes':size,
-                             'queued':sum(r['status']=='queued' for r in result['targets']),
-                             'scanning':sum(r['status']=='scanning' for r in result['targets']),
+                             'queued':sum(r.get('status')=='queued' for r in result['targets']),
+                             'scanning':sum(r.get('status')=='scanning' for r in result['targets']),
                              'published':sum(r.get('lifecycle_status') in {'completed','completed_partial'} for r in result['targets']),
                              'failed':sum(r.get('lifecycle_status') == 'failed' for r in result['targets']),
                              # Include bounded, non-secret publication diagnostics
@@ -181,6 +239,7 @@ def report_publication(config, state, report_release, document=None):
             history = []
         history.append({'at': now(), 'compressed_bytes': size})
         result['report_storage_history'] = history[-60:]
+        result['checked_at'] = now()
         release_manifest.write(config, report_release, result)
     return result
 

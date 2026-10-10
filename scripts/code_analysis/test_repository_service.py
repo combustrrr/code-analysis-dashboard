@@ -167,6 +167,39 @@ class IndependentSecurityChannelsTests(unittest.TestCase):
 
 
 class PublicationCompletenessTests(unittest.TestCase):
+    def test_publication_has_one_canonical_target_and_bounded_run_history(self):
+        config = {'analysis_repository': 'owner/repo', 'report_release': 'analysis-current-1', 'project_id': '1'}
+        rows = [{
+            'id': f'target-{i}', 'head_sha': f'{i + 1:040x}', 'status': 'collected',
+            'scan_run_id': i + 1, 'run_attempt': 1, 'kind': 'branch', 'branch': f'branch-{i}',
+            'source_repository': 'owner/source', 'client_request_id': f'request-{i}',
+        } for i in range(12)]
+        state = {'project_id': '1', 'last_request_id': 'request-7', 'targets': rows}
+
+        def collect(_config, row, destination):
+            destination.mkdir(parents=True, exist_ok=True)
+            (destination / 'findings.json').write_text(json.dumps({'findings': [row['id']]}), encoding='utf-8')
+            return {'analyzed_sha': row['head_sha'], 'status': 'complete',
+                    'generated_at': f"2026-10-10T00:{row['scan_run_id']:02d}:00Z",
+                    'producer_runs': [{'id': str(row['scan_run_id'])}]}
+
+        with patch('scripts.code_analysis.repository_service.github.collect', side_effect=collect), \
+                patch('scripts.code_analysis.repository_service.github.discover', side_effect=[[row] for row in rows]), \
+                patch('scripts.code_analysis.repository_service.github.cf_api'), \
+                patch('scripts.code_analysis.repository_service.accept', return_value=True), \
+                patch('scripts.code_analysis.repository_service.release_manifest.read', return_value={}), \
+                patch('scripts.code_analysis.repository_service.release_manifest.write') as write:
+            result = report_publication(config, state, 'analysis-current-1')
+
+        self.assertEqual(len(result['targets']), 1)
+        target = result['targets'][0]
+        self.assertEqual(target['id'], 'current:1')
+        self.assertEqual(target['original_target_id'], 'target-7')
+        self.assertEqual(target['branch'], 'branch-7')
+        self.assertEqual(target['head_sha'], rows[7]['head_sha'])
+        self.assertEqual(len(result['recent_runs']), 10)
+        self.assertEqual(write.call_args.args[2]['current_target_id'], 'current:1')
+
     def test_report_assets_are_uploaded_under_repository_qualified_keys(self):
         config = {'analysis_repository': 'Owner/Repo', 'report_release': 'analysis-current-1'}
         state = {'targets': [{'id': 'one', 'head_sha': 'a' * 40, 'status': 'collected',

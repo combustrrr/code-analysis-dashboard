@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {reportToken} from './github-app.mjs';
-import {publicReports,reportStorageKey} from './reports.mjs';
+import {publicReports,reportStorageKey,canonicalReportTarget} from './reports.mjs';
 const reportProjectConfig={schema_version:'analysis-projects-v1',execution_repository:{id:88},tooling_sha:'a'.repeat(40),projects:[{id:'1',source_repository:{id:1267340546,full_name:'owner/source'},profile:{mode:'portable'},preferred_branch:'main',enabled_scanners:['semgrep'],deferred_channels:{},report_budget_bytes:900000000}]};
 const reportConfigFile=()=>Response.json({encoding:'base64',content:Buffer.from(JSON.stringify(reportProjectConfig)).toString('base64')});test('public report tokens are limited to one repository and read-only contents',async()=>{
  const pair=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
@@ -26,6 +26,12 @@ async function appKey() {
   const pair=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
   return Buffer.from(await crypto.subtle.exportKey('pkcs8',pair.privateKey)).toString('base64');
 }
+test('canonical report target is stable and rejects an ambiguous multi-target manifest', () => {
+  const canonical = {id:'current:1', original_target_id:'branch-main'};
+  assert.equal(canonicalReportTarget({current_target_id:'current:1',targets:[canonical,{id:'old'}]}), canonical);
+  assert.equal(canonicalReportTarget({current_target_id:'missing',targets:[{id:'one'},{id:'two'}]}), null);
+  assert.equal(canonicalReportTarget({targets:[{id:'legacy'}]}).id, 'legacy');
+});
 test('report access retries once with a fresh installation token after 401',async()=>{
   const pem=await appKey();
   const original=globalThis.fetch;let mints=0;let repoCalls=0;

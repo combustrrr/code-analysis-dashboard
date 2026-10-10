@@ -1,4 +1,4 @@
-import {publicReports} from './reports.mjs';
+import {publicReports, canonicalReportTarget} from './reports.mjs';
 import {readBody, BodyLimitError, resolveLimit, DEFAULT_LIMITS} from './request-limits.mjs';
 import {detectedProfile, validatePortableProfile} from './profile-policy.mjs';
 export {detectedProfile, validatePortableProfile} from './profile-policy.mjs';
@@ -354,8 +354,15 @@ export async function applicationApi(request, env, session, helpers) {
     if(!response.ok)return json({phase:'queued',request_id:id,checked_at:new Date().toISOString(),publication_status:'unavailable',message:'Request is queued successfully. Publication status is temporarily unavailable; the request remains retained.'},202);
     const manifest=await response.json();
     const receipt=manifest.requests?.find(r=>r.request_id===id);
-    const row=manifest.targets.find(t=>t.client_request_id===id&&(!receipt||t.head_sha===receipt.head_sha));
-    if(receipt&&!row)return json({phase:'superseded',source_sha:receipt.head_sha,request_id:id,checked_at:new Date().toISOString()});
+    const canonical=canonicalReportTarget(manifest);
+    let row=canonical && (canonical.client_request_id===id || canonical.request_id===id) ? canonical : null;
+    if (!row) {
+      const recent=Array.isArray(manifest.recent_runs) ? manifest.recent_runs.find(run =>
+        run.client_request_id===id || run.request_id===id) : null;
+      if (recent && canonical && recent.analyzed_sha === canonical.analyzed_sha &&
+          recent.original_target_id === canonical.original_target_id) row = {...canonical, ...recent};
+      else if (receipt || recent) return json({phase:'superseded',source_sha:receipt?.head_sha || recent?.head_sha,request_id:id,checked_at:new Date().toISOString()});
+    }
     if(!row)return json({phase:'queued',request_id:id,checked_at:new Date().toISOString()});
     const result={request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'queued',checked_at:new Date().toISOString()};
     if(row.scan_run_id){
