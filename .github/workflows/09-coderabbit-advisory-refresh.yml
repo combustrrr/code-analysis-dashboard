@@ -24,7 +24,7 @@ jobs:
     - name: Checkout trusted evidence collector
       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
-        ref: 3ae87eba3982ee9fe74312c4a36ca91796f74caf
+        ref: 177e333d2bb696424cdde3b1792fc1e08be10be9
         sparse-checkout: scripts/code_analysis/collect_coderabbit.py
         sparse-checkout-cone-mode: false
     - name: Resolve exact pull-request head
@@ -40,7 +40,7 @@ jobs:
     - name: Collect exact-head CodeRabbit evidence
       env:
         CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
-        COLLECTOR_SHA: 3ae87eba3982ee9fe74312c4a36ca91796f74caf
+        COLLECTOR_SHA: 177e333d2bb696424cdde3b1792fc1e08be10be9
         SCAN_BRANCH: ${{ steps.identity.outputs.branch }}
         SCAN_SHA: ${{ steps.identity.outputs.commit }}
         PR_NUMBER: ${{ steps.identity.outputs.pr_number }}

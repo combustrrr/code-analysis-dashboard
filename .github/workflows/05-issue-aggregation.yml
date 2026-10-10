@@ -75,7 +75,7 @@ jobs:
     - name: Collect optional exact-head CodeRabbit advisories
       env:
         CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
-        COLLECTOR_SHA: 3ae87eba3982ee9fe74312c4a36ca91796f74caf
+        COLLECTOR_SHA: 177e333d2bb696424cdde3b1792fc1e08be10be9
         MONITORED_SHA: ${{ inputs.scan_sha }}
         MONITORED_BRANCH: ${{ inputs.scan_branch }}
       shell: bash
