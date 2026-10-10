@@ -88,4 +88,9 @@ planning and remains pending a pinned multi-file Hadolint producer.
 
 The portable OSV producer and capability planner are pinned to
 `756990013f7213b2d39c14373183ca0baadfde22`; the Worker was redeployed as
-version `3b7807c6-eeac-4d9c-9925-6b14bbf86498` with that tooling revision.
+version `bb84f47e-5d4d-424e-8d22-2556a4c4b995` with that tooling revision.
+
+Published reports now expose one canonical current target per repository
+project. The selected branch, pull request, or commit remains preserved as
+provenance, while bounded `recent_runs` metadata supports launch polling and
+superseded-request reporting without creating multiple current reports.
