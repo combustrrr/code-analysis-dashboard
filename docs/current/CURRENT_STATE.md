@@ -85,3 +85,7 @@ enables the isolated OSV-Scanner producer, while absent inputs remain explicit
 `NOT_AVAILABLE` evidence; source-executing jobs still receive no vendor or
 publication credentials. Generic Dockerfile discovery is currently used for
 planning and remains pending a pinned multi-file Hadolint producer.
+
+The portable OSV producer and capability planner are pinned to
+`bc5bce7f8dca81d4512a81279f1511d64e2a291f`; the Worker was redeployed as
+version `66f064da-e033-4d5d-b017-4a5b5d933bef` with that tooling revision.
