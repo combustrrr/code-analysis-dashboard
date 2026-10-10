@@ -14,6 +14,8 @@ import { AnalysisLauncher, type LaunchRequest } from './AnalysisLauncher';
 import { ThreatReport } from './ThreatReport';
 import { Settings } from './Settings';
 import { safeGithubUrl } from './safeUrls';
+import { Repositories } from './Repositories';
+import { LandingPage } from './LandingPage';
 
 type Target = { scan_run_id?: number; run_attempt?: number; tooling_sha?: string; lifecycle_status?: string; id: string; label: string; repository: string; source_repository: string; head_sha: string; kind: string; branch: string; pr?: number; base_branch?: string; base_sha?: string; checked_at: string; status: string; report?: string; error?: string };
 type Index = { report_storage?: {compressed_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
@@ -132,7 +134,11 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const fresh = !!report && report.analyzed_sha === target?.head_sha;
   const completed = report?.channels.filter(c => ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(c.status)).length || 0;
   const humanBytes=(n?:number)=>typeof n==='number'? (n>950_000_000? (n/1_000_000_000).toFixed(2)+' GB' : (n/1_000_000).toFixed(1)+' MB') : 'Unavailable';
-  return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: {
+   if (!r.repository) {
+     if (r.tab === 'repositories') return <Repositories auth={launchAuth} endpoint={applicationEndpoint}/>;
+     return <LandingPage auth={launchAuth} onStart={() => { location.hash = '#tab=repositories'; }} />;
+   }
+   return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: {
     colorPrimary: appearance === 'dark' ? '#7bd0ff' : '#1765ad',
     colorLink: appearance === 'dark' ? '#7bd0ff' : '#1765ad',
     colorLinkHover: appearance === 'dark' ? '#b3e5ff' : '#124c85',
@@ -253,12 +259,12 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
     </main>
   </ConfigProvider>;
 }
-if(import.meta.env.VITE_APPLICATION_MODE==='repositories') {
- const parameters=new URLSearchParams(location.hash.slice(1));
- if(!parameters.has('repository')) {
-  parameters.set('repository',import.meta.env.VITE_DEFAULT_EXECUTION_REPOSITORY||'combustrrr/code-analysis-dashboard');
-  parameters.set('project',import.meta.env.VITE_DEFAULT_PROJECT_ID||'1360051890');
-  history.replaceState(null,'','#'+parameters.toString());
- }
+if(import.meta.env.VITE_APPLICATION_MODE!=='repositories') {
+  const parameters=new URLSearchParams(location.hash.slice(1));
+  if(!parameters.has('repository')) {
+    parameters.set('repository',import.meta.env.VITE_DEFAULT_EXECUTION_REPOSITORY||'combustrrr/code-analysis-dashboard');
+    parameters.set('project',import.meta.env.VITE_DEFAULT_PROJECT_ID||'1360051890');
+    history.replaceState(null,'','#'+parameters.toString());
+  }
 }
-createRoot(document.getElementById('root')!).render(<DashboardAccess>{auth=><App viewerAuth={auth}/>}</DashboardAccess>);
+createRoot(document.getElementById('root')!).render(<DashboardAccess publicFallback={auth=><LandingPage auth={auth} onStart={() => { location.hash = '#tab=repositories'; }} />}>{auth=><App viewerAuth={auth}/>}</DashboardAccess>);

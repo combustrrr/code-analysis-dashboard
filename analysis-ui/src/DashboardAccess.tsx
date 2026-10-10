@@ -3,7 +3,7 @@ import {Alert,Button,ConfigProvider,Segmented,Space,theme} from 'antd';
 import {useLaunchAuth} from './useLaunchAuth';
 import {applicationEndpoint,setReportSession} from './repositoryReports';
 
-export function DashboardAccess({children}:{children:(auth?:ReturnType<typeof useLaunchAuth>)=>ReactNode}) {
+export function DashboardAccess({children,publicFallback}:{children:(auth?:ReturnType<typeof useLaunchAuth>)=>ReactNode;publicFallback?:(auth:ReturnType<typeof useLaunchAuth>)=>ReactNode}) {
  const auth=useLaunchAuth(applicationEndpoint);
  const [required,setRequired]=useState<boolean>();
  const [verified,setVerified]=useState<string>();
@@ -19,8 +19,9 @@ export function DashboardAccess({children}:{children:(auth?:ReturnType<typeof us
   void verify();const timer=window.setInterval(()=>{if(!document.hidden)void verify();},15000);window.addEventListener('analysis-access-denied',denied);
   return()=>{active=false;clearInterval(timer);window.removeEventListener('analysis-access-denied',denied);setReportSession(undefined);};
  },[required,auth.session?.token]);
- if(!applicationEndpoint||required===false)return children();
- if(auth.session&&verified===auth.session.token)return children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}});
+  if(!applicationEndpoint||required===false)return children(auth);
+  if(auth.session&&verified===auth.session.token)return children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}});
+  if(publicFallback)return publicFallback(auth);
   return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm}}><main className={`dashboard-access ${dark?'dashboard-access-dark':'dashboard-access-light'}`}><section>
   <h1>Code Analysis</h1><p>Sign in with an authorized GitHub account to view repositories, findings and scanner activity.</p>
   <Space direction="vertical" size="middle"><Segmented aria-label="Color theme" value={dark?'Dark':'Light'} options={['Dark','Light']} onChange={v=>{setDark(v==='Dark');localStorage.setItem('analysis-theme',v.toLowerCase());}}/>
