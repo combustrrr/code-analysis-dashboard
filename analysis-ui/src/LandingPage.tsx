@@ -1,22 +1,25 @@
 import { Alert, Button, ConfigProvider, Space, Typography, theme } from 'antd';
 import { ArrowDownOutlined, ArrowRightOutlined, BranchesOutlined, CodeOutlined, FileSearchOutlined, GithubOutlined, RadarChartOutlined, SafetyCertificateOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { useLaunchAuth } from './useLaunchAuth';
+import { AppearanceToggle, useAppearance } from './Appearance';
 import './landing.css';
 
 type Auth = ReturnType<typeof useLaunchAuth>;
 
-export function LandingPage({ auth, onStart, accessError }: { auth: Auth; onStart: () => void; accessError?: string }) {
+export function LandingPage({ auth, onStart, accessError, workspaceRequested = false }: { auth: Auth; onStart: () => void; accessError?: string; workspaceRequested?: boolean }) {
+  const { appearance } = useAppearance();
   const signedIn = Boolean(auth.session) && !accessError;
   const primaryAction = signedIn ? onStart : auth.signIn;
   const primaryLabel = signedIn ? 'Open workspace' : 'Sign in with GitHub';
 
-  return <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
+  return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
     <main className="landing-page landing-v2">
       <div className="landing-wrap">
         <nav className="landing-nav" aria-label="Main navigation">
           <a className="landing-brand" href="#top" aria-label="Code Analysis home"><span className="landing-brand-mark"><RadarChartOutlined /></span><span>Code Analysis</span></a>
           <div className="landing-nav-right">
             <span className="landing-nav-note">READ-ONLY ANALYSIS</span>
+            <AppearanceToggle className="landing-theme-toggle" />
             {signedIn && auth.session && <span className="landing-user">{auth.session.login}</span>}
             <Button className="landing-nav-cta" icon={signedIn ? undefined : <GithubOutlined />} onClick={primaryAction} disabled={!signedIn && !auth.available}>{primaryLabel}</Button>
           </div>
@@ -31,7 +34,8 @@ export function LandingPage({ auth, onStart, accessError }: { auth: Auth; onStar
               <Button type="primary" size="large" icon={signedIn ? <ArrowRightOutlined /> : <GithubOutlined />} onClick={primaryAction} disabled={!signedIn && !auth.available}>{signedIn ? 'Open workspace' : 'Sign in with GitHub'}</Button>
               <a className="landing-secondary-action" href="#workflow">See how it works <ArrowDownOutlined /></a>
             </Space>
-            {!signedIn && <p className="landing-auth-hint">New users: ask a repository admin to add your GitHub account as a collaborator, accept the invitation, then sign in here.</p>}
+            {!signedIn && <p className="landing-auth-hint">First time here? Sign in with GitHub—no separate app account is needed. A dashboard admin must invite your account to combustrrr/code-analysis-dashboard; accept the invitation, then sign in.</p>}
+            {workspaceRequested && !accessError && <p className="landing-auth-hint">Sign in with an approved GitHub account to open the repository workspace. Your sign-in stays active in this tab.</p>}
             {!auth.available && !auth.error && <p className="landing-auth-hint">GitHub sign-in is temporarily unavailable.</p>}
             {(accessError || auth.error) && <Alert className="landing-error" type="error" showIcon title={accessError ? 'Dashboard access' : 'GitHub sign-in'} description={accessError || auth.error} />}
           </div>

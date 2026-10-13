@@ -4,10 +4,11 @@ import { ProjectLauncher } from './ProjectLauncher';
 import { applicationEndpoint, repositoryJson } from './repositoryReports';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Alert, Button, Collapse, ConfigProvider, Descriptions, Drawer, Empty, Grid, Input, Segmented, Progress, Select, Space, Statistic, Table, Tabs, Tag, Typography, theme, message } from 'antd';
+import { Alert, Button, Collapse, ConfigProvider, Descriptions, Drawer, Empty, Grid, Input, Progress, Select, Space, Statistic, Table, Tabs, Tag, Typography, theme, message } from 'antd';
 import { CodeOutlined, GithubOutlined, SearchOutlined } from '@ant-design/icons';
 import 'antd/dist/reset.css';
 import './style.css';
+import './workspace.css';
 import { useLaunchAuth } from './useLaunchAuth';
 import { RequestStatus } from './Integration';
 import { AnalysisLauncher, type LaunchRequest } from './AnalysisLauncher';
@@ -16,6 +17,7 @@ import { Settings } from './Settings';
 import { safeGithubUrl } from './safeUrls';
 import { Repositories } from './Repositories';
 import { LandingPage } from './LandingPage';
+import { AppearanceProvider, AppearanceToggle, useAppearance } from './Appearance';
 
 type Target = { scan_run_id?: number; run_attempt?: number; tooling_sha?: string; lifecycle_status?: string; id: string; label: string; repository: string; source_repository: string; head_sha: string; kind: string; branch: string; pr?: number; base_branch?: string; base_sha?: string; checked_at: string; status: string; report?: string; error?: string };
 type Index = { report_storage?: {compressed_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
@@ -28,7 +30,7 @@ const ranks: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3,
 async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
   return repositoryJson<T>(path, signal);
 }
-function route() { const p = new URLSearchParams(location.hash.slice(1)); const legacy = p.get('tab') || ''; return { repository: p.get('repository') || '', project: p.get('project') || '', target: p.get('target') || '', tab: ['connections','repositories','provenance'].includes(legacy) ? 'settings' : legacy || 'overview', section: p.get('section') || (['connections','repositories','provenance'].includes(legacy) ? legacy : 'connections'), issue: p.get('issue') || '' }; }
+function route() { const p = new URLSearchParams(location.hash.slice(1)); const legacy = p.get('tab') || ''; const repository = p.get('repository') || ''; const legacySettings = ['connections','repositories','provenance'].includes(legacy) && (Boolean(repository) || legacy !== 'repositories'); return { repository, project: p.get('project') || '', target: p.get('target') || '', tab: legacySettings ? 'settings' : legacy || 'overview', section: p.get('section') || (legacySettings ? legacy : 'connections'), issue: p.get('issue') || '' }; }
 function isRepositoryAvailabilityError(value: string) { return /retired|unsupported|not supported|project is unavailable|private reports are not supported/i.test(value); }
 function navigate(target: string, tab: string, issue = '') { const current = route(); location.hash = new URLSearchParams({ ...(current.repository ? { repository: current.repository, project: current.project } : {}), target, tab, ...(issue ? { issue } : {}) }).toString(); }
 function date(s?: string) { return s ? new Date(s).toLocaleString() : 'Unavailable'; }
@@ -70,14 +72,13 @@ function ProjectPicker({repository,project}:{repository:string;project:string}) 
 }
 function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const screens = Grid.useBreakpoint();
-  const [appearance, setAppearance] = useState(() => { try { return localStorage.getItem('analysis-theme') || 'dark'; } catch { return 'dark'; } });
+  const { appearance } = useAppearance();
   const [runOpen, setRunOpen] = useState(false);
   const [pendingLaunch, setPendingLaunch] = useState<(LaunchRequest & { previousReport?: string; previousRun?: number }) | undefined>(() => { try { return JSON.parse(sessionStorage.getItem('analysis-pending-launch') || 'null') || undefined; } catch { return undefined; } });
   const [refreshTick, setRefreshTick] = useState(0);
   const [lastRefresh, setLastRefresh] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   useEffect(()=>{const refresh=()=>setRefreshTick(t=>t+1);window.addEventListener('analysis-report-published',refresh);return()=>window.removeEventListener('analysis-report-published',refresh);},[]);
-  useEffect(() => { document.documentElement.dataset.theme = appearance; try { localStorage.setItem('analysis-theme', appearance); } catch {} }, [appearance]);
   const [category, setCategory] = useState('');
   const [channelStatus, setChannelStatus] = useState('');
   const [directory, setDirectory] = useState('');
@@ -86,7 +87,20 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
    const refreshSequence = useRef(0);
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
   const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
-   useEffect(() => { const c = new AbortController(); const sequence = ++refreshSequence.current; const refresh = () => { refreshRepositoryReports(); return json<Index>('data/index.json', c.signal).then(value => { if (sequence !== refreshSequence.current) return; setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError' && sequence === refreshSequence.current) { setIndex(undefined); setError(e.message); } }).finally(()=>{ if (sequence === refreshSequence.current) setRefreshing(false); }); }; refresh(); const timer = window.setInterval(refresh, 60000); const change = () => setRoute(route()); window.addEventListener('hashchange', change); return () => { c.abort(); window.clearInterval(timer); window.removeEventListener('hashchange', change); }; }, [refreshTick, r.repository, r.project]);
+    useEffect(() => {
+      const sequence = ++refreshSequence.current;
+      const c = new AbortController();
+      const refresh = () => { refreshRepositoryReports(); return json<Index>('data/index.json', c.signal).then(value => { if (sequence !== refreshSequence.current) return; setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError' && sequence === refreshSequence.current) { setIndex(undefined); setError(e.message); } }).finally(()=>{ if (sequence === refreshSequence.current) setRefreshing(false); }); };
+      const change = () => setRoute(route());
+      let timer: number | undefined;
+      if (r.repository && r.project) {
+        refresh(); timer = window.setInterval(refresh, 60000);
+      } else {
+        setIndex(undefined); setError(''); setLastRefresh(''); setRefreshing(false);
+      }
+      window.addEventListener('hashchange', change);
+      return () => { c.abort(); if (timer !== undefined) window.clearInterval(timer); window.removeEventListener('hashchange', change); };
+    }, [refreshTick, r.repository, r.project]);
   const localAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint);
   const launchAuth = viewerAuth || localAuth;
   const launched = pendingLaunch && index?.targets.find(t => t.kind === pendingLaunch.kind && (t.kind === 'pr' ? String(t.pr) === pendingLaunch.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === pendingLaunch.ref.toLowerCase() : t.branch === pendingLaunch.ref));
@@ -134,23 +148,26 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const fresh = !!report && report.analyzed_sha === target?.head_sha;
   const completed = report?.channels.filter(c => ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(c.status)).length || 0;
   const humanBytes=(n?:number)=>typeof n==='number'? (n>950_000_000? (n/1_000_000_000).toFixed(2)+' GB' : (n/1_000_000).toFixed(1)+' MB') : 'Unavailable';
-   if (!r.repository) {
-     if (r.tab === 'repositories') return <Repositories auth={launchAuth} endpoint={applicationEndpoint}/>;
-     return <LandingPage auth={launchAuth} onStart={() => { location.hash = '#tab=repositories'; }} />;
-   }
-   return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: {
-    colorPrimary: appearance === 'dark' ? '#7bd0ff' : '#1765ad',
-    colorLink: appearance === 'dark' ? '#7bd0ff' : '#1765ad',
-    colorLinkHover: appearance === 'dark' ? '#b3e5ff' : '#124c85',
-    colorBgBase: appearance === 'dark' ? '#071523' : '#f4f7fa',
-    colorBgContainer: appearance === 'dark' ? '#102131' : '#ffffff',
-    // Increase light-mode contrast for readability
-    colorText: appearance === 'dark' ? '#dce8f5' : '#1f2937',
-    colorTextSecondary: appearance === 'dark' ? '#a6b8c9' : '#475569',
-    colorBorder: appearance === 'dark' ? '#304459' : '#94a3b8',
-    borderRadius: 6, fontFamily: 'Segoe UI, sans-serif'
-  }, components: { Button: { primaryColor: appearance === 'dark' ? '#071523' : '#ffffff' } } }}>
-    <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}{r.repository&&<ProjectPicker repository={r.repository} project={r.project}/>}<Segmented aria-label="Color theme" value={appearance} options={[{label:'Dark',value:'dark'},{label:'Light',value:'light'}]} onChange={setAppearance}/><Button type="primary" onClick={() => setRunOpen(true)}>Run analysis</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/code-analysis-dashboard'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
+   const appTheme = { algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: {
+     colorPrimary: appearance === 'dark' ? '#75c7b1' : '#08767a',
+     colorLink: appearance === 'dark' ? '#a6d8c8' : '#075b60',
+     colorLinkHover: appearance === 'dark' ? '#d0eadc' : '#06484c',
+     colorBgBase: appearance === 'dark' ? '#102b34' : '#eef1eb',
+     colorBgContainer: appearance === 'dark' ? '#183640' : '#fbfcf8',
+     colorText: appearance === 'dark' ? '#f0f5ef' : '#122c33',
+     colorTextSecondary: appearance === 'dark' ? '#a2beb6' : '#4d666a',
+     colorBorder: appearance === 'dark' ? '#34535a' : '#cbd6d0',
+     borderRadius: 6, fontFamily: 'Segoe UI, sans-serif'
+   }, components: { Button: { primaryColor: appearance === 'dark' ? '#102b34' : '#ffffff' } } };
+    if (!r.repository) {
+      if (r.tab === 'repositories') return <ConfigProvider theme={appTheme}>
+        <header className="topbar workspace-topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap><span>Repository workspace</span><AppearanceToggle className="appearance-toggle"/></Space></header>
+        <main className="workspace-home"><div className="workspace-intro"><div className="eyebrow">WORKSPACE SETUP</div><h1>Connect a repository</h1><p>Choose where analysis runs, then review any proposed setup before confirming it.</p></div><Repositories auth={launchAuth} endpoint={applicationEndpoint}/></main>
+      </ConfigProvider>;
+      return <LandingPage auth={launchAuth} onStart={() => { location.hash = '#tab=repositories'; }} />;
+    }
+    return <ConfigProvider theme={appTheme}>
+     <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}{r.repository&&<ProjectPicker repository={r.repository} project={r.project}/>}<AppearanceToggle/><Button type="primary" onClick={() => setRunOpen(true)}>Run analysis</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/code-analysis-dashboard'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
     {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} close={() => setRunOpen(false)}/>} 
     {runOpen && !(r.repository && r.project) && <AnalysisLauncher
       onSubmitted={request => {
@@ -267,4 +284,4 @@ if(import.meta.env.VITE_APPLICATION_MODE!=='repositories') {
     history.replaceState(null,'','#'+parameters.toString());
   }
 }
-createRoot(document.getElementById('root')!).render(<DashboardAccess publicFallback={(auth,accessError)=><LandingPage auth={auth} accessError={accessError} onStart={() => { location.hash = '#tab=repositories'; }} />}>{auth=><App viewerAuth={auth}/>}</DashboardAccess>);
+createRoot(document.getElementById('root')!).render(<AppearanceProvider><DashboardAccess publicFallback={(auth,accessError)=><LandingPage auth={auth} accessError={accessError} workspaceRequested={new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories'} onStart={() => { location.hash = '#tab=repositories'; }} />}>{auth=><App viewerAuth={auth}/>}</DashboardAccess></AppearanceProvider>);

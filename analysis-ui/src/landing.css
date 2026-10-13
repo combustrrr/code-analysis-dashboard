@@ -112,6 +112,27 @@
 .landing-v2 .landing-footer > span:nth-child(2) { justify-self: center; }
 .landing-v2 .landing-footer > span:last-child { text-align: right; }
 .landing-v2 :where(a,button):focus-visible { outline: 3px solid #d99c3d; outline-offset: 3px; }
+.landing-v2 .landing-theme-toggle.ant-segmented { border: 1px solid var(--landing-line); color: var(--landing-ink); background: var(--landing-paper-deep); }
+.landing-v2 .landing-theme-toggle .ant-segmented-item-selected { color: var(--landing-ink); background: var(--landing-paper); box-shadow: 0 1px 2px #122c3318; }
+
+:root[data-theme="dark"] .landing-v2 {
+  --landing-paper: #102b34;
+  --landing-paper-deep: #183640;
+  --landing-ink: #f0f5ef;
+  --landing-muted: #a2beb6;
+  --landing-line: #34535a;
+  --landing-teal: #75c7b1;
+  --landing-teal-dark: #509d8b;
+  --landing-amber: #dcb56e;
+  --landing-night: #071c24;
+  --landing-white: #f6f8f3;
+}
+:root[data-theme="dark"] .landing-brand-mark { border-color: #426765; color: #8ad0bd; background: #183640; }
+:root[data-theme="dark"] .landing-v2 .landing-nav-cta.ant-btn { border-color: #426765; color: var(--landing-ink); }
+:root[data-theme="dark"] .landing-v2 .landing-nav-cta.ant-btn:hover { border-color: var(--landing-teal); color: var(--landing-ink); background: #183640; }
+:root[data-theme="dark"] .landing-step-icon { border-color: #426765; color: var(--landing-teal); background: #183640; }
+:root[data-theme="dark"] .landing-v2 .landing-theme-toggle.ant-segmented { border-color: #426765; color: var(--landing-ink); background: #183640; }
+:root[data-theme="dark"] .landing-v2 .landing-theme-toggle .ant-segmented-item-selected { color: var(--landing-ink); background: #25464b; }
 
 @media (max-width: 900px) {
   .landing-v2 .landing-hero { grid-template-columns: minmax(0,1fr) minmax(330px,.9fr); gap: 34px; padding-top: 58px; }
