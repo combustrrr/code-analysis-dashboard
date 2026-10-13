@@ -1,8 +1,8 @@
 # New-chat handoff: Code Analysis Dashboard
 
-Verified implementation baseline: 2026-10-02, main commit `056eee4`. Worker version
-`182cde64-8a94-4bca-b1a2-a92854ca8fca` contains the current deployed request-idempotency
-fix. This is the service handoff; read it
+Verified implementation baseline: 2026-10-13, main commit `5b07952`. Worker version
+`b990585d-1412-4a8c-8c43-8abb0e096577` contains the current deployed repository-setup
+profile mapping. This is the service handoff; read it
 before AGENTS.md, README.md and the current architecture guide. Old session documents
 are historical evidence, not instructions to restore old hosting.
 
@@ -18,16 +18,19 @@ are historical evidence, not instructions to restore old hosting.
   product fork. No writes to upstream are authorized.
 - Website: https://combustrrr.github.io/code-analysis-dashboard/
 - Worker: https://code-analysis-launcher.icsarthak9.workers.dev
-- Pages deployment is triggered by the main branch workflow. Worker version
-  `182cde64-8a94-4bca-b1a2-a92854ca8fca` deployed.
+- Pages deployment is triggered by the main branch workflow. Pages run `38441170421`
+  deployed commit `5b07952`; Worker version `b990585d-1412-4a8c-8c43-8abb0e096577`
+  is deployed.
 
 ## What is implemented
 
 Ant Design application with light/dark themes, current source/target/revision
 provenance, overview charts, issues, scanners, connections and repository setup.
-Run analysis is a single form: select branch, PR or full 40-character SHA, then
-Run analysis. Readiness expands optionally. Polling follows the request, exact
-scanner run/attempt and publication; published output opens the selected target.
+Primary flow: sign in, choose an execution repository, open a configured source
+project, select branch/PR/full SHA, submit once, follow its persistent request tracker,
+then open the report identified by the published request. Readiness expands optionally.
+The separate optional folder-mapping path is admin-only and requires a fresh preview
+after edits before an explicit configuration commit.
 Threat Reports add deterministic JSON/Markdown/PDF exports, severity-aware UI,
 raw/normalized channel coverage, finding provenance, and explicit limitations.
 Dashboard refresh is read-only; analysis starts only after an explicit user action.
@@ -136,3 +139,13 @@ report/channel verification, and review of open scanner updates. Another accepte
 collaborator live login stays deferred. Triage/suppression, SLA tracking, DAST/mobile
 adapters and unrestricted external-owner onboarding are roadmap items, not implemented
 or live-proven. No paid plan or upstream write is authorized.
+
+## 2026-10-13 repository journey release
+
+Main commit `5b07952` deployed to Pages in workflow run `38441170421`; the matching
+Worker API was deployed as `b990585d-1412-4a8c-8c43-8abb0e096577`. Public Pages and
+the unauthenticated Worker boundary were smoke-tested. Fixture Playwright coverage
+passed 24 tests (5 access tests are excluded in the default fixture build); the separate
+access-enabled suite passed all 5, including a mocked login-to-published-report path.
+No authenticated production launch or scanner dispatch was performed, so this is not
+live end-to-end scan/publication evidence.

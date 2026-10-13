@@ -51,9 +51,18 @@ and canonical artifact name, then publishes the partial/current report to R2.
 The legacy scanner workflow files had been serialized with `true:` instead of the
 GitHub trigger key `'on':`, which made GitHub register push runs with zero jobs.
 Those triggers are repaired and the workflow audit now rejects that serialization.
-GitHub Pages was rebuilt successfully, and the Cloudflare Worker was redeployed as
-version `1328c287-6a7a-4670-9846-009883f31528`; its R2 bindings and origin-protected
-public configuration endpoint are live.
+GitHub Pages was rebuilt from main commit `5b07952` by workflow run `38441170421`.
+The Cloudflare Worker was redeployed as version
+`b990585d-1412-4a8c-8c43-8abb0e096577`; its R2 bindings and origin-protected public
+configuration endpoint remain live.
+
+The repository workspace now connects execution repositories to configured source
+projects, launches explicit branch/PR/SHA requests, and retains a per-request tracker
+through publication before opening the exact report. Repository discovery failures are
+distinct from empty project lists and can be retried. Folder mapping is a separate,
+optional administrator setup path with detected roots, re-preview after edits, and an
+explicit reviewed commit. Playwright now covers one mocked end-to-end login-to-report
+journey. No live scanner request was dispatched as part of this release.
 
 Portable-profile detection and validation were moved into the dedicated
 `analysis-launcher/profile-policy.mjs` module; the former duplicate inline policy and
