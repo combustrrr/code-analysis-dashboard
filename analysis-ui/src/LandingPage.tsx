@@ -6,11 +6,12 @@ import './landing.css';
 
 type Auth = ReturnType<typeof useLaunchAuth>;
 
-export function LandingPage({ auth, onStart, accessError, workspaceRequested = false }: { auth: Auth; onStart: () => void; accessError?: string; workspaceRequested?: boolean }) {
+export function LandingPage({ auth, onStart, accessError, accessPending = false, workspaceRequested = false }: { auth: Auth; onStart: () => void; accessError?: string; accessPending?: boolean; workspaceRequested?: boolean }) {
   const { appearance } = useAppearance();
   const signedIn = Boolean(auth.session) && !accessError;
+  const checkingAccess = workspaceRequested && accessPending;
   const primaryAction = signedIn ? onStart : auth.signIn;
-  const primaryLabel = signedIn ? 'Open workspace' : 'Sign in with GitHub';
+  const primaryLabel = checkingAccess ? 'Checking GitHub access…' : signedIn ? 'Open workspace' : 'Sign in with GitHub';
 
   return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
     <main className="landing-page landing-v2">
@@ -21,7 +22,7 @@ export function LandingPage({ auth, onStart, accessError, workspaceRequested = f
             <span className="landing-nav-note">READ-ONLY ANALYSIS</span>
             <AppearanceToggle className="landing-theme-toggle" />
             {signedIn && auth.session && <span className="landing-user">{auth.session.login}</span>}
-            <Button className="landing-nav-cta" icon={signedIn ? undefined : <GithubOutlined />} onClick={primaryAction} disabled={!signedIn && !auth.available}>{primaryLabel}</Button>
+              <Button className="landing-nav-cta" icon={signedIn ? undefined : <GithubOutlined />} onClick={primaryAction} disabled={checkingAccess || (!signedIn && !auth.available)}>{primaryLabel}</Button>
           </div>
         </nav>
 
@@ -31,11 +32,11 @@ export function LandingPage({ auth, onStart, accessError, workspaceRequested = f
             <Typography.Title id="landing-title">Know what your code is carrying.</Typography.Title>
             <Typography.Paragraph>Run isolated analysis against a branch, pull request, or exact commit. Then inspect each finding with the scanner evidence and source revision still attached.</Typography.Paragraph>
             <Space wrap className="landing-actions">
-              <Button type="primary" size="large" icon={signedIn ? <ArrowRightOutlined /> : <GithubOutlined />} onClick={primaryAction} disabled={!signedIn && !auth.available}>{signedIn ? 'Open workspace' : 'Sign in with GitHub'}</Button>
+              <Button type="primary" size="large" icon={signedIn ? <ArrowRightOutlined /> : <GithubOutlined />} onClick={primaryAction} disabled={checkingAccess || (!signedIn && !auth.available)}>{primaryLabel}</Button>
               <a className="landing-secondary-action" href="#workflow">See how it works <ArrowDownOutlined /></a>
             </Space>
             {!signedIn && <p className="landing-auth-hint">First time here? Sign in with GitHub—no separate app account is needed. A dashboard admin must invite your account to combustrrr/code-analysis-dashboard; accept the invitation, then sign in.</p>}
-            {workspaceRequested && !accessError && <p className="landing-auth-hint">Sign in with an approved GitHub account to open the repository workspace. Your sign-in stays active in this tab.</p>}
+            {workspaceRequested && !accessError && <p className="landing-auth-hint">{accessPending ? 'Checking your GitHub access. This workspace request will be kept while access is verified.' : 'Sign in with an approved GitHub account to open the repository workspace. Your sign-in stays active in this tab.'}</p>}
             {!auth.available && !auth.error && <p className="landing-auth-hint">GitHub sign-in is temporarily unavailable.</p>}
             {(accessError || auth.error) && <Alert className="landing-error" type="error" showIcon title={accessError ? 'Dashboard access' : 'GitHub sign-in'} description={accessError || auth.error} />}
           </div>
@@ -71,7 +72,7 @@ export function LandingPage({ auth, onStart, accessError, workspaceRequested = f
         <section className="landing-boundary" aria-label="Security and access boundaries">
           <div className="landing-boundary-mark"><SafetyCertificateOutlined /></div>
           <div><span className="landing-kicker">BUILT AROUND TRUST BOUNDARIES</span><h2>Your source stays read-only.</h2><p>Scans use an immutable checkout. Scanner execution does not receive report-publication or vendor credentials. Incomplete coverage is shown as incomplete—not quietly counted as clean.</p></div>
-          <Button type="primary" onClick={primaryAction} disabled={!signedIn && !auth.available}>{signedIn ? 'Open workspace' : 'Get started'} <ArrowRightOutlined /></Button>
+          <Button type="primary" onClick={primaryAction} disabled={checkingAccess || (!signedIn && !auth.available)}>{checkingAccess ? 'Checking access…' : signedIn ? 'Open workspace' : 'Get started'} <ArrowRightOutlined /></Button>
         </section>
 
         <footer className="landing-footer"><a className="landing-brand" href="#top"><span className="landing-brand-mark"><RadarChartOutlined /></span><span>Code Analysis</span></a><span>Read-only analysis. Evidence you can trace.</span><span>Dashboard access is limited to approved GitHub collaborators.</span></footer>

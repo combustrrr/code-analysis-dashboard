@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export function useLaunchAuth(endpoint?: string) {
   const [session, setSession] = useState<{ token: string; login: string }>();
@@ -16,20 +16,21 @@ export function useLaunchAuth(endpoint?: string) {
     window.addEventListener('message', receive);
     return () => { window.removeEventListener('message', receive); popup.current?.close(); popup.current = null; nonce.current = ''; };
   }, [origin]);
-  const signIn = () => {
+  const signIn = useCallback(() => {
     if (!origin) return;
     nonce.current = Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
     popup.current?.close();
     popup.current = window.open(`${origin}/auth/login?nonce=${nonce.current}`, 'analysis-github-auth', 'popup,width=640,height=760');
     setError(popup.current ? '' : 'Allow the GitHub sign-in popup, then try again.');
-  };
-  async function api<T>(path: string, body?: unknown): Promise<T> {
+  }, [origin]);
+  const api = useCallback(async function api<T>(path: string, body?: unknown): Promise<T> {
     if (!origin || !session) throw new Error('Sign in to start analysis.');
     const response = await fetch(`${origin}/api/${path}`, { method: body ? 'POST' : 'GET', cache: 'no-store', credentials: 'omit',
       headers: { Authorization: `Bearer ${session.token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
     const result = await response.json();
     if (!response.ok) { if (response.status === 401) setSession(undefined); throw new Error(result.error || 'Analysis request failed.'); }
     return result as T;
-  }
-  return { available: !!origin, session, error, signIn, signOut: () => setSession(undefined), api };
+  }, [origin, session]);
+  const signOut = useCallback(() => setSession(undefined), []);
+  return useMemo(() => ({ available: !!origin, session, error, signIn, signOut, api }), [origin, session, error, signIn, signOut, api]);
 }

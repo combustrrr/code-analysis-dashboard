@@ -56,7 +56,7 @@ test('wrappers are pinned and detected profiles never invent executable commands
  assert.ok(Object.values(files).every(x=>x.includes('@'+'a'.repeat(40))));
  assert.deepEqual(detectedProfile(['Cargo.toml','Dockerfile']).profile,{mode:'portable'});
 });
-const configuration={schema_version:'analysis-projects-v1',execution_repository:{id:1},tooling_sha:'a'.repeat(40),projects:[{id:'1',source_repository:{id:1,full_name:'owner/repo'},profile:{mode:'portable'},preferred_branch:'main',enabled_scanners:['semgrep','snyk','future-scanner'],deferred_channels:Object.fromEntries(['atheris','bandit','checkov','codeql','coderabbit-ai-advisory','coverage','eslint','github-actions-security','github-secret-protection-posture','gitleaks','hadolint','openssf-scorecard','osv','pyright','radon','ruff','sbom-license-provenance','schemathesis','shipping-image-cves','sonarqube-cloud','trivy','typescript','vulture','xenon'].map(s=>[s,'fixture'])),report_budget_bytes:900000000}]};
+const configuration={schema_version:'analysis-projects-v1',execution_repository:{id:1},tooling_sha:'a'.repeat(40),projects:[{id:'1',source_repository:{id:1,full_name:'owner/repo'},profile:{mode:'portable'},preferred_branch:'main',enabled_scanners:['semgrep','snyk','sonarqube-cloud','future-scanner'],deferred_channels:Object.fromEntries(['atheris','bandit','checkov','codeql','coderabbit-ai-advisory','coverage','eslint','github-actions-security','github-secret-protection-posture','gitleaks','hadolint','openssf-scorecard','osv','pyright','radon','ruff','sbom-license-provenance','schemathesis','shipping-image-cves','trivy','typescript','vulture','xenon'].map(s=>[s,'fixture'])),report_budget_bytes:900000000}]};
 const configBlob={content:Buffer.from(JSON.stringify(configuration)).toString('base64')};
 function configuredHelpers(extra={}) {return helpers({['repos/owner/repo/contents/.github/code-analysis/projects.json?ref=main']:configBlob,['repos/owner/repo/contents/.github/code-analysis/projects.json?ref='+'b'.repeat(40)]:configBlob,'repos/owner/repo/branches/main':{name:'main'},...extra});}
 test('configuration preview is read-only, rejects identity edits and validates deferrals',async()=>{
@@ -81,7 +81,8 @@ test('readiness never calls configured evidence complete and flags absent adapte
  const result=await applicationApi(new Request('https://worker.example/api/project-readiness?repository=owner/repo&project_id=1'),env,{token:'test'},configuredHelpers());
  const rows=(await result.json()).channels;
  assert.equal(rows.find(x=>x.channel==='semgrep').status,'configured');
- assert.equal(rows.find(x=>x.channel==='snyk').status,'setup_required');
+  assert.equal(rows.find(x=>x.channel==='snyk').status,'configured');
+  assert.equal(rows.find(x=>x.channel==='sonarqube-cloud').status,'configured');
  assert.equal(rows.find(x=>x.channel==='future-scanner').status,'setup_required');
  assert.ok(rows.every(x=>x.status!=='completed'));
 });
@@ -95,11 +96,33 @@ test('revoked installation access blocks configuration and launch before writes'
  }
 });
 test('portable configuration supports two layouts and rejects executable path escape',async()=>{
- const {validatePortableProfile}=await import('./application.mjs');
- for(const profile of [{mode:'portable',python_root:'packages/core'},{mode:'portable',javascript_root:'client',commands:{eslint:{cwd:'client',argv:['npx','--no-install','eslint','.'],install:[['npm','ci']]}}}])assert.doesNotThrow(()=>validatePortableProfile(profile));
- assert.throws(()=>validatePortableProfile({mode:'portable',commands:{coverage:{argv:['pytest'],cwd:'../outside'}}}));
- const detection=detectedProfile(['packages/core/main.py','client/src/index.ts']);
- assert.equal(detection.profile.python_root,'.');assert.equal(detection.profile.javascript_root,'.');assert.equal(detection.profile.commands,undefined);
+  const {validatePortableProfile}=await import('./application.mjs');
+  for(const profile of [{mode:'portable',python_root:'packages/core'},{mode:'portable',javascript_root:'client',commands:{eslint:{cwd:'client',argv:['npx','--no-install','eslint','.'],install:[['npm','ci']]}}}])assert.doesNotThrow(()=>validatePortableProfile(profile));
+  assert.throws(()=>validatePortableProfile({mode:'portable',commands:{coverage:{argv:['pytest'],cwd:'../outside'}}}));
+  const detection=detectedProfile(['packages/core/main.py','client/src/index.ts']);
+  assert.equal(detection.profile.python_root,'.');assert.equal(detection.profile.javascript_root,'.');assert.equal(detection.profile.commands,undefined);
+});
+
+test('folder setup offers detected language roots and only persists selected source folders',async()=>{
+ const sourceTree=[
+  {type:'blob',path:'services/api/main.py'},
+  {type:'blob',path:'apps/web/src/index.ts'},
+  {type:'blob',path:'apps/web/package.json'},
+ ];
+ const treePath='repos/owner/repo/git/trees/'+'c'.repeat(40)+'?recursive=1';
+ const h=helpers({[treePath]:{tree:sourceTree,truncated:false}});
+ const response=await applicationApi(request('/api/connections/preview',{
+  execution_repository:'owner/repo',
+  analysis_folders:{python:'services/api',javascript:'apps/web'},
+ }),env,{token:'test'},h);
+ const preview=await response.json();
+ assert.deepEqual(preview.project.profile,{mode:'portable',python_root:'services/api',javascript_root:'apps/web'});
+ assert.ok(preview.detection.language_roots.python.includes('services'));
+ assert.ok(preview.detection.language_roots.javascript.includes('apps/web/src'));
+ assert.ok(h.calls.every(call=>!call.options.method));
+ for(const folders of [{python:'../../outside',javascript:'apps/web'},{python:'README.md',javascript:'apps/web'}]) {
+  await assert.rejects(()=>applicationApi(request('/api/connections/preview',{execution_repository:'owner/repo',analysis_folders:folders}),env,{token:'test'},helpers({[treePath]:{tree:sourceTree,truncated:false}})),error=>error.status===400);
+ }
 });
 
 

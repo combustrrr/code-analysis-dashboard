@@ -17,6 +17,12 @@ The Worker owns API delivery and access checks. Scanner execution remains in Git
 Actions, and source repositories remain read-only. `dist/`, `.wrangler/`, and local
 development variables are generated or ignored and must not be committed.
 
+Repository setup detects Python and JavaScript/TypeScript source folders from the
+selected source tree and lets an administrator choose the roots included in its
+portable profile. Folder choices are validated against that detected tree and shown
+in the exact configuration preview. Confirming setup writes configuration and workflow
+files only to the execution repository; scanning does not modify the source repository.
+
 ## Operational guards
 
 - **Per-endpoint request body limits** fail closed (`request-limits.mjs`):

@@ -18,6 +18,7 @@ import { safeGithubUrl } from './safeUrls';
 import { Repositories } from './Repositories';
 import { LandingPage } from './LandingPage';
 import { AppearanceProvider, AppearanceToggle, useAppearance } from './Appearance';
+import { ProjectRunTracker, type ProjectRunRequest } from './ProjectRunTracker';
 
 type Target = { scan_run_id?: number; run_attempt?: number; tooling_sha?: string; lifecycle_status?: string; id: string; label: string; repository: string; source_repository: string; head_sha: string; kind: string; branch: string; pr?: number; base_branch?: string; base_sha?: string; checked_at: string; status: string; report?: string; error?: string };
 type Index = { report_storage?: {compressed_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
@@ -32,6 +33,9 @@ async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 function route() { const p = new URLSearchParams(location.hash.slice(1)); const legacy = p.get('tab') || ''; const repository = p.get('repository') || ''; const legacySettings = ['connections','repositories','provenance'].includes(legacy) && (Boolean(repository) || legacy !== 'repositories'); return { repository, project: p.get('project') || '', target: p.get('target') || '', tab: legacySettings ? 'settings' : legacy || 'overview', section: p.get('section') || (legacySettings ? legacy : 'connections'), issue: p.get('issue') || '' }; }
 function isRepositoryAvailabilityError(value: string) { return /retired|unsupported|not supported|project is unavailable|private reports are not supported/i.test(value); }
+const PROJECT_RUNS_STORAGE_KEY = 'analysis-project-runs';
+const ACTIVE_PROJECT_RUN_PHASES = new Set(['queued', 'running', 'scanning', 'collecting', 'publishing']);
+function readProjectRuns(): ProjectRunRequest[] { try { const value = JSON.parse(sessionStorage.getItem(PROJECT_RUNS_STORAGE_KEY) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } }
 function navigate(target: string, tab: string, issue = '') { const current = route(); location.hash = new URLSearchParams({ ...(current.repository ? { repository: current.repository, project: current.project } : {}), target, tab, ...(issue ? { issue } : {}) }).toString(); }
 function date(s?: string) { return s ? new Date(s).toLocaleString() : 'Unavailable'; }
 const colors: Record<string, string> = { CRITICAL: 'red', HIGH: 'volcano', MEDIUM: 'gold', LOW: 'blue', INFO: 'default', current: 'green', partial: 'orange', failed: 'red', scanning: 'blue', COMPLETED: 'green', CONFIGURED_COMPLETE: 'green', POLICY_FINDINGS: 'orange', NOT_AVAILABLE: 'orange', FAILED: 'red' };
@@ -66,15 +70,23 @@ function Evidence({ detail, source, error, findings, openFinding }: { detail?: D
 }
 
 function ProjectPicker({repository,project}:{repository:string;project:string}) {
- const [projects,setProjects]=useState<{id:string;source_repository:string}[]>([]);
- useEffect(()=>{if(!applicationEndpoint||!repository)return;const controller=new AbortController();reportFetch(`${applicationEndpoint}/api/public/projects?repository=${encodeURIComponent(repository)}`,{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Project discovery unavailable');return r.json();}).then(r=>setProjects(r.projects)).catch(()=>setProjects([]));return()=>controller.abort();},[repository]);
- return <Select aria-label="Source project" style={{minWidth:260}} value={project||undefined} options={projects.map(p=>({value:p.id,label:p.source_repository}))} onChange={value=>{location.hash=new URLSearchParams({repository,project:value,tab:'overview'}).toString();}}/>;
+  const [projects,setProjects]=useState<{id:string;source_repository:string}[]>([]);
+  const [state,setState]=useState<'loading'|'ready'|'error'>('loading');
+  const [retry,setRetry]=useState(0);
+  useEffect(()=>{if(!applicationEndpoint||!repository)return;const controller=new AbortController();setProjects([]);setState('loading');reportFetch(`${applicationEndpoint}/api/public/projects?repository=${encodeURIComponent(repository)}`,{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Project discovery unavailable');return r.json();}).then(r=>{if(!controller.signal.aborted){setProjects(r.projects);setState('ready');}}).catch(()=>{if(!controller.signal.aborted)setState('error');});return()=>controller.abort();},[repository,retry]);
+  const placeholder=state==='loading'?'Loading source projects…':state==='error'?'Could not load source projects':'No configured source projects';
+  return <Space size={6}>
+    <Select aria-label="Source project" style={{minWidth:260}} disabled={state!=='ready'||projects.length===0} loading={state==='loading'} placeholder={placeholder} value={project||undefined} options={projects.map(p=>({value:p.id,label:p.source_repository}))} onChange={value=>{location.hash=new URLSearchParams({repository,project:value,tab:'overview'}).toString();}}/>
+    {state==='error'&&<Button size="small" onClick={()=>setRetry(value=>value+1)}>Retry projects</Button>}
+  </Space>;
 }
 function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const screens = Grid.useBreakpoint();
   const { appearance } = useAppearance();
   const [runOpen, setRunOpen] = useState(false);
   const [pendingLaunch, setPendingLaunch] = useState<(LaunchRequest & { previousReport?: string; previousRun?: number }) | undefined>(() => { try { return JSON.parse(sessionStorage.getItem('analysis-pending-launch') || 'null') || undefined; } catch { return undefined; } });
+  const [projectRuns, setProjectRuns] = useState<ProjectRunRequest[]>(readProjectRuns);
+  const projectRunsRef = useRef(projectRuns);
   const [refreshTick, setRefreshTick] = useState(0);
   const [lastRefresh, setLastRefresh] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -108,6 +120,38 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
    const launchPhase = launched?.lifecycle_status || launched?.status;
    const launchStatus = newOutput ? 'New report available for your selected target' : launchPhase === 'running' || launchPhase === 'scanning' ? 'Analysis is running' : launchPhase === 'collecting' ? 'Collecting scanner results' : launchPhase === 'publishing' ? 'Publishing the canonical report' : launchPhase === 'queued' ? 'Target is queued for analysis' : launchPhase === 'failed' && launched?.scan_run_id !== pendingLaunch?.previousRun ? 'Analysis needs attention' : 'Request submitted — awaiting a new published result';
   const target = index?.targets.find(t => t.id === r.target) || (!r.target ? index?.targets.find(t => t.kind === 'branch' && t.branch === index.preferred_branch) || index?.targets[0] : undefined);
+  useEffect(() => {
+    if (r.tab === 'repositories' && !r.repository) {
+      try { sessionStorage.removeItem('analysis-workspace-requested'); } catch {}
+    }
+  }, [r.tab, r.repository]);
+  const persistProjectRuns = (next: ProjectRunRequest[]) => {
+    projectRunsRef.current = next;
+    setProjectRuns(next);
+    try { sessionStorage.setItem(PROJECT_RUNS_STORAGE_KEY, JSON.stringify(next)); } catch {}
+  };
+  const handleProjectSubmitted = (request: ProjectRunRequest) => {
+    const run = {
+      ...request,
+      previousReport: request.previousReport || target?.report,
+      previousTargetLabel: request.previousTargetLabel || target?.label || target?.branch || (target?.kind === 'pr' ? `PR #${target.pr}` : target?.id),
+      previousAnalyzedSha: request.previousAnalyzedSha || report?.analyzed_sha,
+      previousGeneratedAt: request.previousGeneratedAt || report?.generated_at,
+    };
+    persistProjectRuns([...projectRunsRef.current.filter(item => item.request_id !== run.request_id), run]);
+    setRunOpen(false);
+  };
+  const updateProjectRunPhase = (requestId: string, phase: string) => {
+    const current = projectRunsRef.current;
+    const next = current.map(item => item.request_id === requestId ? { ...item, phase } : item);
+    if (next.some((item, index) => item.phase !== current[index]?.phase)) persistProjectRuns(next);
+  };
+  const dismissProjectRun = (requestId: string) => persistProjectRuns(projectRunsRef.current.filter(item => item.request_id !== requestId));
+  const openProjectRunReport = (request: ProjectRunRequest, targetId: string) => {
+    location.hash = new URLSearchParams({ repository: request.repository, project: request.project, target: targetId, tab: 'overview' }).toString();
+  };
+  const projectRunTrackers = projectRuns.map(request => <ProjectRunTracker key={request.request_id} auth={launchAuth} request={request} onPhase={updateProjectRunPhase} onDismiss={() => dismissProjectRun(request.request_id)} onOpenReport={id => openProjectRunReport(request, id)}/>);
+  const activeProjectRun = projectRuns.find(request => request.repository === r.repository && request.project === r.project && (!request.phase || ACTIVE_PROJECT_RUN_PHASES.has(request.phase)));
   useEffect(() => { setReport(undefined); setFindings([]); setDetail(undefined); setSource([]); setPage(0); setError(''); setLoading(false); if (!target?.report) return;
     const c = new AbortController(); setLoading(true); Promise.all([json<Report>(`data/${target.report}/report.json`, c.signal), json<Finding[]>(`data/${target.report}/findings.json`, c.signal)]).then(([a, b]) => { setReport(a); setFindings(b); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort();
   }, [target?.id, target?.report]);
@@ -162,13 +206,15 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
     if (!r.repository) {
       if (r.tab === 'repositories') return <ConfigProvider theme={appTheme}>
         <header className="topbar workspace-topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap><span>Repository workspace</span><AppearanceToggle className="appearance-toggle"/></Space></header>
-        <main className="workspace-home"><div className="workspace-intro"><div className="eyebrow">WORKSPACE SETUP</div><h1>Connect a repository</h1><p>Choose where analysis runs, then review any proposed setup before confirming it.</p></div><Repositories auth={launchAuth} endpoint={applicationEndpoint}/></main>
+        <div className="workspace-run-status">{projectRunTrackers}</div>
+        <main className="workspace-home"><div className="workspace-intro"><div className="eyebrow">CODEBASE WORKSPACE</div><h1>Connect and analyze a repository</h1><p>Choose the repository that runs the workflows, review its configured codebases, and follow each analysis through to its published evidence.</p></div><Repositories auth={launchAuth} endpoint={applicationEndpoint} onSubmitted={handleProjectSubmitted}/></main>
       </ConfigProvider>;
-      return <LandingPage auth={launchAuth} onStart={() => { location.hash = '#tab=repositories'; }} />;
+      return <LandingPage auth={launchAuth} onStart={() => { try { sessionStorage.setItem('analysis-workspace-requested', 'true'); } catch {} location.hash = '#tab=repositories'; }} />;
     }
     return <ConfigProvider theme={appTheme}>
-     <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}{r.repository&&<ProjectPicker repository={r.repository} project={r.project}/>}<AppearanceToggle/><Button type="primary" onClick={() => setRunOpen(true)}>Run analysis</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/code-analysis-dashboard'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
-    {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} close={() => setRunOpen(false)}/>} 
+     <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}{r.repository&&<ProjectPicker repository={r.repository} project={r.project}/>}<AppearanceToggle/><Button type="primary" disabled={!!activeProjectRun} title={activeProjectRun ? 'An analysis request for this project is still active.' : undefined} onClick={() => setRunOpen(true)}>{activeProjectRun ? 'Analysis in progress' : 'Run analysis'}</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/code-analysis-dashboard'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
+     <div className="project-run-status">{projectRunTrackers}</div>
+     {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} close={() => setRunOpen(false)} onSubmitted={handleProjectSubmitted}/>}
     {runOpen && !(r.repository && r.project) && <AnalysisLauncher
       onSubmitted={request => {
         const previous = index?.targets.find(t => t.kind === request.kind && (t.kind === 'pr' ? String(t.pr) === request.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === request.ref : t.branch === request.ref));
@@ -203,7 +249,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
            {index && <span title="Counts are across all configured branch, pull-request, and commit targets in this repository inventory.">{index.targets.length} configured targets | {index.targets.filter(t => (t.lifecycle_status || t.status) === 'queued').length} queued | {index.targets.filter(t => ['scanning', 'running', 'collecting', 'publishing'].includes(t.lifecycle_status || t.status)).length} active</span>}
           {index?.report_storage && <span>Report storage: {humanBytes(index.report_storage.compressed_bytes)}</span>}
           {report?.tooling_sha && <span>Tooling <code title={report.tooling_sha}>{report.tooling_sha.slice(0, 12)}</code> | attempt {report.producer_run_attempt ?? 'Unavailable'}</span>}
-          {report?.producer_runs.map(run => { const url = safeGithubUrl(run.url); return url ? <a key={run.id} href={url} target="_blank" rel="noreferrer">Run #{run.id}</a> : null; })}
+           {report?.producer_runs.map(run => { const url = safeGithubUrl(run.url); return url ? <a key={run.id} href={url} target="_blank" rel="noreferrer">Published report · Run #{run.id}</a> : null; })}
         </Space>
       </section>
       {(error || index?.discovery_error || index?.publication_error || target?.error) && (() => {
@@ -284,4 +330,4 @@ if(import.meta.env.VITE_APPLICATION_MODE!=='repositories') {
     history.replaceState(null,'','#'+parameters.toString());
   }
 }
-createRoot(document.getElementById('root')!).render(<AppearanceProvider><DashboardAccess publicFallback={(auth,accessError)=><LandingPage auth={auth} accessError={accessError} workspaceRequested={new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories'} onStart={() => { location.hash = '#tab=repositories'; }} />}>{auth=><App viewerAuth={auth}/>}</DashboardAccess></AppearanceProvider>);
+createRoot(document.getElementById('root')!).render(<AppearanceProvider><DashboardAccess publicFallback={(auth,accessError,accessPending,workspaceRequested)=><LandingPage auth={auth} accessError={accessError} accessPending={accessPending} workspaceRequested={workspaceRequested} onStart={() => { try { sessionStorage.setItem('analysis-workspace-requested', 'true'); } catch {} location.hash = '#tab=repositories'; }} />}>{auth=><App viewerAuth={auth}/>}</DashboardAccess></AppearanceProvider>);

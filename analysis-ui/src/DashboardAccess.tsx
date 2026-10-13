@@ -3,25 +3,39 @@ import {Alert,Button,ConfigProvider,Segmented,Space,theme} from 'antd';
 import {useLaunchAuth} from './useLaunchAuth';
 import {applicationEndpoint,setReportSession} from './repositoryReports';
 
-export function DashboardAccess({children,publicFallback}:{children:(auth?:ReturnType<typeof useLaunchAuth>)=>ReactNode;publicFallback?:(auth:ReturnType<typeof useLaunchAuth>,accessError?:string)=>ReactNode}) {
+export function DashboardAccess({children,publicFallback}:{children:(auth?:ReturnType<typeof useLaunchAuth>)=>ReactNode;publicFallback?:(auth:ReturnType<typeof useLaunchAuth>,accessError?:string,accessPending?:boolean,workspaceRequested?:boolean)=>ReactNode}) {
  const auth=useLaunchAuth(applicationEndpoint);
  const [required,setRequired]=useState<boolean>();
- const [verified,setVerified]=useState<string>();
- const [error,setError]=useState('');
+  const [verified,setVerified]=useState<string>();
+  const [error,setError]=useState('');
+  const [workspaceRequested,setWorkspaceRequested]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories');
  const [dark,setDark]=useState(()=>localStorage.getItem('analysis-theme')!=='light');
- useEffect(()=>{if(!applicationEndpoint)return;let active=true;
+  useEffect(()=>{if(!applicationEndpoint)return;let active=true;
   fetch(applicationEndpoint+'/api/public/config',{cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error('Access configuration unavailable.');return r.json();}).then(c=>{if(active)setRequired(c.require_login===true);}).catch(()=>{if(active)setError('Could not verify dashboard access. Reload to retry.');});return()=>{active=false;};
- },[]);
- useEffect(()=>{setVerified(undefined);setReportSession(undefined);if(!required||!auth.session)return;
+  },[]);
+  useEffect(()=>{
+   const update=()=>setWorkspaceRequested(new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories');
+   window.addEventListener('hashchange',update);
+   return()=>window.removeEventListener('hashchange',update);
+  },[]);
+  useEffect(()=>{setVerified(undefined);setReportSession(undefined);if(!required||!auth.session)return;
   let active=true;const token=auth.session.token;
   const verify=async()=>{try {await auth.api('session');if(active){setReportSession(token);setVerified(token);setError('');}}catch(e){if(active){setReportSession(undefined);setVerified(undefined);setError(String(e));}}};
   const denied=()=>{setReportSession(undefined);setVerified(undefined);setError('Access expired or was revoked. Sign in with an authorized GitHub account.');auth.signOut();};
   void verify();const timer=window.setInterval(()=>{if(!document.hidden)void verify();},15000);window.addEventListener('analysis-access-denied',denied);
   return()=>{active=false;clearInterval(timer);window.removeEventListener('analysis-access-denied',denied);setReportSession(undefined);};
- },[required,auth.session?.token]);
+  },[required,auth.session?.token]);
+  useEffect(()=>{
+   if(!auth.session||verified!==auth.session.token)return;
+   try {
+    if(sessionStorage.getItem('analysis-workspace-requested')==='true' && new URLSearchParams(location.hash.slice(1)).get('tab')!=='repositories') {
+     location.hash='#tab=repositories';
+    }
+   } catch {}
+  },[auth.session?.token,verified]);
   if(!applicationEndpoint||required===false)return children();
   if(auth.session&&verified===auth.session.token)return children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}});
-  if(publicFallback)return publicFallback(auth,error);
+  if(publicFallback)return publicFallback(auth,error,required===true&&!!auth.session&&verified!==auth.session.token&&!error,workspaceRequested);
   return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm}}><main className={`dashboard-access ${dark?'dashboard-access-dark':'dashboard-access-light'}`}><section>
   <h1>Code Analysis</h1><p>Sign in with an authorized GitHub account to view repositories, findings and scanner activity.</p>
   <Space direction="vertical" size="middle"><Segmented aria-label="Color theme" value={dark?'Dark':'Light'} options={['Dark','Light']} onChange={v=>{setDark(v==='Dark');localStorage.setItem('analysis-theme',v.toLowerCase());}}/>

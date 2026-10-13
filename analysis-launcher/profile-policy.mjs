@@ -14,8 +14,30 @@ export function validatePortableProfile(profile) {
 
 export function detectedProfile(paths) {
   const manifests = paths.filter(p => /(^|\/)(package.json|pyproject.toml|requirements[^/]*\.txt|Cargo.toml|go.mod|pom.xml|build.gradle)$/.test(p));
+  const languageRoots = extension => {
+    const roots = new Set(['.']);
+    for (const path of paths) {
+      if (!extension.test(path)) continue;
+      const parts = path.split('/');
+      parts.pop();
+      for (let index = 1; index <= parts.length && roots.size < 100; index++) {
+        roots.add(parts.slice(0, index).join('/'));
+      }
+      if (roots.size === 100) break;
+    }
+    return [...roots].sort((a, b) => a === '.' ? -1 : b === '.' ? 1 : a.localeCompare(b));
+  };
   const profile = {mode: 'portable'};
   if (paths.some(p => p.endsWith('.py'))) profile.python_root = '.';
   if (paths.some(p => /\.[cm]?[jt]sx?$/.test(p))) profile.javascript_root = '.';
-  return {profile, detected_manifests: manifests, dockerfiles: paths.filter(p => /(^|\/)Dockerfile(?:\.[^/]*)?$/.test(p)), notice: 'Portable scanners can run immediately. Language build, test, fuzzing and vendor adapters require reviewed repository configuration.'};
+  return {
+    profile,
+    detected_manifests: manifests,
+    dockerfiles: paths.filter(p => /(^|\/)Dockerfile(?:\.[^/]*)?$/.test(p)),
+    language_roots: {
+      python: languageRoots(/\.py$/),
+      javascript: languageRoots(/\.[cm]?[jt]sx?$/),
+    },
+    notice: 'Portable scanners can run immediately. Language build, test, fuzzing and vendor adapters require reviewed repository configuration.',
+  };
 }

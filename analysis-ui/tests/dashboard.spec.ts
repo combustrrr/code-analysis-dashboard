@@ -167,9 +167,10 @@ test('theme persists and direct analysis accepts an exact commit', async ({page}
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
-  await page.getByText('Full commit SHA', {exact:true}).click();
-  await page.getByLabel('Analysis target',{exact:true}).fill('a'.repeat(40));
-  await expect(page.getByText('Full commit SHA',{exact:true})).toBeVisible();
+  const dialog=page.getByRole('dialog',{name:'Run analysis'});
+  await dialog.getByRole('radio',{name:'Commit SHA'}).click();
+  await dialog.getByLabel('Full commit SHA').fill('a'.repeat(40));
+  await expect(dialog.getByLabel('Full commit SHA')).toHaveValue('a'.repeat(40));
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'Refresh results',exact:true}).click();
   await expect(page.getByText(/Reports checked:/)).toBeVisible();
@@ -177,99 +178,108 @@ test('theme persists and direct analysis accepts an exact commit', async ({page}
 
 
 test('authenticated developer selects live source and directly starts analysis', async ({page, context}) => {
-  const source = 'combustrrr/Agentic-Kibana';
+  const source = 'ARYDESTROYER/Kavach-AgenticSOC';
+  const execution = 'combustrrr/code-analysis-dashboard';
+  const project = '1267340546';
+  const sha = 'b'.repeat(40);
   let submitted: any;
   await page.route('**/index.json', async route => {
     const data = JSON.parse(readFileSync('public/data/index.json','utf8'));
-    Object.assign(data, {launch_endpoint:'https://launcher.example', source_repository:source, analysis_default_branch:'Testing'});
+    Object.assign(data, {launch_endpoint:'https://launcher.example', analysis_repository:execution});
     await route.fulfill({json:data});
   });
   await context.route('https://launcher.example/**', async route => {
     const url = new URL(route.request().url());
     const headers = {'Access-Control-Allow-Origin':'http://127.0.0.1:4178', 'Access-Control-Allow-Headers':'Authorization, Content-Type', 'Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
     if (route.request().method() === 'OPTIONS') return route.fulfill({status:204, headers});
-    if (url.pathname === '/api/runs/42') return route.fulfill({headers,json:{status:'completed',conclusion:'success',attempt:1,checked_at:new Date().toISOString()}});
     if (url.pathname === '/auth/login') return route.fulfill({contentType:'text/html', body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'opaque-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
-    if (url.pathname === '/api/targets') return route.fulfill({headers, json:{repository:source, analysis_repository:source, targets:[{id:'branch:latest',kind:'branch',branch:'latest',label:'latest',repository:source,source_repository:source,head_sha:'b'.repeat(40),checked_at:new Date().toISOString()}]}});
     expect(route.request().headers().authorization).toBe('Bearer opaque-session');
-    submitted = route.request().postDataJSON();
-    return route.fulfill({status:202, headers, json:{status:'submitted',run_id:42,url:`https://github.com/${source}/actions/runs/42`}});
+    if (url.pathname === '/api/project-targets') return route.fulfill({headers,json:{repository:source,branches:[{name:'Testing',sha}],prs:[]}});
+    if (url.pathname === '/api/project-readiness') return route.fulfill({headers,json:{tooling_sha:'a'.repeat(40),channels:[{channel:'codeql',status:'configured',reason:''}]}});
+    if (url.pathname === '/api/project-launch') { submitted=route.request().postDataJSON(); return route.fulfill({status:202,headers,json:{request_id:'request-42',run_id:42}}); }
+    if (url.pathname === '/api/project-activity') return route.fulfill({headers,json:{phase:'scanning',source_sha:sha,message:'Scanner jobs are running.'}});
+    throw new Error(url.pathname);
   });
-  await page.goto('/');
+  await page.goto('/#'+new URLSearchParams({repository:execution,project,tab:'overview'}).toString());
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
-  await expect(page.getByLabel('Analysis repository')).toBeVisible();
-  await page.getByRole('button',{name:'Sign in'}).click();
-  await expect(page.getByText('Signed in as developer')).toBeVisible();
-  await page.getByLabel('Available analysis targets').click();
-  await expect(page.getByRole('option',{name:'latest',exact:true})).toBeAttached();
-  await page.getByLabel('Available analysis targets').press('ArrowDown');
-  await page.getByLabel('Available analysis targets').press('Enter');
-  await expect(page.getByRole('dialog').getByTitle('latest')).toBeVisible();
-  await expect(page.getByText('b'.repeat(40),{exact:true})).toBeVisible();
-  await expect(page.getByRole('dialog').getByRole('button',{name:'Run analysis',exact:true})).toBeEnabled();
-  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
-  await expect(page.getByText('Analysis started',{exact:true})).toBeVisible();
-  expect(submitted).toEqual({repository:source,kind:'branch',ref:'latest'});
-  await expect(page.getByRole('link',{name:'Track workflow'})).toHaveAttribute('href',/actions\/runs\/42$/);
-  await page.getByRole('button',{name:'View dashboard results'}).click();
-  await expect(page.getByText('Request workflow: success',{exact:true})).toBeVisible();
-  await expect(page.getByText('Discovery completed. Scanner execution and report publication are separate stages; check the target status and producing runs below.')).toBeVisible();
-  await expect(page.getByText('Request submitted — awaiting a new published result')).toBeVisible();
+  const dialog=page.getByRole('dialog',{name:'Run analysis'});
+  await expect(dialog.getByText(execution)).toBeVisible();
+  await dialog.getByRole('button',{name:'Sign in with GitHub'}).click();
+  const revision=dialog.getByLabel('Revision');
+  await revision.click();
+  await revision.press('ArrowDown');
+  await revision.press('Enter');
+  await expect(dialog.getByRole('button',{name:'Run analysis',exact:true})).toBeEnabled();
+  await dialog.getByRole('button',{name:'Run analysis',exact:true}).click();
+  await expect(page.getByText('Analysis is running against the selected revision.')).toBeVisible();
+  expect(submitted).toEqual({repository:execution,project_id:project,kind:'branch',ref:'Testing'});
+  await expect(page.getByRole('link',{name:'Request workflow #42'})).toHaveAttribute('href',`https://github.com/${execution}/actions/runs/42`);
+  await expect(page.getByText(/Resolved source commit:/)).toBeVisible();
   expect(await page.evaluate(() => JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('opaque-session');
 });
 
 test('commit selection survives sign-in and old output is not mistaken for new results', async ({page, context}) => {
   const data = JSON.parse(readFileSync('public/data/index.json','utf8'));
-  const source = data.analysis_repository;
+  const execution = 'combustrrr/code-analysis-dashboard';
+  const source = 'ARYDESTROYER/Kavach-AgenticSOC';
+  const project = '1267340546';
   const sha = 'c'.repeat(40);
-  const oldTarget = {...data.targets[0], id:'manual-commit', kind:'commit', head_sha:sha, scan_run_id:41, status:'partial'};
-  data.targets = [oldTarget];
-  Object.assign(data, {launch_endpoint:'https://launcher.example', source_repository:source, analysis_default_branch:'Testing'});
-  await page.route('**/index.json', route => route.fulfill({json:data}));
+  let phase='queued';
   let submitted: unknown;
+  Object.assign(data, {launch_endpoint:'https://launcher.example', analysis_repository:execution});
+  await page.route('**/index.json', route => route.fulfill({json:data}));
   await context.route('https://launcher.example/**', async route => {
     const url = new URL(route.request().url());
     const headers = {'Access-Control-Allow-Origin':'http://127.0.0.1:4178', 'Access-Control-Allow-Headers':'Authorization, Content-Type', 'Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
     if (route.request().method() === 'OPTIONS') return route.fulfill({status:204,headers});
-    if (url.pathname === '/api/runs/42') return route.fulfill({headers,json:{status:'completed',conclusion:'success',attempt:1,checked_at:new Date().toISOString()}});
     if (url.pathname === '/auth/login') return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'test-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
-    if (url.pathname === '/api/targets') return route.fulfill({headers,json:{repository:source,analysis_repository:source,targets:[]}});
-    submitted = route.request().postDataJSON();
-    return route.fulfill({headers,status:202,json:{run_id:42,url:`https://github.com/${source}/actions/runs/42`}});
+    if (url.pathname === '/api/project-targets') return route.fulfill({headers,json:{repository:source,branches:[{name:'Testing',sha}],prs:[]}});
+    if (url.pathname === '/api/project-readiness') return route.fulfill({headers,json:{tooling_sha:'a'.repeat(40),channels:[]}});
+    if (url.pathname === '/api/project-launch') { submitted=route.request().postDataJSON(); return route.fulfill({headers,status:202,json:{request_id:'commit-request',run_id:42}}); }
+    if (url.pathname === '/api/project-activity') return route.fulfill({headers,json:{phase,source_sha:sha,message:`Analysis ${phase}.`}});
+    throw new Error(url.pathname);
+  });
+  await page.goto('/#'+new URLSearchParams({repository:execution,project,tab:'overview'}).toString());
+  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Run analysis'});
+  await dialog.getByRole('radio',{name:'Commit SHA'}).click();
+  await dialog.getByLabel('Full commit SHA').fill(sha.toUpperCase());
+  await dialog.getByRole('button',{name:'Sign in with GitHub'}).click();
+  await expect(dialog.getByLabel('Full commit SHA')).toHaveValue(sha.toUpperCase());
+  await dialog.getByRole('button',{name:'Run analysis',exact:true}).click();
+  expect(submitted).toEqual({repository:execution,project_id:project,kind:'commit',ref:sha});
+  await expect(page.getByText('Analysis queued — the previous report is still being shown.')).toBeVisible();
+  await expect(page.getByText('combustrrr/Agentic-Kibana',{exact:true})).toBeVisible();
+  phase='scanning';
+  await page.getByRole('button',{name:'Check status now'}).click();
+  await expect(page.getByText('Analysis is running against the selected revision.')).toBeVisible();
+  await expect(page.getByText('combustrrr/Agentic-Kibana',{exact:true})).toBeVisible();
+});
+
+test('commit validation prevents an invalid project launch', async ({page,context}) => {
+  await page.route('**/index.json', async route => {
+    const data=JSON.parse(readFileSync('public/data/index.json','utf8'));
+    data.launch_endpoint='https://launcher.example';
+    await route.fulfill({json:data});
+  });
+  await context.route('https://launcher.example/**', async route => {
+    const url=new URL(route.request().url());
+    const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'valid-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+    if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:'ARYDESTROYER/Kavach-AgenticSOC',branches:[{name:'Testing',sha:'b'.repeat(40)}],prs:[]}});
+    if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{tooling_sha:'a'.repeat(40),channels:[]}});
+    throw new Error(url.pathname);
   });
   await page.goto('/');
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
-  await page.getByText('Full commit SHA',{exact:true}).click();
-  await page.getByLabel('Analysis target',{exact:true}).fill(sha.toUpperCase());
-  await page.getByRole('button',{name:'Sign in'}).click();
-  await expect(page.getByText('Signed in as developer')).toBeVisible();
-  await expect(page.getByLabel('Analysis target',{exact:true})).toHaveValue(sha.toUpperCase());
-  await page.getByRole('dialog').getByRole('button',{name:'Run analysis',exact:true}).click();
-  await page.getByRole('button',{name:'View dashboard results'}).click();
-  await expect(page.getByText('Request workflow: success',{exact:true})).toBeVisible();
-  await expect(page.getByText('Discovery completed. Scanner execution and report publication are separate stages; check the target status and producing runs below.')).toBeVisible();
-  expect(submitted).toEqual({repository:source,kind:'commit',ref:sha});
-  await page.getByRole('button',{name:'Check for results'}).click();
-  await expect(page.getByText('Request submitted — awaiting a new published result')).toBeVisible();
-  await expect(page.getByText('New report available for your selected target')).not.toBeVisible();
-  data.targets[0] = {...oldTarget, scan_run_id:43, status:'scanning'};
-  await page.getByRole('button',{name:'Check for results'}).click();
-  await expect(page.getByText('Analysis is running',{exact:true})).toBeVisible();
-  data.targets[0] = {...oldTarget, scan_run_id:43, status:'partial', report:'reports/new-output'};
-  await page.getByRole('button',{name:'Check for results'}).click();
-  await expect(page.getByText('New report available for your selected target')).toBeVisible();
-  await expect(page.getByRole('button',{name:'Open new report'})).toBeVisible();
-});
-
-test('commit validation prevents an invalid launch and distinguishes PR input', async ({page}) => {
-  await page.goto('/');
-  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
-  await page.getByText('Full commit SHA',{exact:true}).click();
-  await page.getByLabel('Analysis target',{exact:true}).fill('abc');
-  await expect(page.getByText('Enter the full 40-character commit SHA.')).toBeVisible();
-  await page.getByText('Pull request',{exact:true}).click();
-  await page.getByLabel('Analysis target',{exact:true}).fill('-1');
-  await expect(page.getByText('Enter a positive pull request number.')).toBeVisible();
+  const dialog=page.getByRole('dialog',{name:'Run analysis'});
+  await dialog.getByRole('button',{name:'Sign in with GitHub'}).click();
+  await dialog.getByRole('radio',{name:'Commit SHA'}).click();
+  await dialog.getByLabel('Full commit SHA').fill('abc');
+  await expect(dialog.getByRole('button',{name:'Run analysis',exact:true})).toBeDisabled();
+  await dialog.getByLabel('Full commit SHA').fill('a'.repeat(40));
+  await expect(dialog.getByRole('button',{name:'Run analysis',exact:true})).toBeEnabled();
 });
 
 test('connections verify live configuration without claiming scanner completion', async ({page,context}, testInfo) => {
@@ -326,11 +336,11 @@ test('repository configuration requires a preview and explicit confirmation', as
   await page.goto('/#tab=repositories');
   await page.getByRole('button',{name:'Sign in with GitHub',exact:true}).click();
   await expect(page.getByText('Signed in as developer')).toBeVisible();
-  await page.getByRole('button',{name:'Load repositories',exact:true}).click();
+  await expect(page.getByLabel('Execution repository',{exact:true})).toBeEnabled();
   await page.getByLabel('Execution repository', {exact:true}).click();
   await page.getByLabel('Execution repository', {exact:true}).press('ArrowDown');
   await page.getByLabel('Execution repository', {exact:true}).press('Enter');
-  await page.getByRole('button',{name:'Load configured projects'}).click();
+  await expect(page.getByRole('button',{name:'Edit configuration'})).toBeVisible();
   await page.getByRole('button',{name:'Edit configuration'}).click();
   await page.getByLabel('Project configuration JSON').fill(JSON.stringify({preferred_branch:'develop',enabled_scanners:['semgrep'],deferred_channels:{}}));
   await page.getByRole('button',{name:'Preview configuration commit'}).click();
@@ -343,7 +353,7 @@ test('repository configuration requires a preview and explicit confirmation', as
 });
 
 
-test('simple analysis follows scanner attempt and opens published target',async({page,context})=>{
+test('project run tracking survives the launch dialog and separates the old report',async({page,context})=>{
  let polls=0;
  await page.route('**/index.json',async route=>{const data=JSON.parse(readFileSync('public/data/index.json','utf8'));data.launch_endpoint='https://launcher.example';await route.fulfill({json:data});});
  await context.route('https://launcher.example/**',async route=>{
@@ -354,20 +364,26 @@ test('simple analysis follows scanner attempt and opens published target',async(
   if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:'owner/repo',branches:[{name:'main',sha:'a'.repeat(40)}],prs:[]}});
   if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{tooling_sha:'b'.repeat(40),channels:[{channel:'bandit',status:'configured',reason:'Native evidence required'}]}});
   if(url.pathname==='/api/project-launch')return route.fulfill({headers,json:{request_id:'11111111-1111-1111-1111-111111111111',run_id:10}});
-  if(url.pathname==='/api/project-activity'){polls++;return route.fulfill({headers,json:{phase:polls===1?'scanning':'published',target_id:'selected-target',source_sha:'a'.repeat(40),producer:{url:'https://github.com/owner/repo/actions/runs/11/attempts/2',attempt:2,status:polls===1?'in_progress':'completed'},...(polls>1?{completeness:'partial'}:{})}});}
+   if(url.pathname==='/api/project-activity'){polls++;return route.fulfill({headers,json:{phase:polls===1?'scanning':'published',target_id:'selected-target',source_sha:'a'.repeat(40),producer:{url:'https://github.com/owner/repo/actions/runs/11/attempts/2',attempt:2,status:polls===1?'in_progress':'completed'},...(polls>1?{completeness:'partial'}:{})}});}
   throw new Error(url.pathname);
  });
  await page.goto('/#repository=owner%2Frepo&project=1');
+ await expect(page.getByText('ANALYZED COMMIT')).toBeVisible();
  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
  await page.getByRole('button',{name:'Sign in with GitHub',exact:true}).click();
  await page.getByLabel('Revision',{exact:true}).click();await page.getByLabel('Revision',{exact:true}).press('ArrowDown');await page.getByLabel('Revision',{exact:true}).press('Enter');
  await expect(page.getByRole('button',{name:'Continue',exact:true})).toHaveCount(0);
  await page.getByRole('dialog').getByRole('button',{name:'Run analysis',exact:true}).click();
- await expect(page.getByRole('link',{name:'Scanner workflow, attempt 2'})).toHaveAttribute('href','https://github.com/owner/repo/actions/runs/11/attempts/2');
- await expect(page.getByText('Scanner workflow is running.', { exact: true })).toBeVisible();
-  await expect(page).not.toHaveURL(/target=selected-target/,{timeout:25000});
-  await expect(page.getByRole('dialog')).toHaveCount(1);
-  expect(polls).toBeGreaterThanOrEqual(1);
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByText('Analysis is running against the selected revision.',{exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Scanner workflow attempt 2'})).toHaveAttribute('href','https://github.com/owner/repo/actions/runs/11/attempts/2');
+ await expect(page.getByText(/It will remain visible until this request publishes\./)).toBeVisible();
+ await page.getByRole('button',{name:'Check status now'}).click();
+ await expect(page.getByText('New report published for this request.',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Open published report'})).toBeVisible();
+ expect(polls).toBeGreaterThanOrEqual(2);
+ await page.getByRole('button',{name:'Open published report'}).click();
+ await expect(page).toHaveURL(/target=selected-target/);
 });
 
 
@@ -395,30 +411,45 @@ test('issue filters compose, clear and remain usable on mobile',async({page})=>{
 test('repositories recover from failures and discard stale installation preview',async({page,context})=>{
  const data=JSON.parse(readFileSync('public/data/index.json','utf8'));data.launch_endpoint='https://launcher.example';
  await page.route('**/index.json',r=>r.fulfill({json:data}));
- let fail=true;
+  let fail=true;let selectedFolders:unknown;
  await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());
   const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'test-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
-  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{installation_url:'https://github.com/apps/test/installations/new'}});
-  if(url.pathname==='/api/repositories')return route.fulfill({headers,status:fail?503:200,json:fail?{error:'GitHub temporarily unavailable'}:{repositories:[{id:1,full_name:'owner/service',can_configure:true}],has_more:false}});
-  if(url.pathname==='/api/connections/preview')return route.fulfill({headers,json:{confirmation:'opaque',files:{'config.json':'{}'},project:{relationship:'observer',source_repository:{full_name:'owner/source'}},detection:{notice:'Review scanner setup',detected_manifests:[]}}});
+   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{installation_url:'https://github.com/apps/test/installations/new'}});
+   if(url.pathname==='/api/repositories')return route.fulfill({headers,status:fail?503:200,json:fail?{error:'GitHub temporarily unavailable'}:{repositories:[{id:1,full_name:'owner/service',can_configure:true}],has_more:false}});
+   if(url.pathname==='/api/projects')return route.fulfill({headers,json:{projects:[]}});
+    if(url.pathname==='/api/connections/preview'){
+     const body=route.request().postDataJSON() as {analysis_folders?:{python:string|null;javascript:string|null}};
+     if(body.analysis_folders)selectedFolders=body.analysis_folders;
+     const profile={mode:'portable',...(body.analysis_folders?.python?{python_root:body.analysis_folders.python}:{python_root:'.'}),...(body.analysis_folders?.javascript?{javascript_root:body.analysis_folders.javascript}:{})};
+     return route.fulfill({headers,json:{confirmation:'opaque',files:{'config.json':JSON.stringify(profile)},project:{relationship:'observer',source_repository:{full_name:'owner/source'},profile},detection:{notice:'Review scanner setup',detected_manifests:[],language_roots:{python:['.','backend'],javascript:['.','client']}}}});
+    }
   throw Error('Unexpected request '+url.pathname);
  });
  await page.goto('/#tab=repositories');
  await page.getByRole('button',{name:'Sign in with GitHub',exact:true}).click();
  await page.getByRole('button',{name:'Load repositories',exact:true}).click();
  await expect(page.getByText('Error: GitHub temporarily unavailable',{exact:true})).toBeVisible();
- fail=false;await page.getByRole('button',{name:'Load repositories',exact:true}).click();
- await page.getByLabel('Execution repository',{exact:true}).click();
- await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'owner/service'}).click();
- await page.getByRole('button',{name:'Preview setup',exact:true}).click();
- await expect(page.getByRole('button',{name:'Confirm installation commit'})).toBeVisible();
+  fail=false;await page.getByRole('button',{name:'Load repositories',exact:true}).click();
+  await page.getByLabel('Execution repository',{exact:true}).click();
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'owner/service'}).click();
+   await page.getByText('Optional setup · map analysis folders',{exact:true}).click();
+   await page.getByRole('button',{name:'Detect source folders',exact:true}).click();
+   await page.getByLabel('Python analysis folder',{exact:true}).fill('backend');
+   await page.getByLabel('Python analysis folder',{exact:true}).press('Enter');
+   await expect(page.getByText('Python: backend',{exact:true})).toBeVisible();
+   await page.getByLabel('JavaScript analysis folder',{exact:true}).fill('client');
+   await page.getByLabel('JavaScript analysis folder',{exact:true}).press('Enter');
+   await expect(page.getByText('JavaScript: client',{exact:true})).toBeVisible();
+   await page.getByRole('button',{name:'Review selected analysis folders',exact:true}).click();
+   expect(selectedFolders).toEqual({python:'backend',javascript:'client'});
+  await expect(page.getByRole('button',{name:'Confirm installation commit'})).toBeVisible();
  await page.getByLabel('Source repository',{exact:true}).fill('owner/another');
  await expect(page.getByRole('button',{name:'Confirm installation commit'})).not.toBeVisible();
  await page.getByRole('button',{name:'Sign out',exact:true}).click();
- await expect(page.getByRole('button',{name:'Preview setup',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Detect source folders',exact:true})).toBeDisabled();
 });
 test('unsafe source URLs are omitted from report links', async ({ page }) => {
   const findings = JSON.parse(readFileSync('public/data/reports/retained/findings.json', 'utf8'));

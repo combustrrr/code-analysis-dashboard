@@ -181,6 +181,19 @@ export async function applicationApi(request, env, session, helpers) {
     const sourceTree = source.id === execution.id ? tree : await github(`repos/${source.full_name}/git/trees/${encodeURIComponent(source.default_branch)}?recursive=1`, token);
     if (tree.truncated || sourceTree.truncated) throw new Failure(422, 'Repository inventory is incomplete; manual profile setup is required.', 'inventory_incomplete');
     const found = detectedProfile(sourceTree.tree.filter(x => x.type === 'blob').map(x => x.path));
+    if (input.analysis_folders !== undefined) {
+      const folders = input.analysis_folders;
+      if (!folders || typeof folders !== 'object' || Array.isArray(folders) || Object.keys(folders).some(key => !['python', 'javascript'].includes(key))) {
+        throw new Failure(400, 'Choose Python and JavaScript folders from the detected source layout.', 'invalid_analysis_folders');
+      }
+      for (const [language, profileKey] of [['python', 'python_root'], ['javascript', 'javascript_root']]) {
+        const folder = folders[language];
+        if (folder === null) delete found.profile[profileKey];
+        else if (typeof folder !== 'string' || !found.language_roots[language].includes(folder)) {
+          throw new Failure(400, `Choose a detected ${language} folder or leave it unselected.`, 'invalid_analysis_folders');
+        } else found.profile[profileKey] = folder;
+      }
+    }
     const tooling = env.TOOLING_FROM_SERVICE === 'true' ? (await config(await publicRepository(env.ANALYSIS_REPOSITORY))).tooling_sha : env.TOOLING_SHA;
     if(!SHA.test(tooling||''))throw new Failure(503, 'Validated tooling revision unavailable.', 'tooling_unavailable');
     const files = wrappers(env.ANALYSIS_REPOSITORY, tooling);
@@ -260,7 +273,7 @@ export async function applicationApi(request, env, session, helpers) {
     const document = await config(repo);
     const project = document.projects.find(p => p.id === url.searchParams.get('project_id'));
     if (!project) throw new Failure(404,'Unknown project.','unknown_project');
-  const portable = new Set(['semgrep','gitleaks','trivy','checkov','osv','openssf-scorecard','github-secret-protection-posture','github-actions-security','coderabbit-ai-advisory']);
+    const portable = new Set(['semgrep','gitleaks','trivy','checkov','osv','snyk','sonarqube-cloud','openssf-scorecard','github-secret-protection-posture','github-actions-security','coderabbit-ai-advisory']);
     if(project.profile.python_root)['bandit','ruff','radon','xenon','vulture','codeql'].forEach(c=>portable.add(c));
     if(project.profile.javascript_root)portable.add('codeql');
     Object.keys(project.profile.commands||{}).forEach(c=>portable.add(c));
