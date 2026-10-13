@@ -3,7 +3,7 @@ import {Alert,Button,ConfigProvider,Segmented,Space,theme} from 'antd';
 import {useLaunchAuth} from './useLaunchAuth';
 import {applicationEndpoint,setReportSession} from './repositoryReports';
 
-export function DashboardAccess({children,publicFallback}:{children:(auth?:ReturnType<typeof useLaunchAuth>)=>ReactNode;publicFallback?:(auth:ReturnType<typeof useLaunchAuth>)=>ReactNode}) {
+export function DashboardAccess({children,publicFallback}:{children:(auth?:ReturnType<typeof useLaunchAuth>)=>ReactNode;publicFallback?:(auth:ReturnType<typeof useLaunchAuth>,accessError?:string)=>ReactNode}) {
  const auth=useLaunchAuth(applicationEndpoint);
  const [required,setRequired]=useState<boolean>();
  const [verified,setVerified]=useState<string>();
@@ -21,7 +21,7 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
  },[required,auth.session?.token]);
   if(!applicationEndpoint||required===false)return children();
   if(auth.session&&verified===auth.session.token)return children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}});
-  if(publicFallback)return publicFallback(auth);
+  if(publicFallback)return publicFallback(auth,error);
   return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm}}><main className={`dashboard-access ${dark?'dashboard-access-dark':'dashboard-access-light'}`}><section>
   <h1>Code Analysis</h1><p>Sign in with an authorized GitHub account to view repositories, findings and scanner activity.</p>
   <Space direction="vertical" size="middle"><Segmented aria-label="Color theme" value={dark?'Dark':'Light'} options={['Dark','Light']} onChange={v=>{setDark(v==='Dark');localStorage.setItem('analysis-theme',v.toLowerCase());}}/>

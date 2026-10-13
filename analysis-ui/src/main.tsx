@@ -267,4 +267,4 @@ if(import.meta.env.VITE_APPLICATION_MODE!=='repositories') {
     history.replaceState(null,'','#'+parameters.toString());
   }
 }
-createRoot(document.getElementById('root')!).render(<DashboardAccess publicFallback={auth=><LandingPage auth={auth} onStart={() => { location.hash = '#tab=repositories'; }} />}>{auth=><App viewerAuth={auth}/>}</DashboardAccess>);
+createRoot(document.getElementById('root')!).render(<DashboardAccess publicFallback={(auth,accessError)=><LandingPage auth={auth} accessError={accessError} onStart={() => { location.hash = '#tab=repositories'; }} />}>{auth=><App viewerAuth={auth}/>}</DashboardAccess>);
