@@ -1,13 +1,14 @@
 # Analysis Launcher
 
-Cloudflare Worker boundary for authentication, authorization, repository setup,
-analysis launch, request activity, and report delivery.
+Cloudflare Worker boundary for authentication, fixed-host authorization, configured
+project discovery, analysis launch, request activity, and report delivery.
 
 | Area | Files |
 |---|---|
 | Worker entrypoint | `worker.mjs` |
 | Request/application API | `application.mjs` |
 | Report access | `reports.mjs` |
+| Fixed host and targets | `target-registry.mjs`, `repository-api.mjs` |
 | GitHub App/auth helpers | `github-app.mjs`, `viewer-access.mjs` |
 | Diagnostics | `diagnostics.mjs` |
 | Deployment contract | `wrangler.jsonc` |
@@ -17,11 +18,12 @@ The Worker owns API delivery and access checks. Scanner execution remains in Git
 Actions, and source repositories remain read-only. `dist/`, `.wrangler/`, and local
 development variables are generated or ignored and must not be committed.
 
-Repository setup detects Python and JavaScript/TypeScript source folders from the
-selected source tree and lets an administrator choose the roots included in its
-portable profile. Folder choices are validated against that detected tree and shown
-in the exact configuration preview. Confirming setup writes configuration and workflow
-files only to the execution repository; scanning does not modify the source repository.
+Repository mode fixes the execution host to `combustrrr/code-analysis-dashboard` and
+validates the three centrally configured public projects by repository ID, name,
+relationship, branch, and native-feedback policy. Read access lists and inspects
+targets; `push` is required to launch; `admin` is required for configuration changes.
+Target profiles are managed in the versioned central registry, not through per-user
+source setup or App installation.
 
 ## Operational guards
 
@@ -51,8 +53,8 @@ files only to the execution repository; scanning does not modify the source repo
 
 Repository mode uses the installed GitHub App. The sign-in redirect intentionally
 omits an OAuth `scope` parameter: the signed-in user token establishes identity,
-while repository inspection, collaborator checks, launches, and report reads use
-the installation token. The App registration requires repository permissions for
+while registry/workflow reads, collaborator checks, and reports use a scoped central
+installation token. Explicit launches use the user's token after a `push` check. The App registration requires repository permissions for
 `actions: write`, `contents: write`, `metadata: read`, and `pull_requests: read`.
 It does not require `workflows: write`. App permissions are distinct from OAuth
 scopes and are approved when the App is installed on the execution repository.
@@ -67,9 +69,8 @@ Deployment validation rejects a missing or broader legacy scope value.
 - Source execution is read-only and receives no publication credential. SARIF
   publication is limited to the explicitly scoped reconciliation/native-publication
   job with `security-events: write`; generated source and diagnostic jobs cannot
-  publish SARIF. Source-only observer projects do not upload checks or findings to
-  the source repository, and a connected project publishes only to its configured
-  execution repository.
+  publish SARIF. Observer projects do not upload findings to their source. Only the
+  connected self-analysis project can publish native findings back to its own repository.
 - Reports are current-only. The Worker serves the current manifest and its current
   assets after freshness and identity checks; superseded, stale, undated, or
   unpublished targets are not reconstructed or served as empty results. Rerun

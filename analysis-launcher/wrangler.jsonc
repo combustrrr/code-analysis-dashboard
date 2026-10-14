@@ -7,7 +7,9 @@
   "vars": {
     "SOURCE_REPOSITORY": "ARYDESTROYER/Kavach-AgenticSOC",
     "ANALYSIS_REPOSITORY": "combustrrr/code-analysis-dashboard",
+    "ANALYSIS_REPOSITORY_ID": "1360051890",
     "DASHBOARD_ORIGIN": "https://combustrrr.github.io",
+    "DASHBOARD_BASE_PATH": "/code-analysis-dashboard/",
     "GITHUB_CLIENT_ID": "Iv23lixjTGgPaq9Jfp6R",
     "NEXT_GITHUB_CLIENT_ID": "Iv23liZLGddxXQUEV3Lq",
     "NEXT_GITHUB_APP_ID": "4893614",

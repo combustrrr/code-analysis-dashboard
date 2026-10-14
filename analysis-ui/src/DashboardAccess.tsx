@@ -20,9 +20,9 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
   },[]);
   useEffect(()=>{setVerified(undefined);setReportSession(undefined);if(!required||!auth.session)return;
   let active=true;const token=auth.session.token;
-   const verify=async()=>{try {if(!auth.verified)await auth.api('session');if(active){setReportSession(token);setVerified(token);setError('');}}catch(e){if(active){setReportSession(undefined);setVerified(undefined);setError(e instanceof Error?e.message:'GitHub access could not be verified.');restoreAuthDestination();auth.signOut();}}};
+    const verify=async(recheck=false)=>{try {if(recheck||!auth.verified)await auth.api('session');if(active){setReportSession(token);setVerified(token);setError('');}}catch(e){if(active){setReportSession(undefined);setVerified(undefined);setError(e instanceof Error?e.message:'GitHub access could not be verified.');restoreAuthDestination();auth.signOut();}}};
   const denied=()=>{setReportSession(undefined);setVerified(undefined);setError('Access expired or was revoked. Sign in with an authorized GitHub account.');auth.signOut();};
-  void verify();const timer=window.setInterval(()=>{if(!document.hidden)void verify();},15000);window.addEventListener('analysis-access-denied',denied);
+   void verify();const timer=window.setInterval(()=>{if(!document.hidden)void verify(true);},15000);window.addEventListener('analysis-access-denied',denied);
   return()=>{active=false;clearInterval(timer);window.removeEventListener('analysis-access-denied',denied);setReportSession(undefined);};
    },[required,auth.session?.token,auth.verified]);
   useEffect(()=>{
@@ -41,7 +41,7 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
   if(auth.session&&verified===auth.session.token)return children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}});
   if(publicFallback)return publicFallback(auth,error,required===true&&!!auth.session&&verified!==auth.session.token&&!error,workspaceRequested);
   return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm}}><main className={`dashboard-access ${dark?'dashboard-access-dark':'dashboard-access-light'}`}><section>
-  <h1>Code Analysis</h1><p>Sign in with an authorized GitHub account to view repositories, findings and scanner activity.</p>
+   <h1>Code Analysis</h1><p>Sign in with an authorized GitHub account to browse configured analysis targets, current reports and scanner evidence.</p>
   <Space direction="vertical" size="middle"><Segmented aria-label="Color theme" value={dark?'Dark':'Light'} options={['Dark','Light']} onChange={v=>{setDark(v==='Dark');localStorage.setItem('analysis-theme',v.toLowerCase());}}/>
   {(error||auth.error)&&<Alert type="error" title="Dashboard access" description={error||auth.error}/>}
   <Button type="primary" disabled={required!==true} onClick={auth.signIn}>Sign in with GitHub</Button>

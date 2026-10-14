@@ -1,11 +1,12 @@
 import {emitDiagnostic} from './diagnostics.mjs';
 import {isCollaborator} from './viewer-access.mjs';
-import { webhook } from './github-app.mjs';
+import { webhook, reportToken } from './github-app.mjs';
 import { publicReports } from './reports.mjs';
 import { applicationApi } from './application.mjs';
 import {readBody, BodyLimitError, resolveLimit, DEFAULT_LIMITS} from './request-limits.mjs';
 import {MAX_GITHUB_READ_RETRIES, sleep, retryAfterMs, secondaryRateLimit, transientReadStatus} from './github-retry.mjs';
 import {AuthExchangeStore} from './auth-exchange.mjs';
+import {EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID} from './target-registry.mjs';
 // Credential boundary: this Worker calls GitHub APIs only; it never runs source code.
 const encoder = new TextEncoder();
 const b64 = bytes => btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
@@ -33,7 +34,8 @@ function settings(env) {
     if (!/^[\w.-]+\/[\w.-]+$/.test(env[key] || '')) throw new Failure(503, 'Launcher repository configuration is unavailable.', 'launcher_misconfigured');
   }
   if (env.APPLICATION_MODE !== 'repositories' && env.SOURCE_REPOSITORY.toLowerCase() === env.ANALYSIS_REPOSITORY.toLowerCase()) throw new Failure(503, 'Source and analysis repositories must be separate.', 'launcher_misconfigured');
-  if (new URL(env.DASHBOARD_ORIGIN).origin !== env.DASHBOARD_ORIGIN || !env.DASHBOARD_ORIGIN.startsWith('https://') || !env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET || !env.SESSION_KEY) throw new Failure(503, 'Launcher authentication is not configured.', 'launcher_misconfigured');
+  const dashboardBase = new URL(env.DASHBOARD_BASE_PATH || '/', `${env.DASHBOARD_ORIGIN}/`);
+  if (new URL(env.DASHBOARD_ORIGIN).origin !== env.DASHBOARD_ORIGIN || !env.DASHBOARD_ORIGIN.startsWith('https://') || dashboardBase.origin !== env.DASHBOARD_ORIGIN || !dashboardBase.pathname.endsWith('/') || dashboardBase.search || dashboardBase.hash || !env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET || !env.SESSION_KEY) throw new Failure(503, 'Launcher authentication is not configured.', 'launcher_misconfigured');
   // Legacy mode uses a GitHub OAuth App; keep its grant explicit and minimal.
   if (env.APPLICATION_MODE !== 'repositories' && env.GITHUB_OAUTH_SCOPES !== 'public_repo') throw new Failure(503, 'Launcher OAuth scope configuration is unavailable.', 'launcher_misconfigured');
 }
@@ -54,9 +56,10 @@ async function github(path, token, init = {}) {
     response.status === 401 ? 'github_unauthorized' : response.status === 403 || response.status === 404 ? 'github_forbidden' : 'github_unavailable');
   return response.status === 204 ? null : response.json();
 }
-async function access(env, token) {
+async function access(env, token, permission = 'pull') {
   const repo = await github(`repos/${env.ANALYSIS_REPOSITORY}`, token);
-  if (!repo.permissions?.push) throw new Failure(403, 'Write access to the configured analysis repository is required.', 'repository_write_required');
+  if (env.APPLICATION_MODE === 'repositories' && (repo.id !== Number(env.ANALYSIS_REPOSITORY_ID || EXECUTION_REPOSITORY_ID) || repo.full_name?.toLowerCase() !== EXECUTION_REPOSITORY.toLowerCase())) throw new Failure(409, 'Configured execution repository identity mismatch.', 'repository_identity');
+  if (!repo.permissions?.[permission]) throw new Failure(403, permission === 'push' ? 'Write access to the configured analysis repository is required.' : 'Read access to the configured analysis repository is required.', permission === 'push' ? 'repository_write_required' : 'repository_read_required');
   return repo;
 }
 async function pages(path, token) {
@@ -89,7 +92,12 @@ async function viewer(env, token, {dashboard = restricted(env), reports = false}
   return user;
 }
 const json = (value, status = 200, extra = {}) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json', ...extra } });
-const authRedirect = (env, status) => new Response(null, { status: 302, headers: { Location: `${env.DASHBOARD_ORIGIN}/#analysis_auth_error=${encodeURIComponent(status)}`, 'Cache-Control': 'no-store', 'Set-Cookie': cookie('', 0) } });
+const dashboardLocation = (env, fragment) => {
+  const url = new URL(env.DASHBOARD_BASE_PATH || '/', `${env.DASHBOARD_ORIGIN}/`);
+  url.hash = fragment;
+  return url.toString();
+};
+const authRedirect = (env, status) => new Response(null, { status: 302, headers: { Location: dashboardLocation(env, `analysis_auth_error=${encodeURIComponent(status)}`), 'Cache-Control': 'no-store', 'Set-Cookie': cookie('', 0) } });
 async function exchangeRequest(env, code, action, body) {
   if (!env.AUTH_EXCHANGES) throw new Failure(503, 'Sign-in exchange storage is unavailable.', 'exchange_store_unavailable');
   const stub = env.AUTH_EXCHANGES.get(env.AUTH_EXCHANGES.idFromName(code));
@@ -211,13 +219,13 @@ async function route(request, env) {
         body: JSON.stringify({ client_id: env.GITHUB_CLIENT_ID, client_secret: env.GITHUB_CLIENT_SECRET, code: url.searchParams.get('code'), redirect_uri: `${url.origin}/auth/callback`, code_verifier: pending.verifier }) });
       const grant = await response.json();
       if (!response.ok || !grant.access_token) return authRedirect(env, 'retry');
-      if (env.APPLICATION_MODE !== 'repositories') await access(env, grant.access_token);
+      if (env.APPLICATION_MODE !== 'repositories') await access(env, grant.access_token, 'push');
       const user = await viewer(env, grant.access_token, { dashboard: restricted(env), reports: privateReports(env) });
       const token = await seal({ type: 'session', token: grant.access_token, exp: Date.now() + Math.min(3600, grant.expires_in || 3600) * 1000 }, env.SESSION_KEY);
       const code = random();
       const issued = await exchangeRequest(env, code, 'issue', { verifier_hash: pending.challenge, token, login: user.login });
       if (!issued.ok) return authRedirect(env, 'retry');
-      return new Response(null, { status: 302, headers: { Location: `${env.DASHBOARD_ORIGIN}/#analysis_auth=${code}`, 'Cache-Control': 'no-store', 'Set-Cookie': cookie('', 0) } });
+      return new Response(null, { status: 302, headers: { Location: dashboardLocation(env, `analysis_auth=${code}`), 'Cache-Control': 'no-store', 'Set-Cookie': cookie('', 0) } });
     } catch (error) {
       if (error instanceof Failure && error.code === 'viewer_not_authorized') return authRedirect(env, 'not_authorized');
       return authRedirect(env, 'retry');
@@ -225,8 +233,7 @@ async function route(request, env) {
   }
   if (env.APPLICATION_MODE === 'repositories') {
     if (request.method === 'GET' && url.pathname === '/api/public/config') {
-      const slug = env.GITHUB_APP_SLUG;
-      return json({mode:'repositories', require_login:restricted(env), require_report_login:privateReports(env), installation_url: /^[a-z0-9-]+$/.test(slug || '') ? `https://github.com/apps/${slug}/installations/new` : null});
+      return json({mode:'repositories', require_login:restricted(env), require_report_login:privateReports(env), execution_repository:{id:Number(env.ANALYSIS_REPOSITORY_ID || EXECUTION_REPOSITORY_ID),full_name:env.ANALYSIS_REPOSITORY}});
     }
     if (env.REPORT_ACCESS === 'public') {
       const report = await publicReports(request,env);
@@ -258,13 +265,24 @@ async function route(request, env) {
     if (request.method === 'GET' && url.pathname === '/api/session') return json({login:user.login});
   }
   if (env.APPLICATION_MODE === 'repositories') {
+    const helpers = {github, json, Failure, seal, unseal, pages, serviceToken:() => reportToken(env, env.ANALYSIS_REPOSITORY, {contents:'read',actions:'read'})};
+    if (reportPath(url.pathname)) {
+      await access(env, session.token, 'pull');
+      if (privateReports(env) && url.searchParams.has('project_id')) {
+        const identityUrl = new URL('/api/project-identity', url);
+        identityUrl.search = new URLSearchParams({project_id:url.searchParams.get('project_id')});
+        const identity = await applicationApi(new Request(identityUrl, {headers:{Authorization:request.headers.get('Authorization') || ''}}), env, session, helpers);
+        if (!identity) throw new Failure(404, 'Configured project is unavailable.', 'project_unavailable');
+        if (!identity.ok) return identity;
+      }
+    }
     const report = await protectedReportResponse(request,env);
     if (report) return report;
-    const response = await applicationApi(request, env, session, {github, json, Failure, seal, unseal, pages});
+    const response = await applicationApi(request, env, session, helpers);
     if (response) return response;
     throw new Failure(404, 'Unknown application endpoint.', 'not_found');
   }
-  const repo = await access(env, session.token); // Recheck current permissions for every API call.
+  const repo = await access(env, session.token, 'push'); // Recheck current permissions for every API call.
   if (request.method === 'GET' && url.pathname === '/api/integration') {
     const [configFile, workflow] = await Promise.all([
       github(`repos/${env.ANALYSIS_REPOSITORY}/contents/config/code-analysis/service.json?ref=${encodeURIComponent(repo.default_branch)}`, session.token),

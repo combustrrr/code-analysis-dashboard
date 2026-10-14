@@ -8,8 +8,8 @@ export function ProjectLauncher({auth,repository,project,close,onSubmitted}:{aut
  const [readiness,setReadiness]=useState<{channels:{channel:string;status:string;reason:string}[];tooling_sha:string}>();
  const [inventory,setInventory]=useState<Inventory>();const [kind,setKind]=useState('branch');const [ref,setRef]=useState('');
   const [busy,setBusy]=useState(false);const [error,setError]=useState('');
-  useEffect(()=>{if(!auth.session)return;let active=true;auth.api<Inventory>(`project-targets?repository=${encodeURIComponent(repository)}&project_id=${project}`).then(r=>{if(active)setInventory(r);}).catch(e=>{if(active)setError(String(e));});return()=>{active=false;};},[auth.session,repository,project]);
- useEffect(()=>{if(!auth.session)return;let active=true;setReadiness(undefined);auth.api<{channels:{channel:string;status:string;reason:string}[];tooling_sha:string}>(`project-readiness?repository=${encodeURIComponent(repository)}&project_id=${project}`).then(r=>{if(active)setReadiness(r);}).catch(e=>{if(active)setError(String(e));});return()=>{active=false;};},[auth.session,repository,project]);
+   useEffect(()=>{if(!auth.session)return;let active=true;auth.api<Inventory>(`project-targets?project_id=${project}`).then(r=>{if(active)setInventory(r);}).catch(e=>{if(active)setError(String(e));});return()=>{active=false;};},[auth.session?.token,project]);
+  useEffect(()=>{if(!auth.session)return;let active=true;setReadiness(undefined);auth.api<{channels:{channel:string;status:string;reason:string}[];tooling_sha:string}>(`project-readiness?project_id=${project}`).then(r=>{if(active)setReadiness(r);}).catch(e=>{if(active)setError(String(e));});return()=>{active=false;};},[auth.session?.token,project]);
  const valid=kind==='commit'?/^[a-fA-F0-9]{40}$/.test(ref):!!ref;
  return <Modal open title="Run analysis" onCancel={close} footer={null} width={760}>
   {!auth.session&&<Button onClick={auth.signIn}>Sign in with GitHub</Button>}
@@ -24,7 +24,7 @@ export function ProjectLauncher({auth,repository,project,close,onSubmitted}:{aut
       setBusy(true);setError('');let submitted=false;
       try {
         const normalizedRef=kind==='commit'?ref.toLowerCase():ref;
-        const receipt=await auth.api<{run_id:number|null;request_id:string}>('project-launch',{repository,project_id:project,kind,ref:normalizedRef});
+        const receipt=await auth.api<{run_id:number|null;request_id:string}>('project-launch',{project_id:project,kind,ref:normalizedRef});
         onSubmitted({...receipt,repository,project,kind,ref:normalizedRef,submittedAt:new Date().toISOString()});
         submitted=true;
       } catch(e) { setError(String(e)); }

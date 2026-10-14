@@ -58,7 +58,8 @@ Validation must distinguish adapter coverage from universal language support:
 CodeQL portability currently covers Python and JavaScript/TypeScript. A second
 read-only source proves another layout; it does not prove a second App installation.
 
-Current instance: only service-self and the read-only Kavach upstream/product fork
-are monitored. The alternate layout was a historical test and is no longer active.
-New previews use the adopted service tooling pin; do not copy a historical pin
-without checking the execution profile. See [handoff](HANDOFF.md).
+Current registry: service-self, read-only Kavach upstream, and read-only Agentic-Kibana
+are the only configured targets. Project selection reads this trusted registry and
+never provisions a target or dispatches a scan. New profiles use the adopted service
+tooling pin; do not copy a historical pin without checking the execution profile. See
+the [handoff](../HANDOFF.md).

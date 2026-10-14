@@ -41,6 +41,16 @@ a { color: var(--workspace-accent); }
 .workspace-intro h1 { margin: 8px 0; color: var(--workspace-ink); font: 650 clamp(32px, 5vw, 46px)/1.08 Georgia, "Times New Roman", serif; letter-spacing: -.04em; }
 .workspace-intro p { max-width: 700px; margin: 0; }
 .workspace-home>.connections-panel { width: 100%; max-width: none; padding: 24px; box-shadow: 0 12px 32px #071c2414; }
+.target-catalog { display: grid; gap: 18px; }
+.target-catalog-heading>span,.target-card-kicker { color: var(--workspace-accent); font: 700 10px/1.2 Consolas, monospace; letter-spacing: 1.3px; }
+.target-catalog-heading h2 { margin: 7px 0; color: var(--workspace-ink); font: 650 clamp(24px,3vw,32px)/1.12 Georgia,serif; }
+.target-catalog-heading p,.target-catalog-footer { max-width: 760px; margin: 0; color: var(--workspace-muted); }
+.target-cards { display: grid; gap: 10px; }
+.target-card { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 16px; align-items: center; padding: 18px; border: 1px solid var(--workspace-line); border-left: 3px solid var(--workspace-accent); border-radius: 6px; background: var(--workspace-panel-raised); }
+.target-card-index { color: var(--workspace-muted); font: 12px/1 Consolas,monospace; }
+.target-card h3 { margin: 5px 0 8px; color: var(--workspace-ink); font-size: clamp(16px,2vw,20px); overflow-wrap: anywhere; }
+.target-card .ant-space { color: var(--workspace-muted); }
+.target-catalog-footer { overflow-wrap: anywhere; }
 .workspace-home>.connections-panel>p { color: var(--workspace-muted); }
 .workspace-home .ant-steps-item-title { color: var(--workspace-ink); }
 .workspace-home .ant-steps-item-description,.workspace-home .ant-table-cell small { color: var(--workspace-muted); }
@@ -82,6 +92,8 @@ a { color: var(--workspace-accent); }
 @media (max-width: 700px) {
   .workspace-home { padding: 28px 16px 48px; }
   .workspace-home>.connections-panel { padding: 16px; }
+  .target-card { grid-template-columns: 28px minmax(0,1fr); gap: 10px; padding: 14px; }
+  .target-card>.ant-btn { grid-column: 2; justify-self: start; }
   .analysis-folder-wizard { grid-template-columns: 1fr; padding: 14px; }
   .analysis-folder-heading,.analysis-folder-wizard>.ant-btn { grid-column: 1; }
   .topbar.workspace-topbar { padding: 12px 14px; }

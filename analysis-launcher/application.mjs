@@ -1,6 +1,8 @@
 import {publicReports, canonicalReportTarget} from './reports.mjs';
 import {readBody, BodyLimitError, resolveLimit, DEFAULT_LIMITS} from './request-limits.mjs';
 import {detectedProfile, validatePortableProfile} from './profile-policy.mjs';
+import {SUPPORTED_SCANNERS as SCANNERS} from './target-registry.mjs';
+import {repositoryApi} from './repository-api.mjs';
 export {detectedProfile, validatePortableProfile} from './profile-policy.mjs';
 // Repository application API. No source code is executed by the Worker.
 const PROTECTED = 'arydestroyer/kavach-agenticsoc';
@@ -8,7 +10,6 @@ const readOnly = repo => [1267340546,1278177697].includes(repo.id) || [PROTECTED
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 const SHA = /^[a-f0-9]{40}$/;
 const CONFIG = '.github/code-analysis/projects.json';
-const SCANNERS = ['atheris','bandit','checkov','codeql','coderabbit-ai-advisory','coverage','eslint','github-actions-security','github-secret-protection-posture','gitleaks','hadolint','openssf-scorecard','osv','pyright','radon','ruff','sbom-license-provenance','schemathesis','semgrep','shipping-image-cves','snyk','sonarqube-cloud','trivy','typescript','vulture','xenon'];
 const encode = value => btoa(String.fromCharCode(...new TextEncoder().encode(value)));
 const decode = value => new TextDecoder().decode(Uint8Array.from(atob(value.replace(/\s/g, '')), c => c.charCodeAt(0)));
 const evaluationEnabled = (env, source) => String(env.EVALUATION_MODE).toLowerCase() === 'true' && source.toLowerCase() === String(env.EVALUATION_SOURCE_REPOSITORY || 'ARYDESTROYER/Kavach-AgenticSOC').toLowerCase();
@@ -121,6 +122,7 @@ export async function applicationApi(request, env, session, helpers) {
   const {github, json, Failure, seal, unseal} = helpers;
   const url = new URL(request.url);
   const token = session?.token;
+  if (env.APPLICATION_MODE === 'repositories') return repositoryApi(request, env, session, helpers);
   async function publicRepository(name) {
     if (!REPO.test(name || '')) throw new Failure(400, 'Use owner/repository.', 'invalid_repository');
     const repo = await github(`repos/${name}`, token);

@@ -10,6 +10,7 @@ Runbooks and maintenance procedures for the deployed service.
 | Scanner maintenance | [Scanner maintenance](SCANNER-MAINTENANCE.md) |
 | Secret management and rotation | [Secret management](SECRET-MANAGEMENT.md) |
 | Portable profiles | [Portable profiles](PORTABLE_PROFILES.md) |
+| Read-only analysis workflow | [Read-only analysis](READ_ONLY_ANALYSIS.md) |
 | Deployment migration history | [Migration](../MIGRATION.md) |
 | Known limitations | [Limitations](LIMITATIONS.md) |
 

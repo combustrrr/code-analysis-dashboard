@@ -1,6 +1,7 @@
 import {reportToken, invalidateReportToken} from './github-app.mjs';
 import {resolveLimit} from './request-limits.mjs';
 import {MAX_GITHUB_READ_RETRIES, sleep, retryAfterMs, secondaryRateLimit, transientReadStatus} from './github-retry.mjs';
+import {EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID, validateTargetRegistry} from './target-registry.mjs';
 const apiCache=new Map();
 const projectConfigCache=new Map();
 // Public reports are resolved through verified public repositories and managed releases.
@@ -33,10 +34,10 @@ export function canonicalReportTarget(manifest) {
 }
 export async function publicReports(request,env) {
   const url = new URL(request.url);
-  if (request.method !== 'GET' || !['/api/public/manifest','/api/public/asset','/api/public/projects','/api/public/threat-report'].includes(url.pathname)) return null;
+  if (request.method !== 'GET' || !['/api/public/manifest','/api/public/asset','/api/public/threat-report'].includes(url.pathname)) return null;
   const repository = url.searchParams.get('repository');
   const project = url.searchParams.get('project_id');
-  if (!REPO.test(repository || '') || (url.pathname!=='/api/public/projects'&&!/^[1-9][0-9]*$/.test(project || ''))) return Response.json({error:'Invalid repository or project.'},{status:400});
+  if (!REPO.test(repository || '') || (env.APPLICATION_MODE === 'repositories' && (repository.toLowerCase() !== EXECUTION_REPOSITORY.toLowerCase() || env.ANALYSIS_REPOSITORY?.toLowerCase() !== EXECUTION_REPOSITORY.toLowerCase() || Number(env.ANALYSIS_REPOSITORY_ID) !== EXECUTION_REPOSITORY_ID)) || !/^[1-9][0-9]*$/.test(project || '')) return Response.json({error:'Invalid repository or project.'},{status:400});
   const headers = {Accept:'application/vnd.github+json','User-Agent':'code-analysis-reports'};
   async function mintToken() {
   try { return await reportToken(env, repository); }
@@ -75,7 +76,7 @@ export async function publicReports(request,env) {
     if(cached&&cached.until>Date.now()) return cached.value;
     const file = await github(`repos/${repository}/contents/.github/code-analysis/projects.json?ref=${encodeURIComponent(repo.default_branch)}`);
     const config = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g,'')),c=>c.charCodeAt(0))));
-    if(config.execution_repository?.id!==repo.id || !Array.isArray(config.projects)) throw new Error('Project configuration identity mismatch.');
+    if(config.execution_repository?.id!==repo.id || !Array.isArray(config.projects) || (env.APPLICATION_MODE === 'repositories' && !validateTargetRegistry(config,repo))) throw new Error('Project configuration identity mismatch.');
     projectConfigCache.set(cacheKey,{value:config,until:Date.now()+30000});
     return config;
   }
@@ -83,10 +84,6 @@ export async function publicReports(request,env) {
     const token=await mintToken();if(token)headers.Authorization=`Bearer ${token}`;
     const repo = await github('repos/'+repository);
     if(repo.private) return Response.json({error:'Private reports are not supported.'},{status:403});
-    if(url.pathname==='/api/public/projects') {
-      const config=await projectConfig(repo);
-      return Response.json({projects:config.projects.map(p=>({id:p.id,source_repository:p.source_repository.full_name,relationship:p.relationship,preferred_branch:p.preferred_branch}))},{headers:{'Cache-Control':'public, max-age=30'}});
-    }
     const config=await projectConfig(repo);
     if(!config.projects.some(p=>String(p.id)===project)) return Response.json({error:'Report project is unavailable.'},{status:404,headers:{'Cache-Control':'no-store'}});
     

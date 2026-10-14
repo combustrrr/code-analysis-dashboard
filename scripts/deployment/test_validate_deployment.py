@@ -15,6 +15,10 @@ def test_repository_mode_requires_app_oauth_and_webhook_configuration():
         "NEXT_GITHUB_CLIENT_ID",
         "NEXT_GITHUB_APP_ID",
         "NEXT_GITHUB_APP_SLUG",
+        "ANALYSIS_REPOSITORY",
+        "ANALYSIS_REPOSITORY_ID",
+        "DASHBOARD_ORIGIN",
+        "DASHBOARD_BASE_PATH",
         "NEXT_GITHUB_CLIENT_SECRET",
         "NEXT_GITHUB_APP_PRIVATE_KEY",
         "NEXT_GITHUB_WEBHOOK_SECRET",
@@ -28,6 +32,10 @@ def test_repository_mode_configuration_is_complete_without_secret_values():
             "NEXT_GITHUB_CLIENT_ID": "client-id",
             "NEXT_GITHUB_APP_ID": "app-id",
             "NEXT_GITHUB_APP_SLUG": "app-slug",
+            "ANALYSIS_REPOSITORY": "combustrrr/code-analysis-dashboard",
+            "ANALYSIS_REPOSITORY_ID": "1360051890",
+            "DASHBOARD_ORIGIN": "https://combustrrr.github.io",
+            "DASHBOARD_BASE_PATH": "/code-analysis-dashboard/",
         },
         "secrets": {
             "required": [
@@ -54,3 +62,17 @@ def test_legacy_mode_requires_explicit_minimum_oauth_scope():
 def test_repository_mode_does_not_require_oauth_scopes():
     config = {"vars": {"APPLICATION_MODE": "repositories"}, "secrets": {"required": []}}
     assert "GITHUB_OAUTH_SCOPES" not in missing_worker_configuration(config)
+
+
+def test_repository_mode_rejects_another_execution_host_or_pages_path():
+    config = {
+        "vars": {
+            "APPLICATION_MODE": "repositories",
+            "ANALYSIS_REPOSITORY": "owner/other",
+            "ANALYSIS_REPOSITORY_ID": "1",
+            "DASHBOARD_ORIGIN": "https://example.test",
+            "DASHBOARD_BASE_PATH": "/",
+        },
+        "secrets": {"required": []},
+    }
+    assert {"ANALYSIS_REPOSITORY", "ANALYSIS_REPOSITORY_ID", "DASHBOARD_ORIGIN", "DASHBOARD_BASE_PATH"} <= missing_worker_configuration(config)

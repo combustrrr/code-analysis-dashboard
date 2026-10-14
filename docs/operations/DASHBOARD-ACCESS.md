@@ -10,14 +10,32 @@ DASHBOARD_ACCESS is set to collaborators. The Worker identifies the signed-in
 GitHub user and uses its repository-scoped App installation token to check exact
 collaborator membership on every protected request. Missing App access or GitHub
 API failures deny access. The repository owner qualifies through the same check.
-Responses use private, no-store caching. View permission does not grant launch or
-repository configuration permission: existing write/admin checks still apply.
-The OAuth authorization request intentionally omits a `scope` parameter. The OAuth
-grant is used for sign-in identity (and legacy source-mode checks); repository-mode
-repository reads, collaborator checks, launches, and report access use the installed
-GitHub App token scoped to the configured execution repository. Do not infer broader
-OAuth access from a successful sign-in, and do not add scopes without reviewing the
-credential boundary and authorization flow.
+Responses use private, no-store caching. The App is installed only on the execution
+host; dashboard users do not install it on their own repositories.
+
+The execution host is fixed to `combustrrr/code-analysis-dashboard` (repository ID
+`1360051890`). Its versioned `.github/code-analysis/projects.json` registry must contain
+exactly these three public project identities: `ARYDESTROYER/Kavach-AgenticSOC`
+(`1267340546`, observer), `combustrrr/code-analysis-dashboard` (`1360051890`, connected
+self-analysis), and `combustrrr/Agentic-Kibana` (`1278177697`, observer). The Worker
+validates IDs, names, relationships, branches, and native-feedback policy and fails
+closed on mismatch. The self-analysis target is the only one allowed to publish native
+findings back to its source repository.
+
+Read-only collaborators can list, select, and inspect configured projects. Launching
+requires `push` permission on the fixed execution repository; configuration changes
+require `admin` and are made through its trusted versioned registry. Project selection
+does not create workflow runs. Application and report routes accept the fixed execution
+repository plus a configured project ID, never a user-selected source repository.
+The authenticated `/api/projects` route returns the registry and caller capabilities;
+there is no anonymous project-list or arbitrary repository-discovery endpoint.
+
+The OAuth authorization request intentionally omits a `scope` parameter. The user
+token supplies identity and GitHub `pull`/`push`/`admin` permission checks. The central
+App token reads the trusted registry and workflow readiness, checks collaborator
+membership, and serves reports. Launches use the user's token and are refused without
+execution-host write permission. Do not infer broader access from successful sign-in,
+and do not add scopes without reviewing the authorization boundary.
 
 Sign-in uses a same-tab GitHub redirect. OAuth state and PKCE remain validated by the
 Worker. An authorized callback returns a two-minute exchange code to the fixed

@@ -33,7 +33,7 @@ export function restoreAuthDestination() {
 }
 
 function friendlyAuthError(code?: string) {
-  if (code === 'viewer_not_authorized') return 'This GitHub account is not authorized yet. Ask a dashboard maintainer to invite your account to combustrrr/code-analysis-dashboard, accept the invitation, then retry.';
+  if (code === 'viewer_not_authorized' || code === 'not_authorized') return 'This GitHub account is not authorized yet. Ask a dashboard maintainer to invite your account to combustrrr/code-analysis-dashboard, accept the invitation, then retry.';
   if (code === 'cancelled') return 'GitHub sign-in was cancelled. Retry when you are ready.';
   return 'GitHub sign-in could not be completed. Check your connection and retry.';
 }

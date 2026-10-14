@@ -63,7 +63,6 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
     setChecking(true);
     try {
       const query = new URLSearchParams({
-        repository: request.repository,
         project_id: request.project,
         request_id: request.request_id,
       });

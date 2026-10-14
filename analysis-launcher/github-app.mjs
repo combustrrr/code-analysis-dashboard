@@ -24,16 +24,17 @@ export async function installationToken(env,installationId,repositoryId,permissi
   return (await response.json()).token;
 }
 const reportTokens=new Map();
-const tokenCacheKey=(env,repository)=>`${env?.GITHUB_APP_ID||'app'}:${String(repository||'').toLowerCase()}`;
+const tokenCacheKey=(env,repository,permissions={contents:'read'})=>`${env?.GITHUB_APP_ID||'app'}:${String(repository||'').toLowerCase()}:${Object.keys(permissions).sort().map(key=>`${key}:${permissions[key]}`).join(',')}`;
 // Drop a cached installation token so the next call mints a fresh one.
 // Call whenever GitHub rejects a cached token (401/403): revoked or
 // re-scoped installations must never keep serving stale credentials.
 export function invalidateReportToken(env,repository) {
-  reportTokens.delete(tokenCacheKey(env,repository));
+  const prefix=`${env?.GITHUB_APP_ID||'app'}:${String(repository||'').toLowerCase()}:`;
+  for(const key of reportTokens.keys())if(key.startsWith(prefix))reportTokens.delete(key);
 }
-export async function reportToken(env,repository) {
+export async function reportToken(env,repository,permissions={contents:'read'}) {
   if(!env?.GITHUB_APP_ID || !env.GITHUB_APP_PRIVATE_KEY)return undefined;
-  const cacheKey=tokenCacheKey(env,repository);
+  const cacheKey=tokenCacheKey(env,repository,permissions);
   const cached=reportTokens.get(cacheKey);if(cached&&cached.until>Date.now())return cached.token;
   const jwt=await appJwt(env);
   const headers={Authorization:`Bearer ${jwt}`,Accept:'application/vnd.github+json','User-Agent':'code-analysis-reports'};
@@ -41,7 +42,7 @@ export async function reportToken(env,repository) {
   if(!installation.ok){const failure=await installation.json().catch(()=>({}));throw new Error(`GitHub App installation lookup failed (${installation.status}): ${failure.message||'Install the App on this execution repository.'}`);}
   const value=await installation.json();
   // Restrict the token to this single execution repository and read-only contents.
-  const token=await installationToken(env,value.id,repository.split('/')[1],{contents:'read'});
+  const token=await installationToken(env,value.id,repository.split('/')[1],permissions);
   reportTokens.set(cacheKey,{token,until:Date.now()+3000000});
   if(reportTokens.size>10)reportTokens.delete(reportTokens.keys().next().value);
   return token;

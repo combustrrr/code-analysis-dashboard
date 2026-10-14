@@ -6,7 +6,7 @@ import type { useLaunchAuth } from './useLaunchAuth';
 type Auth = ReturnType<typeof useLaunchAuth>;
 type Configuration = { source_repository: string; analysis_repository: string; publishing_repository?: string; workflow_branch: string; workflow_state: string; configuration_matches: boolean; ready: boolean; enabled_scanners: string[]; checked_at: string; report_budget_bytes?: number; report_storage?: { compressed_bytes: number|null; remaining_bytes: number|null; history_points: number }; storage_backend?: string };
 
-export function Connections({ auth, source, host, publisher, endpoint, start, repository, project }: { repository?:string; project?:string; auth: Auth; source?: string; host?: string; publisher?: string; endpoint?: string; start: () => void }) {
+export function Connections({ auth, source, host, publisher, endpoint, start, repository, project, canLaunch=true }: { repository?:string; project?:string; auth: Auth; source?: string; host?: string; publisher?: string; endpoint?: string; start: () => void; canLaunch?:boolean }) {
   const [configuration, setConfiguration] = useState<Configuration>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -14,7 +14,7 @@ export function Connections({ auth, source, host, publisher, endpoint, start, re
   useEffect(() => {
     let active = true;
     setConfiguration(undefined); setError(''); setBusy(!!auth.session);
-    if (auth.session) auth.api<Configuration>(repository && project ? `project-integration?${new URLSearchParams({repository,project_id:project})}` : 'integration').then(value => {
+    if (auth.session) auth.api<Configuration>(repository && project ? `project-integration?${new URLSearchParams({project_id:project})}` : 'integration').then(value => {
       if (!active) return;
       const mismatch = (source && value.source_repository !== source) || (host && value.analysis_repository !== host) || (publisher && value.publishing_repository !== publisher);
       if (mismatch) throw Error('Published dashboard and live service configuration disagree. Check the repository configuration before launching.');
@@ -35,11 +35,11 @@ export function Connections({ auth, source, host, publisher, endpoint, start, re
        configuration?.report_storage ? {key:'usage',label:'Storage used / remaining',children:`${humanBytes(configuration.report_storage.compressed_bytes)} / ${humanBytes(configuration.report_storage.remaining_bytes ?? (configuration.report_budget_bytes != null && configuration.report_storage.compressed_bytes != null ? Math.max(0, configuration.report_budget_bytes - configuration.report_storage.compressed_bytes) : null))}`} : undefined,
       {key:'identity',label:'GitHub session',children:auth.session ? `Signed in as ${auth.session.login}` : 'Not signed in'},
     ].filter(Boolean) as any}/>
-    <Space wrap>{auth.session ? <><Button loading={busy} onClick={() => setRefresh(n => n + 1)}>Verify connections</Button><Button onClick={auth.signOut}>Sign out</Button></> : <Button disabled={!auth.available} onClick={auth.signIn}>Sign in to verify connections</Button>}<Button type="primary" disabled={!auth.session || busy || !configuration?.ready} onClick={start}>Choose revision to analyze</Button></Space>
+     <Space wrap>{auth.session ? <><Button loading={busy} onClick={() => setRefresh(n => n + 1)}>Verify connections</Button><Button onClick={auth.signOut}>Sign out</Button></> : <Button disabled={!auth.available} onClick={auth.signIn}>Sign in to verify connections</Button>}{canLaunch&&<Button type="primary" disabled={!auth.session || busy || !configuration?.ready} onClick={start}>Choose revision to analyze</Button>}</Space>
     {(error || auth.error) && <Alert showIcon type="error" title="Connection check unavailable" description={error || auth.error}/>}
     {configuration && <Alert showIcon type={configuration.ready ? 'success' : 'warning'} title={configuration.ready ? 'Launch configuration verified' : 'Configuration needs attention'} description={<><p>Configuration match: {configuration.configuration_matches ? 'yes' : 'no'}. Discovery workflow: {configuration.workflow_state}. Trusted workflow branch: {configuration.workflow_branch}. Checked {new Date(configuration.checked_at).toLocaleString()}.</p><p>{configuration.enabled_scanners.length} enabled channels: {configuration.enabled_scanners.join(', ')}.</p><p>This verifies routing and workflow availability. Scanner results determine which channels actually completed.</p></>}/>}
     <h3>How analysis reaches this application</h3><ol><li>Sign in and select a branch, PR, or full commit SHA.</li><li>Cloudflare checks your GitHub permissions and submits the request to the configured workflow.</li><li>GitHub resolves the source revision and queues the scanners. Source execution has no publishing credentials.</li><li>The publisher validates current evidence, updates the target report, and the dashboard fetches it. Superseded assets are cleaned after successful publication; report changes do not rebuild the UI.</li></ol>
-    <p>Repository setup is managed through the versioned service configuration and scanner profile. Changing codebases requires updating and validating that configuration; this page does not silently scan an arbitrary repository with the wrong profile.</p>
+     <p>Project identities and scanner profiles come from the versioned execution-repository registry. Only repository administrators can change that registry; source code remains read-only to analysis workflows.</p>
   </section>;
 }
 

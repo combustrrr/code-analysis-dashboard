@@ -19,18 +19,20 @@ are historical evidence, not instructions to restore old hosting.
 - Website: https://combustrrr.github.io/code-analysis-dashboard/
 - Worker: https://code-analysis-launcher.icsarthak9.workers.dev
 - Pages deployment is triggered by the main branch workflow. Pages run `38441170421`
-  deployed commit `5b07952`; Worker version `b990585d-1412-4a8c-8c43-8abb0e096577`
-  is deployed.
+  deployed commit `5b07952`; Worker version `ec340878-82e9-44c7-8105-d4053f677241`
+  is deployed with the Pages base-path redirect fix. The current fixed-host plan work
+  in this working tree has not been committed or deployed.
 
 ## What is implemented
 
-Ant Design application with light/dark themes, current source/target/revision
-provenance, overview charts, issues, scanners, connections and repository setup.
-Primary flow: sign in, choose an execution repository, open a configured source
-project, select branch/PR/full SHA, submit once, follow its persistent request tracker,
-then open the report identified by the published request. Readiness expands optionally.
-The separate optional folder-mapping path is admin-only and requires a fresh preview
-after edits before an explicit configuration commit.
+The current source implements an Ant Design application with light/dark themes, current
+source/target/revision provenance, overview charts, issues, scanners, connections and a
+fixed-host project catalog. Primary repository-mode flow: sign in, choose one of the
+three trusted projects, inspect its current report, then (with execution-host write
+access) explicitly choose a branch/PR/full SHA and submit once. Project selection itself
+is read-only and never dispatches a workflow. Per-user execution-host selection, generic
+repository discovery, source setup and folder-mapping commits are not part of this flow.
+Project profiles are changed through the trusted versioned registry by an administrator.
 Threat Reports add deterministic JSON/Markdown/PDF exports, severity-aware UI,
 raw/normalized channel coverage, finding provenance, and explicit limitations.
 Dashboard refresh is read-only; analysis starts only after an explicit user action.
@@ -39,16 +41,16 @@ Issues combines text, severity, scanner, rule, file, directory, source-location 
 scanner-overlap filters. Clear filters and overview shortcuts reset unrelated
 filters. Group by rule/scanner/file/directory; inspect immutable source links,
 explanation and supporting observations. Related findings are not proven root causes.
-Connections uses `/api/project-integration` for the selected project, verifies App
-access, source identity and both execution workflows. Repository forms gate edits
-on admin permission, invalidate stale previews, and recover from failed requests.
+Connections uses `/api/project-integration` and `/api/project-readiness` for the selected
+project and verifies source identity and both execution workflows. `/api/projects` reads
+the three-entry registry using a centrally installed, repository-scoped App token.
 
-The Worker requires GitHub login and accepted collaborator membership in the service
-repository for dashboard/API viewing. Public repo read permission alone does not
-qualify. Launch requires write access; configuration requires admin access and exact
-preview confirmation. Report assets are delivered through the Worker/R2 path and
-access gating is an application boundary; this is not a substitute for confidential
-storage guarantees.
+The Worker requires GitHub login and current collaborator membership in the fixed
+execution repository for dashboard/API viewing. Public repo read permission alone does
+not qualify. Collaborators with `pull` can browse reports; `push` is required to launch;
+`admin` is required for configuration changes. Report assets are delivered through the
+Worker/R2 path and access gating is an application boundary, not a substitute for
+confidential storage guarantees.
 
 ## Execution and storage
 
@@ -87,19 +89,22 @@ reverified in the UI repair session.
 
 ## Verification and next work
 
-PR #17: 59 service tests, 31 launcher tests and workflow policy passed. Retained
+Historical PR #17 validation: 59 service tests, 31 launcher tests and workflow policy
+passed. Retained
 21,189-finding browser coverage includes provenance, grouping, charts, filters,
 mobile navigation, themes, launch tracking and configuration confirmation. Repeated
 repository recovery checks passed after stable accessible loading labels were added.
-Production-mode login/logout/revocation browser test passed. Live anonymous smoke:
-sign-in visible, project-integration HTTP 401. Both execution workflows active.
+Production-mode login/logout/revocation browser test passed. The current plan change
+has passed 78 launcher tests, 13 deployment tests, service unit tests, workflow audit,
+UI build, 22 fixture browser tests, and all 11 repository-mode OAuth/access browser
+tests locally. It has not been deployed, so the previous live anonymous smoke applies
+only to the deployed code, not these uncommitted changes.
 
 Owner login is confirmed; another accepted collaborator's live sign-in is deferred
 by the owner. No need to request it repeatedly. Outstanding external exceptions:
 Sonar branch entitlement and upstream posture access. Do not buy plans or modify
-upstream. General repository onboarding exists and has mocked acceptance coverage;
-independent installation by another owner is not live-proven and is outside current
-Kavach-focused scope. Do not claim unrestricted self-service acceptance.
+upstream. The dashboard does not offer arbitrary repository onboarding or per-user App
+installation. Project access is limited to the fixed host and its validated registry.
 
 Next chat: read live profile/run/Release state, keep named scanner limitations honest,
 and implement new requested work only in the service unless product work is explicit.

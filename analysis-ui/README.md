@@ -5,8 +5,8 @@ Static React/Ant Design application deployed to GitHub Pages.
 | Area | Location |
 |---|---|
 | Application entrypoint | `src/main.tsx` |
-| Launch flow | `src/ProjectLauncher.tsx`, `src/AnalysisLauncher.tsx` |
-| Repository onboarding | `src/Repositories.tsx` |
+| Fixed target selection | `src/Repositories.tsx` |
+| Explicit launch flow | `src/ProjectLauncher.tsx` |
 | Integration checks | `src/Integration.tsx` |
 | Shared styling | `src/style.css` |
 | Build | `npm run build` |
@@ -14,6 +14,10 @@ Static React/Ant Design application deployed to GitHub Pages.
 
 The UI contains no report data. It retrieves current manifests/assets through the
 Worker and must preserve exact source, target, request, and publication provenance.
+The authenticated project list comes from the fixed execution-host registry. Selecting
+a configured target only opens its report; the separate launch action is shown only
+when the signed-in user has execution-host write access. The dashboard has no arbitrary
+repository picker, per-user App installation, or setup-commit workflow.
 The dashboard includes a **Threat Report** view for newly published analyses. It
 summarizes severity/category coverage and deterministic catalog guidance, then links
 back to Issues for scanner evidence. Reports can be copied as authenticated private

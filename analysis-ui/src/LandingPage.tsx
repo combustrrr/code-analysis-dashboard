@@ -30,7 +30,7 @@ export function LandingPage({ auth, onStart, accessError, accessPending = false,
           <div className="landing-copy">
             <div className="landing-kicker"><span className="landing-kicker-dot" /> SECURITY FINDINGS, WITH THEIR RECEIPTS</div>
             <Typography.Title id="landing-title">Know what your code is carrying.</Typography.Title>
-            <Typography.Paragraph>Run isolated analysis against a branch, pull request, or exact commit. Then inspect each finding with the scanner evidence and source revision still attached.</Typography.Paragraph>
+            <Typography.Paragraph>Browse current reports from the analysis service's trusted project registry. When you have execution write access, start a separate, explicit analysis request against a branch, pull request, or exact commit.</Typography.Paragraph>
             <Space wrap className="landing-actions">
               <Button type="primary" size="large" icon={signedIn ? <ArrowRightOutlined /> : <GithubOutlined />} onClick={primaryAction} disabled={checkingAccess || (!signedIn && !auth.available)}>{primaryLabel}</Button>
               <a className="landing-secondary-action" href="#workflow">See how it works <ArrowDownOutlined /></a>
@@ -63,9 +63,9 @@ export function LandingPage({ auth, onStart, accessError, accessPending = false,
         <section className="landing-workflow" id="workflow" aria-labelledby="workflow-title">
           <div className="landing-section-heading"><div><span className="landing-kicker">FROM SOURCE TO EVIDENCE</span><Typography.Title id="workflow-title" level={2}>A clear path from code to context.</Typography.Title></div><p>No automatic scans on page load. You choose the target; the dashboard follows the run and shows the published result.</p></div>
           <div className="landing-steps">
-            <article className="landing-step"><span className="landing-step-index">01</span><div className="landing-step-icon"><GithubOutlined /></div><h3>Connect a repository</h3><p>Sign in and choose an execution repository you administer. Review any proposed setup before confirming it.</p></article>
-            <article className="landing-step"><span className="landing-step-index">02</span><div className="landing-step-icon"><BranchesOutlined /></div><h3>Choose what to analyze</h3><p>Select a branch, pull request, or full commit SHA. Each run records the exact source revision.</p></article>
-            <article className="landing-step"><span className="landing-step-index">03</span><div className="landing-step-icon"><FileSearchOutlined /></div><h3>Follow the evidence</h3><p>See which scanners completed, inspect findings, and open the source and workflow evidence behind them.</p></article>
+            <article className="landing-step"><span className="landing-step-index">01</span><div className="landing-step-icon"><GithubOutlined /></div><h3>Sign in to the dashboard</h3><p>A dashboard collaborator can browse configured projects. Read access does not grant permission to launch or change configuration.</p></article>
+            <article className="landing-step"><span className="landing-step-index">02</span><div className="landing-step-icon"><BranchesOutlined /></div><h3>Choose a configured project</h3><p>The execution host and source identities come from the trusted service registry. Opening a project only reads its current report.</p></article>
+            <article className="landing-step"><span className="landing-step-index">03</span><div className="landing-step-icon"><FileSearchOutlined /></div><h3>Follow or launch explicitly</h3><p>Inspect scanner evidence and provenance. A separate launch action requires execution-repository write access.</p></article>
           </div>
         </section>
 

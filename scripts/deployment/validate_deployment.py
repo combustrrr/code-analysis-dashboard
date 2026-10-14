@@ -47,7 +47,21 @@ REPOSITORY_REQUIRED_SECRETS = {
     "NEXT_GITHUB_APP_PRIVATE_KEY",
     "NEXT_GITHUB_WEBHOOK_SECRET",
 }
-REPOSITORY_REQUIRED_VARS = {"NEXT_GITHUB_CLIENT_ID", "NEXT_GITHUB_APP_ID", "NEXT_GITHUB_APP_SLUG"}
+REPOSITORY_REQUIRED_VARS = {
+    "NEXT_GITHUB_CLIENT_ID",
+    "NEXT_GITHUB_APP_ID",
+    "NEXT_GITHUB_APP_SLUG",
+    "ANALYSIS_REPOSITORY",
+    "ANALYSIS_REPOSITORY_ID",
+    "DASHBOARD_ORIGIN",
+    "DASHBOARD_BASE_PATH",
+}
+REPOSITORY_EXPECTED_VARS = {
+    "ANALYSIS_REPOSITORY": "combustrrr/code-analysis-dashboard",
+    "ANALYSIS_REPOSITORY_ID": "1360051890",
+    "DASHBOARD_ORIGIN": "https://combustrrr.github.io",
+    "DASHBOARD_BASE_PATH": "/code-analysis-dashboard/",
+}
 LEGACY_REQUIRED_VARS = {"GITHUB_OAUTH_SCOPES"}
 
 
@@ -67,6 +81,8 @@ def missing_worker_configuration(config: dict) -> set[str]:
         if vars_.get("APPLICATION_MODE") == "repositories"
         else {name for name in LEGACY_REQUIRED_VARS if vars_.get(name) != "public_repo"}
     )
+    if vars_.get("APPLICATION_MODE") == "repositories":
+        missing.update(name for name, expected in REPOSITORY_EXPECTED_VARS.items() if vars_.get(name) != expected)
     declared = set(config.get("secrets", {}).get("required", []))
     missing.update(required_worker_secrets(config) - declared)
     return missing

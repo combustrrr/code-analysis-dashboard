@@ -1,30 +1,39 @@
 # Current implementation state
 
-The authoritative [new-chat handoff](../HANDOFF.md) records the verified deployment,
-source projects, producer evidence, tests and remaining work as of 2026-10-02.
+The latest verified deployed Worker is `ec340878-82e9-44c7-8105-d4053f677241`; it
+contains the GitHub Pages base-path redirect correction. The fixed-host sign-in plan
+implementation described below is present in the current working tree but has not been
+committed or deployed. Do not treat local target/API/UI changes as live behavior.
 
-Deployed: standalone Ant Design application, collaborator login, repository/profile
-configuration, direct branch/PR/full-SHA launch, durable bounded queue, current R2
-reports, explicit selected-target results, issue filtering/grouping/provenance,
-selected-project connection verification, Threat Report JSON/Markdown/PDF exports,
-and validated immutable scanner adoption. Dashboard refresh is read-only; launches
-require an explicit user action.
+The local source now fixes execution, storage and publishing to
+`combustrrr/code-analysis-dashboard` (ID `1360051890`). Its trusted registry contains
+Kavach-AgenticSOC (`1267340546`), service self-analysis (`1360051890`), and
+Agentic-Kibana (`1278177697`). Read-only collaborators can browse reports; execution
+write access is required to launch; repository admin access is required to change the
+versioned registry. Selecting a project does not trigger a workflow. The repository
+setup, arbitrary execution-host selection, and per-user App installation screens are
+removed from the repository-mode UI.
 
-Execution/storage: service repository only. Kavach upstream and Agentic-Kibana fork
-are read-only sources; service-self is connected. Scanner execution remains in Actions.
-Current report manifests/assets use Cloudflare R2, while `temp-runs/` is lifecycle-
-managed ephemeral storage. Parking-lot monitoring is removed. Pages has no report data.
+The deployed application already has same-tab GitHub OAuth with PKCE and a one-time
+Durable Object exchange. The local plan implementation also adds fixed-host project
+API validation, exact target identity checks, separate viewer/write/admin enforcement,
+and real visible-tab session rechecks. Source scans still execute only in isolated
+GitHub Actions jobs; Cloudflare Workers do not execute source code.
 
-Open exceptions: Sonar non-main-branch entitlement and upstream repository-security
-posture permissions. A successful advisory workflow is not a complete scanner report.
-Another collaborator's live login is deferred; independent external-owner installation
-is not live-proven and is outside the current Kavach-focused scope. Do not restore
-superseded fork installation or claim every scanner has usable evidence.
+Reports remain in Cloudflare R2 and service state in KV. Public Actions artifacts are
+not confidential merely because the dashboard is authenticated. The project currently
+has no claim of private artifact handling.
 
-Latest documented main rollout: commit `056eee4`; Worker version
-`182cde64-8a94-4bca-b1a2-a92854ca8fca` contains the request-idempotency fix. Pages
-deployments are triggered from main. Read the live project profile before reusing a
-tooling pin; the configured evaluation target is Kavach `Testing` at the frozen SHA
+Open exceptions remain Sonar non-main-branch entitlement and upstream repository-
+security posture permissions. A successful advisory workflow is not a complete scanner
+report. Another collaborator's live sign-in is not a verified deployment check; the
+access behavior is covered by local browser/API tests.
+
+Latest documented Pages rollout: commit `056eee4`; Pages deployments are triggered
+from main. The Worker was subsequently deployed as `ec340878-82e9-44c7-8105-d4053f677241`
+for the Pages base-path redirect fix. The current fixed-host plan changes remain local.
+Read the live project profile before reusing a tooling pin; the configured evaluation
+target is Kavach `Testing` at the frozen SHA
 `231bb41f7eb1b707e25113c258eb8d5c7356b743`.
 
 Operational safeguards: generated source and reusable workflows must be regenerated
@@ -56,13 +65,10 @@ The Cloudflare Worker was redeployed as version
 `b990585d-1412-4a8c-8c43-8abb0e096577`; its R2 bindings and origin-protected public
 configuration endpoint remain live.
 
-The repository workspace now connects execution repositories to configured source
-projects, launches explicit branch/PR/SHA requests, and retains a per-request tracker
-through publication before opening the exact report. Repository discovery failures are
-distinct from empty project lists and can be retried. Folder mapping is a separate,
-optional administrator setup path with detected roots, re-preview after edits, and an
-explicit reviewed commit. Playwright now covers one mocked end-to-end login-to-report
-journey. No live scanner request was dispatched as part of this release.
+The earlier repository workspace connected user-selected execution repositories to
+source projects and offered an optional folder-mapping setup flow. That implementation
+is superseded in the current local source by the fixed-host target registry and
+read-only viewer flow. No live scanner request has been dispatched for this plan.
 
 Portable-profile detection and validation were moved into the dedicated
 `analysis-launcher/profile-policy.mjs` module; the former duplicate inline policy and

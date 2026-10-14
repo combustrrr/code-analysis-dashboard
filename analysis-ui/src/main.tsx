@@ -1,5 +1,5 @@
 import { DashboardAccess } from './DashboardAccess';
-import { reportFetch, refreshRepositoryReports } from './repositoryReports';
+import { refreshRepositoryReports } from './repositoryReports';
 import { ProjectLauncher } from './ProjectLauncher';
 import { applicationEndpoint, repositoryJson } from './repositoryReports';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -15,7 +15,7 @@ import { AnalysisLauncher, type LaunchRequest } from './AnalysisLauncher';
 import { ThreatReport } from './ThreatReport';
 import { Settings } from './Settings';
 import { safeGithubUrl } from './safeUrls';
-import { Repositories } from './Repositories';
+import { ProjectPicker, Repositories } from './Repositories';
 import { LandingPage } from './LandingPage';
 import { AppearanceProvider, AppearanceToggle, useAppearance } from './Appearance';
 import { ProjectRunTracker, type ProjectRunRequest } from './ProjectRunTracker';
@@ -69,17 +69,6 @@ function Evidence({ detail, source, error, findings, openFinding }: { detail?: D
         </> : <Empty description={error || 'Issue evidence unavailable or loading...'}/>}</div>;
 }
 
-function ProjectPicker({repository,project}:{repository:string;project:string}) {
-  const [projects,setProjects]=useState<{id:string;source_repository:string}[]>([]);
-  const [state,setState]=useState<'loading'|'ready'|'error'>('loading');
-  const [retry,setRetry]=useState(0);
-  useEffect(()=>{if(!applicationEndpoint||!repository)return;const controller=new AbortController();setProjects([]);setState('loading');reportFetch(`${applicationEndpoint}/api/public/projects?repository=${encodeURIComponent(repository)}`,{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Project discovery unavailable');return r.json();}).then(r=>{if(!controller.signal.aborted){setProjects(r.projects);setState('ready');}}).catch(()=>{if(!controller.signal.aborted)setState('error');});return()=>controller.abort();},[repository,retry]);
-  const placeholder=state==='loading'?'Loading source projects…':state==='error'?'Could not load source projects':'No configured source projects';
-  return <Space size={6}>
-    <Select aria-label="Source project" style={{minWidth:260}} disabled={state!=='ready'||projects.length===0} loading={state==='loading'} placeholder={placeholder} value={project||undefined} options={projects.map(p=>({value:p.id,label:p.source_repository}))} onChange={value=>{location.hash=new URLSearchParams({repository,project:value,tab:'overview'}).toString();}}/>
-    {state==='error'&&<Button size="small" onClick={()=>setRetry(value=>value+1)}>Retry projects</Button>}
-  </Space>;
-}
 function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const screens = Grid.useBreakpoint();
   const { appearance } = useAppearance();
@@ -90,6 +79,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const [refreshTick, setRefreshTick] = useState(0);
   const [lastRefresh, setLastRefresh] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [hostAccess,setHostAccess]=useState<{can_launch:boolean;can_configure:boolean}>({can_launch:false,can_configure:false});
   useEffect(()=>{const refresh=()=>setRefreshTick(t=>t+1);window.addEventListener('analysis-report-published',refresh);return()=>window.removeEventListener('analysis-report-published',refresh);},[]);
   const [category, setCategory] = useState('');
   const [channelStatus, setChannelStatus] = useState('');
@@ -117,6 +107,14 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
     }, [refreshTick, r.repository, r.project]);
   const localAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint, !viewerAuth);
   const launchAuth = viewerAuth || localAuth;
+  const mayLaunch = viewerAuth ? hostAccess.can_launch : import.meta.env.VITE_APPLICATION_MODE !== 'repositories' || hostAccess.can_launch;
+  useEffect(()=>{
+    let active=true;
+    setHostAccess({can_launch:false,can_configure:false});
+    if(!launchAuth.session)return;
+    launchAuth.api<{can_launch:boolean;can_configure:boolean}>('projects').then(value=>{if(active)setHostAccess(value);}).catch(()=>{});
+    return()=>{active=false;};
+  },[launchAuth.session?.token]);
   const launched = pendingLaunch && index?.targets.find(t => t.kind === pendingLaunch.kind && (t.kind === 'pr' ? String(t.pr) === pendingLaunch.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === pendingLaunch.ref.toLowerCase() : t.branch === pendingLaunch.ref));
   const newOutput = !!(launched?.report && launched.report !== pendingLaunch?.previousReport && ['current', 'partial'].includes(launched.status));
    const launchPhase = launched?.lifecycle_status || launched?.status;
@@ -207,14 +205,14 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
    }, components: { Button: { primaryColor: appearance === 'dark' ? '#102b34' : '#ffffff' } } };
     if (!r.repository) {
       if (r.tab === 'repositories') return <ConfigProvider theme={appTheme}>
-        <header className="topbar workspace-topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap><span>Repository workspace</span><AppearanceToggle className="appearance-toggle"/></Space></header>
+        <header className="topbar workspace-topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{viewerAuth?.session&&<><span>Signed in as {viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}<span>Configured projects</span><AppearanceToggle className="appearance-toggle"/></Space></header>
         <div className="workspace-run-status">{projectRunTrackers}</div>
-        <main className="workspace-home"><div className="workspace-intro"><div className="eyebrow">CODEBASE WORKSPACE</div><h1>Connect and analyze a repository</h1><p>Choose the repository that runs the workflows, review its configured codebases, and follow each analysis through to its published evidence.</p></div><Repositories auth={launchAuth} endpoint={applicationEndpoint} onSubmitted={handleProjectSubmitted}/></main>
+        <main className="workspace-home"><div className="workspace-intro"><div className="eyebrow">CODEBASE WORKSPACE</div><h1>Choose a configured codebase</h1><p>Browse the current reports for the trusted analysis targets. Project selection is read-only; launching analysis is a separate action.</p></div><Repositories auth={launchAuth}/></main>
       </ConfigProvider>;
       return <LandingPage auth={launchAuth} onStart={() => { try { sessionStorage.setItem('analysis-workspace-requested', 'true'); } catch {} location.hash = '#tab=repositories'; }} />;
     }
     return <ConfigProvider theme={appTheme}>
-     <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}{r.repository&&<ProjectPicker repository={r.repository} project={r.project}/>}<AppearanceToggle/><Button type="primary" disabled={!!activeProjectRun} title={activeProjectRun ? 'An analysis request for this project is still active.' : undefined} onClick={() => setRunOpen(true)}>{activeProjectRun ? 'Analysis in progress' : 'Run analysis'}</Button><a href={`https://github.com/${index?.analysis_repository || 'combustrrr/code-analysis-dashboard'}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a></Space></header>
+      <header className="topbar"><a className="brand" href="#"><CodeOutlined/> Code Analysis</a><Space wrap>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}{r.repository&&<ProjectPicker auth={launchAuth} project={r.project}/>}<AppearanceToggle/>{mayLaunch&&<Button type="primary" disabled={!!activeProjectRun} title={activeProjectRun ? 'An analysis request for this project is still active.' : undefined} onClick={() => setRunOpen(true)}>{activeProjectRun ? 'Analysis in progress' : 'Run analysis'}</Button>}{index?.analysis_repository&&<a href={`https://github.com/${index.analysis_repository}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a>}</Space></header>
      <div className="project-run-status">{projectRunTrackers}</div>
      {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} close={() => setRunOpen(false)} onSubmitted={handleProjectSubmitted}/>}
     {runOpen && !(r.repository && r.project) && <AnalysisLauncher
@@ -261,8 +259,8 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
          return <Alert showIcon type={isNoCurrent ? 'info' : 'error'} title={isRepositoryUnavailable ? 'Repository unavailable' : isNoCurrent ? 'No current report yet' : 'Report service error'} description={isRepositoryUnavailable ? (r.repository || 'This repository') + ' is retired or unsupported by the live analysis service. No other repository was selected.' : isNoCurrent ? 'Run analysis to generate the first report for this target.' : desc}/>;
       })()}
        {report && (target?.status === 'failed' || !fresh || report.status === 'partial') && <Alert showIcon type="warning" title={target?.status === 'failed' ? 'Showing last successful report' : !fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={target?.status === 'failed' ? `The newer analysis failed. These findings belong to commit ${report.analyzed_sha} and are retained as the last successful report; inspect the failure above before treating them as current.` : !fresh ? 'These findings belong to the older analyzed commit shown above.' : `Available findings are shown. Incomplete scanners: ${report.channels.filter(c=>!['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE','DEFERRED'].includes(c.status)).map(c=>c.name).join(', ') || 'see Scanners for evidence details'}. Open Scanners for the failure reason.`}/>}
-       <Tabs activeKey={r.tab} onChange={tab => navigate(target?.id || '', tab)} items={['overview', 'threat-report', 'issues', 'scanners', 'settings'].map(tab => ({ key: tab, label: tab === 'threat-report' ? 'Threat Report' : tab[0].toUpperCase() + tab.slice(1) + (tab === 'issues' && report ? ` (${report.finding_count.toLocaleString()})` : '') }))}/>
-       {r.tab === 'settings' ? <Settings auth={launchAuth} repository={r.repository} project={r.project} source={index?.source_repository || index?.targets[0]?.repository} host={index?.analysis_repository} publisher={index?.publishing_repository} endpoint={applicationEndpoint || index?.launch_endpoint} start={() => setRunOpen(true)} report={report} target={target} index={index}/> : r.tab === 'threat-report' && target?.report ? <ThreatReport reportPath={target.report} targetSha={target.head_sha}/> : !report ? <div className="empty" role="status"><Empty description={loading ? 'Loading the selected report...' : r.target && !target ? 'Target no longer active' : 'No report available yet'}/></div> : <>
+        <Tabs activeKey={r.tab} onChange={tab => navigate(target?.id || '', tab)} items={['overview', 'threat-report', 'issues', 'scanners', 'settings'].map(tab => ({ key: tab, label: tab === 'threat-report' ? 'Threat Report' : tab === 'settings' ? 'Readiness' : tab[0].toUpperCase() + tab.slice(1) + (tab === 'issues' && report ? ` (${report.finding_count.toLocaleString()})` : '') }))}/>
+        {r.tab === 'settings' ? <Settings auth={launchAuth} repository={r.repository} project={r.project} source={index?.source_repository || index?.targets[0]?.repository} host={index?.analysis_repository} publisher={index?.publishing_repository} endpoint={applicationEndpoint || index?.launch_endpoint} start={() => setRunOpen(true)} canLaunch={mayLaunch} report={report} target={target} index={index}/> : r.tab === 'threat-report' && target?.report ? <ThreatReport reportPath={target.report} targetSha={target.head_sha}/> : !report ? <div className="empty" role="status"><Empty description={loading ? 'Loading the selected report...' : r.target && !target ? 'Target no longer active' : 'No report available yet'}/></div> : <>
         {r.tab === 'overview' && <>
           <section className="metrics">{['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(s => <div key={s}><Statistic title={<Badge value={s}/>} value={report.severities[s] || 0}/><Button type="link" onClick={() => { resetFilters();setSeverity(s); navigate(target!.id, 'issues'); }}>View findings</Button></div>)}</section>
           <section className="summary"><div><h2>Reported issues</h2><p>{report.finding_count.toLocaleString()} findings from {report.observation_count.toLocaleString()} scanner observations.</p><p>Inspect the rule, exact source location, and evidence behind each finding.</p><Button type="primary" onClick={() => { resetFilters(); navigate(target!.id, 'issues'); }}>Browse issues</Button></div>

@@ -11,5 +11,7 @@ Authoritative current-state material for the deployed service.
 | Launch flow | [Authenticated launching](AUTHENTICATED_LAUNCHING.md) |
 | Threat reports | [Threat reports](THREAT_REPORTS.md) |
 
-The current service targets `ARYDESTROYER/Kavach-AgenticSOC` as a read-only source.
-Do not infer support for future roadmap items from implementation documents.
+The checked-in project registry targets `ARYDESTROYER/Kavach-AgenticSOC` and
+`combustrrr/code-analysis-dashboard`. Read-only launch and storage boundaries are
+documented in [the operations runbook](../operations/READ_ONLY_ANALYSIS.md). Do not
+infer support for future roadmap items from implementation documents.
