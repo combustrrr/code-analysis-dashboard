@@ -26,9 +26,10 @@ test('view access requires login and clears on logout',async({page,context})=>{
   const u=new URL(route.request().url());const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(u.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
-  if(u.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${u.searchParams.get('nonce')}',token:'opaque-session',login:'combustrrr'},'http://127.0.0.1:4178');window.close();</script>`});
+   if(u.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+   if(u.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'opaque-session',login:'combustrrr'}});
   expect(route.request().headers().authorization).toBe('Bearer opaque-session');
-  if(u.pathname==='/api/session')return route.fulfill({headers,status:allowed?200:403,json:allowed?{login:'combustrrr'}:{error:'Account not authorized'}});
+   if(u.pathname==='/api/session')return route.fulfill({headers,status:allowed?200:403,json:allowed?{login:'combustrrr'}:{error:'Account not authorized',code:'viewer_not_authorized'}});
   reports++;return route.fulfill({headers,json:u.pathname.endsWith('projects')?{projects:[]}:{schema_version:'analysis-current-v1',analysis_repository:'owner/repo',project_id:'1',targets:[]}});
  });
  await page.goto('/#repository=owner%2Frepo&project=1');
@@ -37,7 +38,62 @@ test('view access requires login and clears on logout',async({page,context})=>{
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
  await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toBeVisible();await expect.poll(()=>reports).toBeGreaterThan(0);
  await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toHaveCount(0);
- allowed=false;await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();await expect(page.getByText('Error: Account not authorized')).toBeVisible();await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toHaveCount(0);
+  allowed=false;await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();await expect(page.getByText(/Ask a dashboard maintainer to invite your account/)).toBeVisible();await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toHaveCount(0);
+ });
+
+test('cancellation and exchange failures stay on the public shell',async({page,context})=>{
+ test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+ const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+ let attempts=0;let sessionChecks=0;let reportRequests=0;
+ await context.route('https://launcher.example/**',async route=>{
+  const url=new URL(route.request().url());
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true,require_report_login:true}});
+  if(url.pathname==='/auth/login'){
+   attempts++;
+   const callback=attempts===1?'#analysis_auth_error=cancelled':`#analysis_auth=${'e'.repeat(43)}`;
+   return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/${callback}`}});
+  }
+  if(url.pathname==='/api/auth/redeem')return route.fulfill({status:503,headers,json:{error:'private store diagnostic',code:'exchange_store_unavailable'}});
+  if(url.pathname==='/api/session'){sessionChecks++;return route.fulfill({headers,json:{login:'developer'}});}
+  reportRequests++;
+  return route.fulfill({status:200,headers,json:{targets:[],projects:[]}});
+ });
+ await page.goto('/#tab=repositories');
+ const signIn=page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/});
+ await signIn.click();
+ await expect(page.getByText('GitHub sign-in was cancelled. Retry when you are ready.')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Connect and analyze a repository'})).toHaveCount(0);
+ await signIn.click();
+ await expect(page.getByText('GitHub sign-in could not be completed. Check your connection and retry.')).toBeVisible();
+ await expect(page.getByText('private store diagnostic')).toHaveCount(0);
+ expect(sessionChecks).toBe(0);expect(reportRequests).toBe(0);
+});
+
+test('a revoked workspace API request clears the session immediately',async({page,context})=>{
+ test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+ const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+ let revoked=false;let reportRequests=0;
+ await context.route('https://launcher.example/**',async route=>{
+  const url=new URL(route.request().url());
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true,require_report_login:true}});
+  if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`} });
+  if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'revoked-session',login:'developer'}});
+  expect(route.request().headers().authorization).toBe('Bearer revoked-session');
+  if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
+  if(url.pathname==='/api/repositories')return route.fulfill({headers,status:revoked?403:200,json:revoked?{code:'viewer_not_authorized'}:{repositories:[],has_more:false}});
+  reportRequests++;
+  return route.fulfill({headers,status:200,json:{targets:[],projects:[]}});
+ });
+ await page.goto('/#tab=repositories');
+ await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
+ await page.getByRole('button',{name:/Load repositories|Refresh repositories/}).waitFor();
+ revoked=true;
+ await page.getByRole('button',{name:/Load repositories|Refresh repositories/}).click();
+ await expect(page.getByText('Access expired or was revoked. Sign in with an authorized GitHub account.')).toBeVisible();
+ await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
+ expect(reportRequests).toBe(0);
 });
 
 test('repository deep links open the authenticated workspace with a shared theme',async({page,context})=>{
@@ -47,7 +103,8 @@ test('repository deep links open the authenticated workspace with a shared theme
   const url=new URL(route.request().url());
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true,installation_url:null}});
-  if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'workspace-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'workspace-session',login:'developer'}});
   expect(route.request().headers().authorization).toBe('Bearer workspace-session');
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
   if(url.pathname==='/api/repositories')return route.fulfill({headers,json:{repositories:[],has_more:false}});
@@ -88,22 +145,55 @@ test('workspace intent survives a transient hash reset while GitHub access is ch
   const url=new URL(route.request().url());
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
-  if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'workspace-intent',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'workspace-intent',login:'developer'}});
   expect(route.request().headers().authorization).toBe('Bearer workspace-intent');
   if(url.pathname==='/api/session') { notifySessionCheck();await sessionGate;return route.fulfill({headers,json:{login:'developer'}}); }
   if(url.pathname==='/api/repositories')return route.fulfill({headers,json:{repositories:[],has_more:false}});
   throw new Error(`Unexpected request ${url.pathname}`);
  });
- await page.goto('/');
+ await page.goto('/#tab=repositories');
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
  await sessionCheckStarted;
- await page.locator('.landing-actions').getByRole('button',{name:'Open workspace'}).click();
- await expect(page.locator('.landing-actions').getByRole('button',{name:'Checking GitHub access…'})).toBeDisabled();
  await page.evaluate(()=>{location.hash='';});
  releaseSessionCheck();
  await expect(page.getByRole('heading',{name:'Connect and analyze a repository'})).toBeVisible({timeout:10000});
   await expect(page).toHaveURL(/#tab=repositories$/);
+  });
+
+test('reloads and new tabs require a fresh in-memory sign-in',async({page,context})=>{
+ test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+ const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+ let sessionChecks=0;
+ await context.route('https://launcher.example/**',async route=>{
+  const url=new URL(route.request().url());
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true,require_report_login:true}});
+  if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+  if(url.pathname==='/api/auth/redeem'){
+   const body=route.request().postDataJSON();expect(body.code).toBe('e'.repeat(43));expect(body.verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+   return route.fulfill({headers,json:{token:'memory-only-session',login:'developer'}});
+  }
+  expect(route.request().headers().authorization).toBe('Bearer memory-only-session');
+  if(url.pathname==='/api/session'){sessionChecks++;return route.fulfill({headers,json:{login:'developer'}});}
+  if(url.pathname==='/api/repositories')return route.fulfill({headers,json:{repositories:[],has_more:false}});
+  throw new Error(`Unexpected request ${url.pathname}`);
  });
+ await page.goto('/#tab=repositories');
+ await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
+ await expect(page.getByRole('heading',{name:'Connect and analyze a repository'})).toBeVisible();
+ await expect(page).toHaveURL(/#tab=repositories$/);
+ expect(page.url()).not.toContain('analysis_auth');
+ expect(await page.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('memory-only-session');
+ expect(await page.evaluate(()=>sessionStorage.getItem('analysis-auth-verifier'))).toBeNull();
+ await page.reload();
+ await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
+ expect(sessionChecks).toBe(1);
+ const anotherTab=await context.newPage();
+ await anotherTab.goto('/#tab=repositories');
+ await expect(anotherTab.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
+ expect(sessionChecks).toBe(1);
+});
 
 test('authorized user follows one repository project from selection through publication',async({page,context})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
@@ -117,7 +207,8 @@ test('authorized user follows one repository project from selection through publ
   const url=new URL(route.request().url());
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
-  if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'flow-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'flow-session',login:'developer'}});
   expect(route.request().headers().authorization).toBe('Bearer flow-session');
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
   if(url.pathname==='/api/repositories')return route.fulfill({headers,json:{repositories:[{id:7,full_name:execution,can_configure:true}],has_more:false}});

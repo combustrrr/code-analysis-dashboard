@@ -1,9 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker, { seal, unseal } from './worker.mjs';
+import {AuthExchangeStore} from './auth-exchange.mjs';
 
 const env = { SOURCE_REPOSITORY: 'source/app', ANALYSIS_REPOSITORY: 'host/scanners', DASHBOARD_ORIGIN: 'https://owner.github.io', GITHUB_CLIENT_ID: 'app-id', GITHUB_CLIENT_SECRET: 'test-secret', GITHUB_OAUTH_SCOPES: 'public_repo', SESSION_KEY: Buffer.alloc(32, 7).toString('base64url') };
 const reply = value => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
+function exchangeBinding() {
+  const objects = new Map();
+  return {
+    idFromName: name => name,
+    get(id) {
+      if (!objects.has(id)) {
+        const values = new Map(); let tail = Promise.resolve();
+        const storage = {
+          get: key => values.get(key), put: (key, value) => values.set(key, value), delete: key => values.delete(key), setAlarm: async () => {},
+          transaction: async fn => { const previous = tail; let release; tail = new Promise(resolve => { release = resolve; }); await previous; try { return await fn(storage); } finally { release(); } },
+        };
+        const store = new AuthExchangeStore({ storage });
+        objects.set(id, { fetch: request => store.fetch(request) });
+      }
+      return objects.get(id);
+    },
+  };
+}
+async function oauthChallenge(verifier) {
+  return Buffer.from(await crypto.subtle.digest('SHA-256', Buffer.from(verifier))).toString('base64url');
+}
 async function request(path, body, overrides = {}) {
   const session = await seal({ type: 'session', token: 'github-test-token', exp: Date.now() + 60000 }, env.SESSION_KEY);
   return new Request(`https://launcher.example${path}`, { method: body ? 'POST' : 'GET', headers: { Origin: env.DASHBOARD_ORIGIN, Authorization: `Bearer ${session}`, 'Content-Type': 'application/json', ...overrides }, ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -65,28 +87,84 @@ test('target discovery paginates and attributes fork PR source and base', async 
   assert.equal(data.targets.at(-1).source_repository, 'fork/app');
   assert.equal(data.targets.at(-1).base_branch, 'main');
 });
-test('OAuth binds callback to cookie and nonce, uses PKCE and exposes only encrypted session', async t => {
-  const nonce = 'a'.repeat(64);
-  const login = await worker.fetch(new Request(`https://launcher.example/auth/login?nonce=${nonce}`), env);
+test('same-tab OAuth uses state, PKCE and a verifier-bound one-time exchange', async t => {
+  const verifier = 'v'.repeat(43); const challenge = await oauthChallenge(verifier); const exchanges = exchangeBinding();
+  const authEnv = { ...env, REPORT_ACCESS: 'public', AUTH_EXCHANGES: exchanges };
+  const login = await worker.fetch(new Request(`https://launcher.example/auth/login?challenge=${challenge}`), authEnv);
   assert.equal(login.status, 302);
   const location = new URL(login.headers.get('Location'));
   assert.equal(location.searchParams.get('code_challenge_method'), 'S256');
   assert.equal(location.searchParams.get('scope'), 'public_repo');
   assert.ok(login.headers.get('Set-Cookie').includes('HttpOnly; SameSite=Lax'));
   const cookie = login.headers.get('Set-Cookie').split(';')[0];
+  const pending = await unseal(cookie.split('=')[1], env.SESSION_KEY, 'oauth');
+  assert.equal(location.searchParams.get('code_challenge'), await oauthChallenge(pending.verifier));
+  assert.notEqual(location.searchParams.get('code_challenge'), challenge);
   const wrong = await worker.fetch(new Request('https://launcher.example/auth/callback?code=x&state=wrong', { headers: { Cookie: cookie } }), env);
-  assert.equal(wrong.status, 401);
+  assert.equal(wrong.status, 302); assert.equal(new URL(wrong.headers.get('Location')).hash, '#analysis_auth_error=retry');
   t.mock.method(globalThis, 'fetch', async url => url.includes('access_token') ? reply({ access_token: 'never-show-github-token' }) : url.endsWith('/user') ? reply({ login: 'developer' }) : reply({ permissions: { push: true } }));
-  const response = await worker.fetch(new Request(`https://launcher.example/auth/callback?code=x&state=${location.searchParams.get('state')}`, { headers: { Cookie: cookie } }), env);
-  const html = await response.text();
-  assert.equal(response.status, 200); assert.ok(!html.includes('never-show-github-token'));
-  assert.ok(html.includes(nonce)); assert.ok(html.includes('https://owner.github.io'));
-  assert.ok(response.headers.get('Content-Security-Policy').includes("default-src 'none'"));
-  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  const response = await worker.fetch(new Request(`https://launcher.example/auth/callback?code=x&state=${location.searchParams.get('state')}`, { headers: { Cookie: cookie } }), authEnv);
+  const returnUrl = new URL(response.headers.get('Location'));
+  assert.equal(response.status, 302); assert.equal(returnUrl.origin, env.DASHBOARD_ORIGIN); assert.match(returnUrl.hash, /^#analysis_auth=[A-Za-z0-9_-]{43}$/);
+  assert.ok(!returnUrl.href.includes('never-show-github-token')); assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  const code = new URLSearchParams(returnUrl.hash.slice(1)).get('analysis_auth');
+  const redeem = () => worker.fetch(new Request('https://launcher.example/api/auth/redeem', { method: 'POST', headers: { Origin: env.DASHBOARD_ORIGIN, 'Content-Type': 'application/json' }, body: JSON.stringify({ code, verifier }) }), authEnv);
+  const wrongVerifier = await worker.fetch(new Request('https://launcher.example/api/auth/redeem', { method: 'POST', headers: { Origin: env.DASHBOARD_ORIGIN, 'Content-Type': 'application/json' }, body: JSON.stringify({ code, verifier: 'x'.repeat(43) }) }), authEnv);
+  assert.equal(wrongVerifier.status, 401);
+  const redeemed = await redeem(); const session = await redeemed.json();
+  assert.equal(redeemed.status, 200); assert.equal(redeemed.headers.get('Cache-Control'), 'no-store');
+  assert.equal(session.login, 'developer'); assert.ok(!session.token.includes('never-show-github-token'));
+  const replay = await redeem(); assert.equal(replay.status, 401); assert.equal((await replay.json()).code, 'exchange_invalid');
+});
+
+test('OAuth cancellation and unauthorized collaborators return safe dashboard errors', async t => {
+  const mode={...env,APPLICATION_MODE:'repositories',DASHBOARD_ACCESS:'allowlist',DASHBOARD_ALLOWED_USERS:'maintainer',REPORT_ACCESS:'public'};
+  t.mock.method(globalThis,'fetch',async url=>String(url).includes('access_token')?reply({access_token:'github-token'}):reply({login:'developer'}));
+  const makeLogin=async()=>{
+    const login=await worker.fetch(new Request(`https://launcher.example/auth/login?challenge=${'c'.repeat(43)}`),mode);
+    return {url:new URL(login.headers.get('Location')),cookie:login.headers.get('Set-Cookie').split(';')[0]};
+  };
+  const denied=await makeLogin();
+  const denial=await worker.fetch(new Request(`https://launcher.example/auth/callback?code=oauth&state=${denied.url.searchParams.get('state')}`,{headers:{Cookie:denied.cookie}}),mode);
+  assert.equal(new URL(denial.headers.get('Location')).hash,'#analysis_auth_error=not_authorized');
+  const cancelled=await makeLogin();
+  const cancel=await worker.fetch(new Request(`https://launcher.example/auth/callback?error=access_denied&state=${cancelled.url.searchParams.get('state')}`,{headers:{Cookie:cancelled.cookie}}),mode);
+  assert.equal(new URL(cancel.headers.get('Location')).hash,'#analysis_auth_error=cancelled');
+});
+
+test('authorized OAuth fails closed when one-time exchange storage is unavailable', async t => {
+  const mode={...env,APPLICATION_MODE:'repositories',DASHBOARD_ACCESS:'disabled',REPORT_ACCESS:'public'};
+  t.mock.method(globalThis,'fetch',async url=>String(url).includes('access_token')?reply({access_token:'github-token'}):reply({login:'developer'}));
+  const login=await worker.fetch(new Request(`https://launcher.example/auth/login?challenge=${'c'.repeat(43)}`),mode);
+  const cookie=login.headers.get('Set-Cookie').split(';')[0];
+  const state=new URL(login.headers.get('Location')).searchParams.get('state');
+  const callback=await worker.fetch(new Request(`https://launcher.example/auth/callback?code=oauth&state=${state}`,{headers:{Cookie:cookie}}),mode);
+  assert.equal(new URL(callback.headers.get('Location')).hash,'#analysis_auth_error=retry');
+  assert.equal(callback.headers.get('Cache-Control'),'no-store');
+});
+
+test('Durable Object exchange rejects wrong verifier, expiry and concurrent replay', async t => {
+  let now = 1000;
+  t.mock.method(Date, 'now', () => now);
+  const values = new Map(); let tail = Promise.resolve();
+  const storage = {
+    get: key => values.get(key), put: (key, value) => values.set(key, value), delete: key => values.delete(key), setAlarm: async () => {},
+    transaction: async fn => { const previous = tail; let release; tail = new Promise(resolve => { release = resolve; }); await previous; try { return await fn(storage); } finally { release(); } },
+  };
+  const store = new AuthExchangeStore({ storage });
+  const post = (path, body) => store.fetch(new Request(`https://exchange${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+  const record = { verifier_hash: 'h'.repeat(43), token: 't'.repeat(43), login: 'developer' };
+  await post('/issue', record);
+  assert.equal((await post('/consume', { verifier_hash: 'x'.repeat(43) })).status, 401);
+  const outcomes = await Promise.all([post('/consume', { verifier_hash: record.verifier_hash }), post('/consume', { verifier_hash: record.verifier_hash })]);
+  assert.deepEqual(outcomes.map(response => response.status).sort(), [200, 404]);
+  await post('/issue', record);
+  now += 120_001;
+  assert.equal((await post('/consume', { verifier_hash: record.verifier_hash })).status, 410);
 });
 test('repository App authorization omits OAuth scopes', async () => {
   const mode = { ...env, APPLICATION_MODE: 'repositories', ANALYSIS_REPOSITORY: 'host/scanners', GITHUB_APP_SLUG: 'code-analysis-dashboard' };
-  const login = await worker.fetch(new Request(`https://launcher.example/auth/login?nonce=${'a'.repeat(64)}`), mode);
+  const login = await worker.fetch(new Request(`https://launcher.example/auth/login?challenge=${'a'.repeat(43)}`), mode);
   assert.equal(login.status, 302);
   assert.equal(new URL(login.headers.get('Location')).searchParams.has('scope'), false);
 });
@@ -135,10 +213,10 @@ test('allowlisted reports require authentication before any report fetch',async 
 });
 test('viewer authorization is case insensitive and rechecked after removal',async t=>{
  t.mock.method(globalThis,'fetch',async url=>{assert.equal(url,'https://api.github.com/user');return reply({login:'Combustrrr'});});
- const restricted={...env,APPLICATION_MODE:'repositories',DASHBOARD_ACCESS:'allowlist',DASHBOARD_ALLOWED_USERS:' combustrrr '};
+  const restricted={...env,APPLICATION_MODE:'repositories',DASHBOARD_ACCESS:'allowlist',DASHBOARD_ALLOWED_USERS:' combustrrr ',REPORT_ACCESS:'public'};
  assert.equal((await worker.fetch(await request('/api/session'),restricted)).status,200);
  assert.equal((await worker.fetch(await request('/api/session'),{...restricted,DASHBOARD_ALLOWED_USERS:'another-user'})).status,403);
- assert.equal((await worker.fetch(await request('/api/public/manifest?repository=host/scanners&project_id=1'),{...restricted,DASHBOARD_ALLOWED_USERS:''})).status,403);
+  assert.equal((await worker.fetch(await request('/api/repositories'),{...restricted,DASHBOARD_ALLOWED_USERS:''})).status,403);
 });
 test('allowlisted viewer still needs repository write access to launch',async t=>{
  t.mock.method(globalThis,'fetch',async url=>reply(url.endsWith('/user')?{login:'combustrrr'}:{permissions:{pull:true,push:false}}));
@@ -193,6 +271,42 @@ test('state and report writes are bounded per endpoint', async () => {
   const assetDenied = await worker.fetch(apiRequest('/api/report/analysis-current-1/analysis-' + 'a'.repeat(64) + '.json.gz', 'x'.repeat(512)), bounded);
   assert.equal(assetDenied.status, 413);
   assert.equal(reports.store.size, 1);
+});
+test('report authorization remains collaborator-only when dashboard sign-in is disabled',async t=>{
+ const pair=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
+ const pem=Buffer.from(await crypto.subtle.exportKey('pkcs8',pair.privateKey)).toString('base64');
+ const config={execution_repository:{id:9},projects:[{id:1}]};
+ const manifest={schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'host/scanners',checked_at:new Date().toISOString(),targets:[]};
+ let reportReads=0;const githubCalls=[];
+ t.mock.method(globalThis,'fetch',async(url,init)=>{
+  const target=String(url);
+  githubCalls.push(target);
+  if(target==='https://api.github.com/user')return reply({login:'viewer'});
+  if(target.endsWith('/repos/host/scanners/installation'))return reply({id:9});
+  if(target.endsWith('/app/installations/9/access_tokens'))return reply({token:'scoped-viewer'});
+  if(target.endsWith('/repos/host/scanners/collaborators/viewer'))return new Response(null,{status:204});
+  if(target==='https://api.github.com/repos/host/scanners')return reply({id:9,full_name:'host/scanners',private:false,default_branch:'main'});
+  if(target.includes('/contents/.github/code-analysis/projects.json'))return reply({content:Buffer.from(JSON.stringify(config)).toString('base64')});
+  throw new Error(`Unexpected GitHub request: ${target}`);
+ });
+ const protectedEnv={...env,APPLICATION_MODE:'repositories',DASHBOARD_ACCESS:'',REPORT_ACCESS:'collaborators',GITHUB_APP_ID:'report-app',GITHUB_APP_PRIVATE_KEY:pem,ANALYSIS_REPOSITORY:'host/scanners',ANALYSIS_REPORTS:{async get(){reportReads++;return{json:async()=>manifest};}}};
+ const path='/api/public/manifest?repository=host/scanners&project_id=1';
+ assert.equal((await worker.fetch(new Request(`https://launcher.example${path}`,{headers:{Origin:env.DASHBOARD_ORIGIN}}),protectedEnv)).status,401);
+ assert.equal(reportReads,0);
+ const allowed=await worker.fetch(await request(path,undefined),protectedEnv);
+ assert.equal(allowed.status,200,`${await allowed.clone().text()} ${githubCalls.join(' | ')}`);assert.equal(allowed.headers.get('Cache-Control'),'private, no-store');assert.equal((await allowed.json()).project_id,'1');assert.equal(reportReads,1);
+ const configResponse=await worker.fetch(new Request('https://launcher.example/api/public/config'),protectedEnv);
+ assert.deepEqual(await configResponse.json(),{mode:'repositories',require_login:false,require_report_login:true,installation_url:null});
+ const publicEnv={...protectedEnv,REPORT_ACCESS:'public'};
+ const anonymous=await worker.fetch(new Request(`https://launcher.example${path}`),publicEnv);
+ assert.equal(anonymous.status,200);assert.equal(anonymous.headers.get('Cache-Control'),'public, max-age=60');assert.equal(reportReads,2);
+ const publicConfig=await worker.fetch(new Request('https://launcher.example/api/public/config'),publicEnv);
+ assert.deepEqual(await publicConfig.json(),{mode:'repositories',require_login:false,require_report_login:false,installation_url:null});
+ const restrictedPublicReports={...protectedEnv,DASHBOARD_ACCESS:'collaborators',REPORT_ACCESS:'public'};
+ const explicitlyPublic=await worker.fetch(new Request(`https://launcher.example${path}`),restrictedPublicReports);
+ assert.equal(explicitlyPublic.status,200);assert.equal(explicitlyPublic.headers.get('Cache-Control'),'private, no-store');assert.equal(reportReads,3);
+ const protectedDashboard=await worker.fetch(new Request('https://launcher.example/api/repositories',{headers:{Origin:env.DASHBOARD_ORIGIN}}),restrictedPublicReports);
+ assert.equal(protectedDashboard.status,401);
 });
 test('launch bodies above the endpoint budget are rejected', async t => {
   t.mock.method(globalThis, 'fetch', async () => reply({ permissions: { push: true }, default_branch: 'main' }));

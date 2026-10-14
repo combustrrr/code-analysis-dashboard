@@ -107,13 +107,15 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
       let timer: number | undefined;
       if (r.repository && r.project) {
         refresh(); timer = window.setInterval(refresh, 60000);
+      } else if (r.tab === 'repositories' && !r.repository && !applicationEndpoint) {
+        json<Index>('data/index.json', c.signal).then(value => { if (sequence === refreshSequence.current) { setIndex(value); setError(''); } }).catch(e => { if (e.name !== 'AbortError' && sequence === refreshSequence.current) { setIndex(undefined); setError(e.message); } });
       } else {
         setIndex(undefined); setError(''); setLastRefresh(''); setRefreshing(false);
       }
       window.addEventListener('hashchange', change);
       return () => { c.abort(); if (timer !== undefined) window.clearInterval(timer); window.removeEventListener('hashchange', change); };
     }, [refreshTick, r.repository, r.project]);
-  const localAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint);
+  const localAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint, !viewerAuth);
   const launchAuth = viewerAuth || localAuth;
   const launched = pendingLaunch && index?.targets.find(t => t.kind === pendingLaunch.kind && (t.kind === 'pr' ? String(t.pr) === pendingLaunch.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === pendingLaunch.ref.toLowerCase() : t.branch === pendingLaunch.ref));
   const newOutput = !!(launched?.report && launched.report !== pendingLaunch?.previousReport && ['current', 'partial'].includes(launched.status));
@@ -324,7 +326,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
 }
 if(import.meta.env.VITE_APPLICATION_MODE!=='repositories') {
   const parameters=new URLSearchParams(location.hash.slice(1));
-  if(!parameters.has('repository')) {
+  if(!parameters.has('repository')&&parameters.get('tab')!=='repositories'&&!parameters.has('analysis_auth')&&!parameters.has('analysis_auth_error')) {
     parameters.set('repository',import.meta.env.VITE_DEFAULT_EXECUTION_REPOSITORY||'combustrrr/code-analysis-dashboard');
     parameters.set('project',import.meta.env.VITE_DEFAULT_PROJECT_ID||'1360051890');
     history.replaceState(null,'','#'+parameters.toString());

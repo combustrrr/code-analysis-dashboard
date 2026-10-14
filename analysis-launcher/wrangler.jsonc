@@ -14,6 +14,7 @@
     "NEXT_GITHUB_APP_SLUG": "code-analysis-dashboard",
     "APPLICATION_MODE": "repositories",
     "DASHBOARD_ACCESS": "collaborators",
+    "REPORT_ACCESS": "collaborators",
     "GITHUB_OAUTH_SCOPES": "public_repo",
     "TOOLING_FROM_SERVICE": "true",
     "TOOLING_SHA": "0ff77f8530c0f7c60b78f10c14d1ebe8216f2daf",
@@ -51,6 +52,20 @@
     {
       "binding": "ANALYSIS_REPORTS",
       "bucket_name": "code-analysis-reports"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUTH_EXCHANGES",
+        "class_name": "AuthExchangeStore"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AuthExchangeStore"]
     }
   ],
   "observability": {

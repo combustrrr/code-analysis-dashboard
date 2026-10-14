@@ -1,6 +1,6 @@
 import {useEffect,useState,type ReactNode} from 'react';
 import {Alert,Button,ConfigProvider,Segmented,Space,theme} from 'antd';
-import {useLaunchAuth} from './useLaunchAuth';
+import {pendingAuthDestination,restoreAuthDestination,useLaunchAuth} from './useLaunchAuth';
 import {applicationEndpoint,setReportSession} from './repositoryReports';
 
 export function DashboardAccess({children,publicFallback}:{children:(auth?:ReturnType<typeof useLaunchAuth>)=>ReactNode;publicFallback?:(auth:ReturnType<typeof useLaunchAuth>,accessError?:string,accessPending?:boolean,workspaceRequested?:boolean)=>ReactNode}) {
@@ -8,10 +8,10 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
  const [required,setRequired]=useState<boolean>();
   const [verified,setVerified]=useState<string>();
   const [error,setError]=useState('');
-  const [workspaceRequested,setWorkspaceRequested]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories');
+  const [workspaceRequested,setWorkspaceRequested]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories'||new URLSearchParams((pendingAuthDestination()||'').split('#')[1]||'').get('tab')==='repositories');
  const [dark,setDark]=useState(()=>localStorage.getItem('analysis-theme')!=='light');
   useEffect(()=>{if(!applicationEndpoint)return;let active=true;
-  fetch(applicationEndpoint+'/api/public/config',{cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error('Access configuration unavailable.');return r.json();}).then(c=>{if(active)setRequired(c.require_login===true);}).catch(()=>{if(active)setError('Could not verify dashboard access. Reload to retry.');});return()=>{active=false;};
+   fetch(applicationEndpoint+'/api/public/config',{cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error('Access configuration unavailable.');return r.json();}).then(c=>{if(active)setRequired(c.require_login===true||c.require_report_login===true);}).catch(()=>{if(active)setError('Could not verify dashboard access. Reload to retry.');});return()=>{active=false;};
   },[]);
   useEffect(()=>{
    const update=()=>setWorkspaceRequested(new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories');
@@ -20,20 +20,24 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
   },[]);
   useEffect(()=>{setVerified(undefined);setReportSession(undefined);if(!required||!auth.session)return;
   let active=true;const token=auth.session.token;
-  const verify=async()=>{try {await auth.api('session');if(active){setReportSession(token);setVerified(token);setError('');}}catch(e){if(active){setReportSession(undefined);setVerified(undefined);setError(String(e));}}};
+   const verify=async()=>{try {if(!auth.verified)await auth.api('session');if(active){setReportSession(token);setVerified(token);setError('');}}catch(e){if(active){setReportSession(undefined);setVerified(undefined);setError(e instanceof Error?e.message:'GitHub access could not be verified.');restoreAuthDestination();auth.signOut();}}};
   const denied=()=>{setReportSession(undefined);setVerified(undefined);setError('Access expired or was revoked. Sign in with an authorized GitHub account.');auth.signOut();};
   void verify();const timer=window.setInterval(()=>{if(!document.hidden)void verify();},15000);window.addEventListener('analysis-access-denied',denied);
   return()=>{active=false;clearInterval(timer);window.removeEventListener('analysis-access-denied',denied);setReportSession(undefined);};
-  },[required,auth.session?.token]);
+   },[required,auth.session?.token,auth.verified]);
   useEffect(()=>{
    if(!auth.session||verified!==auth.session.token)return;
    try {
-    if(sessionStorage.getItem('analysis-workspace-requested')==='true' && new URLSearchParams(location.hash.slice(1)).get('tab')!=='repositories') {
-     location.hash='#tab=repositories';
-    }
+     const restored=restoreAuthDestination();
+     if(sessionStorage.getItem('analysis-workspace-requested')==='true') {
+      sessionStorage.removeItem('analysis-workspace-requested');
+      if(new URLSearchParams(location.hash.slice(1)).get('tab')!=='repositories')location.hash='#tab=repositories';
+      setWorkspaceRequested(true);
+     } else if(restored) setWorkspaceRequested(new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories');
    } catch {}
   },[auth.session?.token,verified]);
-  if(!applicationEndpoint||required===false)return children();
+   if(!applicationEndpoint)return children(auth.available?auth:undefined);
+   if(required===false)return children();
   if(auth.session&&verified===auth.session.token)return children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}});
   if(publicFallback)return publicFallback(auth,error,required===true&&!!auth.session&&verified!==auth.session.token&&!error,workspaceRequested);
   return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm}}><main className={`dashboard-access ${dark?'dashboard-access-dark':'dashboard-access-light'}`}><section>

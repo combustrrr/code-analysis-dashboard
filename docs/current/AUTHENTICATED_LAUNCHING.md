@@ -16,6 +16,29 @@ The dashboard never launches automatically on refresh. A launch is explicit, and
 duplicate deterministic request returns the already-persisted queue asset rather than
 creating a second dispatch.
 
+## Dashboard sign-in and report visibility
+
+GitHub sign-in is a same-tab redirect. The Worker validates OAuth state and PKCE,
+checks the signed-in identity against the configured dashboard policy and (while
+reports are private) current collaborator membership, then redirects to the fixed
+dashboard origin with a short-lived exchange code. The UI removes that code from the
+URL before redeeming it. `AUTH_EXCHANGES` is a SQLite-backed Durable Object: redemption
+is transactionally single-use, bound to a verifier held temporarily in the current
+tab's `sessionStorage`, and expires after two minutes. The resulting opaque session is
+kept only in UI memory; reloads and new tabs require another sign-in.
+
+`DASHBOARD_ACCESS` controls authentication for dashboard APIs. `REPORT_ACCESS` is a
+separate control and defaults to `collaborators`; only the explicit value `public`
+allows anonymous report API reads. Keep reports private when changing or disabling the
+dashboard-wide sign-in gate. Public report access is a separate release decision, not
+an implication of changing `DASHBOARD_ACCESS`. Configure the Durable Object binding
+and migration in `wrangler.jsonc` before deploying this flow.
+
+This application authorization does not make public GitHub Releases or Actions
+artifacts confidential. Scanner outputs in public repository artifacts remain
+accessible outside the dashboard until the separate private-artifact workstream is
+completed.
+
 ## Evaluation mode
 
 The Kavach evaluation is a bounded exception to the normal queue policy: the configured
@@ -58,6 +81,8 @@ analysis-launcher/wrangler.jsonc`; main UI changes trigger pages.yml.
 
 Read [dashboard access](../operations/DASHBOARD-ACCESS.md) before changing authorization.
 Repository writes require admin and exact preview confirmation; scan requests require
-write access. Current report assets are public on GitHub even though dashboard/API
-access requires collaborator login. Owner login and launch are verified; a second
-collaborator live login remains deliberately deferred. See [handoff](../HANDOFF.md).
+write access. Current reports are served through the Worker/R2 path and require the
+independent `REPORT_ACCESS=collaborators` policy. Public GitHub Releases and Actions
+artifacts may still expose scanner outputs; this is not complete Trust Lab-only
+confidentiality. Owner login and launch are verified; a second collaborator live login
+remains deliberately deferred. See [handoff](../HANDOFF.md).

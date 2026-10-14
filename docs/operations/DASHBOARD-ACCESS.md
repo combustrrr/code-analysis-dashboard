@@ -19,13 +19,29 @@ GitHub App token scoped to the configured execution repository. Do not infer bro
 OAuth access from a successful sign-in, and do not add scopes without reviewing the
 credential boundary and authorization flow.
 
-The UI loads reports only after session verification, polls access while visible,
-and clears in-memory reports on sign-out or denial. Refreshing requires sign-in.
+Sign-in uses a same-tab GitHub redirect. OAuth state and PKCE remain validated by the
+Worker. An authorized callback returns a two-minute exchange code to the fixed
+dashboard origin. A SQLite-backed Durable Object binds that code to a client verifier
+and transactionally consumes it once; the UI scrubs the code from the URL before
+redemption. The opaque session remains in React memory, never browser storage. The UI
+loads reports only after `/api/session` verification, polls access while visible, and
+clears in-memory reports on sign-out or denial. Refreshing and opening a new tab
+requires sign-in again.
 
-This is application access control, not confidential report storage. The public
-GitHub repository, its Release assets and Actions artifacts remain publicly
-accessible through GitHub. GitHub Pages serves the static login application.
-Private findings require a separately reviewed storage-visibility migration.
+`DASHBOARD_ACCESS` and `REPORT_ACCESS` are independent. The current deployment uses
+`DASHBOARD_ACCESS=collaborators` and `REPORT_ACCESS=collaborators`. Report API access
+defaults to collaborator-only and remains protected if dashboard sign-in is later
+disabled. Anonymous report delivery requires the explicit `REPORT_ACCESS=public`
+configuration and a separate release decision; do not change that value as a side
+effect of changing the dashboard sign-in gate. The configured Durable Object binding
+and SQLite migration must be deployed before enabling this sign-in flow.
+
+This is application access control, not a complete confidentiality guarantee. The
+public GitHub repository and its Actions artifacts remain publicly accessible through
+GitHub; scanner evidence in public artifacts is not protected by the dashboard gate.
+GitHub Pages serves the generic static sign-in shell, which contains no live findings.
+Private artifact hosting remains a separate prerequisite to claiming Trust Lab-only
+confidentiality.
 
 Verified baseline: owner login is confirmed. Production-mode browser tests cover
 login, logout and revoked access; live anonymous project-integration returns 401.

@@ -5,11 +5,13 @@ import { publicReports } from './reports.mjs';
 import { applicationApi } from './application.mjs';
 import {readBody, BodyLimitError, resolveLimit, DEFAULT_LIMITS} from './request-limits.mjs';
 import {MAX_GITHUB_READ_RETRIES, sleep, retryAfterMs, secondaryRateLimit, transientReadStatus} from './github-retry.mjs';
+import {AuthExchangeStore} from './auth-exchange.mjs';
 // Credential boundary: this Worker calls GitHub APIs only; it never runs source code.
 const encoder = new TextEncoder();
 const b64 = bytes => btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 const bytes = value => Uint8Array.from(atob(value.replaceAll('-', '+').replaceAll('_', '/')), c => c.charCodeAt(0));
 const random = () => b64(crypto.getRandomValues(new Uint8Array(32)));
+const digest = async value => b64(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value))));
 export async function seal(value, secret) {
   const key = await crypto.subtle.importKey('raw', bytes(secret), 'AES-GCM', false, ['encrypt']);
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -68,16 +70,31 @@ async function pages(path, token) {
   throw new Failure(422, 'Target inventory exceeds the launcher pagination limit. Use GitHub Actions to launch this repository.', 'pagination_limit');
 }
 const restricted = env => ['allowlist','collaborators'].includes(env.DASHBOARD_ACCESS);
-async function viewer(env, token) {
+const privateReports = env => env.REPORT_ACCESS !== 'public';
+const reportPath = path => path.startsWith('/api/public/') && path !== '/api/public/config';
+const protectedReportResponse = async (request, env) => {
+  const response = await publicReports(request, env);
+  if (!response || !privateReports(env)) return response;
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', 'private, no-store');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+};
+async function viewer(env, token, {dashboard = restricted(env), reports = false} = {}) {
   const user = await github('user', token);
-  if (env.DASHBOARD_ACCESS === 'allowlist') {
+  if (dashboard && env.DASHBOARD_ACCESS === 'allowlist') {
     const allowed = (env.DASHBOARD_ALLOWED_USERS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
     if (!allowed.includes(user.login?.toLowerCase())) throw new Failure(403, 'This GitHub account is not authorized to view this dashboard.', 'viewer_not_authorized');
   }
-  if(env.DASHBOARD_ACCESS === 'collaborators' && !await isCollaborator(env,user.login)) throw new Failure(403, 'Only collaborators of the analysis repository may view this dashboard.', 'viewer_not_authorized');
+  if (((dashboard && env.DASHBOARD_ACCESS === 'collaborators') || reports) && !await isCollaborator(env,user.login)) throw new Failure(403, 'This GitHub account is not authorized to view these reports.', 'viewer_not_authorized');
   return user;
 }
 const json = (value, status = 200, extra = {}) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json', ...extra } });
+const authRedirect = (env, status) => new Response(null, { status: 302, headers: { Location: `${env.DASHBOARD_ORIGIN}/#analysis_auth_error=${encodeURIComponent(status)}`, 'Cache-Control': 'no-store', 'Set-Cookie': cookie('', 0) } });
+async function exchangeRequest(env, code, action, body) {
+  if (!env.AUTH_EXCHANGES) throw new Failure(503, 'Sign-in exchange storage is unavailable.', 'exchange_store_unavailable');
+  const stub = env.AUTH_EXCHANGES.get(env.AUTH_EXCHANGES.idFromName(code));
+  return stub.fetch(new Request(`https://auth-exchange/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+}
 async function route(request, env) {
   if (env.APPLICATION_MODE === 'repositories') {
     const response = await webhook(request, env);
@@ -168,14 +185,14 @@ async function route(request, env) {
 
   settings(env);
   if (request.method === 'GET' && url.pathname === '/auth/login') {
-    const nonce = url.searchParams.get('nonce');
-    if (!/^[a-f0-9]{64}$/.test(nonce || '')) throw new Failure(400, 'Invalid login request.', 'invalid_request');
+    const challenge = url.searchParams.get('challenge');
+    if (!/^[A-Za-z0-9_-]{43}$/.test(challenge || '')) throw new Failure(400, 'Invalid login request.', 'invalid_request');
     const state = random();
     const verifier = random();
-    const challenge = b64(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(verifier))));
-    const pending = await seal({ type: 'oauth', state, nonce, verifier, exp: Date.now() + 600000 }, env.SESSION_KEY);
+    const oauthChallenge = b64(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(verifier))));
+    const pending = await seal({ type: 'oauth', state, challenge, verifier, exp: Date.now() + 600000 }, env.SESSION_KEY);
     const authorize = new URL('https://github.com/login/oauth/authorize');
-    const parameters = { client_id: env.GITHUB_CLIENT_ID, state, redirect_uri: `${url.origin}/auth/callback`, code_challenge: challenge, code_challenge_method: 'S256' };
+    const parameters = { client_id: env.GITHUB_CLIENT_ID, state, redirect_uri: `${url.origin}/auth/callback`, code_challenge: oauthChallenge, code_challenge_method: 'S256' };
     // GitHub App user authorization is permissioned by the App registration, not OAuth scopes.
     if (env.APPLICATION_MODE !== 'repositories') parameters.scope = env.GITHUB_OAUTH_SCOPES;
     authorize.search = new URLSearchParams(parameters).toString();
@@ -183,28 +200,35 @@ async function route(request, env) {
   }
   if (request.method === 'GET' && url.pathname === '/auth/callback') {
     const stored = (request.headers.get('Cookie') || '').split(';').map(s => s.trim()).find(s => s.startsWith('__Host-analysis-oauth='))?.split('=')[1];
-    const pending = await unseal(stored || '', env.SESSION_KEY, 'oauth');
-    if (!url.searchParams.get('code') || pending.state !== url.searchParams.get('state')) throw new Failure(401, 'GitHub sign-in state did not match. Start sign-in again.', 'oauth_state_mismatch');
-    const exchange = await fetch('https://github.com/login/oauth/access_token', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: env.GITHUB_CLIENT_ID, client_secret: env.GITHUB_CLIENT_SECRET, code: url.searchParams.get('code'), redirect_uri: `${url.origin}/auth/callback`, code_verifier: pending.verifier }) });
-    const grant = await exchange.json();
-    if (!exchange.ok || !grant.access_token) throw new Failure(401, 'GitHub sign-in failed. Start sign-in again.', 'oauth_exchange_failed');
-    if (env.APPLICATION_MODE !== 'repositories') await access(env, grant.access_token);
-    const user = await viewer(env, grant.access_token);
-    const token = await seal({ type: 'session', token: grant.access_token, exp: Date.now() + Math.min(3600, grant.expires_in || 3600) * 1000 }, env.SESSION_KEY);
-    const scriptNonce = random();
-    const message = JSON.stringify({ type: 'analysis-auth', nonce: pending.nonce, token, login: user.login }).replaceAll('<', '\\u003c');
-    return new Response(`<!doctype html><meta charset="utf-8"><title>Analysis sign-in</title><p>Signed in. Return to the dashboard to start your analysis.</p><script nonce="${scriptNonce}">if(window.opener){window.opener.postMessage(${message},${JSON.stringify(env.DASHBOARD_ORIGIN)});window.close();}</script>`, { headers: {
-      'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': cookie('', 0),
-      'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${scriptNonce}'; base-uri 'none'; frame-ancestors 'none'`,
-    } });
+    let pending;
+    try { pending = await unseal(stored || '', env.SESSION_KEY, 'oauth'); }
+    catch { return authRedirect(env, 'retry'); }
+    if (pending.state !== url.searchParams.get('state')) return authRedirect(env, 'retry');
+    if (url.searchParams.has('error')) return authRedirect(env, 'cancelled');
+    if (!url.searchParams.get('code')) return authRedirect(env, 'retry');
+    try {
+      const response = await fetch('https://github.com/login/oauth/access_token', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: env.GITHUB_CLIENT_ID, client_secret: env.GITHUB_CLIENT_SECRET, code: url.searchParams.get('code'), redirect_uri: `${url.origin}/auth/callback`, code_verifier: pending.verifier }) });
+      const grant = await response.json();
+      if (!response.ok || !grant.access_token) return authRedirect(env, 'retry');
+      if (env.APPLICATION_MODE !== 'repositories') await access(env, grant.access_token);
+      const user = await viewer(env, grant.access_token, { dashboard: restricted(env), reports: privateReports(env) });
+      const token = await seal({ type: 'session', token: grant.access_token, exp: Date.now() + Math.min(3600, grant.expires_in || 3600) * 1000 }, env.SESSION_KEY);
+      const code = random();
+      const issued = await exchangeRequest(env, code, 'issue', { verifier_hash: pending.challenge, token, login: user.login });
+      if (!issued.ok) return authRedirect(env, 'retry');
+      return new Response(null, { status: 302, headers: { Location: `${env.DASHBOARD_ORIGIN}/#analysis_auth=${code}`, 'Cache-Control': 'no-store', 'Set-Cookie': cookie('', 0) } });
+    } catch (error) {
+      if (error instanceof Failure && error.code === 'viewer_not_authorized') return authRedirect(env, 'not_authorized');
+      return authRedirect(env, 'retry');
+    }
   }
   if (env.APPLICATION_MODE === 'repositories') {
     if (request.method === 'GET' && url.pathname === '/api/public/config') {
       const slug = env.GITHUB_APP_SLUG;
-      return json({mode:'repositories', require_login:restricted(env), installation_url: /^[a-z0-9-]+$/.test(slug || '') ? `https://github.com/apps/${slug}/installations/new` : null});
+      return json({mode:'repositories', require_login:restricted(env), require_report_login:privateReports(env), installation_url: /^[a-z0-9-]+$/.test(slug || '') ? `https://github.com/apps/${slug}/installations/new` : null});
     }
-    if (!restricted(env)) {
+    if (env.REPORT_ACCESS === 'public') {
       const report = await publicReports(request,env);
       if (report) return report;
     }
@@ -212,13 +236,29 @@ async function route(request, env) {
   if (!url.pathname.startsWith('/api/')) throw new Failure(404, 'Not found.', 'not_found');
   if (request.headers.get('Origin') !== env.DASHBOARD_ORIGIN) throw new Failure(403, 'Dashboard origin required.', 'origin_required');
   if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
+  if (request.method === 'POST' && url.pathname === '/api/auth/redeem') {
+    if (!(request.headers.get('Content-Type') || '').startsWith('application/json')) throw new Failure(415, 'JSON required.', 'unsupported_media_type');
+    let body;
+    try { body = JSON.parse(new TextDecoder().decode(await readBody(request, 2048))); }
+    catch (error) {
+      if (error instanceof BodyLimitError) throw new Failure(413, 'Exchange request is too large.', 'request_too_large');
+      throw new Failure(400, 'Invalid exchange request.', 'invalid_request');
+    }
+    if (!/^[A-Za-z0-9_-]{43}$/.test(body.code || '') || !/^[A-Za-z0-9_-]{43}$/.test(body.verifier || '')) throw new Failure(400, 'Invalid exchange request.', 'invalid_request');
+    const result = await exchangeRequest(env, body.code, 'consume', { verifier_hash: await digest(body.verifier) });
+    if (!result.ok) {
+      const failure = result.status === 410 ? 'exchange_expired' : result.status === 401 || result.status === 404 ? 'exchange_invalid' : 'exchange_store_unavailable';
+      throw new Failure(result.status === 410 || result.status === 401 || result.status === 404 ? 401 : 503, 'Sign-in could not be completed. Retry GitHub sign-in.', failure);
+    }
+    return new Response(result.body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+  }
   const session = await unseal((request.headers.get('Authorization') || '').replace(/^Bearer /, ''), env.SESSION_KEY, 'session');
-  if (restricted(env) || url.pathname === '/api/session') {
-    const user = await viewer(env, session.token);
+  if (restricted(env) || url.pathname === '/api/session' || (reportPath(url.pathname) && privateReports(env))) {
+    const user = await viewer(env, session.token, { dashboard: restricted(env), reports: reportPath(url.pathname) && privateReports(env) || (url.pathname === '/api/session' && privateReports(env)) });
     if (request.method === 'GET' && url.pathname === '/api/session') return json({login:user.login});
   }
   if (env.APPLICATION_MODE === 'repositories') {
-    const report = await publicReports(request,env);
+    const report = await protectedReportResponse(request,env);
     if (report) return report;
     const response = await applicationApi(request, env, session, {github, json, Failure, seal, unseal, pages});
     if (response) return response;
@@ -294,12 +334,13 @@ export default { async fetch(request, env) {
   try { response = await route(request, env); } catch (e) {
     const known = e instanceof Failure || e instanceof BodyLimitError;
     failureCode = known ? e.code : undefined;
-    response = json({ error: known ? e.message : 'Launcher unavailable. No successful launch has been confirmed; check GitHub Actions before retrying.', request_id: requestId }, known ? e.status : 503);
+    response = json({ error: known ? e.message : 'Launcher unavailable. No successful launch has been confirmed; check GitHub Actions before retrying.', ...(failureCode ? { code: failureCode } : {}), request_id: requestId }, known ? e.status : 503);
   }
   const headers = new Headers(response.headers);
   headers.set('X-Request-ID',requestId);
   emitDiagnostic(request,response.status,started,requestId,env,failureCode);
-  if (restricted(env) || !new URL(request.url).pathname.startsWith('/api/public/')) headers.set('Cache-Control', restricted(env) ? 'private, no-store' : 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
+  const protectedReport = privateReports(env) && reportPath(new URL(request.url).pathname);
+  if (restricted(env) || protectedReport || !new URL(request.url).pathname.startsWith('/api/public/')) headers.set('Cache-Control', restricted(env) || protectedReport ? 'private, no-store' : 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
   if (request.headers.get('Origin') === env.DASHBOARD_ORIGIN) {
     headers.set('Access-Control-Allow-Origin', env.DASHBOARD_ORIGIN); headers.set('Vary', 'Origin');
     headers.set('Access-Control-Expose-Headers','X-Request-ID, Retry-After');
@@ -307,3 +348,4 @@ export default { async fetch(request, env) {
   }
   return new Response(response.body, { status: response.status, headers });
 } };
+export {AuthExchangeStore};

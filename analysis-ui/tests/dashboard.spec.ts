@@ -192,7 +192,9 @@ test('authenticated developer selects live source and directly starts analysis',
     const url = new URL(route.request().url());
     const headers = {'Access-Control-Allow-Origin':'http://127.0.0.1:4178', 'Access-Control-Allow-Headers':'Authorization, Content-Type', 'Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
     if (route.request().method() === 'OPTIONS') return route.fulfill({status:204, headers});
-    if (url.pathname === '/auth/login') return route.fulfill({contentType:'text/html', body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'opaque-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+    if (url.pathname === '/auth/login') return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+    if (url.pathname === '/api/auth/redeem') return route.fulfill({headers,json:{token:'opaque-session',login:'developer'}});
+    if (url.pathname === '/api/session') return route.fulfill({headers,json:{login:'developer'}});
     expect(route.request().headers().authorization).toBe('Bearer opaque-session');
     if (url.pathname === '/api/project-targets') return route.fulfill({headers,json:{repository:source,branches:[{name:'Testing',sha}],prs:[]}});
     if (url.pathname === '/api/project-readiness') return route.fulfill({headers,json:{tooling_sha:'a'.repeat(40),channels:[{channel:'codeql',status:'configured',reason:''}]}});
@@ -205,6 +207,7 @@ test('authenticated developer selects live source and directly starts analysis',
   const dialog=page.getByRole('dialog',{name:'Run analysis'});
   await expect(dialog.getByText(execution)).toBeVisible();
   await dialog.getByRole('button',{name:'Sign in with GitHub'}).click();
+  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
   const revision=dialog.getByLabel('Revision');
   await revision.click();
   await revision.press('ArrowDown');
@@ -218,7 +221,7 @@ test('authenticated developer selects live source and directly starts analysis',
   expect(await page.evaluate(() => JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('opaque-session');
 });
 
-test('commit selection survives sign-in and old output is not mistaken for new results', async ({page, context}) => {
+test('commit launch resumes after sign-in and old output is not mistaken for new results', async ({page, context}) => {
   const data = JSON.parse(readFileSync('public/data/index.json','utf8'));
   const execution = 'combustrrr/code-analysis-dashboard';
   const source = 'ARYDESTROYER/Kavach-AgenticSOC';
@@ -232,7 +235,9 @@ test('commit selection survives sign-in and old output is not mistaken for new r
     const url = new URL(route.request().url());
     const headers = {'Access-Control-Allow-Origin':'http://127.0.0.1:4178', 'Access-Control-Allow-Headers':'Authorization, Content-Type', 'Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
     if (route.request().method() === 'OPTIONS') return route.fulfill({status:204,headers});
-    if (url.pathname === '/auth/login') return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'test-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+    if (url.pathname === '/auth/login') return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+    if (url.pathname === '/api/auth/redeem') return route.fulfill({headers,json:{token:'test-session',login:'developer'}});
+    if (url.pathname === '/api/session') return route.fulfill({headers,json:{login:'developer'}});
     if (url.pathname === '/api/project-targets') return route.fulfill({headers,json:{repository:source,branches:[{name:'Testing',sha}],prs:[]}});
     if (url.pathname === '/api/project-readiness') return route.fulfill({headers,json:{tooling_sha:'a'.repeat(40),channels:[]}});
     if (url.pathname === '/api/project-launch') { submitted=route.request().postDataJSON(); return route.fulfill({headers,status:202,json:{request_id:'commit-request',run_id:42}}); }
@@ -242,9 +247,10 @@ test('commit selection survives sign-in and old output is not mistaken for new r
   await page.goto('/#'+new URLSearchParams({repository:execution,project,tab:'overview'}).toString());
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Run analysis'});
+  await dialog.getByRole('button',{name:'Sign in with GitHub'}).click();
+  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
   await dialog.getByRole('radio',{name:'Commit SHA'}).click();
   await dialog.getByLabel('Full commit SHA').fill(sha.toUpperCase());
-  await dialog.getByRole('button',{name:'Sign in with GitHub'}).click();
   await expect(dialog.getByLabel('Full commit SHA')).toHaveValue(sha.toUpperCase());
   await dialog.getByRole('button',{name:'Run analysis',exact:true}).click();
   expect(submitted).toEqual({repository:execution,project_id:project,kind:'commit',ref:sha});
@@ -266,7 +272,9 @@ test('commit validation prevents an invalid project launch', async ({page,contex
     const url=new URL(route.request().url());
     const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
     if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
-    if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'valid-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+    if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+    if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'valid-session',login:'developer'}});
+    if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
     if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:'ARYDESTROYER/Kavach-AgenticSOC',branches:[{name:'Testing',sha:'b'.repeat(40)}],prs:[]}});
     if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{tooling_sha:'a'.repeat(40),channels:[]}});
     throw new Error(url.pathname);
@@ -275,6 +283,7 @@ test('commit validation prevents an invalid project launch', async ({page,contex
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Run analysis'});
   await dialog.getByRole('button',{name:'Sign in with GitHub'}).click();
+  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
   await dialog.getByRole('radio',{name:'Commit SHA'}).click();
   await dialog.getByLabel('Full commit SHA').fill('abc');
   await expect(dialog.getByRole('button',{name:'Run analysis',exact:true})).toBeDisabled();
@@ -292,7 +301,9 @@ test('connections verify live configuration without claiming scanner completion'
     const url = new URL(route.request().url());
     const headers = {'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
     if(route.request().method()==='OPTIONS') return route.fulfill({status:204,headers});
-    if(url.pathname==='/auth/login') return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'connection-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+    if(url.pathname==='/auth/login') return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+    if(url.pathname==='/api/auth/redeem') return route.fulfill({headers,json:{token:'connection-session',login:'developer'}});
+    if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
     expect(url.pathname).toBe('/api/project-integration');
     expect(url.searchParams.get('repository')).toBe(source);expect(url.searchParams.get('project_id')).toBe('selected');
     return route.fulfill({headers,json:{source_repository:source,analysis_repository:source,publishing_repository:'owner/dashboard',workflow_branch:'Testing',workflow_state:ready?'active':'disabled_manually',configuration_matches:true,ready,enabled_scanners:['ruff','coverage'],checked_at:new Date().toISOString()}});
@@ -301,6 +312,7 @@ test('connections verify live configuration without claiming scanner completion'
   await expect(page.getByRole('heading',{name:'Application connections'})).toBeVisible();
   await expect(page.getByText('Launch configuration verified')).not.toBeVisible();
   await page.getByRole('button',{name:'Sign in to verify connections'}).click();
+  await page.getByRole('button',{name:'Verify connections'}).click();
   await expect(page.getByText('Launch configuration verified')).toBeVisible();
   await expect(page.getByText('This verifies routing and workflow availability. Scanner results determine which channels actually completed.')).toBeVisible();
   ready=false;
@@ -309,7 +321,7 @@ test('connections verify live configuration without claiming scanner completion'
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:testInfo.outputPath('connections-mobile.png'),fullPage:true});
   await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await page.getByRole('button',{name:'Sign out',exact:true}).click();
+  await page.getByRole('banner').getByRole('button',{name:'Sign out',exact:true}).click();
   await expect(page.getByText('Configuration needs attention')).not.toBeVisible();
 });
 
@@ -324,7 +336,9 @@ test('repository configuration requires a preview and explicit confirmation', as
     const url=new URL(route.request().url());
     const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
     if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
-    if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'opaque-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+    if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+    if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'opaque-session',login:'developer'}});
+    if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
     if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{installation_url:null}});
     expect(route.request().headers().authorization).toBe('Bearer opaque-session');
     if(url.pathname==='/api/repositories')return route.fulfill({headers,json:{repositories:[{id:1,full_name:'owner/repo',can_configure:true}],has_more:false}});
@@ -359,7 +373,9 @@ test('project run tracking survives the launch dialog and separates the old repo
  await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
-  if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'opaque-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+  if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+  if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'opaque-session',login:'developer'}});
+  if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{installation_url:null}});
   if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:'owner/repo',branches:[{name:'main',sha:'a'.repeat(40)}],prs:[]}});
   if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{tooling_sha:'b'.repeat(40),channels:[{channel:'bandit',status:'configured',reason:'Native evidence required'}]}});
@@ -369,8 +385,9 @@ test('project run tracking survives the launch dialog and separates the old repo
  });
  await page.goto('/#repository=owner%2Frepo&project=1');
  await expect(page.getByText('ANALYZED COMMIT')).toBeVisible();
- await page.getByRole('button',{name:'Run analysis',exact:true}).click();
- await page.getByRole('button',{name:'Sign in with GitHub',exact:true}).click();
+  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
+  await page.getByRole('button',{name:'Sign in with GitHub',exact:true}).click();
+  await page.getByRole('button',{name:'Run analysis',exact:true}).click();
  await page.getByLabel('Revision',{exact:true}).click();await page.getByLabel('Revision',{exact:true}).press('ArrowDown');await page.getByLabel('Revision',{exact:true}).press('Enter');
  await expect(page.getByRole('button',{name:'Continue',exact:true})).toHaveCount(0);
  await page.getByRole('dialog').getByRole('button',{name:'Run analysis',exact:true}).click();
@@ -416,7 +433,9 @@ test('repositories recover from failures and discard stale installation preview'
   const url=new URL(route.request().url());
   const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
-  if(url.pathname==='/auth/login')return route.fulfill({contentType:'text/html',body:`<script>window.opener.postMessage({type:'analysis-auth',nonce:'${url.searchParams.get('nonce')}',token:'test-session',login:'developer'},'http://127.0.0.1:4178');window.close();</script>`});
+   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'test-session',login:'developer'}});
+   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
    if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{installation_url:'https://github.com/apps/test/installations/new'}});
    if(url.pathname==='/api/repositories')return route.fulfill({headers,status:fail?503:200,json:fail?{error:'GitHub temporarily unavailable'}:{repositories:[{id:1,full_name:'owner/service',can_configure:true}],has_more:false}});
    if(url.pathname==='/api/projects')return route.fulfill({headers,json:{projects:[]}});
