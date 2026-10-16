@@ -7,15 +7,26 @@ viewer authorization, fixed-host APIs, explicit launch requests and report deliv
 project-registry entries. Users do not choose or install an execution repository.
 
 Users sign in, choose one configured project, and inspect its current report. Selecting
-a project is read-only and does not launch a workflow. Users with execution-host write
-access may separately choose a branch, PR, or full 40-character SHA and press Run
-analysis. The Worker checks write access, records request intent, and dispatches `code-analysis-reconcile.yml`. Reconciliation queues
-`code-analysis-source.yml` with immutable source/tooling identity under the two-slot
-limit. The UI follows exact request/run/attempt and opens the published target.
-Hourly reconciliation recovers missed work; submission is not scanner completion.
-The dashboard never launches automatically on refresh. A launch is explicit, and a
-duplicate deterministic request returns the already-persisted queue asset rather than
-creating a second dispatch.
+a project, reading branch/PR inventory, and resolving a preview are read-only. Users
+with execution-host write access may choose a branch, open PR, or full 40-character SHA,
+review the resolved full SHA and scanner channels, and explicitly confirm. The Worker
+checks write access and persists an immutable `analysis-request-v2` envelope with source
+and fork identities, original/resolved selection, pinned SHA, optional PR context,
+requested channels, tooling/profile digests, actor, and idempotency key. A 202 means
+accepted/queued, never scanner completion. Retries with the same idempotency key return
+the existing durable request.
+
+The bounded queue is FIFO (maximum 100) with one active source-revision request globally.
+Selected channel producers for that revision may run concurrently; a request remains
+active until every selected lane is terminal. Scheduled reconciliation recovers only
+durable accepted requests and never creates work from branch or PR discovery. Each lane
+checks out the same immutable SHA. Matching channel evidence is reused unless the user
+explicitly chooses **Run again**. Same-SHA publication replaces only successfully
+validated selected channels; other statuses remain distinct, including `NOT_SELECTED`,
+`NOT_APPLICABLE`, `DEFERRED`, and failure. Keep one current source-only report per
+configured project and one separately keyed PR overlay (project, PR, head repository/SHA,
+base SHA, tooling, profile). Source-only report replacement waits for the first valid
+new-SHA channel result; failures preserve the previous report.
 
 ## Dashboard sign-in and report visibility
 
@@ -43,16 +54,15 @@ artifacts confidential. Scanner outputs in public repository artifacts remain
 accessible outside the dashboard until the separate private-artifact workstream is
 completed.
 
-## Evaluation mode
+## Source-write and artifact boundaries
 
-The Kavach evaluation is a bounded exception to the normal queue policy: the configured
-`Testing` branch is resolved once to an immutable SHA, and the Worker stores a durable
-lock in the `ANALYSIS_STATE` KV namespace under
-`evaluation:v1:<lowercase-source-repository>`. The lock records the frozen SHA,
-tooling/profile idempotency key, request ID, pause state, and dispatch count. A failed,
-timed-out, or uncertain dispatch still consumes the one-dispatch budget. Operators reset
-the key only after inspecting the associated request/run state; deleting the key is the
-explicit reset operation. Dashboard refreshes and report reads do not touch the budget.
+Native feedback is disabled for all configured projects, including service
+self-analysis. No scanner findings, comments, checks, SARIF, commits, or pull requests
+are written to an analyzed source repository. Source-executing jobs receive no vendor or
+publication credentials; vendor lanes execute separately in isolated jobs. GitHub
+Actions artifacts in the public execution repository remain publicly accessible outside
+the authenticated dashboard. Dashboard sign-in and report authorization do not make
+those artifacts confidential; private artifact handling is a separate workstream.
 
 ## Deployment configuration
 

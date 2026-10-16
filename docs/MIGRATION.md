@@ -13,12 +13,29 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
   into an upstream/product repository.
 - Source-executing jobs use the configured immutable tooling revision and do not receive
   vendor or publication credentials.
+- Analysis launches are explicit only. The `analysis-request-v2` envelope pins the
+  configured project, selected SHA, tooling/profile digests, requested channels, actor,
+  and idempotency key; 202 is accepted/queued, not complete.
+- Accepted requests drain FIFO from a bounded queue with one active source revision
+  globally. Scheduled reconciliation recovers accepted work only and never creates a
+  request from branch/PR discovery.
+- Each configured repository keeps one current source-only report and at most one
+  separately keyed current PR overlay (project, PR, head repository/SHA, base SHA,
+  tooling, profile). Same-SHA runs replace only successfully validated selected
+  channels; matching channel evidence is reused unless **Run again** is requested.
+- No scanner feedback is written to analyzed sources, including the connected
+  self-analysis target. Public Actions artifacts remain accessible outside the
+  authenticated dashboard; this migration does not make them confidential.
 
 ## Storage Boundary
 
 - GitHub Actions executes scanners and dispatch/reconciliation workflows.
 - Cloudflare R2 stores current report manifests, compressed report shards, and temporary
   producer artifacts under `temp-runs/`.
+- The current manifest references the source-only report and optional PR overlay;
+  overlay content is stored in its own content-addressed asset and fetched only when
+  named in the current manifest. Superseded report/overlay assets are deleted only after
+  the replacement manifest is committed.
 - The `temp-runs/` prefix has a one-day lifecycle rule; the Worker enforces 100 MB asset
   and 900 MB compressed-manifest limits.
 - Cloudflare KV stores service state. GitHub Releases remain only for the bounded request
@@ -32,7 +49,11 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
 3. Generate workflows 11 and 12 with `generate_source_workflow.py`.
 4. Run service tests, workflow audit, launcher tests, and relevant UI checks before
    deployment.
-5. Do not retire an active host or alter an upstream repository without separate,
+5. Deploy the Worker/report reader and trusted workflows before exposing the matching
+   UI. Retain backward reading of `analysis-current-v1` manifests through the first
+   valid new publication. The implementation in the working tree is not evidence of a
+   production rollout.
+6. Do not retire an active host or alter an upstream repository without separate,
    explicit authorization.
 
 ## Storage Key Compatibility

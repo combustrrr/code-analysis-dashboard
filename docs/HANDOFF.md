@@ -1,11 +1,13 @@
 # New-chat handoff: Code Analysis Dashboard
 
-Verified implementation baseline: 2026-10-14, main commit
+Last verified deployed baseline: 2026-10-14, main commit
 `216393820ab8ca05c4729115ceb98dfec1d7ce0e0`. Worker version
 `63068c97-2f88-4121-8539-d97ff0729a19` is live with the fixed-host dashboard access
 configuration. This is the service handoff; read it
 before AGENTS.md, README.md and the current architecture guide. Old session documents
-are historical evidence, not instructions to restore old hosting.
+are historical evidence, not instructions to restore old hosting. The configured-source
+project implementation is currently local and not deployed; do not assume the live
+Worker, Pages UI, or workflows provide its manual FIFO/channel/overlay behavior yet.
 
 ## Repository and deployment boundaries
 
@@ -14,7 +16,8 @@ are historical evidence, not instructions to restore old hosting.
 - Read-only sources: `ARYDESTROYER/Kavach-AgenticSOC` (project `1267340546`)
   and `combustrrr/Agentic-Kibana` (project `1278177697`). Both prefer Testing.
 - Connected self-analysis: `combustrrr/code-analysis-dashboard` (project
-  `1360051890`, main). Only this relationship can publish native findings to itself.
+  `1360051890`, main). Native feedback is disabled for all three configured targets;
+  trusted publication stores reports only in service-managed storage.
 - Parking-lot monitoring was removed. Do not restore it or install analysis in the
   product fork. No writes to upstream are authorized.
 - Website: https://combustrrr.github.io/code-analysis-dashboard/
@@ -39,13 +42,14 @@ read was not run because no signed-in browser session was available.
 
 ## What is implemented
 
-The current source implements an Ant Design application with light/dark themes, current
+The local source implements an Ant Design application with light/dark themes, current
 source/target/revision provenance, overview charts, issues, scanners, connections and a
-fixed-host project catalog. Primary repository-mode flow: sign in, choose one of the
-three trusted projects, inspect its current report, then (with execution-host write
-access) explicitly choose a branch/PR/full SHA and submit once. Project selection itself
-is read-only and never dispatches a workflow. Per-user execution-host selection, generic
-repository discovery, source setup and folder-mapping commits are not part of this flow.
+fixed-host project catalog. Its repository-mode flow is: sign in, choose one of the three
+trusted projects, inspect its current report, then (with execution-host write access)
+choose a branch, open PR, or full SHA, review the resolved SHA and selected scanner
+channels, and explicitly confirm. Project selection, inventory, and preview are read-only.
+Per-user execution-host selection, generic repository discovery, source setup and
+folder-mapping commits are not part of this flow.
 Project profiles are changed through the trusted versioned registry by an administrator.
 Threat Reports add deterministic JSON/Markdown/PDF exports, severity-aware UI,
 raw/normalized channel coverage, finding provenance, and explicit limitations.
@@ -69,16 +73,23 @@ confidential storage guarantees.
 ## Execution and storage
 
 Trusted profiles: `.github/code-analysis/projects.json` on execution default branch.
-Hourly reconciliation and manual requests use the same bounded queue (two analyses).
-Exact source checkout and producer IDs/attempts prevent mixed-revision publication.
-One current report per active branch/open PR plus one bounded manual selection per
-project. Keep previous SHA visibly while replacements run; a valid partial replaces
-old findings without borrowing evidence. R2 holds current manifests and compressed
-report shards; `temp-runs/` holds ephemeral producer artifacts and expires after one
-day. Releases still hold queue/compatibility state where required. UI builds contain
-no reports. Publication does not rebuild UI or rescan. Per-project default report
-budget is 900,000,000 bytes; compressed shards are bounded at 100 MB. Capacity errors
-preserve prior valid data; cleanup follows successful manifest publication.
+The local source accepts only explicit `analysis-request-v2` intents from the bounded
+FIFO (maximum 100), processes one source revision globally, and sequences selected
+producer lanes for that pinned SHA. Scheduled reconciliation is recovery-only and never
+creates scans from branch/PR discovery. A 202 means accepted/queued. Exact source
+checkout, request, tooling/profile, workflow run, and attempt provenance prevent
+mixed-revision publication. Keep one current source-only report per configured project;
+retain one PR-context overlay separately, keyed by project, PR, head repository/SHA, base
+SHA, tooling and profile. A successful source-only report that advances to another SHA
+retires an incompatible older overlay; queued/failed source attempts do not. Matching per-channel evidence is reused unless Run again is
+explicitly selected. Same-SHA publication replaces only successful selected channels;
+`NOT_SELECTED`, `NOT_APPLICABLE`, `DEFERRED`, and failures remain distinct. Keep the
+previous source report while queued/running and on failure before valid new evidence.
+R2 holds manifests and content-addressed compressed report/overlay shards; `temp-runs/`
+holds ephemeral producer artifacts and expires after one day. UI builds contain no
+reports. Superseded assets are removed only after the replacement manifest is committed.
+GitHub Actions artifacts in the public service repository remain publicly accessible;
+dashboard authentication does not make them confidential.
 
 ## Scanner maintenance and limitations
 
@@ -122,10 +133,11 @@ Sonar branch entitlement and upstream posture access. Do not buy plans or modify
 upstream. The dashboard does not offer arbitrary repository onboarding or per-user App
 installation. Project access is limited to the fixed host and its validated registry.
 
-Next chat: read live profile/run/Release state, keep named scanner limitations honest,
-and implement new requested work only in the service unless product work is explicit.
-Preserve unrelated local edits, never log secrets, and record material operational
-changes in the relevant current/operations documentation.
+Next chat: distinguish the deployed baseline from the un-deployed configured-source
+implementation in the working tree. Before cutover, run the full service, launcher,
+workflow-audit, deployment, and UI checks; then verify prerequisites and obtain separate
+authorization for any deployment. Preserve unrelated local edits, never log secrets,
+and record material operational changes in the relevant current/operations documentation.
 See README.md for validation commands and docs/README.md for guides.
 
 ## 2026-09-12 free-service operations update
