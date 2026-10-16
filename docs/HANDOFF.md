@@ -1,8 +1,9 @@
 # New-chat handoff: Code Analysis Dashboard
 
-Verified implementation baseline: 2026-10-13, main commit `5b07952`. Worker version
-`b990585d-1412-4a8c-8c43-8abb0e096577` contains the current deployed repository-setup
-profile mapping. This is the service handoff; read it
+Verified implementation baseline: 2026-10-14, main commit
+`216393820ab8ca05c4729115ceb98dfec1d7ce0e0`. Worker version
+`63068c97-2f88-4121-8539-d97ff0729a19` is live with the fixed-host dashboard access
+configuration. This is the service handoff; read it
 before AGENTS.md, README.md and the current architecture guide. Old session documents
 are historical evidence, not instructions to restore old hosting.
 
@@ -18,10 +19,23 @@ are historical evidence, not instructions to restore old hosting.
   product fork. No writes to upstream are authorized.
 - Website: https://combustrrr.github.io/code-analysis-dashboard/
 - Worker: https://code-analysis-launcher.icsarthak9.workers.dev
-- Pages deployment is triggered by the main branch workflow. Pages run `38441170421`
-  deployed commit `5b07952`; Worker version `ec340878-82e9-44c7-8105-d4053f677241`
-  is deployed with the Pages base-path redirect fix. The current fixed-host plan work
-  in this working tree has not been committed or deployed.
+- Pages deployment is triggered by the main branch workflow. Pages run
+  `38598467689` deployed commit `216393820ab8ca05c4729115ceb98dfec1d7ce0e0`.
+  The workflow artifact and live site both reference `assets/index-Dl9P-4d-.js` and
+  `assets/index-D9a50ibX.css`. Worker version
+  `63068c97-2f88-4121-8539-d97ff0729a19` is active. Live `/api/public/config` reports
+  `require_login=true` and `require_report_login=true`; anonymous `/api/projects`,
+  `/api/public/projects`, and `/api/public/manifest` requests returned `401`.
+
+## 2026-10-14 project profile validation fix
+
+Worker version `63068c97-2f88-4121-8539-d97ff0729a19` is deployed at 100% traffic.
+It validates portable profiles with the portable policy while continuing to accept
+the trusted legacy scanner profiles in the two observer projects. The production
+public config still requires login; anonymous `/api/projects` returned `401`.
+Launcher tests (80), analysis service unit tests (67), deployment tests (13), and
+the workflow audit passed before deployment. An authenticated production registry
+read was not run because no signed-in browser session was available.
 
 ## What is implemented
 
@@ -94,11 +108,13 @@ passed. Retained
 21,189-finding browser coverage includes provenance, grouping, charts, filters,
 mobile navigation, themes, launch tracking and configuration confirmation. Repeated
 repository recovery checks passed after stable accessible loading labels were added.
-Production-mode login/logout/revocation browser test passed. The current plan change
-has passed 78 launcher tests, 13 deployment tests, service unit tests, workflow audit,
+Production-mode login/logout/revocation browser test passed. The fixed-host dashboard
+change passed 78 launcher tests, 13 deployment tests, service unit tests, workflow audit,
 UI build, 22 fixture browser tests, and all 11 repository-mode OAuth/access browser
-tests locally. It has not been deployed, so the previous live anonymous smoke applies
-only to the deployed code, not these uncommitted changes.
+tests locally. It is deployed by Pages run `38598467689`; the live asset fingerprints
+match that run's build log. Anonymous project/report API denial and the deployed Worker
+version/configuration were rechecked after rollout. No authenticated production launch
+or scanner dispatch was performed.
 
 Owner login is confirmed; another accepted collaborator's live sign-in is deferred
 by the owner. No need to request it repeatedly. Outstanding external exceptions:

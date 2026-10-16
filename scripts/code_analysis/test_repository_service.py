@@ -25,6 +25,19 @@ class RepositoryExecutionTests(unittest.TestCase):
             self.assertEqual(result['status'],'not_applicable')
             api.assert_not_called()
 
+    def test_connected_read_only_project_never_calls_native_api(self):
+        doc=config();project=doc['projects'][0]
+        project.update(id='1',relationship='connected',source_repository=doc['execution_repository'],
+                       native_feedback_enabled=False)
+        report={'analyzed_sha':'b'*40,'target':{'repository':'owner/runner',
+                'source_repository':'owner/runner','head_sha':'b'*40}}
+        with patch('scripts.code_analysis.native_feedback.github.api') as api, \
+                patch('scripts.code_analysis.native_feedback.github.pages') as pages:
+            result=publish(doc,'1',{},report,[],dashboard_url='https://example.test')
+        self.assertEqual(result['status'],'not_applicable')
+        api.assert_not_called()
+        pages.assert_not_called()
+
     def test_incomplete_security_does_not_clear_existing_alerts(self):
         doc=config();project=doc['projects'][0]
         project.update(id='1',relationship='connected',source_repository=doc['execution_repository'])

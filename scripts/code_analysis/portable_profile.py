@@ -33,5 +33,8 @@ def readiness(profile):
     supported={'semgrep','gitleaks','trivy','checkov','openssf-scorecard','github-secret-protection-posture','github-actions-security','coderabbit-ai-advisory'}
     if profile.get('python_root'):supported.update({'bandit','ruff','radon','xenon','vulture'})
     if profile.get('python_root') or profile.get('javascript_root'):supported.add('codeql')
+    # These channels run in the isolated vendor workflow for every portable
+    # project. Missing vendor credentials remain explicit scan evidence.
+    supported.update({'snyk','sonarqube-cloud'})
     supported.update(profile.get('commands',{}))
     return supported

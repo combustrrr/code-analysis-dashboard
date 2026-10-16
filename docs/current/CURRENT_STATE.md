@@ -1,9 +1,10 @@
 # Current implementation state
 
-The latest verified deployed Worker is `ec340878-82e9-44c7-8105-d4053f677241`; it
-contains the GitHub Pages base-path redirect correction. The fixed-host sign-in plan
-implementation described below is present in the current working tree but has not been
-committed or deployed. Do not treat local target/API/UI changes as live behavior.
+The latest verified Pages deployment is run `38598467689` for main commit
+`216393820ab8ca05c4729115ceb98dfec1d7ce0e0`; its live HTML references the same JavaScript
+and CSS assets recorded in the workflow build log. The active Worker is
+`63068c97-2f88-4121-8539-d97ff0729a19`. Its public config requires login for dashboard and
+report routes, and anonymous project/report API checks returned `401` after rollout.
 
 The local source now fixes execution, storage and publishing to
 `combustrrr/code-analysis-dashboard` (ID `1360051890`). Its trusted registry contains
@@ -14,11 +15,11 @@ versioned registry. Selecting a project does not trigger a workflow. The reposit
 setup, arbitrary execution-host selection, and per-user App installation screens are
 removed from the repository-mode UI.
 
-The deployed application already has same-tab GitHub OAuth with PKCE and a one-time
-Durable Object exchange. The local plan implementation also adds fixed-host project
-API validation, exact target identity checks, separate viewer/write/admin enforcement,
-and real visible-tab session rechecks. Source scans still execute only in isolated
-GitHub Actions jobs; Cloudflare Workers do not execute source code.
+The deployed application has same-tab GitHub OAuth with PKCE and a one-time Durable
+Object exchange, fixed-host project API validation, exact target identity checks,
+separate viewer/write/admin enforcement, and visible-tab session rechecks. Source scans
+still execute only in isolated GitHub Actions jobs; Cloudflare Workers do not execute
+source code.
 
 Reports remain in Cloudflare R2 and service state in KV. Public Actions artifacts are
 not confidential merely because the dashboard is authenticated. The project currently
@@ -29,9 +30,12 @@ security posture permissions. A successful advisory workflow is not a complete s
 report. Another collaborator's live sign-in is not a verified deployment check; the
 access behavior is covered by local browser/API tests.
 
-Latest documented Pages rollout: commit `056eee4`; Pages deployments are triggered
-from main. The Worker was subsequently deployed as `ec340878-82e9-44c7-8105-d4053f677241`
-for the Pages base-path redirect fix. The current fixed-host plan changes remain local.
+Pages deployments are triggered from main. The latest rollout is commit
+`216393820ab8ca05c4729115ceb98dfec1d7ce0e0` in run `38598467689`; the live site serves
+`assets/index-Dl9P-4d-.js` and `assets/index-D9a50ibX.css`, matching the uploaded build
+artifact. At that Pages rollout, Worker version `a56a008d-7de0-4d66-8717-b7b41aa6b53d`
+was active with `require_login=true` and `require_report_login=true`; anonymous project
+and report API requests were denied with `401`.
 Read the live project profile before reusing a tooling pin; the configured evaluation
 target is Kavach `Testing` at the frozen SHA
 `231bb41f7eb1b707e25113c258eb8d5c7356b743`.
@@ -60,15 +64,17 @@ and canonical artifact name, then publishes the partial/current report to R2.
 The legacy scanner workflow files had been serialized with `true:` instead of the
 GitHub trigger key `'on':`, which made GitHub register push runs with zero jobs.
 Those triggers are repaired and the workflow audit now rejects that serialization.
-GitHub Pages was rebuilt from main commit `5b07952` by workflow run `38441170421`.
-The Cloudflare Worker was redeployed as version
-`b990585d-1412-4a8c-8c43-8abb0e096577`; its R2 bindings and origin-protected public
-configuration endpoint remain live.
+GitHub Pages was rebuilt from main commit `216393820ab8ca05c4729115ceb98dfec1d7ce0e0`
+by workflow run `38598467689`. The live JavaScript/CSS asset fingerprints match the
+build log and uploaded Pages artifact. At that rollout the Cloudflare Worker was version
+`a56a008d-7de0-4d66-8717-b7b41aa6b53d`; its public configuration reported both login
+requirements enabled and anonymous project/report API probes returned `401`.
 
 The earlier repository workspace connected user-selected execution repositories to
 source projects and offered an optional folder-mapping setup flow. That implementation
-is superseded in the current local source by the fixed-host target registry and
-read-only viewer flow. No live scanner request has been dispatched for this plan.
+is superseded by the deployed fixed-host target registry and read-only viewer flow. No
+authenticated production launch or live scanner request was performed as part of this
+deployment verification.
 
 Portable-profile detection and validation were moved into the dedicated
 `analysis-launcher/profile-policy.mjs` module; the former duplicate inline policy and
@@ -93,6 +99,14 @@ The connected service-self project must explicitly enable or defer every scanner
 channel known by the pinned tooling revision. Reconciliation runs may occur both
 from an explicit request and from the durable recovery/scheduled pass; correlate
 them by request ID and persisted target state before treating them as duplicates.
+
+On 2026-10-14, Worker version `63068c97-2f88-4121-8539-d97ff0729a19` was deployed
+at 100% traffic to fix project discovery rejecting trusted legacy scanner profiles.
+Portable profiles remain subject to strict portable-profile validation. The production
+public config requires login and anonymous `/api/projects` returns `401`. Validation
+passed: 67 analysis service unit tests, 13 deployment tests, workflow audit, and 80
+launcher tests. An authenticated production registry read was not performed because
+no signed-in browser session was available.
 
 Portable analysis now discovers repository-relative dependency manifests and
 Dockerfiles outside product-specific paths. A discovered dependency manifest

@@ -10,6 +10,7 @@ def profile_digest(project: dict[str, Any]) -> str:
     profile = {
         "enabled_scanners": sorted(project.get("enabled_scanners", [])),
         "deferred_channels": project.get("deferred_channels", {}),
+        "native_feedback_enabled": project.get("native_feedback_enabled", True),
         "profile": project.get("profile", {}),
     }
     return hashlib.sha256(json.dumps(profile, sort_keys=True, separators=(",", ":")).encode()).hexdigest()

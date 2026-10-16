@@ -47,8 +47,12 @@ def bundle(config: dict, destination: Path, endpoint: str, dashboard_url: str, c
     root = Path(__file__).resolve().parents[2]
     launcher = load(root / 'analysis-launcher/wrangler.jsonc')
     launcher['name'] = worker_name
+    dashboard_path = dashboard.path or '/'
+    if not dashboard_path.endswith('/'):
+        dashboard_path += '/'
     launcher['vars'] = {'SOURCE_REPOSITORY': config['source_repository'], 'ANALYSIS_REPOSITORY': config['analysis_repository'],
-                        'DASHBOARD_ORIGIN': f'{dashboard.scheme}://{dashboard.netloc}', 'GITHUB_CLIENT_ID': client_id}
+                        'DASHBOARD_ORIGIN': f'{dashboard.scheme}://{dashboard.netloc}', 'DASHBOARD_BASE_PATH': dashboard_path,
+                        'GITHUB_CLIENT_ID': client_id}
     destination.mkdir(parents=True, exist_ok=False)
     for repository in ('analysis', 'dashboard'):
         write(destination / repository / 'config/code-analysis/service.json', config)

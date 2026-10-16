@@ -5,21 +5,29 @@ import type { useLaunchAuth } from './useLaunchAuth';
 
 type Auth = ReturnType<typeof useLaunchAuth>;
 type Configuration = { source_repository: string; analysis_repository: string; publishing_repository?: string; workflow_branch: string; workflow_state: string; configuration_matches: boolean; ready: boolean; enabled_scanners: string[]; checked_at: string; report_budget_bytes?: number; report_storage?: { compressed_bytes: number|null; remaining_bytes: number|null; history_points: number }; storage_backend?: string };
+type ChannelReadiness = { channel: string; status: 'configured' | 'deferred' | 'setup_required'; reason: string };
+type ProjectReadiness = { channels: ChannelReadiness[]; checked_at: string };
 
 export function Connections({ auth, source, host, publisher, endpoint, start, repository, project, canLaunch=true }: { repository?:string; project?:string; auth: Auth; source?: string; host?: string; publisher?: string; endpoint?: string; start: () => void; canLaunch?:boolean }) {
   const [configuration, setConfiguration] = useState<Configuration>();
+  const [readiness, setReadiness] = useState<ProjectReadiness>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     let active = true;
-    setConfiguration(undefined); setError(''); setBusy(!!auth.session);
-    if (auth.session) auth.api<Configuration>(repository && project ? `project-integration?${new URLSearchParams({project_id:project})}` : 'integration').then(value => {
-      if (!active) return;
-      const mismatch = (source && value.source_repository !== source) || (host && value.analysis_repository !== host) || (publisher && value.publishing_repository !== publisher);
-      if (mismatch) throw Error('Published dashboard and live service configuration disagree. Check the repository configuration before launching.');
-      setConfiguration(value);
-    }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setBusy(false); });
+    setConfiguration(undefined); setReadiness(undefined); setError(''); setBusy(!!auth.session);
+    if (auth.session) {
+      const integration = auth.api<Configuration>(repository && project ? `project-integration?${new URLSearchParams({project_id:project})}` : 'integration');
+      const channels = repository && project ? auth.api<ProjectReadiness>(`project-readiness?${new URLSearchParams({project_id:project})}`) : Promise.resolve(undefined);
+      Promise.all([integration, channels]).then(([value, channelReadiness]) => {
+        if (!active) return;
+        const mismatch = (source && value.source_repository !== source) || (host && value.analysis_repository !== host) || (publisher && value.publishing_repository !== publisher);
+        if (mismatch) throw Error('Published dashboard and live service configuration disagree. Check the repository configuration before launching.');
+        setConfiguration(value);
+        setReadiness(channelReadiness);
+      }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setBusy(false); });
+    }
     return () => { active = false; };
   }, [auth.session, source, host, publisher, repository, project, refresh]);
   const humanBytes=(n?:number|null)=>typeof n==='number'&&n>=0? (n>950_000_000? (n/1_000_000_000).toFixed(2)+' GB' : (n/1_000_000).toFixed(1)+' MB') : 'Unavailable';
@@ -37,7 +45,8 @@ export function Connections({ auth, source, host, publisher, endpoint, start, re
     ].filter(Boolean) as any}/>
      <Space wrap>{auth.session ? <><Button loading={busy} onClick={() => setRefresh(n => n + 1)}>Verify connections</Button><Button onClick={auth.signOut}>Sign out</Button></> : <Button disabled={!auth.available} onClick={auth.signIn}>Sign in to verify connections</Button>}{canLaunch&&<Button type="primary" disabled={!auth.session || busy || !configuration?.ready} onClick={start}>Choose revision to analyze</Button>}</Space>
     {(error || auth.error) && <Alert showIcon type="error" title="Connection check unavailable" description={error || auth.error}/>}
-    {configuration && <Alert showIcon type={configuration.ready ? 'success' : 'warning'} title={configuration.ready ? 'Launch configuration verified' : 'Configuration needs attention'} description={<><p>Configuration match: {configuration.configuration_matches ? 'yes' : 'no'}. Discovery workflow: {configuration.workflow_state}. Trusted workflow branch: {configuration.workflow_branch}. Checked {new Date(configuration.checked_at).toLocaleString()}.</p><p>{configuration.enabled_scanners.length} enabled channels: {configuration.enabled_scanners.join(', ')}.</p><p>This verifies routing and workflow availability. Scanner results determine which channels actually completed.</p></>}/>}
+     {configuration && <Alert showIcon type={configuration.ready ? 'success' : 'warning'} title={configuration.ready ? 'Launch configuration verified' : 'Configuration needs attention'} description={<><p>Configuration match: {configuration.configuration_matches ? 'yes' : 'no'}. Discovery workflow: {configuration.workflow_state}. Trusted workflow branch: {configuration.workflow_branch}. Checked {new Date(configuration.checked_at).toLocaleString()}.</p><p>{configuration.enabled_scanners.length} enabled channels: {configuration.enabled_scanners.join(', ')}.</p><p>This verifies routing and workflow availability. Scanner results determine which channels actually completed.</p></>}/>}
+     {readiness && <section className="channel-readiness" aria-label="Scanner channel readiness"><h3>Scanner profile readiness</h3><p>Profile prerequisites for this project; readiness does not prove a scan ran or completed.</p>{readiness.channels.length ? <ul>{readiness.channels.map(channel => <li key={channel.channel}><Tag color={channel.status === 'configured' ? 'green' : channel.status === 'deferred' ? 'default' : 'orange'}>{channel.status.replaceAll('_', ' ')}</Tag><strong>{channel.channel}</strong> {channel.reason}</li>)}</ul> : <p>No scanner channels are enabled or deferred for this project.</p>}<p>Checked {new Date(readiness.checked_at).toLocaleString()}.</p></section>}
     <h3>How analysis reaches this application</h3><ol><li>Sign in and select a branch, PR, or full commit SHA.</li><li>Cloudflare checks your GitHub permissions and submits the request to the configured workflow.</li><li>GitHub resolves the source revision and queues the scanners. Source execution has no publishing credentials.</li><li>The publisher validates current evidence, updates the target report, and the dashboard fetches it. Superseded assets are cleaned after successful publication; report changes do not rebuild the UI.</li></ol>
      <p>Project identities and scanner profiles come from the versioned execution-repository registry. Only repository administrators can change that registry; source code remains read-only to analysis workflows.</p>
   </section>;

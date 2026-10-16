@@ -73,8 +73,8 @@ def selection(config: dict, source: Path) -> tuple[list[str], dict, list[str]]:
     portable = profile.get('mode') == 'portable'
     if portable:
         from scripts.code_analysis.portable_profile import readiness
-        supported = readiness(profile)
         capabilities = discover_capabilities(source)
+        supported = readiness(profile)
         if capabilities['dependency_manifests']:
             supported.add('osv')
         languages = (['python'] if profile.get('python_root') and present(profile['python_root']) else []) + (['javascript-typescript'] if profile.get('javascript_root') and present(profile['javascript_root']) else [])

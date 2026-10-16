@@ -135,6 +135,62 @@ test('OAuth cancellation and unauthorized collaborators return safe dashboard er
   assert.equal(new URL(cancel.headers.get('Location')).hash,'#analysis_auth_error=cancelled');
 });
 
+test('collaborator-mode OAuth issues an exchange only after current membership verification', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const key = Buffer.from(await crypto.subtle.exportKey('pkcs8', pair.privateKey)).toString('base64');
+  const privateKey = `-----BEGIN PRIVATE KEY-----\n${key.match(/.{1,64}/g).join('\n')}\n-----END PRIVATE KEY-----`;
+  let membershipStatus = 204;
+  const calls = t.mock.method(globalThis, 'fetch', async (input, init) => {
+    const url = String(input);
+    if (url === 'https://github.com/login/oauth/access_token') return reply({ access_token: 'github-user-token' });
+    if (url === 'https://api.github.com/user') return reply({ login: 'developer' });
+    if (url === `https://api.github.com/repos/${EXECUTION_REPOSITORY}/installation`) return reply({ id: 771 });
+    if (url === 'https://api.github.com/app/installations/771/access_tokens') return reply({ token: 'central-app-token' });
+    if (url === `https://api.github.com/repos/${EXECUTION_REPOSITORY}/collaborators/developer`) {
+      assert.equal(init.headers.Authorization, 'Bearer central-app-token');
+      return new Response(null, { status: membershipStatus });
+    }
+    throw new Error(`Unexpected OAuth request: ${url}`);
+  });
+  const mode = {
+    ...env,
+    APPLICATION_MODE: 'repositories',
+    ANALYSIS_REPOSITORY: EXECUTION_REPOSITORY,
+    DASHBOARD_ACCESS: 'collaborators',
+    REPORT_ACCESS: 'collaborators',
+    GITHUB_APP_ID: 'collaborator-oauth-test',
+    GITHUB_APP_PRIVATE_KEY: privateKey,
+  };
+  let issued = 0;
+  const exchanges = exchangeBinding();
+  mode.AUTH_EXCHANGES = {
+    idFromName: name => exchanges.idFromName(name),
+    get(name) {
+      const stub = exchanges.get(name);
+      return { fetch(request) { if (new URL(request.url).pathname === '/issue') issued++; return stub.fetch(request); } };
+    },
+  };
+  const callback = async () => {
+    const login = await worker.fetch(new Request(`https://launcher.example/auth/login?challenge=${'c'.repeat(43)}`), mode);
+    const state = new URL(login.headers.get('Location')).searchParams.get('state');
+    const cookie = login.headers.get('Set-Cookie').split(';')[0];
+    return worker.fetch(new Request(`https://launcher.example/auth/callback?code=oauth&state=${state}`, { headers: { Cookie: cookie } }), mode);
+  };
+
+  const accepted = await callback();
+  assert.match(new URL(accepted.headers.get('Location')).hash, /^#analysis_auth=/);
+  assert.equal(issued, 1);
+  membershipStatus = 404;
+  const denied = await callback();
+  assert.equal(new URL(denied.headers.get('Location')).hash, '#analysis_auth_error=not_authorized');
+  assert.equal(issued, 1);
+  membershipStatus = 403;
+  const unavailable = await callback();
+  assert.equal(new URL(unavailable.headers.get('Location')).hash, '#analysis_auth_error=retry');
+  assert.equal(issued, 1);
+  assert.ok(calls.mock.calls.some(call => String(call.arguments[0]).endsWith('/collaborators/developer')));
+});
+
 test('authorized OAuth fails closed when one-time exchange storage is unavailable', async t => {
   const mode={...env,APPLICATION_MODE:'repositories',DASHBOARD_ACCESS:'disabled',REPORT_ACCESS:'public'};
   t.mock.method(globalThis,'fetch',async url=>String(url).includes('access_token')?reply({access_token:'github-token'}):reply({login:'developer'}));

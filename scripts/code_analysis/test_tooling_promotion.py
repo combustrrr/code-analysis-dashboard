@@ -18,7 +18,7 @@ class PromotionTests(unittest.TestCase):
     def test_sonar_profile_retains_vendor_identity(self):
         from pathlib import Path
         content=Path('sonar-project.properties').read_text()
-        self.assertIn('sonar.projectKey=combustrrr_Agentic-Kibana',content)
+        self.assertIn('sonar.projectKey=combustrrr_code-analysis-dashboard',content)
         self.assertIn('sonar.organization=combustrrr',content)
 
     def test_promotion_is_separate_from_credential_free_validation(self):

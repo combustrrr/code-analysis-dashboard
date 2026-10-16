@@ -24,7 +24,7 @@ class PortabilityTests(unittest.TestCase):
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.touch()
                 jobs, excluded, _ = selection(self.config(), root)
-                self.assertEqual(set(jobs), PORTABLE_JOBS)
+                self.assertEqual(set(jobs), PORTABLE_JOBS | {'snyk', 'sonarqube-cloud'})
                 self.assertEqual(excluded['atheris']['status'], 'NOT_AVAILABLE')
                 self.assertNotIn('DEFERRED', {v['status'] for v in excluded.values()})
 
@@ -51,6 +51,22 @@ class PortabilityTests(unittest.TestCase):
             self.assertNotIn('osv', excluded)
             self.assertIn('hadolint', excluded)
 
+    def test_portable_selection_keeps_vendor_scanners_in_the_exact_report(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'scripts/code_analysis').mkdir(parents=True)
+            (root / 'analysis-ui').mkdir()
+            (root / '.ci').mkdir()
+            (root / '.ci/requirements.txt').touch()
+            (root / 'analysis-ui/package-lock.json').touch()
+            config = self.config()
+            config['profile'].update(python_root='scripts/code_analysis', javascript_root='analysis-ui')
+            jobs, excluded, _ = selection(config, root)
+            self.assertIn('snyk', jobs)
+            self.assertIn('sonarqube-cloud', jobs)
+            self.assertNotIn('snyk', excluded)
+            self.assertNotIn('sonarqube-cloud', excluded)
+
     def test_portable_workflow_contains_no_original_project_harness(self):
         workflow = generate(self.config())
         jobs = yaml.safe_load(workflow)['jobs']
@@ -74,6 +90,7 @@ class PortabilityTests(unittest.TestCase):
             self.assertEqual(a, b)
             self.assertEqual(a['source_repository'], launcher['vars']['SOURCE_REPOSITORY'])
             self.assertEqual(launcher['vars']['DASHBOARD_ORIGIN'], 'https://example.github.io')
+            self.assertEqual(launcher['vars']['DASHBOARD_BASE_PATH'], '/dashboard/')
             self.assertNotIn('combustrrr', json.dumps(launcher))
             with self.assertRaises(FileExistsError):
                 bundle(*args)

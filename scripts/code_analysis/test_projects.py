@@ -33,6 +33,21 @@ class ProjectTests(unittest.TestCase):
         report['target']['head_sha'] = 'c' * 40
         self.assertFalse(native_feedback_allowed(doc, '1', report))
 
+    def test_connected_read_only_project_disables_github_feedback(self):
+        doc = config()
+        project = doc['projects'][0]
+        project.update(id='1', relationship='connected', source_repository=doc['execution_repository'],
+                       native_feedback_enabled=False)
+        report = {'analyzed_sha': 'b' * 40, 'target': {'repository': 'owner/runner',
+                  'source_repository': 'owner/runner', 'head_sha': 'b' * 40}}
+        self.assertFalse(native_feedback_allowed(doc, '1', report))
+
+    def test_native_feedback_policy_must_be_boolean(self):
+        doc = config()
+        doc['projects'][0]['native_feedback_enabled'] = 'false'
+        with self.assertRaisesRegex(ValueError, 'native_feedback_enabled'):
+            validate(doc)
+
     def test_rename_preserves_project_namespace(self):
         original = config()
         renamed = copy.deepcopy(original)

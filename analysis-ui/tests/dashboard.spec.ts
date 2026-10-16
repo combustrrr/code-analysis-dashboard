@@ -310,8 +310,9 @@ test('connections verify live configuration without claiming scanner completion'
     if(url.pathname==='/api/auth/redeem') return route.fulfill({headers,json:{token:'connection-session',login:'developer'}});
     if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
     if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false,projects:[{id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
-    expect(url.pathname).toBe('/api/project-integration');
     expect(url.searchParams.get('repository')).toBe(null);expect(url.searchParams.get('project_id')).toBe('1278177697');
+    if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{channels:[{channel:'ruff',status:'configured',reason:'Profile supports this channel.'},{channel:'coverage',status:'deferred',reason:'Deferred by the project owner.'},{channel:'semgrep',status:'setup_required',reason:'No reviewed adapter is configured.'}],checked_at:new Date().toISOString()}});
+    expect(url.pathname).toBe('/api/project-integration');
     return route.fulfill({headers,json:{source_repository:source,analysis_repository:execution,publishing_repository:execution,workflow_branch:'main',workflow_state:ready?'active':'disabled_manually',configuration_matches:true,ready,enabled_scanners:['ruff','coverage'],checked_at:new Date().toISOString()}});
   });
   await page.goto('/#'+new URLSearchParams({tab:'connections',repository:execution,project:'1278177697'}));
@@ -321,6 +322,11 @@ test('connections verify live configuration without claiming scanner completion'
   await page.getByRole('button',{name:'Verify connections'}).click();
   await expect(page.getByText('Launch configuration verified')).toBeVisible();
   await expect(page.getByText('This verifies routing and workflow availability. Scanner results determine which channels actually completed.')).toBeVisible();
+  const channelReadiness=page.getByRole('region',{name:'Scanner channel readiness'});
+  await expect(channelReadiness).toContainText('configured');
+  await expect(channelReadiness).toContainText('deferred');
+  await expect(channelReadiness).toContainText('setup required');
+  await expect(channelReadiness).toContainText('No reviewed adapter is configured.');
   ready=false;
   await page.getByRole('button',{name:'Verify connections'}).click();
   await expect(page.getByText('Configuration needs attention')).toBeVisible();

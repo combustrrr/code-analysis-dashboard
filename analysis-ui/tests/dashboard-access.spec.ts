@@ -163,7 +163,7 @@ test('repository deep links open the authenticated workspace with a shared theme
  await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
-   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true,execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'}}});
+  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
    if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
    if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'workspace-session',login:'developer'}});
   expect(route.request().headers().authorization).toBe('Bearer workspace-session');
@@ -205,7 +205,7 @@ test('workspace intent survives a transient hash reset while GitHub access is ch
  await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
-  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
+   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true,execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'}}});
    if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
    if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'workspace-intent',login:'developer'}});
   expect(route.request().headers().authorization).toBe('Bearer workspace-intent');
@@ -223,24 +223,56 @@ test('workspace intent survives a transient hash reset while GitHub access is ch
  });
 
 test('authorization restores the exact requested repository route',async({page,context})=>{
- test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
- const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
-  const destination='#repository=combustrrr%2Fcode-analysis-dashboard&project=1278177697&target=target-1&tab=issues&issue=F-1';
- await context.route('https://launcher.example/**',async route=>{
+  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+  const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+   const destination='#repository=combustrrr%2Fcode-analysis-dashboard&project=1278177697&target=target-1&tab=issues&issue=F-1';
+  const requestOrder:string[]=[];
+  let projectsVerified=false;
+  await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'route-session',login:'developer'}});
-  if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
-   if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:'combustrrr/code-analysis-dashboard',project_id:'1278177697',checked_at:new Date().toISOString(),preferred_branch:'Testing',targets:[]}});
-   if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
+   if(url.pathname==='/api/session'){requestOrder.push('session');return route.fulfill({headers,json:{login:'developer'}});}
+    if(url.pathname==='/api/projects'){
+     requestOrder.push('projects');projectsVerified=true;
+     return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
+    }
+    if(url.pathname==='/api/public/manifest'){
+     expect(projectsVerified).toBe(true);requestOrder.push('manifest');
+     return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:'combustrrr/code-analysis-dashboard',project_id:'1278177697',checked_at:new Date().toISOString(),preferred_branch:'Testing',targets:[]}});
+    }
   throw new Error(`Unexpected request ${url.pathname}`);
  });
  await page.goto('/'+destination);
+  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
+  await expect(page.getByRole('heading',{name:'Code quality dashboard'})).toBeVisible();
+  await expect.poll(()=>new URL(page.url()).hash).toBe(destination);
+  expect(requestOrder.indexOf('session')).toBeLessThan(requestOrder.indexOf('projects'));
+  expect(requestOrder.indexOf('projects')).toBeLessThan(requestOrder.indexOf('manifest'));
+ });
+
+test('a removed requested project is not restored or fetched after sign-in',async({page,context})=>{
+ test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+ const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+ let reportRequests=0;
+ await context.route('https://launcher.example/**',async route=>{
+  const url=new URL(route.request().url());
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true,require_report_login:true}});
+  if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`} });
+  if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'stale-project-session',login:'developer'}});
+  if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
+  if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
+  if(url.pathname==='/api/public/manifest'){reportRequests++;return route.fulfill({headers,json:{targets:[]}});}
+  throw new Error(`Unexpected request ${url.pathname}`);
+ });
+ await page.goto('/#repository=combustrrr%2Fcode-analysis-dashboard&project=1278177697&tab=issues');
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
- await expect(page.getByRole('heading',{name:'Code quality dashboard'})).toBeVisible();
- await expect.poll(()=>new URL(page.url()).hash).toBe(destination);
+ await expect(page.getByText(/The requested project is no longer configured/)).toBeVisible();
+ expect(new URL(page.url()).hash).toBe('');
+ expect(reportRequests).toBe(0);
 });
 
 test('reloads and new tabs require a fresh in-memory sign-in',async({page,context})=>{
@@ -293,7 +325,11 @@ test('authorized user follows one repository project from selection through publ
    if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'flow-session',login:'developer'}});
   expect(route.request().headers().authorization).toBe('Bearer flow-session');
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
-   if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false,projects:[{id:project,source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
+    if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false,projects:[
+     {id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false},
+     {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false},
+     {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:true},
+    ]}});
   if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:project,checked_at:new Date().toISOString(),preferred_branch:'Testing',targets:published?[{id:'published-target',label:'Testing',repository:source,source_repository:source,head_sha:sha,kind:'branch',branch:'Testing',checked_at:new Date().toISOString(),status:'partial',collected_run:43,documents:{'report.json':assetName,'findings.json':assetName},assets}]:[]}});
   if(url.pathname==='/api/public/asset')return route.fulfill({headers,body:compressedReport});
   if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:source,branches:[{name:'Testing',sha}],prs:[]}});
@@ -310,11 +346,14 @@ test('authorized user follows one repository project from selection through publ
   throw new Error(`Unexpected request ${url.pathname}`);
  });
   await page.goto('/');
-  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
-  await expect(page.locator('.landing-actions').getByRole('button',{name:'Open workspace'})).toBeVisible();
-  await page.locator('.landing-actions').getByRole('button',{name:'Open workspace'}).click();
-  await expect(page.getByRole('heading',{name:'Choose a codebase'})).toBeVisible();
-  await page.getByRole('button',{name:'Open report'}).click();
+   await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
+   await expect(page.locator('.landing-actions').getByRole('button',{name:'Open workspace'})).toBeVisible();
+   await page.locator('.landing-actions').getByRole('button',{name:'Open workspace'}).click();
+   await expect(page.getByRole('heading',{name:'Choose a codebase'})).toBeVisible();
+   await expect(page.locator('.target-card')).toHaveCount(3);
+   await expect(page.getByText('OBSERVER · READ-ONLY SOURCE')).toHaveCount(2);
+   await expect(page.getByText('CONNECTED · SELF-ANALYSIS')).toHaveCount(1);
+   await page.locator('.target-card').filter({hasText:source}).getByRole('button',{name:'Open report'}).click();
   await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toBeVisible();
   const selected=new URLSearchParams(new URL(page.url()).hash.slice(1));
   expect(selected.get('repository')).toBe(execution);

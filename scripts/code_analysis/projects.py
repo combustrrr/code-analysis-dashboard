@@ -55,6 +55,9 @@ def validate(document: dict) -> dict:
             raise ValueError('Explicit scanner selection is required')
         if not isinstance(project.get('deferred_channels', {}), dict):
             raise ValueError('Invalid scanner deferrals')
+        if ('native_feedback_enabled' in project
+                and not isinstance(project['native_feedback_enabled'], bool)):
+            raise ValueError('native_feedback_enabled must be a boolean')
         if set(project['enabled_scanners']) & set(project.get('deferred_channels', {})):
             raise ValueError('A scanner cannot be enabled and deferred')
         if any(not isinstance(x, str) or not x.strip() for x in project.get('deferred_channels', {}).values()):
@@ -89,7 +92,8 @@ def service_config(document: dict, project_id: str, template: dict) -> dict:
 def native_feedback_allowed(document: dict, project_id: str, report: dict) -> bool:
     document = validate(document)
     project = next((p for p in document['projects'] if p['id'] == project_id), None)
-    if project is None or project['relationship'] != 'connected':
+    if (project is None or project['relationship'] != 'connected'
+            or project.get('native_feedback_enabled', True) is not True):
         return False
     target = report.get('target', {})
     source = project['source_repository']['full_name'].lower()

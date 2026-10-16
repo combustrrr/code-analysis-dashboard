@@ -35,6 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
+          repository: ${{ fromJSON(inputs.target).source_repository }}
           ref: ${{ fromJSON(inputs.target).head_sha }}
           path: .source
           persist-credentials: false
@@ -81,6 +82,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
+          repository: ${{ fromJSON(inputs.target).source_repository }}
           ref: ${{ fromJSON(inputs.target).head_sha }}
           path: .source
           persist-credentials: false
@@ -94,6 +96,24 @@ jobs:
       - name: Record Sonar unavailable status
         if: env.SONAR_TOKEN == ''
         run: printf '%s\n' '{"schema_version":"1","scanner_family":"SonarQube Cloud","status":"NOT_CONFIGURED","reason":"SONAR_TOKEN is not configured"}' > sonar-status.json
+      - name: Prepare isolated Sonar project settings
+        if: env.SONAR_TOKEN != ''
+        env:
+          SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+          SOURCE_SHA: ${{ fromJSON(inputs.target).head_sha }}
+        run: |
+          set -euo pipefail
+          organization="${SOURCE_REPOSITORY%%/*}"
+          project_key="${SOURCE_REPOSITORY//\//_}"
+          cat > "$RUNNER_TEMP/sonar-project.properties" <<EOF
+          sonar.projectKey=$project_key
+          sonar.organization=$organization
+          sonar.projectName=$SOURCE_REPOSITORY
+          sonar.sources=.
+          sonar.sourceEncoding=UTF-8
+          sonar.scm.revision=$SOURCE_SHA
+          sonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/.venv/**,**/vendor/**
+          EOF
       - name: Run SonarQube analysis
         if: env.SONAR_TOKEN != ''
         continue-on-error: true
@@ -101,9 +121,7 @@ jobs:
         with:
           projectBaseDir: .source
           args: >-
-            -Dsonar.projectKey=${{ fromJSON(inputs.target).source_repository }}
-            -Dsonar.projectName=${{ fromJSON(inputs.target).source_repository }}
-            -Dsonar.scm.revision=${{ fromJSON(inputs.target).head_sha }}
+            -Dproject.settings=${{ runner.temp }}/sonar-project.properties
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       - name: Record Sonar completion status

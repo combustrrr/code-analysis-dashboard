@@ -78,6 +78,37 @@ class ScannerAccessTests(unittest.TestCase):
         self.assertIn('steps.sonar-project.outputs.project_key', sonar_text)
         self.assertNotIn('combustrrr_Agentic-Kibana', sonar_text)
 
+    def test_portable_vendor_jobs_checkout_the_selected_source_read_only(self):
+        from pathlib import Path
+        workflow = yaml.safe_load(Path('.github/workflows/reusable-vendor.yml').read_text())
+        source_checkouts = [step for job in ('snyk', 'sonar')
+                            for step in workflow['jobs'][job]['steps']
+                            if step.get('uses', '').startswith('actions/checkout@')
+                            and step.get('with', {}).get('path') == '.source']
+        self.assertEqual(len(source_checkouts), 2)
+        for step in source_checkouts:
+            self.assertEqual(step['with']['repository'], '${{ fromJSON(inputs.target).source_repository }}')
+            self.assertEqual(step['with']['ref'], '${{ fromJSON(inputs.target).head_sha }}')
+            self.assertFalse(step['with']['persist-credentials'])
+
+    def test_portable_sonar_does_not_trust_source_controlled_project_properties(self):
+        workflow = yaml.safe_load(Path('.github/workflows/reusable-vendor.yml').read_text())
+        steps = workflow['jobs']['sonar']['steps']
+        settings = next(step for step in steps if step.get('name') == 'Prepare isolated Sonar project settings')
+        scan = next(step for step in steps if step.get('name') == 'Run SonarQube analysis')
+        self.assertIn('sonar.sources=.', settings['run'])
+        self.assertIn('sonar.organization=$organization', settings['run'])
+        self.assertIn('${{ runner.temp }}/sonar-project.properties', scan['with']['args'])
+        self.assertNotIn('sonar.projectKey=${{', scan['with']['args'])
+
+    def test_reconciliation_cannot_publish_checks_or_security_events_to_sources(self):
+        for path in ('.github/workflows/code-analysis-reconcile.yml',
+                     '.github/workflows/reusable-reconcile.yml'):
+            workflow = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
+            permissions = workflow['jobs']['reconcile']['permissions']
+            self.assertNotIn('checks', permissions)
+            self.assertNotIn('security-events', permissions)
+
 
 if __name__ == '__main__':
     unittest.main()

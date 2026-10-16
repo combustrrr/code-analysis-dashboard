@@ -38,8 +38,21 @@ test('read-only collaborators can list the exact fixed target registry',async()=
   assert.equal(result.can_launch,false);
   assert.equal(result.can_configure,false);
   assert.deepEqual(result.projects.map(project=>project.id),CONFIGURED_TARGETS.map(project=>project.id));
+  assert.deepEqual(result.projects.map(({id,relationship})=>[id,relationship]),CONFIGURED_TARGETS.map(({id,relationship})=>[id,relationship]));
   assert.ok(h.calls.some(call=>call.path.includes('/contents/.github/code-analysis/projects.json')&&call.token==='central-app-read-token'));
   assert.ok(!JSON.stringify(result).includes('user-token'));
+});
+
+test('trusted legacy scanner profiles remain listable while portable profiles are validated',async()=>{
+  const legacyConfig={...config,projects:config.projects.map((project,index)=>index===0?{...project,profile:{python_root:'backend',python_test_command:['python','-m','pytest'],snyk_python_manifests:['backend/requirements.txt']}}:project)};
+  const legacyHelpers=helpers({overrides:{[`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`]:{content:Buffer.from(JSON.stringify(legacyConfig)).toString('base64')}}});
+  const response=await repositoryApi(get('/api/projects'),env,session,legacyHelpers);
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).projects.length,CONFIGURED_TARGETS.length);
+
+  const invalidConfig={...config,projects:config.projects.map((project,index)=>index===0?{...project,profile:{mode:'portable',commands:{eslint:{cwd:'../outside',argv:['eslint','.']}}}}:project)};
+  const invalidHelpers=helpers({overrides:{[`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`]:{content:Buffer.from(JSON.stringify(invalidConfig)).toString('base64')}}});
+  await assert.rejects(()=>repositoryApi(get('/api/projects'),env,session,invalidHelpers),error=>error.status===503&&error.code==='project_profile_invalid');
 });
 
 test('read-only collaborators can inspect configured project readiness',async()=>{

@@ -55,18 +55,8 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
     handledCallback.current = true;
     history.replaceState(null, '', location.pathname + location.search);
 
-    const restoreLocation = () => {
-      const destination = pendingAuthDestination();
-      if (!destination) return;
-      try {
-        const target = new URL(destination, location.origin);
-        if (target.origin === location.origin) history.replaceState(null, '', target.pathname + target.search + target.hash);
-      } catch {}
-    };
     const fail = (message: string) => {
       try { sessionStorage.removeItem(VERIFIER_KEY); } catch {}
-      restoreLocation();
-      window.dispatchEvent(new Event('hashchange'));
       setError(message);
     };
 
@@ -92,6 +82,34 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
       let verificationResult: { code?: string } = {};
       try { verificationResult = await verification.json(); } catch {}
       if (!verification.ok) throw new Error(friendlyAuthError(verificationResult.code));
+      const destination = pendingAuthDestination();
+      let requestedProject: { repository: string | null; id: string } | undefined;
+      if (destination) {
+        try {
+          const target = new URL(destination, location.origin);
+          const parameters = new URLSearchParams(target.hash.slice(1));
+          const project = parameters.get('project');
+          if (target.origin === location.origin && project) requestedProject = { repository: parameters.get('repository'), id: project };
+        } catch {}
+      }
+      if (requestedProject) {
+        let registryResponse: Response;
+        try {
+          registryResponse = await fetch(`${origin}/api/projects`, { cache: 'no-store', credentials: 'omit', headers: { Authorization: `Bearer ${result.token}` } });
+        } catch {
+          throw new Error('Configured projects could not be verified. Check your connection and retry.');
+        }
+        if (!registryResponse.ok) throw new Error('Configured projects could not be verified. Retry sign-in.');
+        let registry: { execution_repository?: { id?: number; full_name?: string }; projects?: Array<{ id: string | number }> } = {};
+        try { registry = await registryResponse.json(); } catch {}
+        if (!Number.isSafeInteger(registry.execution_repository?.id) || !registry.execution_repository?.full_name || !Array.isArray(registry.projects)) {
+          throw new Error('The configured project registry could not be verified. Retry sign-in.');
+        }
+        if (requestedProject.repository?.toLowerCase() !== registry.execution_repository.full_name.toLowerCase() || !registry.projects.some(value => String(value.id) === requestedProject.id)) {
+          try { sessionStorage.removeItem(RETURN_KEY); } catch {}
+          throw new Error('The requested project is no longer configured. Retry sign-in and choose a current project.');
+        }
+      }
       setSession({ token: result.token, login: result.login });
       setVerified(true);
       setError('');

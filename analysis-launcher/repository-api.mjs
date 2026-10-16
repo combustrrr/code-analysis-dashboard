@@ -61,7 +61,10 @@ export async function repositoryApi(request, env, session, helpers) {
   async function projectFor(configuration, id) {
     const project = configuration.projects.find(value => String(value.id) === String(id));
     if (!project || !CONFIGURED_TARGETS.some(value => value.id === String(id))) throw new Failure(404, 'Configured project is unavailable.', 'project_unavailable');
-    try { validatePortableProfile(project.profile); }
+    try {
+      if (!project.profile || typeof project.profile !== 'object' || Array.isArray(project.profile) || !Object.keys(project.profile).length) throw new Error('A project profile is required.');
+      if (project.profile.mode === 'portable') validatePortableProfile(project.profile);
+    }
     catch { throw new Failure(503, 'The configured project profile is invalid.', 'project_profile_invalid'); }
     let source;
     try { source = await github(`repos/${project.source_repository.full_name}`, token); }

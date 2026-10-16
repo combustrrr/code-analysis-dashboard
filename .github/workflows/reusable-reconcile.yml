@@ -23,8 +23,6 @@ jobs:
     permissions:
       contents: write
       actions: write
-      checks: write
-      security-events: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
