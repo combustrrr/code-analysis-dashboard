@@ -65,7 +65,8 @@ authorization and report delivery. Reports are not bundled into the UI build.
 The checked-in project registry targets `ARYDESTROYER/Kavach-AgenticSOC`,
 `combustrrr/code-analysis-dashboard`, and `combustrrr/Agentic-Kibana`; the dashboard is
 the fixed execution host and its self-analysis target. Registry/workflow changes are
-local until deployed. Independent external-owner installations are not part of the
+deployed to the fixed service as part of the 2026-10-16 configured-source rollout.
+Independent external-owner installations are not part of the
 dashboard onboarding flow.
 
 See [migration status](docs/MIGRATION.md) and

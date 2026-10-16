@@ -1,9 +1,9 @@
 # Read-only analysis workflow
 
-The configured-source implementation described below is local and has not been deployed
-as of 2026-10-16. The last verified production baseline is recorded in
-[HANDOFF.md](../HANDOFF.md). Do not infer that the live Worker, Pages UI, or workflows
-already enforce these local semantics.
+The configured-source implementation described below was deployed on 2026-10-16. The
+Worker, workflows, and Pages rollout order and versions are recorded in
+[HANDOFF.md](../HANDOFF.md). No production source-analysis scan was triggered during
+deployment; use the source report provenance to verify any later scan independently.
 
 This runbook covers the three public source targets configured on the fixed analysis host:
 
