@@ -1,13 +1,10 @@
 # New-chat handoff: Code Analysis Dashboard
 
-Last verified deployed baseline: 2026-10-14, main commit
-`216393820ab8ca05c4729115ceb98dfec1d7ce0e0`. Worker version
-`63068c97-2f88-4121-8539-d97ff0729a19` is live with the fixed-host dashboard access
-configuration. This is the service handoff; read it
+Latest verified deployment: 2026-10-16, main commit
+`5fac872f0b30fe1f116185793a8ffe0846b6304a`, Pages run `38889165977`. The active Worker
+version is `35e6c6a4-097c-40a9-8c48-456092987be8`. This is the service handoff; read it
 before AGENTS.md, README.md and the current architecture guide. Old session documents
-are historical evidence, not instructions to restore old hosting. The configured-source
-project implementation is currently local and not deployed; do not assume the live
-Worker, Pages UI, or workflows provide its manual FIFO/channel/overlay behavior yet.
+are historical evidence, not instructions to restore old hosting.
 
 ## Repository and deployment boundaries
 
@@ -22,13 +19,21 @@ Worker, Pages UI, or workflows provide its manual FIFO/channel/overlay behavior 
   product fork. No writes to upstream are authorized.
 - Website: https://combustrrr.github.io/code-analysis-dashboard/
 - Worker: https://code-analysis-launcher.icsarthak9.workers.dev
-- Pages deployment is triggered by the main branch workflow. Pages run
-  `38598467689` deployed commit `216393820ab8ca05c4729115ceb98dfec1d7ce0e0`.
-  The workflow artifact and live site both reference `assets/index-Dl9P-4d-.js` and
-  `assets/index-D9a50ibX.css`. Worker version
-  `63068c97-2f88-4121-8539-d97ff0729a19` is active. Live `/api/public/config` reports
-  `require_login=true` and `require_report_login=true`; anonymous `/api/projects`,
-  `/api/public/projects`, and `/api/public/manifest` requests returned `401`.
+- Pages deployment is triggered by the main branch workflow. Run `38889165977` deployed
+  commit `5fac872f0b30fe1f116185793a8ffe0846b6304a`; live HTML references
+  `assets/index-DBJkr9AJ.js` and `assets/index-DnQgVVvr.css`, both verified `200`.
+  Worker version `35e6c6a4-097c-40a9-8c48-456092987be8` is active. Live
+  `/api/public/config` reports `require_login=true` and `require_report_login=true`;
+  anonymous project/report API requests returned `403`.
+
+## 2026-10-16 configured-source rollout
+
+Backend/workflow commit `1675f105af2b82cf0181b81aa627eb1e60c54e60` was pushed first; its
+required `Scanner compatibility` check was then run on that exact SHA and passed. The
+normal push response reported that GitHub had bypassed the expected check before that
+manual run. UI/docs PR #45 passed the required check and merged as
+`5fac872f0b30fe1f116185793a8ffe0846b6304a`; Worker deployment preceded Pages run
+`38889165977`. No production source-analysis scan was triggered.
 
 ## 2026-10-14 project profile validation fix
 
@@ -42,7 +47,7 @@ read was not run because no signed-in browser session was available.
 
 ## What is implemented
 
-The local source implements an Ant Design application with light/dark themes, current
+The deployed source implements an Ant Design application with light/dark themes, current
 source/target/revision provenance, overview charts, issues, scanners, connections and a
 fixed-host project catalog. Its repository-mode flow is: sign in, choose one of the three
 trusted projects, inspect its current report, then (with execution-host write access)
@@ -73,7 +78,7 @@ confidential storage guarantees.
 ## Execution and storage
 
 Trusted profiles: `.github/code-analysis/projects.json` on execution default branch.
-The local source accepts only explicit `analysis-request-v2` intents from the bounded
+The deployed source accepts only explicit `analysis-request-v2` intents from the bounded
 FIFO (maximum 100), processes one source revision globally, and sequences selected
 producer lanes for that pinned SHA. Scheduled reconciliation is recovery-only and never
 creates scans from branch/PR discovery. A 202 means accepted/queued. Exact source
@@ -133,11 +138,10 @@ Sonar branch entitlement and upstream posture access. Do not buy plans or modify
 upstream. The dashboard does not offer arbitrary repository onboarding or per-user App
 installation. Project access is limited to the fixed host and its validated registry.
 
-Next chat: distinguish the deployed baseline from the un-deployed configured-source
-implementation in the working tree. Before cutover, run the full service, launcher,
-workflow-audit, deployment, and UI checks; then verify prerequisites and obtain separate
-authorization for any deployment. Preserve unrelated local edits, never log secrets,
-and record material operational changes in the relevant current/operations documentation.
+Next chat: use the deployed configured-source implementation as the current baseline.
+Preserve unrelated local edits, never log secrets, and record material operational
+changes in the relevant current/operations documentation. No live source scan was run
+during this rollout; scanner completion must be verified from its own report evidence.
 See README.md for validation commands and docs/README.md for guides.
 
 ## 2026-09-12 free-service operations update

@@ -1,12 +1,12 @@
 # Current implementation state
 
-The latest verified Pages deployment is run `38598467689` for main commit
-`216393820ab8ca05c4729115ceb98dfec1d7ce0e0`; its live HTML references the same JavaScript
-and CSS assets recorded in the workflow build log. The active Worker is
-`63068c97-2f88-4121-8539-d97ff0729a19`. Its public config requires login for dashboard and
-report routes, and anonymous project/report API checks returned `401` after rollout.
+The latest verified Pages deployment is run `38889165977` for main commit
+`5fac872f0b30fe1f116185793a8ffe0846b6304a`; live HTML references
+`assets/index-DBJkr9AJ.js` and `assets/index-DnQgVVvr.css`, both verified `200`. The
+active Worker is `35e6c6a4-097c-40a9-8c48-456092987be8`. Its public config requires login
+for dashboard and report routes, and anonymous project/report API checks returned `403`.
 
-The local source now fixes execution, storage and publishing to
+The deployed source fixes execution, storage and publishing to
 `combustrrr/code-analysis-dashboard` (ID `1360051890`). Its trusted registry contains
 Kavach-AgenticSOC (`1267340546`), service self-analysis (`1360051890`), and
 Agentic-Kibana (`1278177697`). Read-only collaborators can browse reports; execution
@@ -30,17 +30,14 @@ security posture permissions. A successful advisory workflow is not a complete s
 report. Another collaborator's live sign-in is not a verified deployment check; the
 access behavior is covered by local browser/API tests.
 
-Pages deployments are triggered from main. The latest rollout is commit
-`216393820ab8ca05c4729115ceb98dfec1d7ce0e0` in run `38598467689`; the live site serves
-`assets/index-Dl9P-4d-.js` and `assets/index-D9a50ibX.css`, matching the uploaded build
-artifact. At that Pages rollout, Worker version `a56a008d-7de0-4d66-8717-b7b41aa6b53d`
-was active with `require_login=true` and `require_report_login=true`; anonymous project
-and report API requests were denied with `401`.
-This deployed baseline predates the configured-source implementation now in the local
-working tree. The older deployment used a Kavach Evaluation Mode target; the local
-implementation removes the frozen SHA and dispatch budget. No claim is made that this
-local policy is active in production until the Worker, report reader, workflows, and UI
-are cut over in the required order.
+Pages deployments are triggered from main. The previous 2026-10-14 rollout was run
+`38598467689`; the older deployment used a Kavach Evaluation Mode target. The
+2026-10-16 configured-source rollout removed the frozen SHA and dispatch budget.
+Backend/workflow commit `1675f105af2b82cf0181b81aa627eb1e60c54e60` landed first; its
+Scanner compatibility check was manually run on that exact SHA and passed after GitHub
+reported an expected-check bypass on the normal push. UI/docs PR #45 passed the required
+check and merged as `5fac872f0b30fe1f116185793a8ffe0846b6304a`; Worker deployment
+preceded Pages run `38889165977`. No production source-analysis scan was triggered.
 
 Operational safeguards: generated source and reusable workflows must be regenerated
 from their scripts and kept in parity with checked-in outputs. Signed webhook replay
@@ -132,18 +129,17 @@ project. The selected branch, pull request, or commit remains preserved as
 provenance, while bounded `recent_runs` metadata supports launch polling and
 superseded-request reporting without creating multiple current reports.
 
-## 2026-10-16 Configured-Source Implementation (Local)
+## 2026-10-16 Configured-Source Implementation (Deployed)
 
 The sole implementation specification is
-`.kilo/plans/1791898173827-configured-source-project.md`. Its changes are local and
-not deployed; the production baseline above remains the last verified deployment.
-The local source supports explicit preview then confirmation, immutable
+`.kilo/plans/1791898173827-configured-source-project.md`. The deployed source supports
+explicit preview then confirmation, immutable
 `analysis-request-v2` envelopes, idempotency, FIFO with one active source revision
 globally, per-channel producer lanes and matching-evidence reuse, and incremental
 same-SHA merge. Scheduled reconciliation is recovery-only. Channel states distinguish
 requested/running/completed/failed from `NOT_SELECTED`, `NOT_APPLICABLE`, and `DEFERRED`.
 
-Local reports retain one source-only report per configured repository and one optional
+Reports retain one source-only report per configured repository and one optional
 PR overlay. Source report identity is configured project/repository + SHA + tooling +
 profile. PR overlay identity adds the PR number, head repository/SHA, and base SHA; its
 CodeRabbit asset is stored and read separately so PR evidence never contaminates source-
@@ -153,7 +149,6 @@ state. Superseded content-addressed assets are deleted after manifest commit. Na
 feedback is disabled for all three configured projects. Public GitHub Actions artifacts remain
 publicly accessible regardless of dashboard authentication.
 
-Before cutover, run the service, launcher, workflow audit, deployment, and UI checks,
-then verify migration prerequisites. Deploy the Worker/report reader and trusted
-workflows before exposing the matching UI. No production scan or deployment was
-performed for this local implementation.
+The rollout passed service tests, launcher tests, workflow audit, Worker dry run,
+Worker deployment, UI build, focused browser flows, and the required PR compatibility
+check. Deployment changed the Worker and dashboard only; no production scan was run.

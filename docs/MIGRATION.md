@@ -51,8 +51,8 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
    deployment.
 5. Deploy the Worker/report reader and trusted workflows before exposing the matching
    UI. Retain backward reading of `analysis-current-v1` manifests through the first
-   valid new publication. The implementation in the working tree is not evidence of a
-   production rollout.
+   valid new publication. This order was completed for the 2026-10-16 rollout; see
+   [HANDOFF.md](HANDOFF.md) for the Worker version and Pages run.
 6. Do not retire an active host or alter an upstream repository without separate,
    explicit authorization.
 
