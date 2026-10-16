@@ -37,9 +37,12 @@ npm run build
 For the already configured analysis instance, sign in and open **Projects** to browse
 the service's three trusted targets. Selecting a project opens its current report and
 does not trigger a scan. Users with write access to the fixed execution host can
-separately choose **Run analysis** against a configured branch, PR, or exact commit SHA;
-repository administration is required to change the versioned target registry. There is
-no per-user execution-repository selection or App installation flow. See the
+separately choose **Run analysis**, select a branch, open PR, or full commit SHA, inspect
+the resolved SHA and scanner selection, and explicitly confirm the request. A 202 means
+queued, not completed. Requests run FIFO with one active source revision globally;
+selected scanner lanes for that revision may run concurrently. Repository administration
+is required to change the versioned target registry. There is no per-user
+execution-repository selection or App installation flow. See the
 [read-only analysis runbook](docs/operations/READ_ONLY_ANALYSIS.md) for the end-to-end
 steps, source boundaries, and storage locations.
 
@@ -49,8 +52,8 @@ checks/SARIF to either analyzed source. Service request state and reports are st
 separately by the control plane, as documented in the runbook.
 
 Each execution repository runs its own Actions. GitHub Releases retain the bounded
-request queue and compatibility state; current reports and temporary producer
-artifacts are stored in Cloudflare R2. Small wrappers reference immutable shared
+manual request queue and compatibility state; current source-only reports, the single
+current PR overlay, and temporary producer artifacts are stored in Cloudflare R2. Small wrappers reference immutable shared
 workflows in this service repository. Scanner credentials are supplied by that
 repository's owner; configuration alone does not prove usable scanner evidence.
 Source-only observer projects do not upload checks or security findings to the source.
@@ -81,15 +84,24 @@ The Threat Report view adds deterministic catalog explanations, potential impact
 remediation steps, coverage limitations, private links, JSON/Markdown downloads, and
 print-to-PDF output without changing the underlying scanner evidence.
 
-Evaluation mode is enabled only for the configured Kavach `Testing` branch. It freezes
-one exact commit SHA and permits one durable dispatch budget. Refreshing the dashboard
-does not launch work; only an explicit **Run analysis** action can consume that budget.
-Duplicate request assets are idempotent and return the existing queued request.
+Analysis launches are manual only. Scheduled reconciliation recovers already accepted
+durable requests; it never discovers a branch/PR and creates work. Each immutable
+`analysis-request-v2` envelope pins the configured project, selected revision SHA,
+tooling/profile digests, selected channels, actor, and idempotency key. Matching channel
+evidence is reused unless **Run again** is selected. Same-SHA publication replaces only
+validated selected channels; unselected channels are `NOT_SELECTED`, distinct from
+`NOT_APPLICABLE`, `DEFERRED`, and failures. Source-only evidence is retained separately
+from the current PR review overlay, keyed by project, PR, head repository/SHA, base SHA,
+tooling, and profile. There is no Evaluation Mode SHA or dispatch budget. No findings,
+comments, checks, SARIF, commits, or PRs are written to any analyzed source, including
+self-analysis.
 
-Readiness verifies the selected project's profile and both execution workflows. A
-successful readiness check does not imply complete scanner evidence. Read-only
-collaborators can inspect configured targets and reports; only execution-host writers
-can submit a scan request, and only administrators can change the trusted registry.
+Readiness verifies the selected project's profile and execution workflows. A successful
+readiness check does not imply complete scanner evidence. Read-only collaborators can
+inspect configured targets and reports; only execution-host writers can submit a scan
+request, and only administrators can change the trusted registry. GitHub Actions
+artifacts in the public service repository remain publicly accessible; dashboard sign-in
+does not make scanner evidence confidential.
 
 See [free services and OSS perks](docs/operations/FREE_SERVICES.md) for the Cloudflare operations
 configuration, diagnostics privacy and evaluated optional programs.

@@ -32,13 +32,15 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
   const key=query.toString();
  let entry=manifests.get(key);
  if(!entry||Date.now()-entry.at>60000){const value=await (await response(base+'manifest?'+query,signal)).json();entry={at:Date.now(),value};manifests.set(key,entry);if(manifests.size>10)manifests.delete(manifests.keys().next().value!);}
- const manifest=entry.value;
- const targetPath=(t:any)=>`repository-reports/${t.id}/${t.collected_run}`;
- if(path==='data/index.json')return {...manifest,launch_endpoint:applicationEndpoint,publishing_repository:repository,repository_assets:true,
-   metrics:undefined,report_storage:manifest.metrics,targets:manifest.targets.map((t:any)=>({...t,report:t.documents?targetPath(t):undefined}))} as T;
-  const selectedTarget=manifest.targets.find((t:any)=>path.startsWith('data/'+targetPath(t)+'/'));
-  if(!selectedTarget)throw new Error('Target report is no longer current. Refresh the target.');
-  const document=path.slice(('data/'+targetPath(selectedTarget)+'/').length);
+  const manifest=entry.value;
+  const targetPath=(t:any)=>`repository-reports/${t.id}/${t.collected_run}`;
+  if(path==='data/index.json')return {...manifest,launch_endpoint:applicationEndpoint,publishing_repository:repository,repository_assets:true,
+    metrics:undefined,report_storage:manifest.metrics,targets:manifest.targets.map((t:any)=>({...t,report:t.documents?targetPath(t):undefined}))} as T;
+   const overlayPrefix='data/current-overlay/';
+   const isOverlay=path.startsWith(overlayPrefix);
+   const selectedTarget=isOverlay?manifest.current_overlay:manifest.targets.find((t:any)=>path.startsWith('data/'+targetPath(t)+'/'));
+   if(!selectedTarget)throw new Error('Target report is no longer current. Refresh the target.');
+   const document=path.slice(isOverlay?overlayPrefix.length:('data/'+targetPath(selectedTarget)+'/').length);
   const name=selectedTarget.documents?.[document];
   if(!name && (document==='threat-report.json'||document==='threat-report.md')) {
     const threatQuery=new URLSearchParams(query); threatQuery.set('target_id',selectedTarget.id);
@@ -46,10 +48,10 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
     return (document.endsWith('.md') ? payload.markdown : payload.report) as T;
   }
   if(!name)throw new Error('Requested report document is unavailable.');
- const assetKey=key+'/'+name;
+  const assetKey=key+'/'+(isOverlay?'overlay/':'')+name;
  let promise=shards.get(assetKey);
  if(!promise){
-  const assetQuery=new URLSearchParams(query);assetQuery.set('asset',name);
+   const assetQuery=new URLSearchParams(query);assetQuery.set('asset',name);if(isOverlay)assetQuery.set('overlay','current');
   promise=(async()=>{const r=await response(base+'asset?'+assetQuery);const bytes=await r.arrayBuffer();
    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
     if(hash!==selectedTarget.assets[name].sha256||bytes.byteLength!==selectedTarget.assets[name].bytes)throw new Error('Report integrity check failed.');

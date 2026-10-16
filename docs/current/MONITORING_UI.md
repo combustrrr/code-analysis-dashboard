@@ -4,13 +4,34 @@ Open the [dashboard](https://combustrrr.github.io/code-analysis-dashboard/) and 
 in with GitHub. Accepted collaborators of the service repository may view it;
 scan and configuration permissions are checked separately. Both themes are supported.
 
-1. Select the source project and branch/PR/manual target. The persistent header
-   identifies source and execution repositories, discovered/analyzed SHA, timestamps,
-   completeness and producer links. Older visible findings retain their original SHA.
-2. Run analysis opens one form, not a wizard. Choose branch, PR or full 40-character
-   commit SHA and submit. Readiness is optional to expand. Configuration is not proof
-   of successful scanner execution. Follow request, scanner and publication progress;
-   the newly published selected target opens automatically.
+1. Select one of the three configured source projects. The project overview distinguishes
+   the current source-only report from an optional separately retained PR overlay and
+   shows compact readiness, queued work, source/analyzed SHA, and timestamps. Opening a
+   project or browsing revisions is read-only.
+2. Users with write permission choose a revision kind (branch, open PR including drafts,
+   or full 40-character commit SHA), select the exact ref, and choose scanner channels.
+   Portable channels are selected by default; vendor lanes are opt-in. Shared producer
+   groups must be selected together. Disabled channels explain whether they are deferred,
+   unavailable, not applicable, or require setup. CodeRabbit is available only for an
+   open PR.
+3. **Review exact revision** resolves the branch/PR/SHA server-side and displays the full
+   immutable SHA, fork head and base provenance where applicable, selected channels,
+   readiness, matching cached evidence, and the GitHub Actions/vendor usage caveat. No
+   work is queued until **Confirm and queue analysis**. A moved branch or PR invalidates
+   the preview; refresh it rather than silently retargeting. **Run again** explicitly
+   forces selected channels instead of reusing matching evidence.
+4. Follow request, producer, and per-channel progress. The bounded queue is FIFO with one
+   active source revision globally. A 202 means accepted/queued, never completed; selected
+   lanes for the active SHA may execute concurrently. `NOT_SELECTED`, `NOT_APPLICABLE`,
+   `DEFERRED`, failures, and validated completion are separate states. Same-SHA results
+   replace only successfully validated selected-channel evidence; failed attempts do not
+   erase the previous valid evidence.
+5. The source-only report remains one current report per configured repository. A new SHA
+   replaces it only after the first valid channel result; queued/running work and failures
+   preserve the prior report and its SHA. PR review evidence is stored in a separate
+   current overlay keyed by project, PR, head repository/SHA, base SHA, tooling, and
+   profile; it is never merged into source-only findings. Readers can inspect reports;
+   only writers can submit, and no cancel control is provided.
 3. Overview shows severity/scanner distributions, affected directories and cautious
    investigation suggestions. No invented quality score or proven-root-cause claim.
 4. Issues combines text, severity, scanner, rule, file, directory, source-location
@@ -24,11 +45,18 @@ scan and configuration permissions are checked separately. Both themes are suppo
 6. Connections verifies the selected project through the live project-integration
    API, including App access and both workflows. An unavailable check disables its
    launch shortcut. Successful routing does not prove all scanners completed.
-7. Repositories loads accessible execution repositories. Scan-only users can inspect
-   projects; administrators can preview setup/configuration and explicitly confirm
-   exact commits. Editing the source invalidates a prior preview. Errors support retry.
+7. Repositories lists only the fixed trusted projects. Read-only collaborators can inspect
+   reports and preview revisions; execution-host writers can submit; administrators alone
+   manage the central registry. The connected self-analysis target does not publish native
+   findings back to its source repository.
 
 Results refresh from published data, not directly from partially written scanner
-outputs. The static UI is not rebuilt for a report. Current assets are retained per
-active target, not per historical commit. See [architecture](../architecture/SERVICE_ARCHITECTURE.md)
-and [handoff](../HANDOFF.md) for boundaries and remaining verification.
+outputs. The static UI is not rebuilt for a report. Matching channel evidence is reused
+unless the user selects **Run again**. Superseded full-SHA assets are removed only after
+the replacement manifest is committed. Scheduled reconciliation recovers accepted
+requests but never starts scans from discovered refs. Source-executing jobs receive no
+vendor/publication credentials, and no findings, comments, checks, SARIF, commits, or PRs
+are written to any source. GitHub Actions artifacts in the public service repository
+remain publicly accessible outside the signed-in dashboard. See
+[architecture](../architecture/SERVICE_ARCHITECTURE.md) and [handoff](../HANDOFF.md) for
+deployment boundaries and verification status.

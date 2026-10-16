@@ -313,9 +313,11 @@ test('authorized user follows one repository project from selection through publ
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  const execution='combustrrr/code-analysis-dashboard';const source='combustrrr/Agentic-Kibana';const project='1278177697';const sha='d'.repeat(40);
  const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
- const report={analyzed_sha:sha,generated_at:new Date().toISOString(),status:'partial',finding_count:0,observation_count:0,channels:[],severities:{},producer_runs:[],publication_gate:{satisfied:false}};
- const assetName='published-report.json.gz';const compressedReport=gzipSync(Buffer.from(JSON.stringify({'report.json':report,'findings.json':[]})));
- const assets={[assetName]:{sha256:createHash('sha256').update(compressedReport).digest('hex'),bytes:compressedReport.byteLength}};
+  const report={analyzed_sha:sha,generated_at:new Date().toISOString(),status:'partial',finding_count:0,observation_count:0,channels:[],severities:{},producer_runs:[],publication_gate:{satisfied:false}};
+  const assetName='published-report.json.gz';const compressedReport=gzipSync(Buffer.from(JSON.stringify({'report.json':report,'findings.json':[]})));
+  const assets={[assetName]:{sha256:createHash('sha256').update(compressedReport).digest('hex'),bytes:compressedReport.byteLength}};
+  const overlayAssetName='published-overlay.json.gz';const overlay={schema_version:'analysis-pr-overlay-v1',overlay_key:'overlay-seven',head_sha:sha,checked_at:new Date().toISOString(),pr_context:{number:7,title:'PR overlay test',head_repository:'fork/Agentic-Kibana',head_branch:'topic',base_repository:source,base_branch:'Testing',base_sha:'e'.repeat(40)},channel:{status:'COMPLETED_OPTIONAL'},advisories:[{stable_id:'advisory-1',severity:'MEDIUM',message:'Review fixture advisory'}]};
+  const compressedOverlay=gzipSync(Buffer.from(JSON.stringify({'pr-overlay.json':overlay})));
   let activityReads=0;let launches=0;let published=false;
  await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());
@@ -330,13 +332,16 @@ test('authorized user follows one repository project from selection through publ
      {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false},
      {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:true},
     ]}});
-  if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:project,checked_at:new Date().toISOString(),preferred_branch:'Testing',targets:published?[{id:'published-target',label:'Testing',repository:source,source_repository:source,head_sha:sha,kind:'branch',branch:'Testing',checked_at:new Date().toISOString(),status:'partial',collected_run:43,documents:{'report.json':assetName,'findings.json':assetName},assets}]:[]}});
-  if(url.pathname==='/api/public/asset')return route.fulfill({headers,body:compressedReport});
+   if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:project,checked_at:new Date().toISOString(),preferred_branch:'Testing',current_overlay:{schema_version:'analysis-pr-overlay-v1',overlay_key:'overlay-seven',status:'complete',head_sha:sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel,documents:{'pr-overlay.json':overlayAssetName},assets:{[overlayAssetName]:{sha256:createHash('sha256').update(compressedOverlay).digest('hex'),bytes:compressedOverlay.byteLength}}},targets:published?[{id:'published-target',label:'Testing',repository:source,source_repository:source,head_sha:sha,kind:'branch',branch:'Testing',checked_at:new Date().toISOString(),status:'partial',collected_run:43,documents:{'report.json':assetName,'findings.json':assetName},assets}]:[]}});
+   if(url.pathname==='/api/public/asset')return route.fulfill({headers,body:url.searchParams.get('overlay')==='current'?compressedOverlay:compressedReport});
   if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:source,branches:[{name:'Testing',sha}],prs:[]}});
-  if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{tooling_sha:'e'.repeat(40),channels:[]}});
-  if(url.pathname==='/api/project-launch'){
-   launches++;
-    expect(route.request().postDataJSON()).toEqual({project_id:project,kind:'branch',ref:'Testing'});
+   const channels=[{id:'semgrep',channel:'semgrep',mode:'portable',group:'semgrep',status:'configured',reason:'',default_selected:true,selectable:true}];
+   if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{tooling_sha:'e'.repeat(40),channels}});
+   if(url.pathname==='/api/project-preview')return route.fulfill({headers,json:{preview_id:'preview-access',preview_token:'signed-preview',previewed_at:new Date().toISOString(),project_id:project,source_repository:source,source_repository_id:1278177697,selection:{kind:'branch',ref:'Testing'},target_sha:sha,pr_context:null,tooling_sha:'e'.repeat(40),profile_digest:'f'.repeat(64),channels,cached_channels:[]}});
+   if(url.pathname==='/api/project-launch'){
+    launches++;
+     expect(route.request().postDataJSON()).toMatchObject({project_id:project,preview_token:'signed-preview',requested_channels:['semgrep'],run_again:false});
+     expect(route.request().postDataJSON().idempotency_key).toMatch(/^[a-f0-9-]{36}$/);
    return route.fulfill({headers,status:202,json:{request_id:'flow-request',run_id:42}});
   }
   if(url.pathname==='/api/project-activity'){
@@ -354,6 +359,8 @@ test('authorized user follows one repository project from selection through publ
    await expect(page.getByText('OBSERVER · READ-ONLY SOURCE')).toHaveCount(2);
    await expect(page.getByText('CONNECTED · SELF-ANALYSIS')).toHaveCount(1);
    await page.locator('.target-card').filter({hasText:source}).getByRole('button',{name:'Open report'}).click();
+   await expect(page.getByRole('heading',{name:'Separate PR review overlay · #7'})).toBeVisible();
+   await expect(page.getByText('Review fixture advisory')).toBeVisible();
   await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toBeVisible();
   const selected=new URLSearchParams(new URL(page.url()).hash.slice(1));
   expect(selected.get('repository')).toBe(execution);
@@ -361,11 +368,13 @@ test('authorized user follows one repository project from selection through publ
   expect(new URL(page.url()).hash).not.toContain(source);
   expect(launches).toBe(0);
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'Run analysis'});
-  await dialog.getByLabel('Revision').click();
-  await dialog.getByLabel('Revision').press('ArrowDown');
-  await dialog.getByLabel('Revision').press('Enter');
- await dialog.getByRole('button',{name:'Run analysis',exact:true}).click();
+   const dialog=page.getByRole('dialog',{name:'Choose revision and scanners'});
+   await dialog.getByRole('radio',{name:'Branch'}).click();
+    await dialog.getByRole('combobox',{name:'Revision'}).click();
+   await dialog.getByRole('combobox',{name:'Revision'}).press('ArrowDown');
+   await dialog.getByRole('combobox',{name:'Revision'}).press('Enter');
+  await dialog.getByRole('button',{name:'Review exact revision'}).click();
+  await page.getByRole('dialog',{name:'Review analysis request'}).getByRole('button',{name:'Confirm and queue analysis'}).click();
  await expect(page.getByText('Analysis is running against the selected revision.')).toBeVisible();
  await expect(page.getByText(`Resolved source commit: ${sha}`)).toBeVisible();
  await page.getByRole('button',{name:'Check status now'}).click();
