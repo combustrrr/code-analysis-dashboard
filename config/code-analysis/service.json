@@ -5,17 +5,7 @@
   "publishing_repository": "combustrrr/code-analysis-dashboard",
   "preferred_branch": "Testing",
   "source_workflow": ".github/workflows/code-analysis-source.yml",
-  "discovery_cron": "23 * * * *",
-  "max_parallel_analyses": 0,
-  "evaluation": {
-    "enabled": true,
-    "source_repository": "ARYDESTROYER/Kavach-AgenticSOC",
-    "target_branch": "Testing",
-    "target_sha": "231bb41f7eb1b707e25113c258eb8d5c7356b743",
-    "target_sha_resolved_at": "2026-10-02T12:37:46Z",
-    "dispatch_budget": 1,
-    "paused": false
-  },
+  "max_parallel_analyses": 1,
   "artifact_retention_days": 7,
   "site_limit_bytes": 900000000,
   "deferred_channels": {},

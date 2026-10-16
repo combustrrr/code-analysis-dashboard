@@ -41,9 +41,16 @@ async function signedWebhook(body, overrides = {}) {
   const key=await crypto.subtle.importKey('raw',new TextEncoder().encode('webhook-key'),{name:'HMAC',hash:'SHA-256'},false,['sign']);
   const bytes=new TextEncoder().encode(body);
   const signature='sha256='+Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,bytes)),x=>x.toString(16).padStart(2,'0')).join('');
-  return new Request('https://worker.example/webhook',{method:'POST',body,headers:{'X-Hub-Signature-256':signature,'X-GitHub-Event':'push','X-GitHub-Delivery':'delivery-1',...overrides}});
+  return new Request('https://worker.example/webhook',{method:'POST',body,headers:{'X-Hub-Signature-256':signature,'X-GitHub-Event':'workflow_run','X-GitHub-Delivery':'delivery-1',...overrides}});
 }
-const supportedPayload=JSON.stringify({repository:{id:99,full_name:'owner/repository',private:false,default_branch:'main'},installation:{id:7}});
+const supportedPayload=JSON.stringify({action:'completed',workflow_run:{path:'.github/workflows/code-analysis-source.yml',head_sha:'a'.repeat(40)},repository:{id:99,full_name:'owner/repository',private:false,default_branch:'main'},installation:{id:7}});
+test('push and pull-request webhooks never schedule analysis reconciliation',async()=>{
+  for(const event of ['push','pull_request']){
+    const response=await webhook(await signedWebhook(supportedPayload,{'X-GitHub-Event':event}),{GITHUB_WEBHOOK_SECRET:'webhook-key'});
+    assert.equal(response.status,200);
+    assert.equal((await response.json()).status,'ignored');
+  }
+});
 test('signed supported webhook fails closed when replay state is unavailable',async t=>{
   const calls=t.mock.method(globalThis,'fetch',()=>{throw new Error('must not dispatch without replay state');});
   const response=await (await import('./github-app.mjs')).webhook(await signedWebhook(supportedPayload),{GITHUB_WEBHOOK_SECRET:'webhook-key'});

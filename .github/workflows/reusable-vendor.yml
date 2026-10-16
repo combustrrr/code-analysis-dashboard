@@ -27,6 +27,7 @@ permissions:
 
 jobs:
   snyk:
+    if: ${{ contains(fromJSON(inputs.target).requested_channels, 'snyk') }}
     name: Isolated Snyk evidence
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -73,6 +74,7 @@ jobs:
           retention-days: 7
 
   sonar:
+    if: ${{ contains(fromJSON(inputs.target).requested_channels, 'sonarqube-cloud') }}
     name: Isolated SonarQube evidence
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -152,7 +154,7 @@ jobs:
 
   coderabbit:
     name: Isolated CodeRabbit evidence
-    if: ${{ fromJSON(inputs.target).pr != '' && fromJSON(inputs.target).pr != null }}
+    if: ${{ contains(fromJSON(inputs.target).requested_channels, 'coderabbit-ai-advisory') && fromJSON(inputs.target).pr_context.number != null }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -171,11 +173,11 @@ jobs:
         run: |
           python .analysis-tooling/scripts/code_analysis/collect_coderabbit.py \
             --repository "${{ fromJSON(inputs.target).source_repository }}" \
-            --branch "${{ fromJSON(inputs.target).branch }}" \
-            --commit "${{ fromJSON(inputs.target).head_sha }}" \
-            --pr-number "${{ fromJSON(inputs.target).pr }}" \
-            --base-sha "${{ fromJSON(inputs.target).base_sha }}" \
-            --base-branch "${{ fromJSON(inputs.target).base_branch }}" \
+            --branch "${{ fromJSON(inputs.target).pr_context.head_branch }}" \
+            --commit "${{ fromJSON(inputs.target).pr_context.head_sha }}" \
+            --pr-number "${{ fromJSON(inputs.target).pr_context.number }}" \
+            --base-sha "${{ fromJSON(inputs.target).pr_context.base_sha }}" \
+            --base-branch "${{ fromJSON(inputs.target).pr_context.base_branch }}" \
             --output-dir coderabbit-evidence
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

@@ -71,13 +71,13 @@ export async function webhook(request,env) {
   const kind=request.headers.get('X-GitHub-Event');
   const repository=event.repository;
   if(!repository || repository.private || [1267340546,1278177697].includes(repository.id) || ['arydestroyer/kavach-agenticsoc','combustrrr/agentic-kibana'].includes(repository.full_name?.toLowerCase())) return Response.json({status:'ignored'});
-  const supported=kind==='push'||(kind==='pull_request'&&['opened','reopened','synchronize','closed','edited'].includes(event.action))||(kind==='workflow_run'&&event.action==='completed'&&event.workflow_run?.path?.split('@')[0]==='.github/workflows/code-analysis-source.yml');
+  const supported=kind==='workflow_run'&&event.action==='completed'&&['.github/workflows/code-analysis-source.yml','.github/workflows/11-source-analysis.yml'].includes(event.workflow_run?.path?.split('@')[0]);
   if(!supported) return Response.json({status:'ignored'});
   try {
     const delivery=request.headers.get('X-GitHub-Delivery');
     if(!await claimWebhookDelivery(env,delivery)) return Response.json({status:'duplicate'},{status:202});
     const token=await installationToken(env,event.installation?.id,repository.id);
-    const response=await fetch(`https://api.github.com/repos/${repository.full_name}/actions/workflows/code-analysis-reconcile.yml/dispatches`,{method:'POST',headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','User-Agent':'code-analysis-application'},body:JSON.stringify({ref:repository.default_branch,inputs:{request_id:request.headers.get('X-GitHub-Delivery')||''}})});
+    const response=await fetch(`https://api.github.com/repos/${repository.full_name}/actions/workflows/code-analysis-reconcile.yml/dispatches`,{method:'POST',headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','User-Agent':'code-analysis-application'},body:JSON.stringify({ref:repository.default_branch})});
     if(!response.ok) throw new Error('Reconciliation dispatch failed.');
     return Response.json({status:'submitted'},{status:202});
   } catch {return Response.json({error:'Background dispatch unavailable. Hourly repository reconciliation remains the recovery path.'},{status:503});}

@@ -481,8 +481,8 @@ class MonitoringTests(unittest.TestCase):
         import yaml
         discovery=yaml.safe_load(Path(".github/workflows/10-analysis-discovery.yml").read_text(encoding="utf-8"))
         self.assertEqual(discovery["permissions"], {"contents": "read"})
-        self.assertEqual(discovery["jobs"]["discover"]["permissions"], {
-            "contents": "write", "actions": "write", "security-events": "write"})
+        self.assertEqual(set(discovery["on"]), {"workflow_dispatch"})
+        self.assertIn("Automatic discovery is disabled", discovery["jobs"]["retired"]["steps"][0]["run"])
 
         for name in ("11-source-analysis.yml", "12-scanner-diagnostics.yml"):
             workflow=yaml.safe_load(Path(".github/workflows", name).read_text(encoding="utf-8"))

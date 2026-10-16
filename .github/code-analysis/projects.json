@@ -6,7 +6,7 @@
     "private": false
   },
   "tooling_sha": "0ff77f8530c0f7c60b78f10c14d1ebe8216f2daf",
-  "max_parallel_analyses": 2,
+  "max_parallel_analyses": 1,
   "projects": [
     {
       "id": "1267340546",
@@ -95,15 +95,15 @@
         "xenon"
       ],
       "deferred_channels": {
-        "alibaba-ocr": "No configured adapter in the Kavach evaluation profile.",
-        "codex-security": "No configured adapter in the Kavach evaluation profile.",
-        "flounder-audit": "No configured adapter in the Kavach evaluation profile.",
-        "owasp-go": "No configured adapter in the Kavach evaluation profile.",
-        "owasp-iac-secrets": "No configured adapter in the Kavach evaluation profile.",
-        "owasp-js": "No configured adapter in the Kavach evaluation profile.",
-        "owasp-jvm": "No configured adapter in the Kavach evaluation profile.",
-        "owasp-ruby": "No configured adapter in the Kavach evaluation profile.",
-        "vulnagent-triage": "No configured adapter in the Kavach evaluation profile."
+        "alibaba-ocr": "No configured adapter in the Kavach scanner profile.",
+        "codex-security": "No configured adapter in the Kavach scanner profile.",
+        "flounder-audit": "No configured adapter in the Kavach scanner profile.",
+        "owasp-go": "No configured adapter in the Kavach scanner profile.",
+        "owasp-iac-secrets": "No configured adapter in the Kavach scanner profile.",
+        "owasp-js": "No configured adapter in the Kavach scanner profile.",
+        "owasp-jvm": "No configured adapter in the Kavach scanner profile.",
+        "owasp-ruby": "No configured adapter in the Kavach scanner profile.",
+        "vulnagent-triage": "No configured adapter in the Kavach scanner profile."
       },
       "preferred_branch": "Testing",
       "report_budget_bytes": 900000000
@@ -216,7 +216,7 @@
         "private": false
       },
       "relationship": "connected",
-      "native_feedback_enabled": true,
+      "native_feedback_enabled": false,
       "preferred_branch": "main",
       "profile": {
         "mode": "portable",

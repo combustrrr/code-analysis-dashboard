@@ -9,20 +9,64 @@ from scripts.code_analysis.hosted import load, target, write
 from scripts.code_analysis.hosted_pipeline import assemble
 
 
+def expected_dispatch_id(request_id: str, channels: list[str]) -> str:
+    import hashlib
+    return request_id[:8]+'-'+hashlib.sha256((request_id+':'+','.join(channels)).encode()).hexdigest()[:16]
+
+
+def validate_durable_request(row: dict) -> dict:
+    host = os.environ['GITHUB_REPOSITORY']
+    request_id = os.environ['REQUEST_ID']
+    release = next((value for value in pages(f'repos/{host}/releases') if value.get('tag_name') == 'analysis-requests'), None)
+    if not release:
+        raise ValueError('Explicit durable request is unavailable')
+    asset = next((value for value in pages(f"repos/{host}/releases/{release['id']}/assets")
+                  if value.get('name') == f'request-{request_id}.json'), None)
+    if not asset:
+        raise ValueError('Explicit durable request is unavailable')
+    intent = json.loads(gh('api', f"repos/{host}/releases/assets/{asset['id']}", '-H', 'Accept: application/octet-stream', binary=True))
+    if (intent.get('schema_version') != 'analysis-request-v2' or intent.get('request_id') != request_id
+            or intent.get('execution_repository_id') != api(f'repos/{host}')['id']
+            or intent.get('target_sha') != row.get('head_sha') or intent.get('tooling_sha') != os.environ['TOOLING_SHA']
+            or intent.get('project_id') != row.get('project_id')
+            or intent.get('requested_channels') != row.get('requested_channels')
+            or intent.get('profile_digest') != row.get('profile_digest')
+            or row.get('dispatch_id') != expected_dispatch_id(request_id,row.get('execution_channels') or intent.get('requested_channels',[]))):
+        raise ValueError('Producer dispatch does not match the accepted request envelope')
+    if intent.get('schema_version') == 'analysis-request-v2':
+        selection = intent.get('resolved_selection', {})
+        pr_context=intent.get('pr_context') or {}
+        if selection != {'repository':row.get('source_repository'),'repository_id':pr_context.get('head_repository_id',intent.get('source_repository_id')),'kind':'commit','ref':row.get('head_sha')}:
+            raise ValueError('Producer dispatch revision differs from the pinned request')
+    return intent
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--assemble', action='store_true')
+    p.add_argument('--validate-only', action='store_true')
     a = p.parse_args()
     row = json.loads(os.environ['TARGET_JSON'])
+    intent = validate_durable_request(row)
     validated = target(row['repository'], row['branch'], row['head_sha'], pr=row.get('pr'),
                        source_repository=row['source_repository'], base_sha=row.get('base_sha'), base_branch=row.get('base_branch'), kind=row.get('kind'))
     import subprocess
     tooling_revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() if os.environ.get('IS_REUSABLE_ANALYSIS') == 'true' else os.environ['GITHUB_SHA']
     if validated['id'] != row['id'] or os.environ['TOOLING_SHA'] != tooling_revision:
         raise ValueError('dispatch identity or tooling revision mismatch')
+    if Path('.source').exists():
+        checkout_sha=subprocess.check_output(['git','-C','.source','rev-parse','HEAD'],text=True).strip()
+        if checkout_sha!=row['head_sha']:
+            raise ValueError('Source checkout differs from the immutable accepted target SHA')
+    if a.validate_only:
+        return
+    validated.update(request_id=intent['request_id'],requested_selection=intent.get('selection'),
+                     pr_context=intent.get('pr_context'),requested_channels=intent.get('requested_channels'),
+                     profile_digest=intent.get('profile_digest'),project_id=intent.get('project_id'),
+                     source_repository_id=intent.get('source_repository_id'))
     if not a.assemble:
         from scripts.code_analysis.applicability import selection
-        jobs, _, languages = selection(json.loads(Path('config/code-analysis/service.json').read_text()), Path('.source'))
+        jobs, _, languages = selection(json.loads(Path('config/code-analysis/service.json').read_text()), Path('.source'), row.get('execution_channels') or row.get('requested_channels'))
         with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
             output.write('jobs=' + json.dumps(jobs) + '\n')
             # An empty language result is meaningful: applicability excludes
@@ -58,7 +102,7 @@ def main():
     write(root / 'producer-status.json', {'scanner_family': 'Producer', 'run_id': run, 'run_attempt': attempt,
                                         'source_repository': row['source_repository'], 'source_sha': row['head_sha']})
     from scripts.code_analysis.applicability import selection
-    selected_jobs, excluded, _ = selection(json.loads(Path('config/code-analysis/service.json').read_text()), Path('.source'))
+    selected_jobs, excluded, _ = selection(json.loads(Path('config/code-analysis/service.json').read_text()), Path('.source'), row.get('execution_channels') or row.get('requested_channels'))
     execution_jobs = pages(f'repos/{host}/actions/runs/{run}/attempts/{attempt}/jobs', 'jobs')
     from scripts.code_analysis.applicability import GROUPS
     from scripts.code_analysis.portable_profile import ADAPTER_JOBS
@@ -75,33 +119,15 @@ def main():
         write(root / 'codeql-execution/execution-status.json', {'scanner_family':'CodeQL', 'status':'COMPLETED' if complete else 'FAILED', 'reason':'Every selected language job completed.' if complete else 'One or more selected CodeQL language jobs failed or lack completion evidence.'})
     if 'coderabbit-ai-advisory' in excluded:
         write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', **excluded['coderabbit-ai-advisory']})
-    elif row.get('pr'):
-        from scripts.code_analysis.collect_coderabbit import collect
-        try:
-            evidence, status = collect(
-                row['repository'], row['branch'], row['head_sha'],
-                os.environ.get('CODERABBIT_GITHUB_TOKEN', ''),
-                pr_number=row['pr'], base_sha=row.get('base_sha'), base_branch=row.get('base_branch'),
-                provenance={'workflow_run_id': os.environ['GITHUB_RUN_ID'],
-                            'workflow_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
-                            'tooling_sha': os.environ['TOOLING_SHA'],
-                            'collector': 'collect_coderabbit.py',
-                            'collector_revision': os.environ.get('COLLECTOR_SHA', os.environ['TOOLING_SHA'])})
-            write(root / 'coderabbit/coderabbit-advisories.json', evidence)
-            write(root / 'coderabbit/coderabbit-status.json', status)
-        except Exception as exc:
-            write(root / 'coderabbit/coderabbit-status.json', {
-                'scanner_family': 'CodeRabbit', 'status': 'UNAVAILABLE',
-                'reason': f'Exact upstream PR review collection failed: {type(exc).__name__}',
-                'provenance': {'workflow_run_id': os.environ['GITHUB_RUN_ID'],
-                               'workflow_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
-                               'tooling_sha': os.environ['TOOLING_SHA']},
-            })
-    else:
+    elif not row.get('pr_context'):
         write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', 'status': 'COMPLETED_OPTIONAL', 'reason': 'Branch target; CodeRabbit evidence is collected on PR targets'})
-    report = assemble(root, Path('.hosted/output'), validated, host, run, Path('.source'), Path('config/code-analysis'))
+    report = assemble(root, Path('.hosted/output'), validated, host, run, Path('.source'), Path('config/code-analysis'), row.get('execution_channels') or row.get('requested_channels'))
     report.update(tooling_sha=os.environ['TOOLING_SHA'], producer_run_attempt=attempt,
-                  producer_artifact_bytes=artifact_bytes, source_boundary='isolated-tooling-v1')
+                  producer_artifact_bytes=artifact_bytes, source_boundary='isolated-tooling-v1',
+                  request_id=intent['request_id'],requested_selection=intent.get('selection'),
+                  pr_context=intent.get('pr_context'),requested_channels=intent.get('requested_channels'),
+                  execution_channels=row.get('execution_channels') or intent.get('requested_channels'),
+                  reused_channels=row.get('reused_channels',[]),profile_digest=intent.get('profile_digest'))
     write(Path('.hosted/output/report/report.json'), report)
     from scripts.code_analysis.threat_report import enrich, markdown
     snapshot = load(Path('.hosted/output/snapshot.json'))

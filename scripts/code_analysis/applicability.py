@@ -51,19 +51,27 @@ GROUPS = {
     'owasp-ruby': ['owasp-ruby'],
     'owasp-iac-secrets': ['owasp-iac-secrets'],
 }
-PORTABLE_JOBS = {'semgrep', 'gitleaks', 'trivy', 'checkov', 'openssf-scorecard', 'workflow-security-posture', 'coderabbit'}
+PORTABLE_JOBS = {'semgrep', 'gitleaks', 'trivy', 'checkov', 'openssf-scorecard', 'coderabbit'}
+VENDOR_JOBS = {'snyk','sonarqube-cloud'}
 
 PYTHON_JOBS = {'python-ruff', 'python-bandit', 'python-types', 'complexity',
                'dead-code', 'test-coverage', 'schemathesis-fuzz', 'atheris-state-machine'}
+GENERATED_JOBS = PORTABLE_JOBS | VENDOR_JOBS | PYTHON_JOBS | {'codeql','osv-scanner'}
 
 
-def selection(config: dict, source: Path) -> tuple[list[str], dict, list[str]]:
+def selection(config: dict, source: Path, requested_channels: list[str] | None = None) -> tuple[list[str], dict, list[str]]:
     known = {channel for channels in GROUPS.values() for channel in channels}
     enabled = set(config.get('enabled_scanners', known))
     deferred = config.get('deferred_channels', {})
     if (enabled & set(deferred) or enabled | set(deferred) != known
             or any(not isinstance(reason, str) or not reason.strip() for reason in deferred.values())):
         raise ValueError('Every known scanner must be enabled or explicitly deferred with a reason')
+    requested = set(requested_channels) if requested_channels is not None else enabled
+    if not requested or requested - enabled:
+        raise ValueError('Requested scanner channels must be enabled by the trusted project profile')
+    for channels in GROUPS.values():
+        if requested.intersection(channels) and not set(channels).issubset(requested):
+            raise ValueError('Channels sharing a producer must be selected together')
     profile = config['profile']
     def present(relative: str) -> bool:
         path = (source / relative).resolve()
@@ -78,7 +86,7 @@ def selection(config: dict, source: Path) -> tuple[list[str], dict, list[str]]:
         if capabilities['dependency_manifests']:
             supported.add('osv')
         languages = (['python'] if profile.get('python_root') and present(profile['python_root']) else []) + (['javascript-typescript'] if profile.get('javascript_root') and present(profile['javascript_root']) else [])
-        absent = {job: 'Requires a reviewed source path, command adapter or vendor configuration.' for job, channels in GROUPS.items() if not all(c in supported for c in channels)}
+        absent = {job: 'Requires a reviewed source path, command adapter or vendor configuration.' for job, channels in GROUPS.items() if not all(c in supported for c in channels) or job not in GENERATED_JOBS}
         for job in PYTHON_JOBS:
             if job not in absent and 'python' not in languages:
                 absent[job] = 'Configured Python source path is absent at this revision.'
@@ -87,7 +95,7 @@ def selection(config: dict, source: Path) -> tuple[list[str], dict, list[str]]:
         python = present(profile['python_root'])
         javascript = present(profile['javascript_root'])
         languages = (['python'] if python else []) + (['javascript-typescript'] if javascript else [])
-        absent = {}
+        absent = {'workflow-security-posture':'Repository security-posture access requires a credential unavailable to source scanner jobs.'}
         for job in PYTHON_JOBS:
             if not python:
                 absent[job] = 'Selected source has no configured Python project: ' + profile['python_root']
@@ -110,16 +118,20 @@ def selection(config: dict, source: Path) -> tuple[list[str], dict, list[str]]:
         active = enabled.intersection(channels)
         if active and len(active) != len(channels):
             raise ValueError('Channels sharing producer ' + job + ' must be enabled or deferred together')
-        if active and job not in absent:
+        selected = requested.intersection(channels)
+        if selected and job not in absent:
             jobs.append(job)
         else:
             for channel in channels:
-                excluded[channel] = {
-                    'status': ('NOT_AVAILABLE' if portable else 'NOT_APPLICABLE') if active else 'DEFERRED',
-                    'reason': absent[job] if active else deferred[channel],
-                }
+                if channel not in requested and channel in enabled:
+                    excluded[channel] = {'status':'NOT_SELECTED','reason':'Not selected for this request'}
+                else:
+                    excluded[channel] = {
+                        'status': ('NOT_AVAILABLE' if portable else 'NOT_APPLICABLE') if active else 'DEFERRED',
+                        'reason': absent.get(job) if active else deferred[channel],
+                    }
     workflow_directory = source / '.github/workflows'
-    if ('github-actions-security' in enabled and
+    if ('github-actions-security' in requested and
             (not present('.github/workflows') or not any(
                 p.is_file() and p.suffix in {'.yml', '.yaml'} for p in workflow_directory.iterdir()))):
         # This producer also reads repository posture, which remains applicable.
@@ -127,7 +139,9 @@ def selection(config: dict, source: Path) -> tuple[list[str], dict, list[str]]:
             'status': 'NOT_APPLICABLE', 'reason': 'Selected source contains no GitHub Actions workflow definitions'}
     from scripts.code_analysis.extensions import registry
     for extension in registry(config):
-        if extension.get('deferred_reason'):
+        if extension['channel'] not in requested:
+            excluded[extension['channel']] = {'status':'NOT_SELECTED','reason':'Not selected for this request'}
+        elif extension.get('deferred_reason'):
             excluded[extension['channel']] = {'status': 'DEFERRED', 'reason': extension['deferred_reason']}
         else:
             jobs.append(extension['channel'])
@@ -140,3 +154,5 @@ def apply(snapshot: dict, exclusions: dict) -> None:
             if channel['observation_count']:
                 raise ValueError('Excluded scanner unexpectedly produced observations')
             channel.update(exclusions[channel['channel']], findings=None)
+            if channel['status'] == 'NOT_SELECTED':
+                channel.update(observation_count=0,observation_ids=[],artifact_files=[],reason='Not selected for this request')

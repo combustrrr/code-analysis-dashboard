@@ -1,5 +1,5 @@
 name: Code analysis source
-run-name: Source analysis ${{ inputs.request_id }}
+run-name: Source analysis ${{ inputs.dispatch_id }}
 on:
   workflow_dispatch:
     inputs:
@@ -12,37 +12,65 @@ on:
       request_id:
         type: string
         required: true
+      dispatch_id:
+        type: string
+        required: true
 permissions:
   contents: read
+concurrency:
+  group: source-revision-global
+  cancel-in-progress: false
 jobs:
+  validate-request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ inputs.tooling_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.11'
+      - name: Verify dispatch against its durable accepted request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_JSON: ${{ inputs.target }}
+          TOOLING_SHA: ${{ inputs.tooling_sha }}
+          REQUEST_ID: ${{ inputs.request_id }}
+          IS_REUSABLE_ANALYSIS: 'true'
+        run: python -m scripts.code_analysis.source_identity --validate-only
   analyze:
     if: ${{ fromJSON(inputs.target).profile_mode == 'portable' }}
-    needs: isolated-vendor
+    needs: [validate-request, isolated-vendor]
     permissions:
       contents: read
       actions: read
     uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source.yml@0ff77f8530c0f7c60b78f10c14d1ebe8216f2daf
     with:
-      tooling_sha: 0ff77f8530c0f7c60b78f10c14d1ebe8216f2daf
+      tooling_sha: ${{ inputs.tooling_sha }}
       target: ${{ inputs.target }}
       request_id: ${{ inputs.request_id }}
   configured-profile:
     if: ${{ fromJSON(inputs.target).profile_mode == 'agentic-soc' }}
+    needs: [validate-request, isolated-vendor]
     permissions:
       contents: read
       actions: read
     uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source-full.yml@0ff77f8530c0f7c60b78f10c14d1ebe8216f2daf
     with:
-      tooling_sha: 0ff77f8530c0f7c60b78f10c14d1ebe8216f2daf
+      tooling_sha: ${{ inputs.tooling_sha }}
       target: ${{ inputs.target }}
       request_id: ${{ inputs.request_id }}
   isolated-vendor:
-    if: ${{ fromJSON(inputs.target).profile_mode == 'portable' }}
+    needs: validate-request
     permissions:
       contents: read
     uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-vendor.yml@0ff77f8530c0f7c60b78f10c14d1ebe8216f2daf
     with:
-      tooling_sha: 0ff77f8530c0f7c60b78f10c14d1ebe8216f2daf
+      tooling_sha: ${{ inputs.tooling_sha }}
       target: ${{ inputs.target }}
       request_id: ${{ inputs.request_id }}
     secrets:

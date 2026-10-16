@@ -1,29 +1,73 @@
 import {readBody, BodyLimitError, resolveLimit, DEFAULT_LIMITS} from './request-limits.mjs';
 import {canonicalReportTarget, publicReports} from './reports.mjs';
 import {validatePortableProfile} from './profile-policy.mjs';
-import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID, SUPPORTED_SCANNERS, validateTargetRegistry} from './target-registry.mjs';
+import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID, SUPPORTED_SCANNERS, VENDOR_SCANNERS, UNAVAILABLE_SCANNERS, SCANNER_GROUPS, validateTargetRegistry} from './target-registry.mjs';
 
 const CONFIG = '.github/code-analysis/projects.json';
 const SHA = /^[a-f0-9]{40}$/i;
+const DIGEST = /^[a-f0-9]{64}$/i;
 
-function evaluationEnabled(env, repository) {
-  return String(env.EVALUATION_MODE).toLowerCase() === 'true' &&
-    (!env.EVALUATION_SOURCE_REPOSITORY || env.EVALUATION_SOURCE_REPOSITORY.toLowerCase() === repository.toLowerCase());
+const stable = value => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value);
+const CHANNEL_LANES = {'eslint':'typescript-quality','typescript':'typescript-quality','github-secret-protection-posture':'workflow-security-posture','github-actions-security':'workflow-security-posture','radon':'complexity','xenon':'complexity','shipping-image-cves':'shipping-image-security','sbom-license-provenance':'shipping-image-security','bandit':'python-bandit','ruff':'python-ruff','pyright':'python-types','coverage':'test-coverage','vulture':'dead-code','atheris':'atheris-state-machine','schemathesis':'schemathesis-fuzz','osv':'osv-scanner','snyk':'snyk','sonarqube-cloud':'sonar','coderabbit-ai-advisory':'coderabbit'};
+export function channelProgress(requested, jobs, runStatus) {
+  return (requested||[]).map(channel=>{
+    const lane=(CHANNEL_LANES[channel]||channel).toLowerCase();
+    const job=(jobs||[]).find(value=>String(value.name||'').toLowerCase().includes(lane));
+    const status=job?.conclusion||job?.status||(runStatus==='completed'?'unavailable':'queued');
+    return {channel,status:String(status).toLowerCase(),job_name:job?.name||null,reason:job?.conclusion==='failure'?'Scanner producer job failed.':undefined};
+  });
+}
+async function digest(value) {
+  const bytes = new TextEncoder().encode(stable(value));
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+function requestIdFromKey(value) {
+  return value.toLowerCase();
+}
+function scannerChoices(project) {
+  const portable = new Set(['semgrep','gitleaks','trivy','checkov','osv','snyk','sonarqube-cloud','openssf-scorecard','github-secret-protection-posture','github-actions-security','coderabbit-ai-advisory']);
+  if (project.profile?.python_root) ['bandit','ruff','radon','xenon','vulture','codeql'].forEach(channel=>portable.add(channel));
+  if (project.profile?.javascript_root) ['eslint','typescript','codeql'].forEach(channel=>portable.add(channel));
+  Object.keys(project.profile?.commands || {}).forEach(channel=>portable.add(channel));
+  const choices=[...new Set([...project.enabled_scanners,...Object.keys(project.deferred_channels||{})])].map(channel=>{
+    const reason=project.deferred_channels?.[channel];
+    const supported=SUPPORTED_SCANNERS.includes(channel);
+    const mode=VENDOR_SCANNERS.has(channel)?'vendor':'portable';
+    const setupRequired=project.profile?.mode==='portable'&&!portable.has(channel);
+    const group=SCANNER_GROUPS.find(values=>values.includes(channel));
+    const status=reason?'DEFERRED':!supported||UNAVAILABLE_SCANNERS.has(channel)?'NOT_AVAILABLE':setupRequired?'SETUP_REQUIRED':'READY';
+    const unavailableReason=UNAVAILABLE_SCANNERS.has(channel)?'This lane requires a cross-repository credential and is withheld from source scanner jobs.':!supported?'No registered adapter in this tooling revision.':setupRequired?'Requires a reviewed language or execution profile.':channel==='coderabbit-ai-advisory'?'Available only when analyzing an open pull request.':'';
+    return {id:channel,mode,group:group?.join('+')||channel,status,reason:reason||unavailableReason,default_selected:status==='READY'&&mode==='portable',selectable:status==='READY'};
+  });
+  for(const group of SCANNER_GROUPS){
+    const members=choices.filter(value=>group.includes(value.id));
+    if(members.some(value=>value.selectable)&&!members.every(value=>value.selectable)){
+      for(const member of members){member.selectable=false;member.default_selected=false;if(member.status==='READY'){member.status='SETUP_REQUIRED';member.reason='Every channel in this shared producer lane must be selectable.';}}
+    }
+  }
+  return choices;
 }
 
-function evaluationRequestId(value) {
-  const hash = value.replace(/^evaluation-v1:/, '').toLowerCase().replace(/[^a-f0-9]/g, '').padEnd(32, '0').slice(0, 32);
-  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20)}`;
-}
-
-async function evaluationDigest(value) {
-  const bytes = new TextEncoder().encode(JSON.stringify(value));
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+export function cachedChannelsForSnapshot(snapshot, manifest) {
+  const cached=[];
+  const target=canonicalReportTarget(manifest);
+  if(target?.analyzed_sha===snapshot.target_sha&&target.tooling_sha===snapshot.tooling_sha&&target.profile_digest===snapshot.profile_digest){
+    const complete=new Set(['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE']);
+    cached.push(...(target.channel_statuses||[]).filter(value=>complete.has(value.status)).map(value=>value.channel));
+  }
+  const overlay=manifest?.current_overlay;
+  const currentPr=snapshot.pr_context;
+  const overlayPr=overlay?.pr_context;
+  if(currentPr&&overlay?.status==='complete'&&overlay.head_sha===snapshot.target_sha
+    &&overlay.tooling_sha===snapshot.tooling_sha&&overlay.profile_digest===snapshot.profile_digest
+    &&overlayPr?.number===currentPr.number&&overlayPr?.head_repository===currentPr.head_repository
+    &&overlayPr?.head_repository_id===currentPr.head_repository_id
+    &&overlayPr?.base_sha===currentPr.base_sha)cached.push('coderabbit-ai-advisory');
+  return [...new Set(cached)];
 }
 
 export async function repositoryApi(request, env, session, helpers) {
-  const {github, json, Failure, pages, serviceToken} = helpers;
+  const {github, json, Failure, pages, serviceToken, seal, unseal} = helpers;
   const url = new URL(request.url);
   const token = session?.token;
   const requestedRepository = url.searchParams.get('repository');
@@ -88,6 +132,28 @@ export async function repositoryApi(request, env, session, helpers) {
     catch { throw new Failure(400, 'Invalid JSON.', 'invalid_json'); }
   }
 
+  async function revisionSnapshot(configuration, project, source, selection) {
+    if (!selection || !['branch','pr','commit'].includes(selection.kind) || typeof selection.ref !== 'string' || !selection.ref || selection.ref.length > 255) throw new Failure(400, 'Choose a configured project and revision.', 'invalid_selection');
+    if (selection.kind === 'commit' && !SHA.test(selection.ref)) throw new Failure(400, 'Full commit SHA required.', 'invalid_selection');
+    if (selection.kind === 'pr' && !/^[1-9][0-9]*$/.test(selection.ref)) throw new Failure(400, 'PR number required.', 'invalid_selection');
+    const path = selection.kind === 'branch' ? `branches/${encodeURIComponent(selection.ref)}` : selection.kind === 'pr' ? `pulls/${selection.ref}` : `commits/${selection.ref.toLowerCase()}`;
+    const resolved = await github(`repos/${source.full_name}/${path}`, token);
+    const targetSha = selection.kind === 'branch' ? resolved.commit?.sha : selection.kind === 'pr' ? resolved.head?.sha : resolved.sha;
+    if (!SHA.test(targetSha || '')) throw new Failure(502, 'GitHub did not resolve a full source commit SHA.', 'revision_unavailable');
+    let prContext;
+    if (selection.kind === 'pr') {
+      if (!resolved.head?.repo?.full_name || !Number.isSafeInteger(resolved.head.repo.id) || !SHA.test(resolved.base?.sha || '') || !resolved.base?.ref) throw new Failure(409, 'Pull request source or base is unavailable; refresh the inventory.', 'revision_unavailable');
+      prContext = {number:resolved.number, title:String(resolved.title || ''), draft:resolved.draft === true, head_repository:resolved.head.repo.full_name, head_repository_id:resolved.head.repo.id, head_branch:resolved.head.ref, head_sha:resolved.head.sha.toLowerCase(), base_repository:resolved.base.repo?.full_name || source.full_name, base_branch:resolved.base.ref, base_sha:resolved.base.sha.toLowerCase()};
+    }
+    const profile = {enabled_scanners:[...project.enabled_scanners].sort(),deferred_channels:project.deferred_channels || {},native_feedback_enabled:project.native_feedback_enabled===true,profile:project.profile || {}};
+    const profileDigest = await digest(profile);
+    const channels = scannerChoices(project).map(channel=>{
+      if(channel.id==='coderabbit-ai-advisory'&&selection.kind!=='pr')return {...channel,status:'NOT_APPLICABLE',reason:'CodeRabbit review evidence requires an open pull request.',default_selected:false,selectable:false};
+      return channel;
+    });
+    return {preview_id:crypto.randomUUID(),previewed_at:new Date().toISOString(),project_id:String(project.id),source_repository:source.full_name,source_repository_id:source.id,selection:{kind:selection.kind,ref:selection.kind === 'commit' ? selection.ref.toLowerCase() : selection.ref},target_sha:targetSha.toLowerCase(),pr_context:prContext || null,tooling_sha:configuration.tooling_sha,profile_digest:profileDigest,channels};
+  }
+
   if (request.method === 'GET' && url.pathname === '/api/projects') {
     const {repository, configuration} = await context();
     const verified = await Promise.all(configuration.projects.map(project => projectFor(configuration, project.id)));
@@ -95,13 +161,24 @@ export async function repositoryApi(request, env, session, helpers) {
       execution_repository: {id:repository.id, full_name:repository.full_name},
       can_launch: repository.permissions.push === true,
       can_configure: repository.permissions.admin === true,
-      projects: verified.map(({project}) => ({
+      projects: await Promise.all(verified.map(async ({project}) => {
+        let current_report=null,current_overlay=null,queued_requests=0;
+       const reportUrl=new URL('/api/public/manifest',url);
+       reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
+       try {
+        const response=await publicReports(new Request(reportUrl),env);
+        if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);const overlay=manifest.current_overlay;queued_requests=(manifest.requests||[]).filter(value=>!['published','reused','failed','superseded'].includes(value.status)).length;if(target)current_report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null,status:target.report_status||target.status};if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
+       } catch {}
+       return {
         id: String(project.id),
         source_repository: project.source_repository.full_name,
         source_repository_id: project.source_repository.id,
         relationship: project.relationship,
         preferred_branch: project.preferred_branch,
         native_feedback_enabled: project.native_feedback_enabled === true,
+        readiness_summary:{configured_channels:project.enabled_scanners.length,vendor_channels:project.enabled_scanners.filter(channel=>VENDOR_SCANNERS.has(channel)).length},
+         current_report,current_overlay,queued_requests,
+       };
       })),
     });
   }
@@ -111,21 +188,33 @@ export async function repositoryApi(request, env, session, helpers) {
     return json({project_id:String(project.id),source_repository_id:source.id});
   }
 
+  if (request.method === 'POST' && url.pathname === '/api/project-preview') {
+    const input = await requestBody();
+    const {configuration} = await context();
+    const {project,source} = await projectFor(configuration,input.project_id);
+    const snapshot = await revisionSnapshot(configuration,project,source,input.selection);
+    snapshot.cached_channels=[];
+    const reportUrl=new URL('/api/public/manifest',url);
+    reportUrl.search=new URLSearchParams({repository:EXECUTION_REPOSITORY,project_id:project.id});
+    try {
+      const response=await publicReports(new Request(reportUrl),env);
+      if(response.ok){
+        const manifest=await response.json();
+        snapshot.cached_channels=cachedChannelsForSnapshot(snapshot,manifest);
+      }
+    } catch {}
+    const actor = await github('user',token);
+    const {channels,...identity}=snapshot;
+    snapshot.preview_token = await seal({type:'revision-preview',exp:Date.now()+10*60*1000,actor_id:actor.id,snapshot:identity},env.SESSION_KEY);
+    return json(snapshot);
+  }
+
   if (request.method === 'GET' && ['/api/project-readiness', '/api/project-integration', '/api/project-targets', '/api/project-activity'].includes(url.pathname)) {
     const {repository, configuration, appToken} = await context();
     const {project, source} = await projectFor(configuration, url.searchParams.get('project_id'));
 
     if (url.pathname === '/api/project-readiness') {
-      const portable = new Set(['semgrep','gitleaks','trivy','checkov','osv','snyk','sonarqube-cloud','openssf-scorecard','github-secret-protection-posture','github-actions-security','coderabbit-ai-advisory']);
-      if (project.profile.python_root) ['bandit','ruff','radon','xenon','vulture','codeql'].forEach(channel => portable.add(channel));
-      if (project.profile.javascript_root) portable.add('codeql');
-      Object.keys(project.profile.commands || {}).forEach(channel => portable.add(channel));
-      const channels = [...new Set([...project.enabled_scanners, ...Object.keys(project.deferred_channels || {})])].map(channel => {
-        const reason = project.deferred_channels?.[channel];
-        const supported = SUPPORTED_SCANNERS.includes(channel);
-        const status = reason ? 'deferred' : !supported || (project.profile.mode === 'portable' && !portable.has(channel)) ? 'setup_required' : 'configured';
-        return {channel, status, reason:reason || (!supported ? 'No registered adapter in this tooling revision.' : status === 'setup_required' ? 'Requires a reviewed language or vendor execution profile.' : 'Configured for execution; completed evidence is still required.')};
-      });
+      const channels = scannerChoices(project).map(value=>({...value,channel:value.id,status:value.status==='READY'?'configured':value.status.toLowerCase(),reason:value.reason||'Configured for execution; completed evidence is still required.'}));
       return json({project_id:project.id,preferred_branch:project.preferred_branch,tooling_sha:configuration.tooling_sha,channels,checked_at:new Date().toISOString()});
     }
 
@@ -148,8 +237,8 @@ export async function repositoryApi(request, env, session, helpers) {
 
     if (url.pathname === '/api/project-targets') {
       const [branches, prs] = await Promise.all([pages(`repos/${source.full_name}/branches`, token), pages(`repos/${source.full_name}/pulls?state=open`, token)]);
-      if (prs.some(value => !value.head.repo)) throw new Failure(502, 'PR inventory is incomplete.', 'inventory_incomplete');
-      return json({repository:source.full_name,project_id:project.id,checked_at:new Date().toISOString(),branches:branches.map(value=>({name:value.name,sha:value.commit.sha})),prs:prs.map(value=>({number:value.number,title:String(value.title||''),head_branch:String(value.head.ref||''),head_sha:value.head.sha,head_repository:value.head.repo.full_name,base_sha:value.base.sha,base_branch:value.base.ref}))});
+      const unavailable = prs.filter(value => !value.head?.repo).map(value => value.number);
+      return json({repository:source.full_name,project_id:project.id,checked_at:new Date().toISOString(),inventory_complete:unavailable.length===0,inventory_warning:unavailable.length?`PR head repository unavailable for ${unavailable.map(number=>`#${number}`).join(', ')}.`:null,branches:branches.map(value=>({name:value.name,sha:value.commit.sha})),prs:prs.map(value=>({number:value.number,title:String(value.title||''),draft:value.draft===true,available:!!value.head?.repo,unavailable_reason:!value.head?.repo?'Pull request head repository is unavailable.':undefined,head_branch:String(value.head?.ref||''),head_sha:value.head?.sha||'',head_repository:value.head?.repo?.full_name||null,base_sha:value.base?.sha||'',base_branch:value.base?.ref||''}))});
     }
 
     const id = url.searchParams.get('request_id');
@@ -161,11 +250,13 @@ export async function repositoryApi(request, env, session, helpers) {
     const manifest = await response.json();
     const receipt = manifest.requests?.find(row => row.request_id === id);
     const canonical = canonicalReportTarget(manifest);
-    let row = canonical && (canonical.client_request_id === id || canonical.request_id === id) ? canonical : null;
+    if (receipt&&['published','reused','failed','superseded'].includes(receipt.status)) return json({phase:receipt.status,target_id:receipt.target_id||manifest.current_target_id,overlay_id:receipt.overlay_id||null,source_sha:receipt.head_sha,request_id:id,requested_channels:receipt.requested_channels,channel_progress:(receipt.channel_statuses||[]).map(value=>({...value,status:String(value.status||'unknown').toLowerCase()})),checked_at:new Date().toISOString()});
+    const canonicalForRequest=canonical&&(canonical.client_request_id===id||canonical.request_id===id)?canonical:null;
+    let row = receipt ? {...canonicalForRequest,...receipt,id:canonicalForRequest?.id||receipt.target_id,head_sha:receipt.head_sha,analyzed_sha:canonicalForRequest?.analyzed_sha,report_status:canonicalForRequest?.report_status} : canonicalForRequest;
     if (!row) {
       const recent = Array.isArray(manifest.recent_runs) ? manifest.recent_runs.find(run => run.client_request_id === id || run.request_id === id) : null;
       if (recent && canonical && recent.analyzed_sha === canonical.analyzed_sha && recent.original_target_id === canonical.original_target_id) row = {...canonical,...recent};
-      else if (receipt || recent) return json({phase:'superseded',source_sha:receipt?.head_sha || recent?.head_sha,request_id:id,checked_at:new Date().toISOString()});
+      else if (recent) return json({phase:'superseded',source_sha:recent.head_sha,request_id:id,checked_at:new Date().toISOString()});
     }
     if (!row) return json({phase:'queued',request_id:id,checked_at:new Date().toISOString()});
     const result = {request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'queued',checked_at:new Date().toISOString()};
@@ -173,6 +264,11 @@ export async function repositoryApi(request, env, session, helpers) {
       const run = await github(`repos/${repository.full_name}/actions/runs/${row.scan_run_id}/attempts/${row.run_attempt}`, appToken);
       if (run.head_sha !== row.execution_sha) throw new Failure(409, 'Producer revision does not match the request.', 'producer_mismatch');
       result.producer = {run_id:row.scan_run_id,attempt:row.run_attempt,status:run.status,conclusion:run.conclusion,url:`https://github.com/${repository.full_name}/actions/runs/${row.scan_run_id}/attempts/${row.run_attempt}`};
+      const producerJobs=await pages(`repos/${repository.full_name}/actions/runs/${row.scan_run_id}/jobs?filter=latest`,'jobs',appToken);
+      const progress=new Map((row.channel_statuses||[]).map(value=>[value.channel,{...value,status:String(value.status||'unknown').toLowerCase()}]));
+      for(const value of channelProgress(row.execution_channels||row.requested_channels,producerJobs,run.status))progress.set(value.channel,value);
+      for(const channel of row.requested_channels||[])if(!progress.has(channel))progress.set(channel,{channel,status:'queued'});
+      result.channel_progress=[...progress.values()];
       result.phase = run.status === 'completed' ? 'publishing' : 'scanning';
       if (row.collected_run === `${row.scan_run_id}-${row.run_attempt}` && row.analyzed_sha === row.head_sha) {result.phase='published';result.completeness=row.report_status;}
     }
@@ -183,7 +279,7 @@ export async function repositoryApi(request, env, session, helpers) {
   if (request.method === 'GET' && /^\/api\/project-runs\/[1-9][0-9]*$/.test(url.pathname)) {
     const {repository,appToken} = await context();
     const run = await github(`repos/${repository.full_name}/actions/runs/${url.pathname.split('/').at(-1)}`, appToken);
-    if (!['.github/workflows/code-analysis-reconcile.yml','.github/workflows/code-analysis-source.yml'].includes(run.path?.split('@')[0])) throw new Failure(404, 'Not an application analysis run.', 'not_found');
+    if (!['.github/workflows/code-analysis-reconcile.yml','.github/workflows/code-analysis-source.yml','.github/workflows/11-source-analysis.yml'].includes(run.path?.split('@')[0])) throw new Failure(404, 'Not an application analysis run.', 'not_found');
     return json({run_id:run.id,status:run.status,conclusion:run.conclusion,attempt:run.run_attempt,checked_at:new Date().toISOString()});
   }
 
@@ -191,29 +287,24 @@ export async function repositoryApi(request, env, session, helpers) {
     const input = await requestBody();
     const {repository,configuration} = await context('push');
     const {project,source} = await projectFor(configuration,input.project_id);
-    if (!['branch','pr','commit'].includes(input.kind) || typeof input.ref !== 'string' || !input.ref || input.ref.length > 255) throw new Failure(400, 'Choose a configured project and revision.', 'invalid_selection');
-    if (input.kind === 'commit' && !SHA.test(input.ref)) throw new Failure(400, 'Full commit SHA required.', 'invalid_selection');
-    if (input.kind === 'pr' && !/^[1-9][0-9]*$/.test(input.ref)) throw new Failure(400, 'PR number required.', 'invalid_selection');
-    const path = input.kind === 'branch' ? 'branches' : input.kind === 'pr' ? 'pulls' : 'commits';
-    const resolved = await github(`repos/${source.full_name}/${path}/${encodeURIComponent(input.ref)}`, token);
-    const evaluation = evaluationEnabled(env, source.full_name);
-    const targetSha = input.kind === 'branch' ? resolved.commit?.sha : input.kind === 'pr' ? resolved.head?.sha : input.ref;
-    if (evaluation && input.kind !== 'branch') throw new Failure(409, 'Evaluation mode accepts only the configured frozen branch.', 'evaluation_frozen');
-    if (evaluation && input.ref !== (env.EVALUATION_TARGET_BRANCH || 'Testing')) throw new Failure(409, 'Evaluation mode accepts only the configured frozen branch.', 'evaluation_frozen');
-    if (evaluation && (!SHA.test(targetSha || '') || (env.EVALUATION_TARGET_SHA && env.EVALUATION_TARGET_SHA !== targetSha))) throw new Failure(409, 'Evaluation target SHA is missing or has moved.', 'evaluation_frozen');
-    const scannerProfile = {enabled_scanners:[...project.enabled_scanners].sort(),deferred_channels:project.deferred_channels || {},profile:project.profile || {}};
-    const scannerProfileDigest = await evaluationDigest(scannerProfile);
-    const evaluationKey = evaluation ? `evaluation-v1:${source.full_name}:${targetSha}:${configuration.tooling_sha}:${scannerProfileDigest}` : null;
-    const stateKey = evaluation ? `evaluation:v1:${source.full_name.toLowerCase()}` : null;
-    let evaluationState = evaluation && env.ANALYSIS_STATE ? await env.ANALYSIS_STATE.get(stateKey,'json') : null;
-    if (evaluation) {
-      evaluationState = evaluationState || {evaluation_mode:true,evaluation_target_sha:targetSha,evaluation_dispatches_used:0,evaluation_paused:String(env.EVALUATION_PAUSED).toLowerCase()==='true'};
-      if (evaluationState.evaluation_target_sha && evaluationState.evaluation_target_sha !== targetSha) throw new Failure(409, 'Evaluation target SHA is frozen; refusing a moving target.', 'evaluation_frozen');
-      if (evaluationState.evaluation_paused) throw new Failure(423, 'Evaluation is paused by an operator.', 'evaluation_paused');
-      if (evaluationState.evaluation_idempotency_key === evaluationKey && evaluationState.evaluation_request_id) return json({status:'queued',request_id:evaluationState.evaluation_request_id,run_id:null,repository:repository.full_name,warning:'This deterministic evaluation request is already persisted.'},202);
-      if (Number(evaluationState.evaluation_dispatches_used || 0) >= 1) throw new Failure(429, 'Evaluation dispatch budget is exhausted; operator reset required.', 'evaluation_budget');
-    }
-    const requestId = evaluation ? evaluationRequestId(evaluationKey) : crypto.randomUUID();
+    if (typeof input.preview_token !== 'string' || input.preview_token.length > 4096) throw new Failure(400,'A valid revision preview is required before confirmation.','preview_required');
+    let signedPreview;
+    try { signedPreview = await unseal(input.preview_token,env.SESSION_KEY,'revision-preview'); }
+    catch { throw new Failure(409,'The revision preview expired or is invalid. Refresh it before confirming.','preview_expired'); }
+    const preview = signedPreview.snapshot;
+    if (signedPreview.actor_id !== (await github('user',token)).id || !preview || preview.project_id !== String(project.id) || preview.source_repository_id !== source.id || !SHA.test(preview.target_sha || '') || !DIGEST.test(preview.profile_digest || '') || !SHA.test(preview.tooling_sha || '') || !/^[0-9a-f-]{36}$/i.test(preview.preview_id || '')) throw new Failure(400,'The revision preview does not match this user or project.','preview_required');
+    if (!Array.isArray(input.requested_channels) || !input.requested_channels.length || input.requested_channels.length>SUPPORTED_SCANNERS.length || new Set(input.requested_channels).size!==input.requested_channels.length) throw new Failure(400,'Select one or more available scanner channels.','invalid_channels');
+    const channelChoices=scannerChoices(project);
+    if (input.requested_channels.some(channel=>!channelChoices.some(value=>value.id===channel&&value.selectable))) throw new Failure(400,'A selected scanner channel is not enabled by the trusted project profile.','invalid_channels');
+    if (SCANNER_GROUPS.some(group=>group.some(channel=>input.requested_channels.includes(channel))&&!group.every(channel=>input.requested_channels.includes(channel)))) throw new Failure(400,'Select all channels produced by a shared scanner lane.','invalid_channels');
+    if (!/^[0-9a-f-]{36}$/i.test(input.idempotency_key || '')) throw new Failure(400,'A request idempotency key is required.','invalid_idempotency_key');
+    const current = await revisionSnapshot(configuration, project, source, preview.selection);
+    if (current.target_sha !== preview.target_sha.toLowerCase() || current.profile_digest !== preview.profile_digest || current.tooling_sha !== preview.tooling_sha || stable(current.pr_context) !== stable(preview.pr_context || null)) throw new Failure(409,'The selected ref or PR context changed after preview. Refresh the preview before confirming.','stale_preview');
+    if (input.requested_channels.includes('coderabbit-ai-advisory')&&!current.pr_context) throw new Failure(400,'CodeRabbit review evidence requires an open pull request.','invalid_channels');
+    if (signedPreview.exp <= Date.now()) throw new Failure(409,'The revision preview expired. Refresh it before confirming.','preview_expired');
+    const targetSha = current.target_sha;
+    const requestId = requestIdFromKey(input.idempotency_key);
+    const actor = await github('user',token);
     const releases = await pages(`repos/${repository.full_name}/releases`,token);
     let queue = releases.find(value => value.tag_name === 'analysis-requests');
     if (!queue) {
@@ -221,16 +312,34 @@ export async function repositoryApi(request, env, session, helpers) {
       catch {queue=(await pages(`repos/${repository.full_name}/releases`,token)).find(value=>value.tag_name==='analysis-requests');if(!queue)throw new Failure(502,'Could not persist the analysis request.','persistence_failed');}
     }
     const pending = await pages(`repos/${repository.full_name}/releases/${queue.id}/assets`,token);
-    if (pending.filter(asset=>asset.name.startsWith('request-')).length>=100) throw new Failure(429,'This repository has 100 pending requests. Wait for reconciliation before submitting another.','queue_full');
-    if (pending.some(asset=>asset.name===`request-${requestId}.json`)) return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,warning:'This deterministic analysis request is already persisted and awaiting reconciliation.'},202);
-    const actor = await github('user',token);
-    const selection = {repository:source.full_name,kind:evaluation?'commit':input.kind,ref:evaluation?targetSha:input.ref};
-    const intent = {schema_version:'analysis-request-v1',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,selection,requested_selection:evaluation?{kind:input.kind,ref:input.ref}:undefined,target_sha:targetSha,idempotency_key:evaluationKey,actor_id:actor.id,created_at:new Date().toISOString()};
+    if (pending.filter(asset=>asset.name.startsWith('request-')).length>=100) throw new Failure(429,'The global analysis queue has 100 pending requests. Wait for reconciliation before submitting another.','queue_full');
+    const existingAsset=pending.find(asset=>asset.name===`request-${requestId}.json`);
+    if (existingAsset) {
+      const assetResponse=await fetch(`https://api.github.com/repos/${repository.full_name}/releases/assets/${existingAsset.id}`,{headers:{Authorization:`Bearer ${token}`,Accept:'application/octet-stream','User-Agent':'code-analysis-application'}});
+      if (!assetResponse.ok) throw new Failure(502,'Could not verify the retained idempotency record.','idempotency_unavailable');
+      const previous=await assetResponse.json();
+      const mismatch=previous.project_id!==project.id?'project':previous.target_sha!==targetSha?'target':previous.actor_id!==actor.id?'actor':stable(previous.selection)!==stable(current.selection)?'selection':stable(previous.pr_context||null)!==stable(current.pr_context)?'pull_request':stable([...(previous.requested_channels||[])].sort())!==stable([...input.requested_channels].sort())?'channels':'';
+      if (mismatch) throw new Failure(409,'This idempotency key already identifies a different analysis request.',`idempotency_conflict_${mismatch}`);
+      return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,warning:'This idempotent analysis request is already persisted and awaiting reconciliation.'},202);
+    }
+    const reportUrl = new URL('/api/public/manifest',url);
+    reportUrl.search = new URLSearchParams({repository:repository.full_name,project_id:project.id});
+    const existingManifest = await publicReports(new Request(reportUrl),env);
+    if (existingManifest.ok) {
+      const receipt=(await existingManifest.json()).requests?.find(value=>value.request_id===requestId);
+      if (receipt) {
+        if (receipt.head_sha!==targetSha || stable(receipt.selection)!==stable(current.selection) || stable(receipt.pr_context||null)!==stable(current.pr_context) || stable([...(receipt.requested_channels||[])].sort())!==stable([...input.requested_channels].sort())) throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
+        return json({status:['published','reused'].includes(receipt.status)?receipt.status:'queued',request_id:requestId,run_id:receipt.scan_run_id||null,repository:repository.full_name,warning:'This idempotent analysis request is already retained.'},202);
+      }
+    }
+    const selection = current.selection;
+    const checkoutRepository=current.pr_context?.head_repository||source.full_name;
+    const checkoutRepositoryId=current.pr_context?.head_repository_id||source.id;
+    const intent = {schema_version:'analysis-request-v2',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection,resolved_selection:{repository:checkoutRepository,repository_id:checkoutRepositoryId,kind:'commit',ref:targetSha},target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...input.requested_channels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:input.idempotency_key.toLowerCase(),run_again:input.run_again===true,preview_id:preview.preview_id,created_at:new Date().toISOString()};
     const saved = await fetch(`https://uploads.github.com/repos/${repository.full_name}/releases/${queue.id}/assets?name=request-${requestId}.json`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','User-Agent':'code-analysis-application'},body:JSON.stringify(intent)});
     if (!saved.ok) throw new Failure(502,'Could not persist the analysis request; no scan was confirmed.','persistence_failed');
-    if (evaluation && env.ANALYSIS_STATE) {evaluationState={...evaluationState,evaluation_mode:true,evaluation_target_sha:targetSha,evaluation_dispatches_used:1,evaluation_idempotency_key:evaluationKey,evaluation_request_id:requestId,evaluation_status:'dispatching'};await env.ANALYSIS_STATE.put(stateKey,JSON.stringify(evaluationState));}
     let result;
-    try {result=await github(`repos/${repository.full_name}/actions/workflows/code-analysis-reconcile.yml/dispatches`,token,{method:'POST',body:JSON.stringify({ref:repository.default_branch,return_run_details:true,inputs:{project_id:project.id,selection:JSON.stringify(selection),request_id:requestId}})});}
+    try {result=await github(`repos/${repository.full_name}/actions/workflows/code-analysis-reconcile.yml/dispatches`,token,{method:'POST',body:JSON.stringify({ref:repository.default_branch,return_run_details:true})});}
     catch {return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,warning:'Request saved. Immediate dispatch failed; repository reconciliation will recover it.'},202);}
     return json({status:'submitted',request_id:requestId,run_id:result?.workflow_run_id||null,repository:repository.full_name},202);
   }

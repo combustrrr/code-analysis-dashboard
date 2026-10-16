@@ -174,11 +174,13 @@ def resolve_selection(config: dict, selected: str, rows: list[dict]) -> dict:
             if not loose:
                 raise ValueError('Invalid structured analysis selection') from exc
             selection = {'repository': loose.group(1), 'kind': loose.group(2), 'ref': loose.group(3)}
-        if (not isinstance(selection, dict) or selection.get('repository') != repo
+        if (not isinstance(selection, dict) or not isinstance(selection.get('repository'),str)
                 or selection.get('kind') not in {'branch', 'pr', 'commit'}
                 or not isinstance(selection.get('ref'), str)):
             raise ValueError('Analysis selection must identify the configured source repository')
         kind, ref = selection['kind'], selection['ref']
+        if selection['repository'] != repo and kind != 'commit':
+            raise ValueError('Only a pinned commit may check out an approved fork repository')
         if kind == 'branch':
             matches = [r for r in rows if r['kind'] == 'branch' and r['branch'] == ref]
             if len(matches) != 1:
@@ -193,8 +195,12 @@ def resolve_selection(config: dict, selected: str, rows: list[dict]) -> dict:
             if not re.fullmatch(r'[0-9a-fA-F]{40}', ref):
                 raise ValueError('Full commit SHA required')
             # Bypass branch labels that happen to look like commit SHAs.
-            sha = api(f'repos/{repo}/commits/{ref}')['sha']
-            return target(repo, 'Selected commit', sha, kind='commit')
+            checkout_repository=selection['repository']
+            if checkout_repository != repo:
+                if not isinstance(selection.get('repository_id'),int) or api(f'repos/{checkout_repository}')['id'] != selection['repository_id']:
+                    raise ValueError('Selected fork identity changed')
+            sha = api(f'repos/{checkout_repository}/commits/{ref}')['sha']
+            return target(repo, 'Selected commit', sha, source_repository=checkout_repository, kind='commit')
     if value.startswith(prefix):
         value = value[len(prefix):].split('#', 1)[0].rstrip('/')
         if value.startswith('commit/'):

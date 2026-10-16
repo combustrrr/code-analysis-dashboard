@@ -55,9 +55,8 @@ def target(repository: str, branch: str, sha: str, *, pr: int | None = None,
 
 
 def analysis_key(row: dict, tooling_sha: str, config: dict) -> str:
-    # PR review evidence is contextual; do not reuse it across different PRs/bases.
-    return digest([row["source_repository"], row["head_sha"], tooling_sha, config,
-                   [row["repository"], row["pr"], row["base_sha"]] if row.get("pr") else None])
+    # Source evidence is independent of branch/PR labels and cross-fork checkout URLs.
+    return digest([row["repository"], row["head_sha"], tooling_sha, config])
 
 
 def reconcile(previous: dict, discovered: list[dict], checked_at: str) -> dict:
@@ -99,7 +98,7 @@ def build(snapshot: dict, identity: dict, output: Path, *, producer_repository: 
     if len(observations) != len(snapshot["observations"]):
         raise ValueError("duplicate observation identity")
     channels = snapshot["analysis_channels"]
-    incomplete = [row["channel"] for row in channels if row["status"] not in COMPLETE_STATUSES
+    incomplete = [row["channel"] for row in channels if row["status"] not in COMPLETE_STATUSES | {"NOT_SELECTED"}
                   and not (row["status"] in {"NOT_APPLICABLE", "DEFERRED"} and row.get("reason"))]
     runs = []
     for run in snapshot["workflow_run_ids"]:

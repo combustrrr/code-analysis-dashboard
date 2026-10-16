@@ -12,18 +12,69 @@ import uuid
 
 from scripts.code_analysis import github_service as github, release_manifest
 from scripts.code_analysis.hosted import analysis_key, reconcile, now, accept
-from scripts.code_analysis.projects import validate, service_config, native_feedback_allowed
-from scripts.code_analysis.report_assets import shard
-from scripts.code_analysis.evaluation import can_dispatch, consume, idempotency_key, profile_digest
+from scripts.code_analysis.projects import validate, service_config
+from scripts.code_analysis.report_assets import shard, verify_asset
+from scripts.code_analysis.applicability import GROUPS as SCANNER_GROUPS
 
 WORKFLOW = '.github/workflows/code-analysis-source.yml'
+GENERATED_WORKFLOW = '.github/workflows/11-source-analysis.yml'
+
+
+def project_profile_digest(project):
+    profile = {'enabled_scanners':sorted(project.get('enabled_scanners', [])),
+               'deferred_channels':project.get('deferred_channels', {}),
+               'native_feedback_enabled':project.get('native_feedback_enabled', True),
+               'profile':project.get('profile', {})}
+    return hashlib.sha256(json.dumps(profile, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def channel_execution_plan(requested, cached_channels, run_again=False):
+    reusable={'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE'}
+    cached={value.get('channel'):value for value in cached_channels}
+    reused=[] if run_again else [channel for channel in requested if cached.get(channel,{}).get('status') in reusable]
+    execution=[channel for channel in requested if channel not in reused]
+    for group in SCANNER_GROUPS.values():
+        members=set(group).intersection(requested)
+        if members and members.intersection(execution):
+            reused=[channel for channel in reused if channel not in members]
+            execution=[channel for channel in requested if channel not in reused]
+    return execution,reused
+
+
+def channel_lanes(channels):
+    lanes=[]
+    seen=set()
+    for channel in channels:
+        if channel in seen:
+            continue
+        group=next((list(values) for values in SCANNER_GROUPS.values() if channel in values),[channel])
+        lane=[value for value in channels if value in group]
+        lanes.append(lane)
+        seen.update(lane)
+    return lanes
+
+
+def producer_dispatch_id(request_id, channels):
+    suffix=hashlib.sha256((request_id+':'+','.join(channels)).encode()).hexdigest()[:16]
+    return request_id[:8]+'-'+suffix
 
 
 def queued_selection(intent):
     """Return the canonical repository-qualified selection from a queued request."""
-    selection = intent.get('selection')
+    selection = intent.get('resolved_selection') if intent.get('schema_version') == 'analysis-request-v2' else intent.get('selection')
     if not isinstance(selection, dict):
         raise ValueError('Queued request selection is invalid')
+    if intent.get('schema_version') == 'analysis-request-v1' and intent.get('target_sha'):
+        selection = {'repository':selection.get('repository'),'kind':'commit','ref':intent['target_sha']}
+    if intent.get('schema_version') == 'analysis-request-v2':
+        pr_context=intent.get('pr_context')
+        expected_repository=pr_context.get('head_repository') if isinstance(pr_context,dict) else intent.get('source_repository')
+        expected_repository_id=pr_context.get('head_repository_id') if isinstance(pr_context,dict) else intent.get('source_repository_id')
+        if (selection.get('kind') != 'commit' or selection.get('ref') != intent.get('target_sha')
+                or selection.get('repository') != expected_repository or selection.get('repository_id') != expected_repository_id
+                or not isinstance(intent.get('requested_channels'), list)
+                or not intent.get('requested_channels')):
+            raise ValueError('Pinned request envelope is invalid')
     return json.dumps(selection)
 
 
@@ -69,7 +120,8 @@ def recover_completed_producer_run(config, row, runs):
     candidates = sorted(
         (run for run in runs
          if run.get('status') == 'completed'
-         and run.get('path') == WORKFLOW
+         and run.get('path') in {WORKFLOW,GENERATED_WORKFLOW}
+         and (not row.get('dispatch_id') or run.get('display_title') == 'Source analysis ' + row['dispatch_id'])
          and run.get('head_sha') == execution_sha),
         key=lambda run: (run.get('created_at', ''), run.get('id', 0)),
         reverse=True,
@@ -86,6 +138,177 @@ def recover_completed_producer_run(config, row, runs):
     return None
 
 
+def load_report_documents(config, entry):
+    documents = {}
+    for name, metadata in entry.get('assets', {}).items():
+        content = github.read_storage(config, 'report', f"{config['report_release']}/{name}")
+        documents.update(verify_asset(name, content, metadata))
+    return documents
+
+
+def merge_channel_documents(previous, incoming, selected_channels):
+    """Replace successful selected lanes while retaining healthy sibling evidence."""
+    old_snapshot = previous.get('snapshot.json')
+    new_snapshot = incoming.get('snapshot.json')
+    old_report = previous.get('report.json', {})
+    new_report = incoming.get('report.json', {})
+    if not isinstance(old_snapshot, dict) or not isinstance(new_snapshot, dict):
+        raise ValueError('Same-revision channel merge requires validated snapshot documents')
+    selected = set(selected_channels)
+    success = {'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE'}
+    old_channels = {row['channel']:row for row in old_snapshot.get('analysis_channels', [])}
+    new_channels = {row['channel']:row for row in new_snapshot.get('analysis_channels', [])}
+    replace = {channel for channel in selected if new_channels.get(channel, {}).get('status') in success}
+    if not replace:
+        raise ValueError('No selected scanner channel produced valid evidence for this revision')
+
+    def families(snapshot, channel_rows, identities):
+        observations = {row.get('observation_id'):row for row in snapshot.get('observations', [])}
+        result = set()
+        for identity in identities:
+            row = channel_rows.get(identity, {})
+            result.add(row.get('name', identity))
+            result.update(observations[key].get('scanner_family') for key in row.get('observation_ids', [])
+                          if key in observations and observations[key].get('scanner_family'))
+        return result
+
+    replaced_families = families(old_snapshot, old_channels, replace) | families(new_snapshot, new_channels, replace)
+    old_observations = [row for row in old_snapshot.get('observations', [])
+                        if row.get('scanner_family') not in replaced_families]
+    new_observations = [row for row in new_snapshot.get('observations', [])
+                        if row.get('scanner_family') in replaced_families]
+    observations_by_id = {row['observation_id']:row for row in [*old_observations,*new_observations]}
+
+    def merge_findings(field):
+        combined = {}
+        for finding in old_snapshot.get(field, []):
+            row = dict(finding)
+            row['observation_ids'] = [value for value in row.get('observation_ids', [])
+                                      if value in observations_by_id and observations_by_id[value].get('scanner_family') not in replaced_families]
+            row['supporting_scanner_families'] = [value for value in row.get('supporting_scanner_families', []) if value not in replaced_families]
+            if row['observation_ids'] or row['supporting_scanner_families']:
+                combined[row.get('stable_id',row.get('id'))] = row
+        for finding in new_snapshot.get(field, []):
+            if not set(finding.get('supporting_scanner_families', [])).intersection(replaced_families):
+                continue
+            identity = finding.get('stable_id',finding.get('id'))
+            prior = combined.get(identity)
+            if prior:
+                row = dict(prior)
+                row['observation_ids'] = list(dict.fromkeys([*row.get('observation_ids',[]),*finding.get('observation_ids',[])]))
+                row['supporting_scanner_families'] = list(dict.fromkeys([*row.get('supporting_scanner_families',[]),*finding.get('supporting_scanner_families',[])]))
+                combined[identity] = row
+            else:
+                combined[identity] = dict(finding)
+        return list(combined.values())
+
+    channels=[]
+    for identity in old_channels.keys() | new_channels.keys():
+        old=old_channels.get(identity)
+        new=new_channels.get(identity)
+        if identity in replace:
+            row=dict(new)
+        elif identity in selected and new:
+            row=dict(old or new)
+            row['last_attempt_status']=new.get('status')
+            row['last_attempt_reason']=new.get('reason')
+        else:
+            row=dict(old or new)
+        channels.append(row)
+    channels.sort(key=lambda row:row['channel'])
+    snapshot={**old_snapshot,**new_snapshot,
+              'observations':sorted(observations_by_id.values(),key=lambda row:row['observation_id']),
+              'canonical_findings':merge_findings('canonical_findings'),
+              'ai_advisories':merge_findings('ai_advisories'),
+              'analysis_channels':channels,'analysis_channel_count':len(channels)}
+    snapshot['finding_count']=len(snapshot['canonical_findings'])+len(snapshot['ai_advisories'])
+    snapshot['observation_count']=len(snapshot['observations'])
+    gate_ids=list(dict.fromkeys([*old_snapshot.get('publication_gate',{}).get('channel_ids',[]),
+                                *[channel for channel in replace if channel in new_channels]]))
+    snapshot['publication_gate']={'policy':'static-evidence-v1','channel_ids':gate_ids,
+                                 'satisfied':bool(gate_ids) and all(next((row['status'] for row in channels if row['channel']==channel),'')=='COMPLETED' for channel in gate_ids)}
+
+    old_details = [detail for path, values in previous.items() if path.startswith('details/') and isinstance(values,list) for detail in values]
+    new_details = [detail for path, values in incoming.items() if path.startswith('details/') and isinstance(values,list) for detail in values]
+    details={row['id']:row for row in [*old_details,*new_details]}
+    observations_by_id={row['observation_id']:row for row in snapshot['observations']}
+    findings=[]
+    all_canonical=[*snapshot['canonical_findings'],*snapshot['ai_advisories']]
+    for finding in all_canonical:
+        identity=finding['stable_id']
+        detail=details.get(identity)
+        if not detail:
+            raise ValueError('Merged channel finding lacks its validated detail document')
+        origins=[observations_by_id[oid] for oid in finding.get('observation_ids',[]) if oid in observations_by_id]
+        row={'id':identity,'severity':finding.get('severity','UNKNOWN'),'file':finding.get('file',''),
+             'line':finding.get('start_line',0),'message':detail.get('message',''),
+             'scanners':finding.get('supporting_scanner_families',[]),
+             'rules':sorted({str(origin.get('rule','')) for origin in origins}), 'page':0}
+        findings.append(row)
+        details[identity]={**detail,**row,'origins':[{key:origin.get(key) for key in ('scanner_family','rule','file','start_line','raw_artifact','observation_id')} for origin in origins]}
+    findings.sort(key=lambda row:(row.get('severity',''),row.get('file',''),row.get('line',0),row['id']))
+    merged_documents={path:value for path,value in previous.items() if not (path.startswith('details/') or path in {'report.json','snapshot.json','findings.json'})}
+    merged_documents.update({path:value for path,value in incoming.items() if path.startswith('source/')})
+    for index,row in enumerate(findings):
+        row['page']=index//100
+    for start in range(0,len(findings),100):
+        page=start//100
+        merged_documents[f'details/{page}.json']=[details[row['id']] for row in findings[start:start+100] if row['id'] in details]
+    severities={}
+    for row in findings:severities[row.get('severity','UNKNOWN')]=severities.get(row.get('severity','UNKNOWN'),0)+1
+    incomplete=[row for row in channels if row.get('status') not in {'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_SELECTED'} and not (row.get('status') in {'NOT_APPLICABLE','DEFERRED'} and row.get('reason'))]
+    report={**old_report,**new_report,'finding_count':len(findings),'observation_count':len(snapshot['observations']),
+            'channels':channels,'severities':severities,'status':'partial' if incomplete or selected-replace else 'complete'}
+    merged_documents.update({'snapshot.json':snapshot,'report.json':report,'findings.json':findings})
+    return merged_documents,report
+
+
+def pr_overlay_key(project_id, context, target_sha, tooling_sha, profile_digest):
+    identity=[str(project_id),context['number'],context.get('head_repository_id'),context['head_repository'],target_sha,
+              context['base_sha'],tooling_sha,profile_digest]
+    return hashlib.sha256(json.dumps(identity,separators=(',',':')).encode()).hexdigest()
+
+
+def matching_pr_overlay(overlay, intent):
+    overlay=overlay or {}
+    context=intent.get('pr_context') or {}
+    saved_context=overlay.get('pr_context') or {}
+    return bool(context and overlay.get('status')=='complete'
+                and overlay.get('project_id')==str(intent.get('project_id'))
+                and overlay.get('head_sha')==intent.get('target_sha')
+                and overlay.get('tooling_sha')==intent.get('tooling_sha')
+                and overlay.get('profile_digest')==intent.get('profile_digest')
+                and saved_context.get('number')==context.get('number')
+                and saved_context.get('head_repository')==context.get('head_repository')
+                and saved_context.get('head_repository_id')==context.get('head_repository_id')
+                and saved_context.get('base_sha')==context.get('base_sha'))
+
+
+def build_pr_overlay(documents, report, row):
+    context=row.get('pr_context')
+    snapshot=documents.get('snapshot.json',{})
+    channel=next((value for value in snapshot.get('analysis_channels',[]) if value.get('channel')=='coderabbit-ai-advisory'),None)
+    if not context or not channel or channel.get('status') not in {'COMPLETED','COMPLETED_OPTIONAL','POLICY_FINDINGS'}:
+        raise ValueError('Pull-request overlay lacks validated CodeRabbit evidence and complete PR provenance')
+    observations={value['observation_id']:value for value in snapshot.get('observations',[])}
+    observation_ids=set(channel.get('observation_ids',[]))
+    if not observation_ids.issubset(observations):
+        raise ValueError('Pull-request overlay references missing validated observations')
+    overlay_observations=[observations[key] for key in channel.get('observation_ids',[])]
+    advisories=[value for value in snapshot.get('ai_advisories',[])
+                if set(value.get('observation_ids',[])).intersection(observation_ids)]
+    advisory_ids={value.get('stable_id') for value in advisories}
+    findings=[value for value in documents.get('findings.json',[]) if value.get('id') in advisory_ids]
+    detail_ids={value.get('id') for value in findings}
+    details=[value for path,values in documents.items() if path.startswith('details/') and isinstance(values,list) for value in values if value.get('id') in detail_ids]
+    return {'schema_version':'analysis-pr-overlay-v1','overlay_key':pr_overlay_key(row['project_id'],context,row['head_sha'],report['tooling_sha'],report['profile_digest']),
+            'project_id':str(row['project_id']),'repository':row['repository'],'pr_context':context,
+            'head_sha':row['head_sha'],'tooling_sha':report['tooling_sha'],'profile_digest':report['profile_digest'],
+            'checked_at':report.get('generated_at') or now(),'channel':channel,'observations':overlay_observations,
+            'advisories':advisories,'findings':findings,'details':details,
+            'status':'complete'}
+
+
 def report_publication(config, state, report_release, document=None):
     """Publish one canonical project report, then remove unreferenced assets."""
     previous = release_manifest.read(config, report_release)
@@ -98,7 +321,7 @@ def report_publication(config, state, report_release, document=None):
         # Manifests written before the canonical identity was introduced had one
         # target only in the common case; retain it as a safe fallback.
         prior_current = previous_targets[0] if len(previous_targets) == 1 else None
-    result = {**state, 'schema_version':'analysis-current-v1', 'targets':[]}
+    result = {**previous, **state, 'schema_version':'analysis-current-v1', 'targets':[]}
     pending = {}
     entries = []
     with tempfile.TemporaryDirectory(prefix='analysis-publication-') as directory:
@@ -111,7 +334,7 @@ def report_publication(config, state, report_release, document=None):
             old = prior.get(row['id'], {})
             if not old and prior_current and prior_current.get('original_target_id') == row.get('id'):
                 old = prior_current
-            for key in ('documents', 'assets', 'analyzed_sha', 'collected_run', 'report_status', 'native_feedback'):
+            for key in ('documents', 'assets', 'analyzed_sha', 'collected_run', 'report_status', 'tooling_sha', 'profile_digest', 'requested_channels', 'execution_channels', 'reused_channels', 'channel_statuses'):
                 if key in old:
                     entry[key] = old[key]
             if row.get('status') == 'collected' and old.get('collected_run') == f"{row.get('scan_run_id')}-{row.get('run_attempt')}":
@@ -119,14 +342,14 @@ def report_publication(config, state, report_release, document=None):
             if entry.get('analyzed_sha') and entry['analyzed_sha'] != row['head_sha']:
                 entry['status'] = 'stale'
             run_key = f"{row.get('scan_run_id')}-{row.get('run_attempt')}"
-            native_upgrade = old.get('native_feedback', {}).get('reason', '').startswith('Native SARIF exceeds') and old.get('native_feedback', {}).get('adapter_version') != 2
-            if row.get('status') == 'collected' and (old.get('collected_run') != run_key or native_upgrade):
+            if row.get('status') == 'collected' and old.get('collected_run') != run_key:
                 entry['lifecycle_status'] = 'collecting'
+                attempt_channel_statuses=[]
                 try:
                     destination = Path(directory) / row['id']
                     report = github.collect(config, row, destination)
-                    latest = next((x for x in github.discover(config) if x['id'] == row['id']), None)
-                    if row['kind'] == 'commit':
+                    latest = row if row.get('client_request_id') else next((x for x in github.discover(config) if x['id'] == row['id']), None)
+                    if row['kind'] == 'commit' and not row.get('client_request_id'):
                         latest = github.resolve_selection(config, row['head_sha'], [])
                     if latest is None or not accept(latest, report):
                         raise ValueError('Target changed before publication')
@@ -136,41 +359,77 @@ def report_publication(config, state, report_release, document=None):
                             documents[p.relative_to(destination).as_posix()] = json.loads(p.read_text(encoding='utf-8'))
                         elif p.suffix == '.md':
                             documents[p.relative_to(destination).as_posix()] = p.read_text(encoding='utf-8')
+                    report.update(profile_digest=row.get('profile_digest'),requested_channels=row.get('requested_channels'),
+                                  execution_channels=row.get('execution_channels',row.get('requested_channels')),
+                                   reused_channels=row.get('reused_channels',[]),
+                                   request_id=row.get('client_request_id'),requested_selection=row.get('requested_selection'),
+                                   pr_context=row.get('pr_context'))
+                    attempt_channel_statuses=[dict(value) for value in report.get('channels',[]) if isinstance(value,dict)]
+                    selected_channels=row.get('execution_channels',row.get('requested_channels',[]))
+                    channel_rows={value.get('channel'):value for value in report.get('channels',[])}
+                    valid_selected=any(channel_rows.get(channel,{}).get('status') in {'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE'} for channel in selected_channels)
+                    if (selected_channels==['coderabbit-ai-advisory'] and row.get('pr_context')):
+                        overlay=build_pr_overlay(documents,report,row)
+                        overlay_manifest,overlay_blobs=shard({'pr-overlay.json':overlay})
+                        pending.update(overlay_blobs)
+                        result['current_overlay']={key:overlay[key] for key in (
+                            'schema_version','overlay_key','project_id','repository','pr_context','head_sha',
+                            'tooling_sha','profile_digest','checked_at','channel','status')}
+                        result['current_overlay'].update(documents=overlay_manifest['documents'],assets=overlay_manifest['assets'],
+                                                        client_request_id=row.get('client_request_id'),request_id=row.get('client_request_id'),
+                                                        scan_run_id=row.get('scan_run_id'),run_attempt=row.get('run_attempt'))
+                        entry.update(status='overlay_published',lifecycle_status='overlay_published',overlay_only=True,
+                                     overlay_id=overlay['overlay_key'],overlay_status='complete',
+                                     attempt_channel_statuses=attempt_channel_statuses,channel_statuses=report.get('channels',[]))
+                        entries.append(entry)
+                        continue
+                    same_revision=(old.get('analyzed_sha')==report.get('analyzed_sha')
+                                   and old.get('tooling_sha')==report.get('tooling_sha')
+                                   and old.get('profile_digest')==report.get('profile_digest'))
+                    if same_revision:
+                        documents,report=merge_channel_documents(load_report_documents(config,old),documents,selected_channels)
+                        for channel in report.get('channels',[]):
+                            if channel.get('channel') in row.get('reused_channels',[]):
+                                channel['evidence_reused']=True
+                        for channel in documents.get('snapshot.json',{}).get('analysis_channels',[]):
+                            if channel.get('channel') in row.get('reused_channels',[]):
+                                channel['evidence_reused']=True
+                    elif not valid_selected:
+                        raise ValueError('No selected scanner channel produced valid evidence; the previous current report is preserved')
+                    documents['report.json']=report
                     manifest, blobs = shard(documents)
                     pending.update(blobs)
                     entry['lifecycle_status'] = 'publishing'
                     entry.update(documents=manifest['documents'], assets=manifest['assets'],
                                  analyzed_sha=report['analyzed_sha'], collected_run=run_key,
+                                 tooling_sha=report.get('tooling_sha'),profile_digest=report.get('profile_digest'),
+                                 requested_channels=report.get('requested_channels'),execution_channels=report.get('execution_channels'),
+                                 reused_channels=report.get('reused_channels'),
+                                  attempt_channel_statuses=attempt_channel_statuses,
+                                 channel_statuses=report.get('channels',[]),
                                  status=report['status'], report_status=report['status'])
-                    for key in ('generated_at', 'report_generation_timestamp', 'producer_runs', 'tooling_sha'):
+                    for key in ('generated_at', 'report_generation_timestamp', 'producer_runs', 'requested_selection', 'pr_context'):
                         if key in report:
                             entry[key] = report[key]
                     entry['lifecycle_status'] = 'completed_partial' if report['status'] == 'partial' else 'completed'
                     entry.pop('error', None)
-                    if document is not None:
-                        from scripts.code_analysis.native_feedback import publish
-                        try:
-                            dashboard_url = os.environ.get('DASHBOARD_URL') or config.get('dashboard_url', '') or 'https://combustrrr.github.io/code-analysis-dashboard/'
-                            entry['native_feedback'] = publish(document, config['project_id'], row, report, documents['findings.json'], dashboard_url=dashboard_url)
-                        except (ValueError, RuntimeError) as error:
-                            entry['native_feedback'] = {'status':'failed', 'reason':str(error)}
+                    # Findings are never projected back to source repositories.
                 except (ValueError, RuntimeError) as error:
                     entry.update(status='failed', lifecycle_status='failed', error=str(error))
+                    receipt=next((value for value in state.get('requests',[]) if value.get('request_id')==row.get('client_request_id')),None)
+                    if receipt and attempt_channel_statuses:
+                        statuses={value.get('channel'):value for value in receipt.get('channel_statuses',[])}
+                        statuses.update({value.get('channel'):value for value in attempt_channel_statuses if value.get('channel') in row.get('execution_channels',[])})
+                        receipt['channel_statuses']=list(statuses.values())
                     try:
                         if recover_expired_evidence(config, row):
                             entry['recovery_reason'] = row['recovery_reason']
                     except (ValueError, RuntimeError):
                         pass  # API failure does not prove evidence is absent.
-            if entry.get('native_feedback', {}).get('status') == 'security_processing':
-                from scripts.code_analysis.native_feedback import processing
-                try:
-                    entry['native_feedback'] = processing(config['analysis_repository'], entry['native_feedback'])
-                except (ValueError, RuntimeError) as error:
-                    entry['native_feedback']['processing_error'] = str(error)
             entries.append(entry)
 
         canonical_id = f"current:{config.get('project_id', state.get('project_id', 'unknown'))}"
-        valid = [entry for entry in entries
+        valid = [entry for entry in entries if not entry.get('overlay_only')
                  if entry.get('lifecycle_status') in {'completed', 'completed_partial'}
                  and entry.get('analyzed_sha') == entry.get('head_sha')
                  and entry.get('documents') and entry.get('assets')]
@@ -192,6 +451,10 @@ def report_publication(config, state, report_release, document=None):
                 canonical['status'] = canonical['report_status']
             result['targets'] = [canonical]
             result['current_target_id'] = canonical_id
+            overlay=result.get('current_overlay')
+            if (overlay and selected is not prior_current
+                    and overlay.get('head_sha')!=selected.get('analyzed_sha')):
+                result.pop('current_overlay',None)
 
         # Keep enough request/run history for activity polling without turning the
         # current manifest back into a per-target inventory.
@@ -200,8 +463,12 @@ def report_publication(config, state, report_release, document=None):
             recent.append({key: entry[key] for key in (
                 'request_id', 'client_request_id', 'original_target_id', 'head_sha',
                 'analyzed_sha', 'scan_run_id', 'run_attempt', 'execution_sha',
-                'collected_run', 'report_status', 'lifecycle_status', 'checked_at')
+                'collected_run', 'report_status', 'lifecycle_status', 'checked_at',
+                'execution_channels','attempt_channel_statuses')
                            if key in entry})
+        for entry in entries:
+            if entry.get('overlay_only'):
+                recent.append({key:entry[key] for key in ('request_id','client_request_id','head_sha','analyzed_sha','scan_run_id','run_attempt','lifecycle_status','overlay_id','attempt_channel_statuses') if key in entry})
         deduped = []
         seen_runs = set()
         for run in reversed(recent):
@@ -213,6 +480,7 @@ def report_publication(config, state, report_release, document=None):
             deduped.append(run)
         result['recent_runs'] = list(reversed(deduped))[-10:]
         referenced = {name:meta for row in result['targets'] for name,meta in row.get('assets', {}).items()}
+        referenced.update((result.get('current_overlay') or {}).get('assets',{}))
         size = sum(meta['bytes'] for meta in referenced.values())
         for name in referenced:
             if name in pending:
@@ -241,6 +509,13 @@ def report_publication(config, state, report_release, document=None):
         result['report_storage_history'] = history[-60:]
         result['checked_at'] = now()
         release_manifest.write(config, report_release, result)
+        previous_assets={name for row in previous_targets for name in row.get('assets',{})}
+        previous_assets.update((previous.get('current_overlay') or {}).get('assets',{}))
+        for name in previous_assets-set(referenced):
+            try:
+                github.cf_api(config,github.storage_path(config,'report',f'{config["report_release"]}/{name}'),method='DELETE')
+            except (ValueError,RuntimeError):
+                pass  # The committed manifest no longer references these assets.
     return result
 
 
@@ -250,20 +525,41 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
     queue = github.release(repository, 'analysis-requests')
     if queue:
         candidates = sorted((a for a in github.pages(f"repos/{repository}/releases/{queue['id']}/assets") if a['name'].startswith('request-') and a['name'].endswith('.json')), key=lambda a:(a['created_at'],a['id']))
-        if candidates:
-            queued_asset = candidates[0]
-            if queued_asset.get('size', 0)>8192:
-                raise ValueError('Queued request exceeds the accepted request size')
-            intent = json.loads(github.gh('api',f"repos/{repository}/releases/assets/{queued_asset['id']}",'-H','Accept: application/octet-stream',binary=True))
-            if intent.get('schema_version')!='analysis-request-v1' or intent.get('execution_repository_id')!=repo['id'] or not any(p['id']==intent.get('project_id') for p in document['projects']):
-                raise ValueError('Queued request identity is invalid or project was removed')
-            # `selection` is the canonical, repository-qualified revision. The
-            # optional requested_selection records the user's original UI
-            # choice and, in evaluation mode, intentionally omits repository.
+        for candidate in candidates:
+            try:
+                candidate_intent = (json.loads(github.gh('api',f"repos/{repository}/releases/assets/{candidate['id']}",'-H','Accept: application/octet-stream',binary=True))
+                                    if candidate.get('size',0)<=8192 else {})
+            except (ValueError, RuntimeError):
+                candidate_intent = {}
+            project = next((p for p in document['projects'] if p['id']==candidate_intent.get('project_id')),None)
+            channels = candidate_intent.get('requested_channels')
+            valid = (candidate_intent.get('schema_version')=='analysis-request-v2'
+                     and candidate_intent.get('execution_repository_id')==repo['id']
+                     and isinstance(candidate_intent.get('actor_id'),int)
+                     and candidate_intent.get('source_repository_id')==(project or {}).get('source_repository',{}).get('id')
+                     and candidate_intent.get('target_sha')
+                     and candidate_intent.get('tooling_sha')==document['tooling_sha']
+                     and candidate_intent.get('profile_digest')==project_profile_digest(project)
+                     and isinstance(channels,list) and channels and set(channels).issubset(set((project or {}).get('enabled_scanners',[])))
+                     and project is not None)
+            if not valid:
+                # Preserve legacy/automatic entries as evidence, but never allow
+                # an incomplete pre-v2 request to execute after this cutover.
+                github.api(f"repos/{repository}/releases/assets/{candidate['id']}",
+                           {'name':f"superseded-{candidate['name']}",'label':'superseded: request predates the immutable manual envelope'},'PATCH')
+                continue
+            queued_asset, intent = candidate, candidate_intent
             project_id, selection, request_id = intent['project_id'], queued_selection(intent), intent['request_id']
+            break
+    if queued_asset is None:
+        # Direct/manual workflow inputs are recovery signals only. Only a durable,
+        # previously accepted request asset is allowed to introduce scan work.
+        project_id, selection, request_id = '', '', ''
     template = json.loads((Path(__file__).resolve().parents[2] / 'config/code-analysis/service.json').read_text(encoding='utf-8-sig'))
-    evaluation = template.get('evaluation', {})
-    runs = github.pages(f'repos/{repository}/actions/workflows/code-analysis-source.yml/runs', 'workflow_runs')
+    runs = []
+    for workflow in ('code-analysis-source.yml','11-source-analysis.yml'):
+        runs.extend(github.pages(f'repos/{repository}/actions/workflows/{workflow}/runs','workflow_runs'))
+    runs = list({run['id']:run for run in runs}.values())
     running = sum(run['status'] != 'completed' for run in runs)
     by_id = {run['id']:run for run in runs}
     by_nonce = {run['display_title']:run for run in reversed(runs)}
@@ -276,14 +572,18 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         stored[project['id']] = (rel, release_manifest.read(config_tmp, rel))
     projects = sorted(document['projects'], key=lambda p: not (str(p['id']) == str(project_id) and selection or any(r.get('manual_refresh') for r in stored[p['id']][1].get('targets', []))))
     for project in projects:
+        queue_advanced=False
         config = service_config(document, project['id'], template)
         config['source_workflow'] = WORKFLOW
+        current=config['report_release']
+        current_manifest=release_manifest.read(config,current)
         source = github.api('repos/' + config['source_repository'])
         if source['id'] != config['source_repository_id'] or source['private']:
             raise ValueError('Source repository identity/visibility changed')
         config['source_repository'] = source['full_name']
         release, old = stored[project['id']]
         rows = github.inventory(config, old)  # Fail closed on incomplete pagination.
+        selected = None
         if selection and str(project['id']) == str(project_id):
             selected = github.resolve_selection(config, selection, rows)
             if not any(r['id'] == selected['id'] for r in rows):
@@ -292,90 +592,157 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                 old['manual_target'] = selected
                 rows.append(selected)
         state = reconcile(old, rows, now())
+        for row in state['targets']:
+            if row.get('status') in {'queued','dispatching'} and not (row.get('client_request_id') or row.get('request_id')):
+                row.update(status='superseded',error='Automatic discovery no longer launches scans; submit an explicit request.')
         state.update(project_id=project['id'], source_repository=source['full_name'],
                      analysis_repository=repository, relationship=project['relationship'],
                      preferred_branch=project['preferred_branch'])
-        evaluation_enabled = bool(evaluation.get('enabled')) and source['full_name'].lower() == str(evaluation.get('source_repository', '')).lower()
-        if evaluation_enabled:
-            state.setdefault('evaluation_mode', True)
-            state.setdefault('evaluation_target_sha', None)
-            state.setdefault('evaluation_dispatches_used', 0)
-            state.setdefault('evaluation_paused', bool(evaluation.get('paused', False)))
-            state.setdefault('evaluation_dispatch_budget', int(evaluation.get('dispatch_budget', 1)))
-            if evaluation.get('paused'):
-                state['evaluation_paused'] = True
         if selection and str(project['id']) == str(project_id) and request_id != old.get('last_request_id'):
             github.request_refresh(state, selected['id'])
             state['last_request_id'] = request_id
-            next(r for r in state['targets'] if r['id'] == selected['id'])['client_request_id'] = request_id
-            state['requests'] = [r for r in state.get('requests', []) if r['request_id'] != request_id][-99:] + [{'request_id':request_id,'target_id':selected['id'],'head_sha':selected['head_sha']}]
+            accepted = next(r for r in state['targets'] if r['id'] == selected['id'])
+            accepted['client_request_id'] = request_id
+            accepted['requested_selection'] = intent.get('selection', selected) if queued_asset is not None else selected
+            if queued_asset is not None and intent.get('schema_version') == 'analysis-request-v2':
+                accepted.update(requested_channels=intent['requested_channels'],pr_context=intent.get('pr_context'),
+                                tooling_sha=intent['tooling_sha'],profile_digest=intent['profile_digest'],
+                                analysis_key_components=intent['analysis_key'],run_again=intent.get('run_again',False))
+                requested=accepted['requested_channels']
+                cached_target=next((target for target in current_manifest.get('targets',[])
+                                    if target.get('original_target_id')==selected['id']
+                                    and target.get('analyzed_sha')==selected['head_sha']
+                                    and target.get('tooling_sha')==intent['tooling_sha']
+                                    and target.get('profile_digest')==intent['profile_digest']),None)
+                cached_status=list((cached_target or {}).get('channel_statuses',[]))
+                overlay=current_manifest.get('current_overlay',{})
+                if matching_pr_overlay(overlay,intent):
+                    cached_status.append({'channel':'coderabbit-ai-advisory','status':'COMPLETED','evidence_reused':True})
+                execution,reused=channel_execution_plan(requested,cached_status,accepted['run_again'])
+                lanes=channel_lanes(execution)
+                current_lane=lanes[0] if lanes else []
+                remaining=[channel for lane in lanes[1:] for channel in lane]
+                accepted.update(execution_channels=current_lane,remaining_channels=remaining,reused_channels=reused,
+                                completed_channels=list(reused),failed_channels=[])
+                if reused:
+                    cached_by_id={value['channel']:value for value in cached_status}
+                    accepted['channel_statuses']=[{**cached_by_id[channel],'evidence_reused':True} for channel in reused]
+                if not execution:
+                    accepted.update(status='cached',lifecycle_status='completed',execution_channels=[],remaining_channels=[],reused_channels=list(requested))
+            state['requests'] = [r for r in state.get('requests', []) if r['request_id'] != request_id][-99:] + [{'request_id':request_id,'target_id':selected['id'],'head_sha':selected['head_sha'],'requested_channels':accepted.get('requested_channels',project['enabled_scanners']),'execution_channels':accepted.get('execution_channels',accepted.get('requested_channels',[])),'remaining_channels':accepted.get('remaining_channels',[]),'reused_channels':accepted.get('reused_channels',[]),'completed_channels':accepted.get('completed_channels',[]),'failed_channels':[],'selection':accepted.get('requested_selection'),'pr_context':accepted.get('pr_context'),'channel_statuses':accepted.get('channel_statuses',[]),'status':'reused' if accepted.get('status')=='cached' else 'queued'}]
         state['targets'].sort(key=lambda row: not row.get('manual_refresh',False))
-        project_dispatches = 0
         for row in state['targets']:
-            if evaluation_enabled and selection and str(project['id']) == str(project_id):
-                frozen_sha = state.get('evaluation_target_sha') or evaluation.get('target_sha')
-                if row.get('branch') != evaluation.get('target_branch') and row.get('head_sha') != frozen_sha:
-                    state['evaluation_error'] = f"Evaluation only accepts the frozen {evaluation.get('target_branch')} branch."
-                    continue
             key = analysis_key(row, document['tooling_sha'], config)
             if row.get('analysis_key') != key:
                 row.update(analysis_key=key,status='queued')
                 row.pop('request_id',None); row.pop('scan_run_id',None)
             if row.get('request_id'):
                 run = (by_id.get(row.get('scan_run_id'))
-                       or by_nonce.get('Source analysis ' + row['request_id'])
+                       or by_nonce.get('Source analysis ' + row.get('dispatch_id',row['request_id']))
                        or recover_completed_producer_run(config, row, runs))
                 if run and run['head_sha'] == row.get('execution_sha'):
                     row.update(scan_run_id=run['id'],run_attempt=run['run_attempt'],
                                status='collected' if run['status']=='completed' else 'scanning',run_conclusion=run['conclusion'])
                 continue  # Never retry a dispatch with an uncertain outcome.
-            if running >= (1 if evaluation_enabled else 2) or (not evaluation_enabled and len(projects)>1 and project_dispatches>=1):
+            if row.get('status')=='cached':
                 continue
-            if evaluation_enabled:
-                # Evaluation dispatches are request-driven and consume their budget before
-                # the external dispatch. Reconciliation can recover this request, but never
-                # infer that an uncertain dispatch was absent and issue another one.
-                if not selection or project['id'] != project_id:
-                    continue
-                if not state.get('evaluation_target_sha'):
-                    state['evaluation_target_sha'] = row.get('head_sha')
-                allowed, reason = can_dispatch(state, row.get('head_sha'))
-                if not allowed:
-                    state['evaluation_error'] = reason
-                    continue
-                scanner_digest = profile_digest(project)
-                evaluation_key = idempotency_key(source['full_name'], row['head_sha'], document['tooling_sha'], scanner_digest)
-                duplicate = next((candidate for candidate in state['targets'] if candidate.get('evaluation_idempotency_key') == evaluation_key), None)
-                if duplicate:
-                    continue
-                request_id = hashlib.sha256(evaluation_key.encode()).hexdigest()[:32]
-                row['evaluation_idempotency_key'] = evaluation_key
-                state.update(consume(state, request_id, evaluation_key))
-            else:
-                request_id = uuid.uuid4().hex
+            if not selection or str(project['id']) != str(project_id):
+                continue
+            request_id=row.get('client_request_id')
+            if not request_id:
+                continue
+            execution_channels=row.get('execution_channels',row.get('requested_channels',project['enabled_scanners']))
+            dispatch_id=producer_dispatch_id(request_id,execution_channels)
+            row.update(dispatch_id=dispatch_id,execution_sha=execution_sha,execution_channels=execution_channels)
+            already_started=by_nonce.get('Source analysis '+dispatch_id)
+            if already_started and already_started.get('head_sha')==execution_sha:
+                row.update(request_id=request_id,scan_run_id=already_started['id'],run_attempt=already_started.get('run_attempt',1),
+                           status='collected' if already_started['status']=='completed' else 'scanning',
+                           run_conclusion=already_started.get('conclusion'))
+                running+=already_started['status']!='completed'
+                continue
+            if running >= 1:
+                continue
             row.update(profile_mode='portable' if project['profile'].get('mode') == 'portable' else 'agentic-soc', project_id=project['id'],request_id=request_id,status='dispatching',
-                       tooling_sha=document['tooling_sha'], execution_sha=execution_sha)
+                       tooling_sha=document['tooling_sha'], execution_sha=execution_sha,
+                       requested_channels=row.get('requested_channels',project['enabled_scanners']),
+                       execution_channels=execution_channels,dispatch_id=dispatch_id,
+                       reused_channels=row.get('reused_channels',[]))
             row.pop('manual_refresh',None)
             release_manifest.write(config,release,state)
             dispatched = github.api(f'repos/{repository}/actions/workflows/code-analysis-source.yml/dispatches',
                 {'ref':repo['default_branch'],'return_run_details':True,'inputs':{
-                    'target':json.dumps(row),'tooling_sha':document['tooling_sha'],'request_id':row['request_id']}})
+                    'target':json.dumps(row),'tooling_sha':document['tooling_sha'],'request_id':row['request_id'],'dispatch_id':row['dispatch_id']}})
             if dispatched and dispatched.get('workflow_run_id'):
                 row.update(scan_run_id=dispatched['workflow_run_id'],run_attempt=1)
             row['status']='scanning'
             running += 1
-            project_dispatches += 1
         release_manifest.write(config,release,state)
-        if queued_asset is not None and project['id']==project_id and state.get('last_request_id')==request_id:
-            github.api(f"repos/{repository}/releases/assets/{queued_asset['id']}",method='DELETE')
-            queued_asset = None
         for receipt in state.get('requests', []):
             selected_row = next((r for r in state['targets'] if r.get('client_request_id') == receipt['request_id'] and r['head_sha'] == receipt['head_sha']), None)
             if selected_row and selected_row.get('scan_run_id'):
-                receipt.update({k:selected_row[k] for k in ('scan_run_id','run_attempt','execution_sha')})
-        current = config['report_release']
-        summaries.append(report_publication(config,state,current,document)['metrics'])
+                receipt.update({k:selected_row[k] for k in ('scan_run_id','run_attempt','execution_sha','status','error','execution_channels','remaining_channels','dispatch_id') if k in selected_row})
+        published = report_publication(config,state,current,document)
+        summaries.append(published['metrics'])
+        # Keep the FIFO head durable until every selected lane reaches a terminal state.
+        if queued_asset is not None and str(project['id'])==str(project_id):
+            active_request=next((row for row in state['targets'] if row.get('client_request_id')==request_id),None)
+            if active_request and active_request.get('status') in {'collected','cached'}:
+                receipt=next((row for row in state['requests'] if row.get('request_id')==request_id),None)
+                if receipt:
+                    if active_request.get('status')=='cached':
+                        receipt.update(status='reused',target_id=published.get('current_target_id',receipt.get('target_id')))
+                        queue_advanced=True
+                    else:
+                        recent=next((run for run in published.get('recent_runs',[])
+                                     if (run.get('client_request_id') or run.get('request_id'))==request_id
+                                     and run.get('scan_run_id')==active_request.get('scan_run_id')
+                                     and run.get('run_attempt')==active_request.get('run_attempt')),None)
+                        attempt_rows={value.get('channel'):value for value in (recent or {}).get('attempt_channel_statuses',[])}
+                        success={'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE'}
+                        progress={value.get('channel'):value for value in receipt.get('channel_statuses',[])}
+                        completed=set(receipt.get('completed_channels',[]))
+                        failed=set(receipt.get('failed_channels',[]))
+                        for channel in active_request.get('execution_channels',[]):
+                            attempt=attempt_rows.get(channel,{})
+                            status=attempt.get('status','FAILED')
+                            progress[channel]={**attempt,'channel':channel,'status':status,
+                                               'reason':attempt.get('reason') or (None if status in success else active_request.get('error') or 'Scanner lane did not produce valid evidence.')}
+                            if status in success:
+                                completed.add(channel);failed.discard(channel)
+                            else:
+                                failed.add(channel);completed.discard(channel)
+                        receipt.update(completed_channels=sorted(completed),failed_channels=sorted(failed),
+                                       channel_statuses=list(progress.values()))
+                        remaining=receipt.get('remaining_channels',[])
+                        if remaining:
+                            lanes=channel_lanes(remaining)
+                            next_lane=lanes[0]
+                            remaining=[channel for lane in lanes[1:] for channel in lane]
+                            active_request.update(status='queued',execution_channels=next_lane,remaining_channels=remaining)
+                            for field in ('request_id','scan_run_id','run_attempt','execution_sha','run_conclusion','dispatch_id'):
+                                active_request.pop(field,None)
+                            receipt.update(status='queued',execution_channels=next_lane,remaining_channels=remaining)
+                            for field in ('scan_run_id','run_attempt','execution_sha','dispatch_id'):
+                                receipt.pop(field,None)
+                            queue_advanced=True
+                        else:
+                            receipt.update(status='published' if completed else 'failed',target_id=published.get('current_target_id',receipt.get('target_id')))
+                            overlay=published.get('current_overlay',{})
+                            if overlay.get('client_request_id')==request_id and overlay.get('head_sha')==receipt.get('head_sha'):
+                                receipt['overlay_id']=overlay.get('overlay_key')
+                            queue_advanced=True
+                    published['requests']=state['requests']
+                    release_manifest.write(config,current,published)
+                if not active_request.get('remaining_channels') and active_request.get('status') in {'collected','cached'}:
+                    github.api(f"repos/{repository}/releases/assets/{queued_asset['id']}",method='DELETE')
+                    queued_asset=None
         release_manifest.write(config,release,state)  # Persist bounded evidence recovery intents.
+        if queue_advanced and queue:
+            remaining_assets=github.pages(f"repos/{repository}/releases/{queue['id']}/assets")
+            if any(asset['name'].startswith('request-') and asset['name'].endswith('.json') for asset in remaining_assets):
+                github.api(f'repos/{repository}/actions/workflows/code-analysis-reconcile.yml/dispatches',
+                           {'ref':repo['default_branch']},'POST')
     return summaries
 
 

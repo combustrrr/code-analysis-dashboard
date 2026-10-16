@@ -19,7 +19,7 @@ from scripts.code_analysis.generate_source_workflow import generate, diagnostics
 class ScannerAccessTests(unittest.TestCase):
     def test_vendor_diagnostics_cannot_publish_a_target_report(self):
         workflow = yaml.safe_load(diagnostics())
-        self.assertEqual(set(workflow['jobs']), {'identity', 'scanner-3-snyk', 'scanner-1-sonarqube-cloud'})
+        self.assertEqual(set(workflow['jobs']), {'identity'})
         self.assertEqual(workflow['permissions'], {'contents': 'read'})
         self.assertNotIn('--assemble', diagnostics())
         self.assertEqual(Path('.github/workflows/12-scanner-diagnostics.yml').read_text(encoding='utf-8'), diagnostics())
@@ -51,15 +51,13 @@ class ScannerAccessTests(unittest.TestCase):
             self.assertEqual(document, {'access_failure':kind})
             self.assertNotIn(message, json.dumps(document))
 
-    def test_probe_uses_the_actual_scanner_branch_after_identity_derivation(self):
-        job = yaml.safe_load(generate())['jobs']['scanner-1-sonarqube-cloud']
-        steps = job['steps']
-        identity = next(i for i,s in enumerate(steps) if s.get('id')=='sonar-identity')
-        access = next(i for i,s in enumerate(steps) if s.get('id')=='sonar-access')
-        self.assertLess(identity, access)
-        self.assertEqual(steps[access]['env']['SCAN_BRANCH'], '${{ steps.sonar-identity.outputs.sonar_branch }}')
-        status = next(s for s in steps if s.get('name')=='Record configured scan status')
-        self.assertIn('branch_entitlement', status['run'])
+    def test_vendor_scanners_are_absent_from_source_checkout_jobs(self):
+        jobs = yaml.safe_load(generate())['jobs']
+        self.assertNotIn('scanner-1-sonarqube-cloud', jobs)
+        self.assertNotIn('scanner-3-snyk', jobs)
+        for job in jobs.values():
+            if 'fromJSON(inputs.target).source_repository' in yaml.safe_dump(job):
+                self.assertNotIn('secrets.', yaml.safe_dump(job))
 
     def test_sonar_identity_is_source_scoped_and_rejects_missing_environment(self):
         self.assertEqual(project_identity('owner/other-repo'), ('owner', 'owner_other-repo'))
@@ -69,18 +67,11 @@ class ScannerAccessTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 ensure_browse.ensure(Path(tempfile.mkdtemp()) / 'grant.json')
 
-    def test_generated_sonar_jobs_use_dispatch_source_identity(self):
-        workflow = yaml.safe_load(generate())
-        job = workflow['jobs']['scanner-1-sonarqube-cloud']
-        self.assertEqual(job['env']['SOURCE_REPOSITORY'], '${{ fromJSON(inputs.target).source_repository }}')
-        self.assertEqual(next(step for step in job['steps'] if step.get('id') == 'sonar-project')['name'], 'Derive Sonar project identity')
-        sonar_text = yaml.safe_dump(job)
-        self.assertIn('steps.sonar-project.outputs.project_key', sonar_text)
-        self.assertNotIn('combustrrr_Agentic-Kibana', sonar_text)
-
-    def test_portable_vendor_jobs_checkout_the_selected_source_read_only(self):
-        from pathlib import Path
+    def test_vendor_jobs_are_opt_in_and_checkout_the_pinned_head_read_only(self):
         workflow = yaml.safe_load(Path('.github/workflows/reusable-vendor.yml').read_text())
+        self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'snyk')", workflow['jobs']['snyk']['if'])
+        self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'sonarqube-cloud')", workflow['jobs']['sonar']['if'])
+        self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'coderabbit-ai-advisory')", workflow['jobs']['coderabbit']['if'])
         source_checkouts = [step for job in ('snyk', 'sonar')
                             for step in workflow['jobs'][job]['steps']
                             if step.get('uses', '').startswith('actions/checkout@')

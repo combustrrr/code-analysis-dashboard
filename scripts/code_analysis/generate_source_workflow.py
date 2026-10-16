@@ -18,14 +18,14 @@ PYTHON = 'actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1'
 def generate(config=None):
     config = config or json.loads((ROOT / 'config/code-analysis/service.json').read_text())
     profile = config['profile']
-    inputs = {k: {'required': True, 'type': 'string'} for k in ('target', 'tooling_sha', 'request_id')}
-    document = {'name': 'Exact Source Analysis', 'run-name': 'Source analysis ${{ inputs.request_id }}',
+    inputs = {k: {'required': True, 'type': 'string'} for k in ('target', 'tooling_sha', 'request_id', 'dispatch_id')}
+    document = {'name': 'Exact Source Analysis', 'run-name': 'Source analysis ${{ inputs.dispatch_id }}',
                 'on': {'workflow_dispatch': {'inputs': inputs}}, 'permissions': {'contents': 'read'},
                  # Every explicit launch gets its own producer artifact.  A
                  # newer request may supersede the dashboard target, but it
                  # must not cancel the earlier run before its evidence/report
                  # artifact is assembled.
-                 'concurrency': {'group': 'source-${{ fromJSON(inputs.target).id }}', 'cancel-in-progress': False}, 'jobs': {}}
+                  'concurrency': {'group': 'source-revision-global', 'cancel-in-progress': False}, 'jobs': {}}
     jobs = document['jobs']
     jobs['identity'] = {'runs-on': 'ubuntu-latest', 'timeout-minutes': 5,
         'outputs': {'jobs': '${{ steps.identity.outputs.jobs }}', 'languages': '${{ steps.identity.outputs.languages }}'},
@@ -33,12 +33,16 @@ def generate(config=None):
                   {'uses': CHECKOUT, 'with': {'repository': '${{ fromJSON(inputs.target).source_repository }}',
                     'ref': '${{ fromJSON(inputs.target).head_sha }}', 'path': '.source', 'persist-credentials': False}},
                   {'name': 'Validate trusted tooling and selected target', 'id': 'identity',
-                   'env': {'TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}'},
+                    'env': {'GH_TOKEN':'${{ github.token }}','TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}','REQUEST_ID':'${{ inputs.request_id }}'},
                    'run': 'python -m scripts.code_analysis.source_identity'}]}
     for number in (1, 2, 3, 4, 7):
         path = next((ROOT / '.github/workflows').glob(f'0{number}-*.yml'))
         old = yaml.safe_load(path.read_text(encoding='utf-8'))
         for name, original in old['jobs'].items():
+            if name in {'workflow-security-posture','snyk','sonarqube-cloud'}:
+                # These lanes run only in the isolated vendor workflow, not in
+                # source-checkout scanner jobs.
+                continue
             if profile.get('mode') == 'portable':
                 from scripts.code_analysis.applicability import PORTABLE_JOBS
                 if name not in PORTABLE_JOBS | {'codeql'}:
@@ -50,6 +54,12 @@ def generate(config=None):
             # Source jobs may inspect public source, but never receive credentials.
             job['env'] = {key: value for key, value in job.get('env', {}).items()
                           if not (isinstance(value, str) and 'secrets.' in value)}
+            for step in job.get('steps', []):
+                if isinstance(step.get('env'), dict):
+                    step['env'] = {key:value for key,value in step['env'].items()
+                                   if not (isinstance(value,str) and 'secrets.' in value)}
+                    if not step['env']:
+                        step.pop('env')
             # Older generated scanner jobs used single-brace GitHub expressions in
             # shell strings. Normalize those inputs while regenerating exact-source
             # workflows so secrets and run metadata are evaluated by Actions.
@@ -265,17 +275,22 @@ def generate(config=None):
                                      'uses': UPLOAD, 'with': {'name': 'snyk-resolver-diagnostics',
                                      'path': '${{ runner.temp }}/snyk-resolver-error.json',
                                      'if-no-files-found': 'ignore', 'retention-days': 7}})
+            if 'secrets.' in json.dumps(job):
+                raise ValueError('Source scanner job retains a repository secret reference: ' + name)
             jobs[f'scanner-{number}-{name}'] = job
     from scripts.code_analysis.extensions import registry
     for extension in registry(config):
         channel = extension['channel']
+        if extension['mode'] == 'source' and extension.get('secrets'):
+            raise ValueError('Source extensions cannot receive credentials')
         steps = [{'uses': CHECKOUT, 'with': {'ref': '${{ inputs.tooling_sha }}', 'persist-credentials': False}},
                  {'uses': PYTHON, 'with': {'python-version': '3.11'}}]
         if extension['mode'] == 'source':
             steps.append({'uses': CHECKOUT, 'with': {'repository': '${{ fromJSON(inputs.target).source_repository }}',
                           'ref': '${{ fromJSON(inputs.target).head_sha }}', 'path': '.source', 'persist-credentials': False}})
         environment = {'TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}'}
-        environment.update({key: '${{ secrets.' + value + ' }}' for key, value in extension.get('secrets', {}).items()})
+        if extension['mode'] == 'vendor':
+            environment.update({key: '${{ secrets.' + value + ' }}' for key, value in extension.get('secrets', {}).items()})
         steps += [{'name': 'Run trusted scanner adapter', 'env': environment,
                    'run': 'python -m scripts.code_analysis.extension_runner ' + channel},
                   {'uses': UPLOAD, 'if': 'always()', 'with': {'name': channel,
@@ -296,7 +311,7 @@ def generate(config=None):
             {'uses': CHECKOUT, 'with': {'repository': '${{ fromJSON(inputs.target).source_repository }}',
                 'ref': '${{ fromJSON(inputs.target).head_sha }}', 'path': '.source', 'persist-credentials': False}},
             {'name': 'Collect exact producer artifacts and assemble report',
-             'env': {'GH_TOKEN': '${{ github.token }}', 'TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}'},
+             'env': {'GH_TOKEN': '${{ github.token }}', 'TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}','REQUEST_ID':'${{ inputs.request_id }}'},
              'run': 'python -m scripts.code_analysis.source_identity --assemble'},
             {'uses': UPLOAD, 'with': {'name': 'hosted-report-${{ github.run_id }}-${{ github.run_attempt }}',
                 'path': '.hosted/report/', 'if-no-files-found': 'error', 'retention-days': 7}}]}
@@ -306,8 +321,8 @@ def generate(config=None):
 def diagnostics():
     document = yaml.safe_load(generate())
     document['name'] = 'Scanner access diagnostics'
-    document['run-name'] = 'Scanner diagnostics ${{ inputs.request_id }}'
-    document['concurrency']['group'] = 'scanner-diagnostics'
+    document['run-name'] = 'Scanner diagnostics ${{ inputs.dispatch_id }}'
+    document['concurrency']['group'] = 'source-revision-global'
     document['jobs'] = {key: value for key, value in document['jobs'].items()
                         if key in {'identity', 'scanner-3-snyk', 'scanner-1-sonarqube-cloud'}}
     return '# Generated scanner diagnostics; never publishes a target report.\n' + yaml.safe_dump(document, sort_keys=False, width=110)

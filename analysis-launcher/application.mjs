@@ -12,10 +12,6 @@ const SHA = /^[a-f0-9]{40}$/;
 const CONFIG = '.github/code-analysis/projects.json';
 const encode = value => btoa(String.fromCharCode(...new TextEncoder().encode(value)));
 const decode = value => new TextDecoder().decode(Uint8Array.from(atob(value.replace(/\s/g, '')), c => c.charCodeAt(0)));
-const evaluationEnabled = (env, source) => String(env.EVALUATION_MODE).toLowerCase() === 'true' && source.toLowerCase() === String(env.EVALUATION_SOURCE_REPOSITORY || 'ARYDESTROYER/Kavach-AgenticSOC').toLowerCase();
-const hex = bytes => Array.from(new Uint8Array(bytes), x => x.toString(16).padStart(2, '0')).join('');
-async function evaluationDigest(value) { return hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)))); }
-function evaluationRequestId(value) { const hash = value.replace(/^evaluation-v1:/, '').toLowerCase().replace(/[^a-f0-9]/g, '').padEnd(32, '0').slice(0, 32); return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20)}`; }
 
 export function wrappers(toolingRepository, sha) {
   if (!REPO.test(toolingRepository) || !SHA.test(sha)) throw new Error('Immutable shared tooling required');
@@ -323,55 +319,7 @@ export async function applicationApi(request, env, session, helpers) {
   if (request.method === 'POST' && url.pathname === '/api/project-launch') {
     const input = await body();
     const repo = await publicRepository(input.repository); await installation(repo);
-    const document = await config(repo);
-    const project = document.projects.find(p => p.id === input.project_id);
-    if (!project || !['branch','pr','commit'].includes(input.kind) || typeof input.ref !== 'string' || !input.ref || input.ref.length > 255) throw new Failure(400, 'Choose a configured project and revision.', 'invalid_selection');
-    if (input.kind === 'commit' && !SHA.test(input.ref)) throw new Failure(400, 'Full commit SHA required.', 'invalid_selection');
-    if (input.kind === 'pr' && !/^[1-9][0-9]*$/.test(input.ref)) throw new Failure(400, 'PR number required.', 'invalid_selection');
-    const source = await publicRepository(project.source_repository.full_name);
-    if (source.id !== project.source_repository.id) throw new Failure(409, 'Source identity changed.', 'identity_changed');
-    const path = input.kind === 'branch' ? 'branches' : input.kind === 'pr' ? 'pulls' : 'commits';
-    const resolved = await github(`repos/${source.full_name}/${path}/${encodeURIComponent(input.ref)}`, token);
-    const evaluation = evaluationEnabled(env, source.full_name);
-    const targetSha = input.kind === 'branch' ? resolved.commit?.sha : input.kind === 'pr' ? resolved.head?.sha : input.ref;
-    if (evaluation && input.kind !== 'branch') throw new Failure(409, 'Evaluation mode accepts only the configured frozen branch.', 'evaluation_frozen');
-    if (evaluation && input.ref !== (env.EVALUATION_TARGET_BRANCH || 'Testing')) throw new Failure(409, 'Evaluation mode accepts only the configured frozen branch.', 'evaluation_frozen');
-    if (evaluation && (!SHA.test(targetSha || '') || (env.EVALUATION_TARGET_SHA && env.EVALUATION_TARGET_SHA !== targetSha))) throw new Failure(409, 'Evaluation target SHA is missing or has moved.', 'evaluation_frozen');
-    const scannerProfile = {enabled_scanners:[...(project.enabled_scanners || [])].sort(), deferred_channels:project.deferred_channels || {}, profile:project.profile || {}};
-    const scannerProfileDigest = await evaluationDigest(scannerProfile);
-    const evaluationKey = evaluation ? `evaluation-v1:${source.full_name}:${targetSha}:${document.tooling_sha}:${scannerProfileDigest}` : null;
-    const stateKey = evaluation ? `evaluation:v1:${source.full_name.toLowerCase()}` : null;
-    let evaluationState = evaluation && env.ANALYSIS_STATE ? await env.ANALYSIS_STATE.get(stateKey, 'json') : null;
-    if (evaluation) {
-      evaluationState = evaluationState || {evaluation_mode:true, evaluation_target_sha:targetSha, evaluation_dispatches_used:0, evaluation_paused:String(env.EVALUATION_PAUSED).toLowerCase() === 'true'};
-      if (evaluationState.evaluation_target_sha && evaluationState.evaluation_target_sha !== targetSha) throw new Failure(409, 'Evaluation target SHA is frozen; refusing a moving target.', 'evaluation_frozen');
-      if (evaluationState.evaluation_paused) throw new Failure(423, 'Evaluation is paused by an operator.', 'evaluation_paused');
-      if (evaluationState.evaluation_idempotency_key === evaluationKey && evaluationState.evaluation_request_id) return json({status:'queued',request_id:evaluationState.evaluation_request_id,run_id:null,repository:repo.full_name,warning:'This deterministic evaluation request is already persisted.'},202);
-      if (Number(evaluationState.evaluation_dispatches_used || 0) >= 1) throw new Failure(429, 'Evaluation dispatch budget is exhausted; operator reset required.', 'evaluation_budget');
-    }
-    const request_id = evaluation ? evaluationRequestId(evaluationKey) : crypto.randomUUID();
-    let queue;
-    const releases = await helpers.pages(`repos/${repo.full_name}/releases`, token);
-    queue = releases.find(r => r.tag_name === 'analysis-requests');
-    if (!queue) {
-      try {queue=await github(`repos/${repo.full_name}/releases`,token,{method:'POST',body:JSON.stringify({tag_name:'analysis-requests',name:'Analysis request queue',body:'Durable pending analysis requests. Processed entries are removed.',make_latest:'false'})});}
-      catch {queue=(await helpers.pages(`repos/${repo.full_name}/releases`,token)).find(r=>r.tag_name==='analysis-requests');if(!queue)throw new Failure(502,'Could not persist the analysis request.','persistence_failed');}
-    }
-    const pending=await helpers.pages(`repos/${repo.full_name}/releases/${queue.id}/assets`,token);
-    if(pending.filter(a=>a.name.startsWith('request-')).length>=100)throw new Failure(429,'This repository has 100 pending requests. Wait for reconciliation before submitting another.','queue_full');
-    const existingRequest = pending.find(a => a.name === `request-${request_id}.json`);
-    if (existingRequest) return json({status:'queued',request_id,run_id:null,repository:repo.full_name,warning:'This deterministic analysis request is already persisted and awaiting reconciliation.'},202);
-    const actor=await github('user',token);
-    const intent={schema_version:'analysis-request-v1',request_id,execution_repository_id:repo.id,project_id:project.id,selection:{repository:source.full_name,kind:evaluation?'commit':input.kind,ref:evaluation?targetSha:input.ref},requested_selection:evaluation?{kind:input.kind,ref:input.ref}:undefined,target_sha:targetSha,idempotency_key:evaluationKey,actor_id:actor.id,created_at:new Date().toISOString()};
-    const saved=await fetch(`https://uploads.github.com/repos/${repo.full_name}/releases/${queue.id}/assets?name=request-${request_id}.json`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','User-Agent':'code-analysis-application'},body:JSON.stringify(intent)});
-    if(!saved.ok)throw new Failure(502,'Could not persist the analysis request; no scan was confirmed.','persistence_failed');
-    if (evaluation && env.ANALYSIS_STATE) {
-      evaluationState = {...evaluationState, evaluation_mode:true, evaluation_target_sha:targetSha, evaluation_dispatches_used:1, evaluation_idempotency_key:evaluationKey, evaluation_request_id:request_id, evaluation_status:'dispatching'};
-      await env.ANALYSIS_STATE.put(stateKey, JSON.stringify(evaluationState));
-    }
-    let result;
-    try { result = await github(`repos/${repo.full_name}/actions/workflows/code-analysis-reconcile.yml/dispatches`, token, {method:'POST', body:JSON.stringify({ref:repo.default_branch, return_run_details:true, inputs:{project_id:project.id,selection:JSON.stringify({repository:source.full_name,kind:evaluation?'commit':input.kind,ref:evaluation?targetSha:input.ref}),request_id}})}); } catch { return json({status:'queued',request_id,run_id:null,repository:repo.full_name,warning:'Request saved. Immediate dispatch failed; repository reconciliation will recover it.'},202); }
-    return json({status:'submitted',request_id,run_id:result?.workflow_run_id || null,repository:repo.full_name},202);
+    throw new Failure(409,'Direct launches are disabled. Use the configured project preview and confirmation flow.','legacy_launch_disabled');
   }
   if (request.method === 'GET' && url.pathname === '/api/project-activity') {
     const repo = await publicRepository(url.searchParams.get('repository')); await installation(repo);

@@ -14,6 +14,13 @@ def config():
 
 
 class ProjectTests(unittest.TestCase):
+    def test_global_active_request_limit_is_exactly_one(self):
+        doc=config();doc['max_parallel_analyses']=1
+        self.assertEqual(validate(doc)['max_parallel_analyses'],1)
+        doc['max_parallel_analyses']=2
+        with self.assertRaisesRegex(ValueError,'one active source-revision request'):
+            validate(doc)
+
     def test_observer_cannot_publish_native_findings(self):
         self.assertFalse(native_feedback_allowed(config(), '2', {}))
 

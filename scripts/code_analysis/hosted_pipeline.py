@@ -13,7 +13,7 @@ from scripts.code_analysis.snapshot import build_analysis_snapshot
 
 
 def assemble(artifacts: Path, output: Path, identity: dict, producer_repository: str,
-             run_id: str, source: Path, config_root: Path) -> dict:
+             run_id: str, source: Path, config_root: Path, requested_channels: list[str] | None = None) -> dict:
     output.mkdir(parents=True, exist_ok=True)
     normalized = output / 'normalized'
     subprocess.run([sys.executable, '-m', 'scripts.code_analysis.normalizer', '--input-dir',
@@ -56,11 +56,17 @@ def assemble(artifacts: Path, output: Path, identity: dict, producer_repository:
     from scripts.code_analysis.applicability import selection, apply
     service = config_root / 'service.json'
     if service.exists():
-        _, excluded, _ = selection(load(service), source)
+        _, excluded, _ = selection(load(service), source, requested_channels)
         apply(snapshot, excluded)
+        if requested_channels:
+            selected = set(requested_channels)
+            gate_ids = [channel for channel in snapshot['publication_gate']['channel_ids'] if channel in selected]
+            gate_by_id = {channel['channel']:channel for channel in snapshot['analysis_channels']}
+            snapshot['publication_gate']['channel_ids'] = gate_ids or [channel for channel in selected if channel in gate_by_id]
+            snapshot['publication_gate']['satisfied'] = bool(snapshot['publication_gate']['channel_ids']) and all(gate_by_id[channel]['status']=='COMPLETED' for channel in snapshot['publication_gate']['channel_ids'])
     write(output / 'snapshot.json', snapshot)
     return build(snapshot, identity, output / 'report', producer_repository=producer_repository,
-                 source=source)
+                  source=source)
 
 
 def main() -> None:

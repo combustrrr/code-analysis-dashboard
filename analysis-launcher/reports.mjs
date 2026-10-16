@@ -113,8 +113,9 @@ export async function publicReports(request,env) {
     }
     
     const name = url.searchParams.get('asset');
-    const target=canonicalReportTarget(manifest);
-    if(!target || !/^analysis-[a-f0-9]{64}\.json\.gz$/.test(name || '') || !target.assets?.[name]) return Response.json({error:'Asset is not part of the current report.'},{status:404});
+    const overlay=url.searchParams.get('overlay')==='current';
+    const target=overlay ? manifest.current_overlay : canonicalReportTarget(manifest);
+    if(!target || (overlay && target.status!=='complete') || !/^analysis-[a-f0-9]{64}\.json\.gz$/.test(name || '') || !target.assets?.[name]) return Response.json({error:'Asset is not part of the current report.'},{status:404});
     
     let assetObj = await env.ANALYSIS_REPORTS.get(reportStorageKey(repo.full_name, project, name));
     if(!assetObj) throw new ReportFailure('Report asset missing or exceeds the delivery limit.', 502, 'report_asset_missing');

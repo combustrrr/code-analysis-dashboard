@@ -67,9 +67,9 @@ def validate(document: dict) -> dict:
             validate_profile(project['profile'])
         project['source_repository'] = source
     result['execution_repository'] = execution
-    if result.get('max_parallel_analyses', 2) != 2:
-        raise ValueError('This version supports two analysis slots per execution repository')
-    result['max_parallel_analyses'] = 2
+    if result.get('max_parallel_analyses', 1) != 1:
+        raise ValueError('This version supports one active source-revision request per execution repository')
+    result['max_parallel_analyses'] = 1
     return result
 
 
@@ -84,7 +84,7 @@ def service_config(document: dict, project_id: str, template: dict) -> dict:
             'source_repository_id': project['source_repository']['id'],
             'execution_repository_id': document['execution_repository']['id'],
             'project_id': project_id, 'analysis_repository': execution,
-            'publishing_repository': execution, 'max_parallel_analyses': 2,
+            'publishing_repository': execution, 'max_parallel_analyses': 1,
             'state_release': f'analysis-state-{project_id}',
             'report_release': f'analysis-current-{project_id}'}
 

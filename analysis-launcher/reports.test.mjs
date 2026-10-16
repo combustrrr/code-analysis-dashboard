@@ -132,6 +132,32 @@ test('report project IDs must exist in the current execution configuration',asyn
   } finally {globalThis.fetch=original;}
 });
 
+test('current PR overlay assets are served only through the separately keyed manifest entry',async()=>{
+  const original=globalThis.fetch;
+  const name='analysis-'+'a'.repeat(64)+'.json.gz';
+  const bytes=new Uint8Array([31,139,8,0,1,2,3]);
+  globalThis.fetch=async url=>{
+    if(String(url).endsWith('/repos/owner/overlay'))return Response.json({id:88,full_name:'owner/overlay',private:false,default_branch:'main'});
+    if(String(url).includes('/contents/.github/code-analysis/projects.json'))return reportConfigFile();
+    throw new Error('Unexpected request');
+  };
+  const manifest={schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/overlay',checked_at:new Date().toISOString(),
+    current_target_id:'current:1',targets:[{id:'current:1',assets:{}}],
+    current_overlay:{status:'complete',overlay_key:'overlay-id',assets:{[name]:{bytes:bytes.byteLength,sha256:'a'.repeat(64)}}}};
+  const reads=[];
+  const reports={get:async key=>{reads.push(key);if(key==='repositories/owner/overlay/analysis-current-1.json')return {json:async()=>manifest};if(key.endsWith('/'+name))return {body:new Blob([bytes]).stream()};return null;}};
+  try {
+    const query=new URLSearchParams({repository:'owner/overlay',project_id:'1',asset:name,overlay:'current'});
+    const response=await publicReports(new Request(`https://worker.example/api/public/asset?${query}`),{ANALYSIS_REPORTS:reports});
+    assert.equal(response.status,200);
+    assert.deepEqual(new Uint8Array(await response.arrayBuffer()),bytes);
+    assert.ok(reads.at(-1).endsWith('/'+name));
+    const sourceQuery=new URLSearchParams({repository:'owner/overlay',project_id:'1',asset:name});
+    const unavailable=await publicReports(new Request(`https://worker.example/api/public/asset?${sourceQuery}`),{ANALYSIS_REPORTS:reports});
+    assert.equal(unavailable.status,404);
+  } finally {globalThis.fetch=original;}
+});
+
 test('threat reports fail closed when only legacy assets are available', async () => {
   const original = globalThis.fetch;
   globalThis.fetch = async url => {

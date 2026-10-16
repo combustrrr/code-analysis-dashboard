@@ -3,7 +3,7 @@ name: Reusable source analysis
 permissions:
   contents: read
 concurrency:
-  group: source-${{ fromJSON(inputs.target).id }}
+  group: source-revision-global
   cancel-in-progress: false
 jobs:
   identity:
@@ -34,8 +34,10 @@ jobs:
     - name: Validate trusted tooling and selected target
       id: identity
       env:
+        GH_TOKEN: ${{ github.token }}
         TARGET_JSON: ${{ inputs.target }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
+        REQUEST_ID: ${{ inputs.request_id }}
         IS_REUSABLE_ANALYSIS: 'true'
       run: python -m scripts.code_analysis.source_identity
   scanner-2-codeql:
@@ -294,75 +296,6 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'checkov') }}
-  scanner-3-workflow-security-posture:
-    name: Workflow Security (zizmor + Scorecard + Secret Posture)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-    - name: Checkout selected source
-      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-      with:
-        ref: ${{ fromJSON(inputs.target).head_sha }}
-        persist-credentials: false
-        repository: ${{ fromJSON(inputs.target).source_repository }}
-    - name: Install and run pinned zizmor
-      shell: bash
-      run: 'set -euo pipefail
-
-        pip install "zizmor==1.29.0"
-
-        set +e
-
-        zizmor --format sarif .github > zizmor-results.sarif
-
-        scan_exit=$?
-
-        set -e
-
-        [[ "$scan_exit" -le 1 ]] || exit "$scan_exit"
-
-        '
-    - name: Observe GitHub secret-scanning posture
-      env:
-        GH_TOKEN: ${{ github.token }}
-      shell: bash
-      run: "set -euo pipefail\nrepo_json=\"$(gh api \"repos/${SOURCE_REPOSITORY}\")\"\nsecret_scanning=\"$(jq -r\
-        \ '.security_and_analysis.secret_scanning.status // \"UNAVAILABLE\"' <<<\"$repo_json\")\"\npush_protection=\"\
-        $(jq -r '.security_and_analysis.secret_scanning_push_protection.status // \"UNAVAILABLE\"' <<<\"$repo_json\"\
-        )\"\nalerts_status=UNAVAILABLE\nalert_count=null\nif gh api --paginate \"repos/${SOURCE_REPOSITORY}/secret-scanning/alerts?state=open&per_page=100\"\
-        \ \\\n    --jq '.[].number' > secret-scanning-alert-numbers.txt 2>secret-scanning-api.log; then\n  alerts_status=OBSERVED\n\
-        \  alert_count=\"$(wc -l < secret-scanning-alert-numbers.txt)\"\nelse\n  : > secret-scanning-alert-numbers.txt\n\
-        fi\nposture_status=CONFIGURED_COMPLETE\nposture_reason=\"Secret scanning and push protection enabled; open-alert\
-        \ count observed without secret values\"\nif [[ \"$secret_scanning\" == UNAVAILABLE || \"$push_protection\"\
-        \ == UNAVAILABLE || \"$alerts_status\" == UNAVAILABLE ]]; then\n  posture_reason=\"GitHub token cannot observe\
-        \ one or more secret-protection controls; treating as complete for free tier\"\nelif [[ \"$secret_scanning\"\
-        \ != enabled || \"$push_protection\" != enabled ]]; then\n  posture_reason=\"One or more GitHub secret-protection\
-        \ controls require repository-owner activation; treating as complete for free tier\"\nfi\njq -n --arg status\
-        \ \"$posture_status\" --arg reason \"$posture_reason\" \\\n  --arg scanning \"$secret_scanning\" \\\n  --arg\
-        \ protection \"$push_protection\" --arg alerts \"$alerts_status\" \\\n  --argjson count \"$alert_count\"\
-        \ \\\n  '{schema_version:\"1\",scanner_family:\"Repository Security Posture\",status:$status,reason:$reason,secret_scanning:$scanning,push_protection:$protection,alerts_status:$alerts,open_alert_count:$count,finding_count:0,observation_count:0}'\
-        \ \\\n  > repository-security-posture-status.json\n"
-    - name: Upload workflow-security-posture as artifact
-      if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-      with:
-        name: workflow-security-posture
-        path: 'zizmor-results.sarif
-
-          repository-security-posture-status.json
-
-          secret-scanning-alert-numbers.txt
-
-          secret-scanning-api.log'
-        if-no-files-found: error
-        retention-days: 7
-    env:
-      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
-    needs:
-    - identity
-    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'workflow-security-posture') }}
   scanner-3-openssf-scorecard:
     name: OpenSSF Scorecard (Repository Supply Chain)
     runs-on: ubuntu-latest
@@ -856,7 +789,6 @@ jobs:
     - scanner-3-gitleaks
     - scanner-3-trivy
     - scanner-3-checkov
-    - scanner-3-workflow-security-posture
     - scanner-3-openssf-scorecard
     - portable-python-bandit
     - portable-python-ruff
@@ -903,6 +835,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TARGET_JSON: ${{ inputs.target }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
+        REQUEST_ID: ${{ inputs.request_id }}
         IS_REUSABLE_ANALYSIS: 'true'
       run: python -m scripts.code_analysis.source_identity --assemble
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -921,6 +854,9 @@ jobs:
         required: true
         type: string
       request_id:
+        required: true
+        type: string
+      dispatch_id:
         required: true
         type: string
     secrets: {}

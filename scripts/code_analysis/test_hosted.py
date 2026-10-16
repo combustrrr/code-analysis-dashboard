@@ -54,10 +54,12 @@ class IdentityTests(unittest.TestCase):
         self.assertEqual(row['status'], 'stale')
         self.assertNotIn('scan_run_id', row)
 
-    def test_base_change_invalidates_pr_analysis(self):
+    def test_source_analysis_key_excludes_pr_overlay_context(self):
         old = h.target('owner/repo', 'work', 'a' * 40, pr=1, base_sha='b' * 40)
         new = {**old, 'base_sha': 'c' * 40}
-        self.assertNotEqual(h.analysis_key(old, 'd' * 40, {}), h.analysis_key(new, 'd' * 40, {}))
+        self.assertEqual(h.analysis_key(old, 'd' * 40, {}), h.analysis_key(new, 'd' * 40, {}))
+        forked = {**old, 'source_repository': 'fork/repo'}
+        self.assertEqual(h.analysis_key(old, 'd' * 40, {}), h.analysis_key(forked, 'd' * 40, {}))
 
     def test_source_only_reuse_key_excludes_branch_label(self):
         a = h.target('owner/repo', 'a', 'a' * 40)
@@ -269,7 +271,8 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(excluded['hadolint']['status'], 'NOT_APPLICABLE')
         self.assertNotIn('osv-scanner', jobs)
         self.assertEqual(excluded['github-actions-security']['status'], 'NOT_APPLICABLE')
-        self.assertIn('workflow-security-posture', jobs)
+        self.assertNotIn('workflow-security-posture', jobs)
+        self.assertEqual(excluded['github-secret-protection-posture']['status'], 'NOT_APPLICABLE')
         self.assertIn('gitleaks', jobs)
         self.assertIn('openssf-scorecard', jobs)
         self.assertEqual(excluded['coverage']['status'], 'NOT_APPLICABLE')
@@ -281,6 +284,18 @@ class ReportTests(unittest.TestCase):
         snapshot['analysis_channels'][0]['observation_count'] = 1
         with self.assertRaises(ValueError):
             apply(snapshot, excluded)
+
+    def test_request_scope_marks_unselected_channels_without_failure(self):
+        from scripts.code_analysis.applicability import selection, apply
+        config=h.load(Path('config/code-analysis/service.json'))
+        jobs,excluded,_=selection(config,self.root,['semgrep'])
+        self.assertIn('semgrep',jobs)
+        self.assertNotIn('gitleaks',jobs)
+        self.assertEqual(excluded['gitleaks']['status'],'NOT_SELECTED')
+        snapshot={'publication_gate':{'satisfied':True},'analysis_channels':[{'channel':'gitleaks','status':'FAILED','observation_count':0}]}
+        apply(snapshot,excluded)
+        self.assertEqual(snapshot['analysis_channels'][0]['status'],'NOT_SELECTED')
+        self.assertEqual(snapshot['analysis_channels'][0]['reason'],'Not selected for this request')
 
     def test_scanner_deferrals_are_explicit_and_shared_producers_cannot_split(self):
         from scripts.code_analysis.applicability import selection
@@ -339,6 +354,20 @@ class ManualSelectionTests(unittest.TestCase):
         with patch.object(service, 'api', return_value={'head': {'ref':'feature','sha':'a'*40,'repo':{'full_name':'fork/repo'}}, 'base': {'ref':'main','sha':'b'*40}}):
             row = service.resolve_selection({'source_repository':'owner/repo'}, 'PR #17', [])
         self.assertEqual((row['source_repository'], row['base_sha'], row['pr']), ('fork/repo', 'b'*40, 17))
+
+    def test_pinned_fork_commit_checks_repository_identity_and_sha(self):
+        from scripts.code_analysis import github_service as service
+        selection={'repository':'fork/repo','repository_id':99,'kind':'commit','ref':'a'*40}
+        def api(path):
+            if path=='repos/fork/repo':return {'id':99}
+            if path=='repos/fork/repo/commits/'+('a'*40):return {'sha':'a'*40}
+            raise AssertionError(path)
+        with patch.object(service,'api',side_effect=api):
+            row=service.resolve_selection({'source_repository':'owner/repo'},json.dumps(selection),[])
+        self.assertEqual((row['repository'],row['source_repository'],row['kind'],row['head_sha']),('owner/repo','fork/repo','commit','a'*40))
+        selection['repository_id']=100
+        with patch.object(service,'api',side_effect=api),self.assertRaisesRegex(ValueError,'fork identity changed'):
+            service.resolve_selection({'source_repository':'owner/repo'},json.dumps(selection),[])
 
     def test_manual_slot_survives_discovery_and_does_not_duplicate_active_pr(self):
         from scripts.code_analysis import github_service as service
