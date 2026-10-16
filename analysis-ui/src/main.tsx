@@ -21,11 +21,12 @@ import { AppearanceProvider, AppearanceToggle, useAppearance } from './Appearanc
 import { ProjectRunTracker, type ProjectRunRequest } from './ProjectRunTracker';
 
 type Target = { scan_run_id?: number; run_attempt?: number; tooling_sha?: string; lifecycle_status?: string; id: string; label: string; repository: string; source_repository: string; head_sha: string; kind: string; branch: string; pr?: number; base_branch?: string; base_sha?: string; checked_at: string; status: string; report?: string; error?: string };
-type Index = { report_storage?: {compressed_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; discovery_error?: string; publication_error?: string };
+type Index = { report_storage?: {compressed_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; current_overlay?: {overlay_key:string;status:string;head_sha:string;checked_at?:string;pr_context:{number:number;title?:string;draft?:boolean;head_repository:string;head_branch:string;base_repository:string;base_branch:string;base_sha:string};channel:{status:string;reason?:string}}; discovery_error?: string; publication_error?: string };
 type Finding = { id: string; severity: string; message: string; file: string; line: number; scanners: string[]; rules: string[]; page: number };
 type Detail = Finding & { origins: { scanner_family: string; rule: string; file: string; start_line: number; raw_artifact: string; observation_id: string }[]; source: string | null; source_start: number; source_url: string | null };
 type Channel = { channel: string; name: string; class: string; status: string; findings: number | null; observation_count: number; reason: string; workflow: string };
 type Report = { tooling_sha?: string; producer_run_attempt?: number; analyzed_sha: string; generated_at: string; status: string; finding_count: number; observation_count: number; channels: Channel[]; severities: Record<string, number>; producer_runs: { id: string; url: string }[]; publication_gate: { satisfied: boolean } };
+type PrOverlay = {overlay_key:string;head_sha:string;checked_at:string;pr_context:{number:number;title?:string;draft?:boolean;head_repository:string;head_branch:string;base_repository:string;base_branch:string;base_sha:string};channel:{status:string;reason?:string};advisories:{stable_id?:string;severity?:string;message?:string;title?:string;file?:string;start_line?:number}[]};
 const states: Record<string, string> = { current: 'Up to date', partial: 'Partial analysis', queued: 'Queued', scanning: 'Running scanners', running: 'Running scanners', collecting: 'Collecting results', publishing: 'Publishing report', stale: 'Newer revision pending', failed: 'Analysis failed', temporarily_unavailable: 'Temporarily unavailable', NOT_AVAILABLE: 'Unavailable', NOT_APPLICABLE: 'Not assessed', DEFERRED: 'Not assessed' };
 const ranks: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4, UNKNOWN: 5 };
 async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -86,6 +87,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const [directory, setDirectory] = useState('');
   const [rule,setRule]=useState(''); const [file,setFile]=useState(''); const [locationFilter,setLocationFilter]=useState(''); const [overlap,setOverlap]=useState('');
    const [index, setIndex] = useState<Index>(); const [error, setError] = useState(''); const [r, setRoute] = useState(route());
+   const [currentOverlay,setCurrentOverlay]=useState<PrOverlay>(); const [overlayError,setOverlayError]=useState('');
    const refreshSequence = useRef(0);
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
   const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
@@ -102,9 +104,17 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
       } else {
         setIndex(undefined); setError(''); setLastRefresh(''); setRefreshing(false);
       }
-      window.addEventListener('hashchange', change);
+     window.addEventListener('hashchange', change);
       return () => { c.abort(); if (timer !== undefined) window.clearInterval(timer); window.removeEventListener('hashchange', change); };
     }, [refreshTick, r.repository, r.project]);
+   useEffect(()=>{
+     setCurrentOverlay(undefined);setOverlayError('');
+     if(!r.repository||!r.project||!index?.current_overlay?.overlay_key)return;
+     const c=new AbortController();
+     json<PrOverlay>('data/current-overlay/pr-overlay.json',c.signal).then(value=>{if(value.overlay_key===index.current_overlay?.overlay_key)setCurrentOverlay(value);})
+       .catch(reason=>{if(reason.name!=='AbortError')setOverlayError(reason.message);});
+     return()=>c.abort();
+   },[r.repository,r.project,index?.current_overlay?.overlay_key,index?.current_overlay?.checked_at]);
   const localAuth = useLaunchAuth(applicationEndpoint || index?.launch_endpoint, !viewerAuth);
   const launchAuth = viewerAuth || localAuth;
   const mayLaunch = viewerAuth ? hostAccess.can_launch : import.meta.env.VITE_APPLICATION_MODE !== 'repositories' || hostAccess.can_launch;
@@ -251,8 +261,13 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
           {report?.tooling_sha && <span>Tooling <code title={report.tooling_sha}>{report.tooling_sha.slice(0, 12)}</code> | attempt {report.producer_run_attempt ?? 'Unavailable'}</span>}
            {report?.producer_runs.map(run => { const url = safeGithubUrl(run.url); return url ? <a key={run.id} href={url} target="_blank" rel="noreferrer">Published report · Run #{run.id}</a> : null; })}
         </Space>
-      </section>
-      {(error || index?.discovery_error || index?.publication_error || target?.error) && (() => {
+       </section>
+       {index?.current_overlay&&<section className="panel pr-overlay" aria-label="Current pull request review overlay">
+         <div className="pr-overlay-heading"><div><h2>Separate PR review overlay · #{index.current_overlay.pr_context.number}</h2><p>This CodeRabbit evidence is stored separately and is not part of the canonical source-only report.</p></div><Tag color="purple">{index.current_overlay.channel.status.replaceAll('_',' ')}</Tag></div>
+         <p><strong>{index.current_overlay.pr_context.head_repository}:{index.current_overlay.pr_context.head_branch}</strong> at <code>{index.current_overlay.head_sha}</code> against <strong>{index.current_overlay.pr_context.base_repository}:{index.current_overlay.pr_context.base_branch}</strong> at <code>{index.current_overlay.pr_context.base_sha}</code>{index.current_overlay.pr_context.draft?' · draft PR':''}</p>
+         {overlayError?<Alert type="warning" showIcon title="PR overlay details unavailable" description={overlayError}/>:currentOverlay?<><p>{currentOverlay.advisories.length} advisory finding{currentOverlay.advisories.length===1?'':'s'} · checked {date(currentOverlay.checked_at)}</p>{currentOverlay.advisories.length>0&&<ul className="pr-overlay-advisories">{currentOverlay.advisories.map((advisory,index)=><li key={advisory.stable_id||index}><Tag color={colors[advisory.severity||'']}>{advisory.severity||'Advisory'}</Tag><strong>{advisory.message||advisory.title||'CodeRabbit advisory'}</strong>{(advisory.file||advisory.start_line)&&<small>{advisory.file||'Source location'}{advisory.start_line?`:${advisory.start_line}`:''}</small>}</li>)}</ul>}</>:<p role="status">Loading the current PR overlay…</p>}
+       </section>}
+       {(error || index?.discovery_error || index?.publication_error || target?.error) && (() => {
         const desc = error || index?.discovery_error || index?.publication_error || target?.error || '';
         const isNoCurrent = typeof desc === 'string' && desc.toLowerCase().includes('report not found in storage');
         const isRepositoryUnavailable = !!applicationEndpoint && isRepositoryAvailabilityError(desc);

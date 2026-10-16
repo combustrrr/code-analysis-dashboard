@@ -6,9 +6,14 @@ import { refreshRepositoryReports } from './repositoryReports';
 type Auth = ReturnType<typeof useLaunchAuth>;
 export type ProjectRunRequest = {
   repository: string;
+  source_repository?: string;
   project: string;
   kind: string;
   ref: string;
+  target_sha?: string;
+  requested_channels?: string[];
+  pr_context?: {head_repository:string;head_branch:string;head_sha:string;base_repository:string;base_branch:string;base_sha:string};
+  channel_progress?: {channel:string;status:string;reason?:string;evidence_reused?:boolean;last_attempt_status?:string}[];
   request_id: string;
   run_id: number | null;
   submittedAt: string;
@@ -27,11 +32,12 @@ type Activity = {
   completeness?: string;
   error?: string;
   message?: string;
+  channel_progress?: {channel:string;status:string;reason?:string;evidence_reused?:boolean;last_attempt_status?:string}[];
   producer?: { url: string; attempt: number; status: string };
   checked_at?: string;
 };
 
-const terminalPhases = new Set(['published', 'failed', 'superseded']);
+const terminalPhases = new Set(['published', 'reused', 'failed', 'superseded']);
 const phaseCopy: Record<string, string> = {
   queued: 'Analysis queued — the previous report is still being shown.',
   scanning: 'Analysis is running against the selected revision.',
@@ -39,6 +45,7 @@ const phaseCopy: Record<string, string> = {
   collecting: 'Collecting scanner results.',
   publishing: 'Analysis finished; validating and publishing the report.',
   published: 'New report published for this request.',
+  reused: 'Matching retained channel evidence was reused; no new scan was launched.',
   failed: 'Analysis failed. The previous published report is unchanged.',
   superseded: 'This request was superseded by a newer analysis request.',
 };
@@ -106,8 +113,8 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
 
   const phase = activity?.phase;
   const terminal = !!phase && terminalPhases.has(phase);
-  const publishedTargetId = phase === 'published' ? activity?.target_id : undefined;
-  const type = phase === 'published' ? 'success' : phase === 'failed' ? 'error' : phase === 'superseded' ? 'warning' : 'info';
+  const publishedTargetId = phase === 'published' || phase === 'reused' ? activity?.target_id : undefined;
+  const type = phase === 'published' || phase === 'reused' ? 'success' : phase === 'failed' ? 'error' : phase === 'superseded' ? 'warning' : 'info';
   const title = phase ? phaseCopy[phase] || `Analysis status: ${phase}` : error ? 'Could not refresh analysis status' : auth.session ? 'Checking analysis status…' : 'Sign in to resume analysis tracking';
   const previousReportNote = phase === 'published'
     ? `This request published its report${activity?.analyzed_sha ? ` for commit ${activity.analyzed_sha.slice(0, 12)}` : ''}. Refreshing the selected report inventory now.`
@@ -121,10 +128,13 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
     showIcon
     title={title}
     description={<>
-      <p><strong>{request.repository}</strong> · {request.kind} <code>{request.ref}</code> · submitted {new Date(request.submittedAt).toLocaleString()} · request <code>{request.request_id}</code></p>
+      <p><strong>{request.source_repository||request.repository}</strong> · {request.kind} <code>{request.ref}</code>{request.target_sha&&<> · pinned <code>{request.target_sha}</code></>} · execution <code>{request.repository}</code> · submitted {new Date(request.submittedAt).toLocaleString()} · request <code>{request.request_id}</code></p>
+      {request.pr_context&&<p>PR head {request.pr_context.head_repository}:{request.pr_context.head_branch} at <code>{request.pr_context.head_sha}</code>; base {request.pr_context.base_repository}:{request.pr_context.base_branch} at <code>{request.pr_context.base_sha}</code>.</p>}
+      {request.requested_channels&&<p>Requested channels: {request.requested_channels.join(', ')}</p>}
       <p>{activity?.message || activity?.error || previousReportNote}</p>
       {activity?.source_sha && <p>Resolved source commit: <code>{activity.source_sha}</code></p>}
       {activity?.producer && <p>Scanner workflow, attempt {activity.producer.attempt}: {activity.producer.status}</p>}
+      {!!activity?.channel_progress?.length&&<div className="channel-progress"><strong>Channel progress</strong>{activity.channel_progress.map(channel=><span key={channel.channel} className={`channel-progress-item channel-${channel.status}`}>{channel.channel}: {channel.status.replaceAll('_',' ')}{channel.evidence_reused?' · retained evidence reused':''}{channel.last_attempt_status?` · latest attempt ${channel.last_attempt_status.toLowerCase()}`:''}{channel.reason?` · ${channel.reason}`:''}</span>)}</div>}
       {activity?.completeness && <p>Published report completeness: {activity.completeness}</p>}
       {error && <p>{error}. The request remains recorded; retrying the status check will not launch another scan.</p>}
       <Space wrap>
