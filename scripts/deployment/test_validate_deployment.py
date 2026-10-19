@@ -19,8 +19,7 @@ def test_repository_mode_requires_canonical_app_configuration():
         "ANALYSIS_REPOSITORY_ID",
         "DASHBOARD_ORIGIN",
         "DASHBOARD_BASE_PATH",
-        "NEXT_GITHUB_CLIENT_SECRET",
-        "NEXT_GITHUB_APP_PRIVATE_KEY",
+        "GITHUB_APP_PRIVATE_KEY",
     }
 
 
@@ -39,8 +38,7 @@ def test_repository_mode_configuration_is_complete_without_secret_values():
         "secrets": {
             "required": [
                 "GITHUB_CLIENT_SECRET",
-                "NEXT_GITHUB_CLIENT_SECRET",
-                "NEXT_GITHUB_APP_PRIVATE_KEY",
+                "GITHUB_APP_PRIVATE_KEY",
                 "SESSION_KEY",
                 "WORKER_API_TOKEN",
             ]

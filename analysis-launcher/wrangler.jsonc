@@ -29,8 +29,7 @@
   "secrets": {
     "required": [
       "GITHUB_CLIENT_SECRET",
-      "NEXT_GITHUB_CLIENT_SECRET",
-      "NEXT_GITHUB_APP_PRIVATE_KEY",
+      "GITHUB_APP_PRIVATE_KEY",
       "SESSION_KEY",
       "WORKER_API_TOKEN"
     ]

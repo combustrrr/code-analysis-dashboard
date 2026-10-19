@@ -296,11 +296,6 @@ async function route(request, env) {
 }
 export default { async fetch(request, env) {
   const started=Date.now();const requestId=crypto.randomUUID();
-  // Bind the currently provisioned central App credentials to the sole
-  // production runtime. Values remain encrypted in Cloudflare and are never
-  // returned, logged, or copied through the client.
-  env = {...env, GITHUB_CLIENT_SECRET:env.NEXT_GITHUB_CLIENT_SECRET || env.GITHUB_CLIENT_SECRET,
-    GITHUB_APP_PRIVATE_KEY:env.NEXT_GITHUB_APP_PRIVATE_KEY || env.GITHUB_APP_PRIVATE_KEY};
   let response; let failureCode;
   try { response = await route(request, env); } catch (e) {
     const known = e instanceof Failure || e instanceof BodyLimitError;

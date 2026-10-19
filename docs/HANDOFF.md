@@ -222,8 +222,9 @@ to the fixed repository service, `/webhook` and direct workflow-dispatch launche
 are absent, and `code-analysis-coordinator.yml` is the only automatic orchestration entry
 point. The old discovery/source/reconcile workflows were removed rather than retained as
 compatibility shims. The sole production runtime consumes the already-provisioned
-central App credentials through Cloudflare's encrypted `NEXT_GITHUB_CLIENT_SECRET` and
-`NEXT_GITHUB_APP_PRIVATE_KEY` bindings; the values are never exposed or copied.
+central App credentials through Cloudflare's encrypted `GITHUB_CLIENT_SECRET` and
+`GITHUB_APP_PRIVATE_KEY` bindings; the values are never exposed or copied. The
+transitional `NEXT_*` bindings were retired after the current private key was provisioned.
 
 ## 2026-10-13 repository journey release
 
