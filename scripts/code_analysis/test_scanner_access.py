@@ -27,12 +27,13 @@ class ScannerAccessTests(unittest.TestCase):
                 {'target', 'tooling_sha', 'request_id'},
             )
 
-    def test_source_profile_runs_after_optional_vendor_skip(self):
+    def test_source_profile_runs_after_incomplete_vendor_evidence(self):
         workflow = yaml.safe_load(Path('.github/workflows/code-analysis-source.yml').read_text(encoding='utf-8'))
         for name in ('analyze', 'configured-profile'):
             condition = workflow['jobs'][name]['if']
-            self.assertIn("needs['isolated-vendor'].result == 'skipped'", condition)
+            self.assertIn('always()', condition)
             self.assertIn("needs['validate-request'].result == 'success'", condition)
+            self.assertNotIn("needs['isolated-vendor'].result", condition)
 
     def test_vendor_diagnostics_cannot_publish_a_target_report(self):
         workflow = yaml.safe_load(diagnostics())
