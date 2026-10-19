@@ -1,5 +1,21 @@
 # New-chat handoff: Code Analysis Dashboard
 
+## 2026-10-19 Phase 2 production rollout
+
+Phase 2 frontend IA commit `1a4cae5f764b0174db1293fc109300475da95fb3`
+was pushed to `main`. The Worker was deployed directly with authenticated Wrangler
+after local validation because GitHub Actions was degraded; Worker version
+`ac0979ea-42cc-4d4e-b29c-e81929eab5ec` is active. Live public configuration returned
+`200`, while anonymous project access returned `403`, as required.
+
+Canonical Worker run `39285623900` and Pages run `39285623937` were still queued with
+zero runner time during the GitHub Actions and Pages incident. The public site therefore
+still served its preceding asset at the last check. Do not call the Phase 2 frontend
+deployed until Pages run `39285623937` succeeds and the live asset is verified. No new
+production scan was admitted: the launch API correctly rejected a GitHub CLI token as
+an invalid application session, and source analysis must continue to enter through the
+signed-in application and durable FIFO rather than a direct workflow dispatch.
+
 ## 2026-10-19 configured-source production verification
 
 The configured-source rollout is live. Pages run `39239386083` deployed commit
