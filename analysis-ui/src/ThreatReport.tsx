@@ -1,6 +1,6 @@
-import { Alert, Button, Card, Col, Empty, Input, List, Row, Select, Space, Statistic, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Col, Empty, Input, List, Pagination, Row, Select, Space, Statistic, Table, Tag, Typography } from 'antd';
 import { CopyOutlined, DownloadOutlined, PrinterOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { refreshRepositoryReports, repositoryJson } from './repositoryReports';
 import { safeGithubUrl } from './safeUrls';
 
@@ -32,25 +32,31 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
   const [severity, setSeverity] = useState('');
   const [category, setCategory] = useState('');
   const [guidance, setGuidance] = useState('');
+  const [findingsPage, setFindingsPage] = useState(1);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     const controller = new AbortController(); setReport(undefined); setMarkdown(''); setError('');
-    Promise.all([repositoryJson<ThreatReportData>(`data/${reportPath}/threat-report.json`, controller.signal), repositoryJson<string>(`data/${reportPath}/threat-report.md`, controller.signal)])
-      .then(([json, md]) => { setReport(json); setMarkdown(md); })
+    repositoryJson<ThreatReportData>(`data/${reportPath}/threat-report.json`, controller.signal)
+      .then(json => setReport(json))
       .catch(e => { if (e.name !== 'AbortError') setError(e.message || 'Threat report unavailable.'); });
+    repositoryJson<string>(`data/${reportPath}/threat-report.md`, controller.signal)
+      .then(setMarkdown)
+      .catch(() => {});
     return () => controller.abort();
   }, [reportPath, retry]);
+  useEffect(() => setFindingsPage(1), [query, severity, category, guidance, reportPath]);
+  const filtered = useMemo(() => report?.findings.filter(f => (!severity || f.severity === severity) && (!category || f.category === category) && (!guidance || f.guidance_source === guidance) && `${f.title} ${f.message} ${f.file} ${f.rule} ${f.scanners.join(' ')}`.toLowerCase().includes(query.toLowerCase())) || [], [report, query, severity, category, guidance]);
   if (error) { const detail = error.toLowerCase(); const expired = detail.includes('expired') || detail.includes('freshness'); const missing = detail.includes('not found') || detail.includes('unavailable'); return <Alert showIcon type="warning" title={expired ? 'Report expired' : missing ? 'Report temporarily unavailable' : 'Threat report could not be retrieved'} description={<>{error} <Space><Button type="link" onClick={() => { refreshRepositoryReports(); setRetry(n => n + 1); }}>Refresh report</Button><Button type="link" onClick={() => { const params = new URLSearchParams(location.hash.slice(1)); params.set('tab', 'overview'); location.hash = params.toString(); }}>Rerun analysis</Button></Space></>} />; }
   if (!report) return <div className="empty" role="status"><Empty description="Loading threat report..." /></div>;
-  const json = JSON.stringify(report, null, 2);
   const legacy = !report.immutable;
-  const filtered = report.findings.filter(f => (!severity || f.severity === severity) && (!category || f.category === category) && (!guidance || f.guidance_source === guidance) && `${f.title} ${f.message} ${f.file} ${f.rule} ${f.scanners.join(' ')}`.toLowerCase().includes(query.toLowerCase()));
+  const pageSize = 25;
+  const visibleFindings = filtered.slice((findingsPage - 1) * pageSize, findingsPage * pageSize);
   return <section className="threat-report" aria-label="Threat report">
     {legacy && <Alert showIcon type="warning" title="Legacy runtime report" description="This report was generated from an older stored analysis and is not an immutable publication artifact. Rerun analysis for a provenance-bound report." />}
     <Space className="report-actions" wrap>
       <Button icon={<CopyOutlined />} onClick={() => navigator.clipboard?.writeText(location.href)}>Copy private report link</Button>
-      <Button icon={<DownloadOutlined />} onClick={() => download('threat-report.json', json, 'application/json')}>Download JSON</Button>
-      <Button icon={<DownloadOutlined />} onClick={() => download('threat-report.md', markdown, 'text/markdown')}>Download Markdown</Button>
+      <Button icon={<DownloadOutlined />} onClick={() => download('threat-report.json', JSON.stringify(report, null, 2), 'application/json')}>Download JSON</Button>
+      <Button icon={<DownloadOutlined />} disabled={!markdown} loading={!markdown} onClick={() => download('threat-report.md', markdown, 'text/markdown')}>Download Markdown</Button>
       <Button icon={<PrinterOutlined />} onClick={() => window.print()}>Print / Save as PDF</Button>
     </Space>
      <Card className="threat-identity report-hero">
@@ -75,7 +81,7 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
     <Card title={<span className="report-card-title">Limitations <small>Read before interpreting results</small></span>} className="threat-limitations report-section"><List dataSource={report.limitations} split={false} renderItem={item => <List.Item><div className="report-list-item">{item}</div></List.Item>} /></Card>
     <section className="threat-findings report-section"><div className="findings-heading"><div><div className="report-kicker">EVIDENCE REGISTER</div><h2>Highest-severity findings</h2><p>Ordered by retained scanner severity and deterministic source identity. No subjective risk score is applied.</p></div><div className="findings-count">{filtered.length.toLocaleString()}<small>shown</small></div></div>
       <Space wrap className="threat-filters"><Input aria-label="Search threat findings" placeholder="Search title, message, file, rule, or scanner" allowClear value={query} onChange={e => setQuery(e.target.value)} /><Select aria-label="Threat severity" value={severity} onChange={setSeverity} options={[{value:'',label:'All severities'}, ...[...new Set(report.findings.map(f => f.severity))].map(value => ({value,label:value}))]} /><Select aria-label="Threat category" value={category} onChange={setCategory} options={[{value:'',label:'All categories'}, ...[...new Set(report.findings.map(f => f.category))].map(value => ({value,label:value}))]} /><Select aria-label="Guidance source" value={guidance} onChange={setGuidance} options={[{value:'',label:'All guidance'}, {value:'catalog',label:'Catalog guidance'}, {value:'fallback',label:'Fallback guidance'}]} /><Typography.Text>{filtered.length.toLocaleString()} findings</Typography.Text></Space>
-       {filtered.map(finding => <Card key={finding.finding_id} className={`threat-finding finding-${finding.severity.toLowerCase()}`} title={<Space><Tag className={`severity-tag severity-${finding.severity.toLowerCase()}`}>{finding.severity}</Tag><span>{finding.title}</span></Space>}>
+       {visibleFindings.map(finding => <Card key={finding.finding_id} className={`threat-finding finding-${finding.severity.toLowerCase()}`} title={<Space><Tag className={`severity-tag severity-${finding.severity.toLowerCase()}`}>{finding.severity}</Tag><span>{finding.title}</span></Space>}>
         <Typography.Paragraph><strong>Category:</strong> {finding.category} · <strong>Location:</strong> <code>{finding.file}:{finding.line}</code> · <strong>Evidence:</strong> {finding.evidence_sources.join(', ')}</Typography.Paragraph>
          <Typography.Paragraph><strong>Scanner message:</strong> {finding.message}</Typography.Paragraph>
          {finding.evidence_provenance?.length ? <Typography.Paragraph><strong>Evidence provenance:</strong> {finding.evidence_provenance.map(source => `${source.scanner || 'scanner'}${source.workflow_run_id ? ` run ${source.workflow_run_id}` : ''}${source.attempt ? ` attempt ${source.attempt}` : ''}`).join('; ')}</Typography.Paragraph> : null}
@@ -85,6 +91,7 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
         {finding.uncertainty_notice && <Alert type="info" showIcon message="Developer validation required" description="The retained evidence does not by itself prove a root cause or exploitable defect." />}
         {finding.references.length > 0 && <Typography.Paragraph><strong>References:</strong> {finding.references.map(reference => { const url = safeGithubUrl(reference); return url ? <a key={reference} href={url} target="_blank" rel="noreferrer">{reference}</a> : <span key={reference}>{reference}</span>; })}</Typography.Paragraph>}
       </Card>)}
+      {filtered.length > pageSize && <Pagination current={findingsPage} pageSize={pageSize} total={filtered.length} showSizeChanger={false} showTotal={total => `${total.toLocaleString()} findings`} onChange={setFindingsPage} />}
     </section>
   </section>;
 }

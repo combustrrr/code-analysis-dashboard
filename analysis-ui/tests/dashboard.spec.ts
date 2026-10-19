@@ -463,4 +463,26 @@ test('unsafe source URLs are omitted from report links', async ({ page }) => {
   await page.unrouteAll({ behavior: 'wait' });
 });
 
+test('large threat reports render one findings page without blocking the report', async ({ page }) => {
+  const findings = Array.from({ length: 100 }, (_, index) => ({
+    finding_id: `finding-${index}`, category: 'code-quality', severity: 'MEDIUM', evidence_sources: ['semgrep'], guidance_source: 'catalog',
+    guidance_match: 'test', title: `Finding ${index}`, explanation: 'Explanation', impact: 'Impact', remediation_steps: ['Fix it'], references: [],
+    message: `Message ${index}`, file: `src/file-${index}.ts`, line: index + 1, rule: 'test-rule', scanners: ['semgrep']
+  }));
+  await page.route('**/data/reports/retained/threat-report.json', route => route.fulfill({ json: {
+    schema_version: '1', report_id: 'report-1', immutable: true, source_repository: 'combustrrr/Agentic-Kibana', target_sha: 'a'.repeat(40), generated_at: new Date().toISOString(),
+    guidance_catalog_version: '1', generator_version: '1', status: 'partial', limitations: [],
+    coverage: { status: 'partial', expected_channels: ['semgrep'], available_channels: ['semgrep'], incomplete_channels: [] },
+    metrics: { findings_total: findings.length, findings_by_category: { 'code-quality': findings.length }, findings_by_severity: { MEDIUM: findings.length }, advisories_total: 0, guidance_matched: findings.length, guidance_fallback: 0 }, findings
+  }}));
+  await page.route('**/data/reports/retained/threat-report.md', route => route.fulfill({ body: '# Threat report', contentType: 'text/markdown' }));
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Threat Report' }).click();
+  await expect(page.getByRole('heading', { name: 'Threat Report' })).toBeVisible();
+  await expect(page.locator('.threat-finding')).toHaveCount(25);
+  await expect(page.getByText('100 findings', { exact: true }).first()).toBeVisible();
+  await page.getByTitle('Next Page').click();
+  await expect(page.getByText('Finding 25', { exact: true })).toBeVisible();
+});
+
 });

@@ -1,5 +1,24 @@
 # New-chat handoff: Code Analysis Dashboard
 
+## 2026-10-19 production browser-recording follow-up
+
+The authenticated production recording confirmed that GitHub sign-in, project access,
+report APIs, issues, scanners, and immutable source links were working. It also exposed
+a frontend performance defect: Threat Report attempted to mount every retained finding
+card in one render (36,466 for the recorded Kavach report), leaving the loading screen
+visible while the browser main thread was blocked. Threat findings are now paginated at
+25 cards per page, JSON serialization happens only when requested for download, and the
+JSON report can render without waiting for the Markdown export. Normal route changes no
+longer invalidate verified report caches, and the header/project catalog share an
+in-flight project-registry read for the current in-memory session.
+
+Local validation passed: 71 service tests, 14 deployment tests, 14 launcher tests,
+workflow audit, production UI build, and 18 active fixture browser tests (18 historical
+fixtures skipped). The browser suite includes a new large-threat-report regression.
+Phase 2 Pages run `39285623937` and Worker run `39285623900` subsequently completed
+successfully; the follow-up frontend fix still requires its own Pages deployment and
+live authenticated verification before this section can call it production-verified.
+
 ## 2026-10-19 Phase 2 production rollout
 
 Phase 2 frontend IA commit `1a4cae5f764b0174db1293fc109300475da95fb3`

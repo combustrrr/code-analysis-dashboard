@@ -98,7 +98,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
     useEffect(() => {
       const sequence = ++refreshSequence.current;
       const c = new AbortController();
-      const refresh = () => { refreshRepositoryReports(); return json<Index>('data/index.json', c.signal).then(value => { if (sequence !== refreshSequence.current) return; setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError' && sequence === refreshSequence.current) { setIndex(undefined); setError(e.message); } }).finally(()=>{ if (sequence === refreshSequence.current) setRefreshing(false); }); };
+      const refresh = () => json<Index>('data/index.json', c.signal).then(value => { if (sequence !== refreshSequence.current) return; setIndex(value); setError(''); setLastRefresh(new Date().toISOString()); }).catch(e => { if (e.name !== 'AbortError' && sequence === refreshSequence.current) { setIndex(undefined); setError(e.message); } }).finally(()=>{ if (sequence === refreshSequence.current) setRefreshing(false); });
       const change = () => setRoute(route());
       let timer: number | undefined;
       if (r.repository && r.project) {

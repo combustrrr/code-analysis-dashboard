@@ -7,25 +7,34 @@ export type ConfiguredProject={id:string;source_repository:string;source_reposit
 type Registry={execution_repository:{id:number;full_name:string};can_launch:boolean;can_configure:boolean;projects:ConfiguredProject[]};
 type Auth=ReturnType<typeof useLaunchAuth>;
 
+let registryToken='';
+let registryValue:Registry|undefined;
+let registryRequest:Promise<Registry>|undefined;
+
 function shortSha(value:unknown){return typeof value==='string'&&value?value.slice(0,12):'Unavailable';}
 
 function useRegistry(auth:Auth){
- const [registry,setRegistry]=useState<Registry>();
+ const token=auth.session?.token||'';
+ const [registry,setRegistry]=useState<Registry|undefined>(()=>token===registryToken?registryValue:undefined);
  const [loading,setLoading]=useState(false);
  const [error,setError]=useState('');
  useEffect(()=>{
   let active=true;
-  setRegistry(undefined);
   setError('');
   if(!auth.session){setLoading(false);return;}
+  if(token!==registryToken){registryToken=token;registryValue=undefined;registryRequest=undefined;setRegistry(undefined);}
+  if(registryValue){setRegistry(registryValue);setLoading(false);return;}
   setLoading(true);
-  auth.api<Registry>('projects').then(value=>{
+  registryRequest ||= auth.api<Registry>('projects');
+  registryRequest.then(value=>{
+   registryValue=value;
    if(active){setRegistry(value);setError('');}
   }).catch(reason=>{
+   registryRequest=undefined;
    if(active)setError(reason instanceof Error?reason.message:'Configured projects are unavailable.');
   }).finally(()=>{if(active)setLoading(false);});
   return()=>{active=false;};
- },[auth.session?.token]);
+ },[token]);
  return {registry,loading,error};
 }
 
