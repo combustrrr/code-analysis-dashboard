@@ -29,11 +29,16 @@ class ScannerAccessTests(unittest.TestCase):
 
     def test_source_profile_runs_after_incomplete_vendor_evidence(self):
         workflow = yaml.safe_load(Path('.github/workflows/code-analysis-source.yml').read_text(encoding='utf-8'))
+        barrier = workflow['jobs']['vendor-complete']
+        self.assertEqual(barrier['needs'], 'isolated-vendor')
+        self.assertEqual(barrier['if'], '${{ always() }}')
+        self.assertEqual(barrier['permissions'], {'contents': 'none'})
         for name in ('analyze', 'configured-profile'):
             condition = workflow['jobs'][name]['if']
             self.assertIn('always()', condition)
             self.assertIn("needs['validate-request'].result == 'success'", condition)
             self.assertNotIn("needs['isolated-vendor'].result", condition)
+            self.assertEqual(workflow['jobs'][name]['needs'], ['validate-request', 'vendor-complete'])
 
     def test_vendor_diagnostics_cannot_publish_a_target_report(self):
         workflow = yaml.safe_load(diagnostics())
