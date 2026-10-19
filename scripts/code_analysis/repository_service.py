@@ -723,6 +723,21 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         # Keep the FIFO head durable until every selected lane reaches a terminal state.
         if queued_asset is not None and str(project['id'])==str(project_id):
             active_request=terminal_queue_request(state,published,request_id)
+            if not active_request:
+                completed_runs = [run for run in runs
+                                  if run.get('status') == 'completed'
+                                  and run.get('display_title', '').startswith('Source analysis ' + request_id[:8] + '-')]
+                exact_run = next((run for run in completed_runs
+                                  if any(target.get('collected_run') == f"{run['id']}-{run.get('run_attempt', 1)}"
+                                         and target.get('analyzed_sha') == intent.get('target_sha')
+                                         and target.get('tooling_sha') == intent.get('tooling_sha')
+                                         and target.get('profile_digest') == intent.get('profile_digest')
+                                         for target in published.get('targets', []))), None)
+                if exact_run:
+                    active_request = {'status':'collected', 'remaining_channels':[],
+                                      'scan_run_id':exact_run['id'],
+                                      'run_attempt':exact_run.get('run_attempt', 1),
+                                      'execution_channels':intent.get('requested_channels', [])}
             if active_request:
                 receipt=next((row for row in state['requests'] if row.get('request_id')==request_id),None)
                 if receipt:
