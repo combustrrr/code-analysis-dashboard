@@ -44,7 +44,7 @@ jobs:
         run: python -m scripts.code_analysis.source_identity --validate-only
   analyze:
     if: ${{ always() && needs['validate-request'].result == 'success' && fromJSON(inputs.target).profile_mode == 'portable' }}
-    needs: [validate-request, isolated-vendor]
+    needs: [validate-request, vendor-complete]
     permissions:
       contents: read
       actions: read
@@ -55,7 +55,7 @@ jobs:
       request_id: ${{ inputs.request_id }}
   configured-profile:
     if: ${{ always() && needs['validate-request'].result == 'success' && fromJSON(inputs.target).profile_mode == 'agentic-soc' }}
-    needs: [validate-request, isolated-vendor]
+    needs: [validate-request, vendor-complete]
     permissions:
       contents: read
       actions: read
@@ -78,3 +78,13 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
       CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
+  vendor-complete:
+    if: ${{ always() }}
+    needs: isolated-vendor
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: none
+    steps:
+      - name: Preserve partial vendor evidence and release source scanners
+        run: echo "Vendor evidence stage completed; source scanners may publish healthy sibling evidence."
