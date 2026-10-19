@@ -38,15 +38,21 @@ sessions; plan rotations during low-traffic windows.
 2. In the Cloudflare dashboard: Workers & Pages → code-analysis-launcher → Settings → Variables & Secrets.
 3. Update the secret (e.g., `SESSION_KEY`, `GITHUB_CLIENT_SECRET`, `WORKER_API_TOKEN`).
 4. Deploy the Worker (no code change required for secret-only updates).
-5. Verify the deployment in the Cloudflare dashboard or with 
-px wrangler deployments list`.
+5. Verify the deployment in the Cloudflare dashboard or with
+   `npx --yes wrangler@4.129.1 deployments list`.
+
+Automated deployments use a narrowly scoped `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` in the GitHub `production` Environment. Restrict that
+Environment to `main`; pull-request validation never receives either value. The queue
+coordinator uses `WORKER_API_TOKEN` only in its claim, publication, and completion jobs.
+Reusable source-executing jobs must never receive this token.
 
 ### GitHub App secrets
 
 1. In GitHub: Settings → Developer settings → GitHub Apps → <app> → Generate a new client secret.
 2. Run `python scripts/deployment/register_github_app.py --worker-origin <url> --dashboard-url <url> [--application]` to store the new secret via wrangler and update the client ID in `wrangler.jsonc`.
 3. The script never prints the client secret; it passes it directly to wrangler stdin.
-4. Rotate the corresponding `NEXT_GITHUB_WEBHOOK_SECRET` if the App is the application variant.
+4. Webhooks are disabled; do not create or retain a webhook secret for this service.
 
 ### R2 and KV credentials
 

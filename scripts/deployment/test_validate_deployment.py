@@ -3,25 +3,24 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "deployment"))
-from validate_deployment import missing_worker_configuration, required_worker_secrets
+from validate_deployment import deployment_workflow_errors, missing_worker_configuration, required_worker_secrets
 
 
-def test_repository_mode_requires_app_oauth_and_webhook_configuration():
+def test_repository_mode_requires_canonical_app_configuration():
     config = {
         "vars": {"APPLICATION_MODE": "repositories"},
         "secrets": {"required": ["GITHUB_CLIENT_SECRET", "SESSION_KEY", "WORKER_API_TOKEN"]},
     }
     assert missing_worker_configuration(config) == {
-        "NEXT_GITHUB_CLIENT_ID",
-        "NEXT_GITHUB_APP_ID",
-        "NEXT_GITHUB_APP_SLUG",
+        "GITHUB_CLIENT_ID",
+        "GITHUB_APP_ID",
+        "GITHUB_APP_SLUG",
         "ANALYSIS_REPOSITORY",
         "ANALYSIS_REPOSITORY_ID",
         "DASHBOARD_ORIGIN",
         "DASHBOARD_BASE_PATH",
         "NEXT_GITHUB_CLIENT_SECRET",
         "NEXT_GITHUB_APP_PRIVATE_KEY",
-        "NEXT_GITHUB_WEBHOOK_SECRET",
     }
 
 
@@ -29,9 +28,9 @@ def test_repository_mode_configuration_is_complete_without_secret_values():
     config = {
         "vars": {
             "APPLICATION_MODE": "repositories",
-            "NEXT_GITHUB_CLIENT_ID": "client-id",
-            "NEXT_GITHUB_APP_ID": "app-id",
-            "NEXT_GITHUB_APP_SLUG": "app-slug",
+            "GITHUB_CLIENT_ID": "client-id",
+            "GITHUB_APP_ID": "app-id",
+            "GITHUB_APP_SLUG": "app-slug",
             "ANALYSIS_REPOSITORY": "combustrrr/code-analysis-dashboard",
             "ANALYSIS_REPOSITORY_ID": "1360051890",
             "DASHBOARD_ORIGIN": "https://combustrrr.github.io",
@@ -42,7 +41,6 @@ def test_repository_mode_configuration_is_complete_without_secret_values():
                 "GITHUB_CLIENT_SECRET",
                 "NEXT_GITHUB_CLIENT_SECRET",
                 "NEXT_GITHUB_APP_PRIVATE_KEY",
-                "NEXT_GITHUB_WEBHOOK_SECRET",
                 "SESSION_KEY",
                 "WORKER_API_TOKEN",
             ]
@@ -52,12 +50,12 @@ def test_repository_mode_configuration_is_complete_without_secret_values():
     assert required_worker_secrets(config) == set(config["secrets"]["required"])
 
 
-def test_legacy_mode_requires_explicit_minimum_oauth_scope():
+def test_non_repository_mode_is_rejected():
     config = {
-        "vars": {"APPLICATION_MODE": "legacy", "GITHUB_OAUTH_SCOPES": "public_repo"},
+        "vars": {"APPLICATION_MODE": "retired"},
         "secrets": {"required": ["GITHUB_CLIENT_SECRET", "SESSION_KEY", "WORKER_API_TOKEN"]},
     }
-    assert missing_worker_configuration(config) == set()
+    assert "APPLICATION_MODE" in missing_worker_configuration(config)
 
 def test_repository_mode_does_not_require_oauth_scopes():
     config = {"vars": {"APPLICATION_MODE": "repositories"}, "secrets": {"required": []}}
@@ -76,3 +74,8 @@ def test_repository_mode_rejects_another_execution_host_or_pages_path():
         "secrets": {"required": []},
     }
     assert {"ANALYSIS_REPOSITORY", "ANALYSIS_REPOSITORY_ID", "DASHBOARD_ORIGIN", "DASHBOARD_BASE_PATH"} <= missing_worker_configuration(config)
+
+
+def test_deployment_workflows_keep_coordinator_scanners_pages_and_worker_isolated():
+    root = Path(__file__).resolve().parents[2]
+    assert deployment_workflow_errors(root) == []

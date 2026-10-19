@@ -21,7 +21,7 @@ test('errors are logged, success is sampled and disabled logging stays silent',t
   for(const key of Object.keys(config.vars))assert.ok(!key.startsWith('EVALUATION_'),`unexpected legacy Worker variable: ${key}`);
  });
 test('request correlation keeps anonymous errors private and does not bypass authorization',async()=>{
- const env={SOURCE_REPOSITORY:'source/app',ANALYSIS_REPOSITORY:'host/scanners',DASHBOARD_ORIGIN:'https://owner.github.io',GITHUB_CLIENT_ID:'id',GITHUB_CLIENT_SECRET:'secret',GITHUB_OAUTH_SCOPES:'public_repo',SESSION_KEY:Buffer.alloc(32,7).toString('base64url')};
+ const env={APPLICATION_MODE:'repositories',ANALYSIS_REPOSITORY:'host/scanners',DASHBOARD_ORIGIN:'https://owner.github.io',GITHUB_CLIENT_ID:'id',GITHUB_CLIENT_SECRET:'secret',SESSION_KEY:Buffer.alloc(32,7).toString('base64url')};
  const response=await worker.fetch(new Request('https://worker/api/launch',{method:'POST',headers:{Origin:env.DASHBOARD_ORIGIN}}),env);
  assert.equal(response.status,401);assert.match(response.headers.get('X-Request-ID'),/^[a-f0-9-]{36}$/);
  assert.match(response.headers.get('Cache-Control'),/no-store/);

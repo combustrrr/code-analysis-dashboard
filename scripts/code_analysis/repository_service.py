@@ -16,7 +16,7 @@ from scripts.code_analysis.projects import validate, service_config
 from scripts.code_analysis.report_assets import shard, verify_asset
 from scripts.code_analysis.applicability import GROUPS as SCANNER_GROUPS
 
-WORKFLOW = '.github/workflows/code-analysis-source.yml'
+WORKFLOW = '.github/workflows/code-analysis-coordinator.yml'
 GENERATED_WORKFLOW = '.github/workflows/11-source-analysis.yml'
 
 
@@ -554,43 +554,25 @@ def report_publication(config, state, report_release, document=None):
 def reconcile_repository(repository, project_id='', selection='', request_id=''):
     repo, document, execution_sha = load_projects(repository)
     queued_asset = None
-    queue = github.release(repository, 'analysis-requests')
-    if queue:
-        candidates = sorted((a for a in github.pages(f"repos/{repository}/releases/{queue['id']}/assets") if a['name'].startswith('request-') and a['name'].endswith('.json')), key=lambda a:(a['created_at'],a['id']))
-        for candidate in candidates:
-            try:
-                candidate_intent = (json.loads(github.gh('api',f"repos/{repository}/releases/assets/{candidate['id']}",'-H','Accept: application/octet-stream',binary=True))
-                                    if candidate.get('size',0)<=8192 else {})
-            except (ValueError, RuntimeError):
-                candidate_intent = {}
-            project = next((p for p in document['projects'] if p['id']==candidate_intent.get('project_id')),None)
-            channels = candidate_intent.get('requested_channels')
-            valid = (candidate_intent.get('schema_version')=='analysis-request-v2'
-                     and candidate_intent.get('execution_repository_id')==repo['id']
-                     and isinstance(candidate_intent.get('actor_id'),int)
-                     and candidate_intent.get('source_repository_id')==(project or {}).get('source_repository',{}).get('id')
-                     and candidate_intent.get('target_sha')
-                     and candidate_intent.get('tooling_sha')==document['tooling_sha']
-                     and candidate_intent.get('profile_digest')==project_profile_digest(project)
-                     and isinstance(channels,list) and channels and set(channels).issubset(set((project or {}).get('enabled_scanners',[])))
-                     and project is not None)
-            if not valid:
-                # Preserve legacy/automatic entries as evidence, but never allow
-                # an incomplete pre-v2 request to execute after this cutover.
-                github.api(f"repos/{repository}/releases/assets/{candidate['id']}",
-                           {'name':f"superseded-{candidate['name']}",'label':'superseded: request predates the immutable manual envelope'},'PATCH')
-                continue
-            queued_asset, intent = candidate, candidate_intent
-            project_id, selection, request_id = intent['project_id'], queued_selection(intent), intent['request_id']
-            break
+    external_queue = bool(os.environ.get('QUEUE_INTENT'))
+    if external_queue:
+        intent = json.loads(os.environ['QUEUE_INTENT'])
+        project_id = intent.get('project_id', '')
+        selection = queued_selection(intent)
+        request_id = intent.get('request_id', '')
+        queued_asset = {'external': True}
     if queued_asset is None:
         # Direct/manual workflow inputs are recovery signals only. Only a durable,
         # previously accepted request asset is allowed to introduce scan work.
         project_id, selection, request_id = '', '', ''
     template = json.loads((Path(__file__).resolve().parents[2] / 'config/code-analysis/service.json').read_text(encoding='utf-8-sig'))
     runs = []
-    for workflow in ('code-analysis-source.yml','11-source-analysis.yml'):
+    for workflow in ('code-analysis-coordinator.yml',):
         runs.extend(github.pages(f'repos/{repository}/actions/workflows/{workflow}/runs','workflow_runs'))
+    if external_queue:
+        runs.append({'id':int(os.environ['GITHUB_RUN_ID']),'run_attempt':int(os.environ.get('GITHUB_RUN_ATTEMPT','1')),
+                     'status':'completed','conclusion':'success','head_sha':os.environ['GITHUB_SHA'],
+                     'display_title':'Queue coordinator '+os.environ['GITHUB_RUN_ID']})
     runs = list({run['id']:run for run in runs}.values())
     running = sum(run['status'] != 'completed' for run in runs)
     by_id = {run['id']:run for run in runs}
@@ -706,13 +688,11 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                        reused_channels=row.get('reused_channels',[]))
             row.pop('manual_refresh',None)
             release_manifest.write(config,release,state)
-            dispatched = github.api(f'repos/{repository}/actions/workflows/code-analysis-source.yml/dispatches',
-                {'ref':repo['default_branch'],'return_run_details':True,'inputs':{
-                    'target':json.dumps(row),'tooling_sha':document['tooling_sha'],'request_id':row['request_id'],'dispatch_id':row['dispatch_id']}})
-            if dispatched and dispatched.get('workflow_run_id'):
-                row.update(scan_run_id=dispatched['workflow_run_id'],run_attempt=1)
-            row['status']='scanning'
-            running += 1
+            if external_queue:
+                row.update(request_id=request_id,scan_run_id=int(os.environ['GITHUB_RUN_ID']),
+                           run_attempt=int(os.environ.get('GITHUB_RUN_ATTEMPT','1')),status='collected')
+                continue
+            raise ValueError('Only Durable Object coordinator claims may start source analysis')
         release_manifest.write(config,release,state)
         for receipt in state.get('requests', []):
             selected_row = next((r for r in state['targets'] if r.get('client_request_id') == receipt['request_id'] and r['head_sha'] == receipt['head_sha']), None)
@@ -772,15 +752,9 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                         queue_advanced=True
                     published['requests']=state['requests']
                     release_manifest.write(config,current,published)
-                if not active_request.get('remaining_channels') and active_request.get('status') in {'collected','cached'}:
-                    github.api(f"repos/{repository}/releases/assets/{queued_asset['id']}",method='DELETE')
+                if not external_queue and not active_request.get('remaining_channels') and active_request.get('status') in {'collected','cached'}:
                     queued_asset=None
         release_manifest.write(config,release,state)  # Persist bounded evidence recovery intents.
-        if queue_advanced and queue:
-            remaining_assets=github.pages(f"repos/{repository}/releases/{queue['id']}/assets")
-            if any(asset['name'].startswith('request-') and asset['name'].endswith('.json') for asset in remaining_assets):
-                github.api(f'repos/{repository}/actions/workflows/code-analysis-reconcile.yml/dispatches',
-                           {'ref':repo['default_branch']},'POST')
     return summaries
 
 

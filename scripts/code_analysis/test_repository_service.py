@@ -155,7 +155,7 @@ class PublicationRecoveryTests(unittest.TestCase):
         from scripts.code_analysis.repository_service import recover_completed_producer_run
         row = {'request_id': 'request', 'execution_sha': 'a' * 40}
         runs = [{
-            'id': 42, 'path': '.github/workflows/code-analysis-source.yml',
+            'id': 42, 'path': '.github/workflows/code-analysis-coordinator.yml',
             'head_sha': 'a' * 40, 'status': 'completed', 'run_attempt': 1,
             'created_at': '2026-10-09T17:00:00Z',
         }]

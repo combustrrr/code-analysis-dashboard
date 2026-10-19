@@ -94,7 +94,7 @@ class PortabilityTests(unittest.TestCase):
             b = load(destination / 'dashboard/config/code-analysis/service.json')
             launcher = load(destination / 'launcher/wrangler.jsonc')
             self.assertEqual(a, b)
-            self.assertEqual(a['source_repository'], launcher['vars']['SOURCE_REPOSITORY'])
+            self.assertNotIn('SOURCE_REPOSITORY', launcher['vars'])
             self.assertEqual(launcher['vars']['DASHBOARD_ORIGIN'], 'https://example.github.io')
             self.assertEqual(launcher['vars']['DASHBOARD_BASE_PATH'], '/dashboard/')
             self.assertNotIn('combustrrr', json.dumps(launcher))

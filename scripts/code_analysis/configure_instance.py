@@ -50,7 +50,7 @@ def bundle(config: dict, destination: Path, endpoint: str, dashboard_url: str, c
     dashboard_path = dashboard.path or '/'
     if not dashboard_path.endswith('/'):
         dashboard_path += '/'
-    launcher['vars'] = {'SOURCE_REPOSITORY': config['source_repository'], 'ANALYSIS_REPOSITORY': config['analysis_repository'],
+    launcher['vars'] = {'ANALYSIS_REPOSITORY': config['analysis_repository'],
                         'DASHBOARD_ORIGIN': f'{dashboard.scheme}://{dashboard.netloc}', 'DASHBOARD_BASE_PATH': dashboard_path,
                         'GITHUB_CLIENT_ID': client_id}
     destination.mkdir(parents=True, exist_ok=False)
@@ -60,8 +60,6 @@ def bundle(config: dict, destination: Path, endpoint: str, dashboard_url: str, c
     target = destination / 'analysis/.github/workflows/11-source-analysis.yml'
     target.parent.mkdir(parents=True)
     target.write_text(workflow, encoding='utf-8')
-    discovery = (root / '.github/workflows/10-analysis-discovery.yml').read_text(encoding='utf-8')
-    (target.parent / '10-analysis-discovery.yml').write_text(discovery, encoding='utf-8')
     target = destination / 'dashboard/.github/workflows/pages.yml'
     target.parent.mkdir(parents=True)
     target.write_text((root / 'config/code-analysis/dashboard-pages.yml').read_text(), encoding='utf-8')

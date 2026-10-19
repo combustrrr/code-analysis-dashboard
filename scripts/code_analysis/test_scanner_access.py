@@ -28,18 +28,12 @@ class ScannerAccessTests(unittest.TestCase):
                 {'target', 'tooling_sha', 'request_id'},
             )
 
-    def test_source_profile_runs_after_incomplete_vendor_evidence(self):
-        workflow = yaml.safe_load(Path('.github/workflows/code-analysis-source.yml').read_text(encoding='utf-8'))
-        barrier = workflow['jobs']['vendor-complete']
-        self.assertEqual(barrier['needs'], 'isolated-vendor')
-        self.assertEqual(barrier['if'], '${{ always() }}')
-        self.assertEqual(barrier['permissions'], {'contents': 'none'})
-        for name in ('analyze', 'configured-profile'):
+    def test_source_profiles_run_after_vendor_evidence(self):
+        workflow = yaml.safe_load(Path('.github/workflows/code-analysis-coordinator.yml').read_text(encoding='utf-8'))
+        for name in ('portable', 'configured'):
             condition = workflow['jobs'][name]['if']
             self.assertIn('always()', condition)
-            self.assertIn("needs['validate-request'].result == 'success'", condition)
-            self.assertNotIn("needs['isolated-vendor'].result", condition)
-            self.assertEqual(workflow['jobs'][name]['needs'], ['validate-request', 'vendor-complete'])
+            self.assertEqual(workflow['jobs'][name]['needs'], ['claim', 'vendor'])
 
     def test_vendor_diagnostics_cannot_publish_a_target_report(self):
         workflow = yaml.safe_load(diagnostics())
@@ -122,12 +116,13 @@ class ScannerAccessTests(unittest.TestCase):
         self.assertNotIn('sonar.projectKey=${{', scan['with']['args'])
 
     def test_reconciliation_cannot_publish_checks_or_security_events_to_sources(self):
-        for path in ('.github/workflows/code-analysis-reconcile.yml',
+        for path in ('.github/workflows/code-analysis-coordinator.yml',
                      '.github/workflows/reusable-reconcile.yml'):
             workflow = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
-            permissions = workflow['jobs']['reconcile']['permissions']
-            self.assertNotIn('checks', permissions)
-            self.assertNotIn('security-events', permissions)
+            for job in workflow['jobs'].values():
+                permissions = job.get('permissions', {})
+                self.assertNotIn('checks', permissions)
+                self.assertNotIn('security-events', permissions)
 
 
 if __name__ == '__main__':

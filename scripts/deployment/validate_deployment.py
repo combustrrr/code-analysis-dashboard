@@ -45,12 +45,11 @@ BASE_REQUIRED_SECRETS = {"GITHUB_CLIENT_SECRET", "SESSION_KEY", "WORKER_API_TOKE
 REPOSITORY_REQUIRED_SECRETS = {
     "NEXT_GITHUB_CLIENT_SECRET",
     "NEXT_GITHUB_APP_PRIVATE_KEY",
-    "NEXT_GITHUB_WEBHOOK_SECRET",
 }
 REPOSITORY_REQUIRED_VARS = {
-    "NEXT_GITHUB_CLIENT_ID",
-    "NEXT_GITHUB_APP_ID",
-    "NEXT_GITHUB_APP_SLUG",
+    "GITHUB_CLIENT_ID",
+    "GITHUB_APP_ID",
+    "GITHUB_APP_SLUG",
     "ANALYSIS_REPOSITORY",
     "ANALYSIS_REPOSITORY_ID",
     "DASHBOARD_ORIGIN",
@@ -62,27 +61,22 @@ REPOSITORY_EXPECTED_VARS = {
     "DASHBOARD_ORIGIN": "https://combustrrr.github.io",
     "DASHBOARD_BASE_PATH": "/code-analysis-dashboard/",
 }
-LEGACY_REQUIRED_VARS = {"GITHUB_OAUTH_SCOPES"}
 
 
 def required_worker_secrets(config: dict) -> set[str]:
     """Return secrets required by the selected Worker application mode."""
     required = set(BASE_REQUIRED_SECRETS)
-    if config.get("vars", {}).get("APPLICATION_MODE") == "repositories":
-        required.update(REPOSITORY_REQUIRED_SECRETS)
+    required.update(REPOSITORY_REQUIRED_SECRETS)
     return required
 
 
 def missing_worker_configuration(config: dict) -> set[str]:
     """Return missing repository-mode vars and declared secrets."""
     vars_ = config.get("vars", {})
-    missing = (
-        {name for name in REPOSITORY_REQUIRED_VARS if not vars_.get(name)}
-        if vars_.get("APPLICATION_MODE") == "repositories"
-        else {name for name in LEGACY_REQUIRED_VARS if vars_.get(name) != "public_repo"}
-    )
-    if vars_.get("APPLICATION_MODE") == "repositories":
-        missing.update(name for name, expected in REPOSITORY_EXPECTED_VARS.items() if vars_.get(name) != expected)
+    missing = {name for name in REPOSITORY_REQUIRED_VARS if not vars_.get(name)}
+    if vars_.get("APPLICATION_MODE") != "repositories":
+        missing.add("APPLICATION_MODE")
+    missing.update(name for name, expected in REPOSITORY_EXPECTED_VARS.items() if vars_.get(name) != expected)
     declared = set(config.get("secrets", {}).get("required", []))
     missing.update(required_worker_secrets(config) - declared)
     return missing
@@ -209,6 +203,41 @@ def check_worker_secrets_declared() -> bool:
     return True
 
 
+def deployment_workflow_errors(root: Path) -> list[str]:
+    """Return contract violations for isolated coordinator and Worker deployment."""
+    worker = (root / ".github/workflows/worker-deploy.yml").read_text(encoding="utf-8")
+    coordinator = (root / ".github/workflows/code-analysis-coordinator.yml").read_text(encoding="utf-8")
+    pages = (root / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+    errors = []
+    if "pull_request:" not in worker or "github.event_name == 'push'" not in worker or "github.ref == 'refs/heads/main'" not in worker:
+        errors.append("Worker deployment is not restricted to trusted main after PR validation")
+    if worker.index("node --test") > worker.index("wrangler@4.129.1 deploy --dry-run") or worker.index("needs: validate") > worker.index("wrangler@4.129.1 deploy\n"):
+        errors.append("Worker deployment validation does not precede deployment")
+    if "environment: production" not in worker or "CLOUDFLARE_API_TOKEN" not in worker:
+        errors.append("Worker deployment does not use the production Environment token")
+    if "cron: '*/15 * * * *'" not in coordinator or "workflow_dispatch:" in coordinator:
+        errors.append("Queue coordinator is not schedule-only at 15-minute cadence")
+    if "/api/internal/queue/claim" not in coordinator or "uses: ./.github/workflows/reusable-source" not in coordinator:
+        errors.append("Queue coordinator does not claim and invoke local reusable scanners")
+    source_section = coordinator[coordinator.index("  portable:"):coordinator.index("  publish:")]
+    if "WORKER_API_TOKEN" in source_section:
+        errors.append("Source-executing jobs receive the coordinator credential")
+    if "deploy-pages" not in pages or "wrangler" in pages:
+        errors.append("Pages deployment is not isolated from Worker deployment")
+    return errors
+
+
+def check_deployment_workflows() -> bool:
+    root = Path(__file__).resolve().parents[2]
+    errors = deployment_workflow_errors(root)
+    for error in errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+    if errors:
+        return False
+    print("OK: deployment workflow isolation validated")
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check-r2-lifecycle", action="store_true", help="Check R2 temp-runs lifecycle rule")
@@ -219,6 +248,7 @@ def main() -> int:
     all_ok = True
     all_ok &= check_wrangler_config()
     all_ok &= check_worker_secrets_declared()
+    all_ok &= check_deployment_workflows()
 
     if args.check_r2_lifecycle:
         all_ok &= check_r2_lifecycle_rule(

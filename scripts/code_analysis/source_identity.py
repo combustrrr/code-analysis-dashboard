@@ -17,14 +17,9 @@ def expected_dispatch_id(request_id: str, channels: list[str]) -> str:
 def validate_durable_request(row: dict) -> dict:
     host = os.environ['GITHUB_REPOSITORY']
     request_id = os.environ['REQUEST_ID']
-    release = next((value for value in pages(f'repos/{host}/releases') if value.get('tag_name') == 'analysis-requests'), None)
-    if not release:
-        raise ValueError('Explicit durable request is unavailable')
-    asset = next((value for value in pages(f"repos/{host}/releases/{release['id']}/assets")
-                  if value.get('name') == f'request-{request_id}.json'), None)
-    if not asset:
-        raise ValueError('Explicit durable request is unavailable')
-    intent = json.loads(gh('api', f"repos/{host}/releases/assets/{asset['id']}", '-H', 'Accept: application/octet-stream', binary=True))
+    intent = row.get('queue_intent')
+    if not isinstance(intent, dict):
+        raise ValueError('Explicit Durable Object request is unavailable')
     if (intent.get('schema_version') != 'analysis-request-v2' or intent.get('request_id') != request_id
             or intent.get('execution_repository_id') != api(f'repos/{host}')['id']
             or intent.get('target_sha') != row.get('head_sha') or intent.get('tooling_sha') != os.environ['TOOLING_SHA']
@@ -52,7 +47,7 @@ def main():
                        source_repository=row['source_repository'], base_sha=row.get('base_sha'), base_branch=row.get('base_branch'), kind=row.get('kind'))
     import subprocess
     tooling_revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() if os.environ.get('IS_REUSABLE_ANALYSIS') == 'true' else os.environ['GITHUB_SHA']
-    if validated['id'] != row['id'] or os.environ['TOOLING_SHA'] != tooling_revision:
+    if validated.get('target_sha') != row['head_sha'] or os.environ['TOOLING_SHA'] != tooling_revision:
         raise ValueError('dispatch identity or tooling revision mismatch')
     if Path('.source').exists():
         checkout_sha=subprocess.check_output(['git','-C','.source','rev-parse','HEAD'],text=True).strip()

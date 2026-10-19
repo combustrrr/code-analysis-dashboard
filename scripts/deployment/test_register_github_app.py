@@ -104,6 +104,8 @@ class TestFindOpenSSL:
 def test_app_registration_requests_only_used_permissions():
     source = (Path(__file__).parent / "register_github_app.py").read_text(encoding="utf-8")
     assert "manifest[\"default_permissions\"][\"workflows\"]" not in source
-    assert "\"actions\": \"write\"" in source
-    assert "\"contents\": \"write\" if args.application else \"read\"" in source
+    assert "\"actions\": \"read\"" in source
+    assert "\"contents\": \"read\"" in source
+    assert "\"actions\": \"write\"" not in source
+    assert "\"contents\": \"write\"" not in source
     assert "\"pull_requests\": \"read\"" in source

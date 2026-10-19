@@ -38,8 +38,9 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
   the replacement manifest is committed.
 - The `temp-runs/` prefix has a one-day lifecycle rule; the Worker enforces 100 MB asset
   and 900 MB compressed-manifest limits.
-- Cloudflare KV stores service state. GitHub Releases remain only for the bounded request
-  queue and compatibility state where the current implementation requires them.
+- Cloudflare KV stores report service state. The SQLite-backed Durable Object stores
+  OAuth exchanges, encrypted grants/session metadata, and the bounded FIFO request
+  queue. GitHub Releases are no longer used for request admission or execution.
 
 ## Change Rules
 

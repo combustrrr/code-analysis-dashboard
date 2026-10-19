@@ -11,7 +11,7 @@ const configBlob={content:Buffer.from(JSON.stringify(config)).toString('base64')
 const host=(permissions={pull:true,push:true,admin:false})=>({id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY,private:false,default_branch:'main',permissions});
 
 function helpers({permissions,overrides={}}={}) {
-  const calls=[];
+  const calls=[],queueCalls=[];
   const serviceToken=async()=> 'central-app-read-token';
   const github=async(path,token,options={})=>{
     calls.push({path,token,options});
@@ -23,7 +23,7 @@ function helpers({permissions,overrides={}}={}) {
     if(source)return {id:source.repository_id,full_name:source.repository,private:false,default_branch:source.branch,permissions:{pull:true}};
     throw new Error(`Unexpected GitHub request: ${path}`);
   };
-  return {calls,Failure,json,github,serviceToken,pages:async()=>[],seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
+  return {calls,queueCalls,Failure,json,github,serviceToken,pages:async()=>[],queue:async(path,body)=>{queueCalls.push({path,body});return json({...body.request,status:'queued',queue_position:1},201);},seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
 }
 
 const session={token:'user-token'};
@@ -53,10 +53,10 @@ test('read-only collaborators can list the exact fixed target registry',async()=
   assert.ok(!JSON.stringify(result).includes('user-token'));
 });
 
-test('trusted legacy scanner profiles remain listable while portable profiles are validated',async()=>{
-  const legacyConfig={...config,projects:config.projects.map((project,index)=>index===0?{...project,profile:{python_root:'backend',python_test_command:['python','-m','pytest'],snyk_python_manifests:['backend/requirements.txt']}}:project)};
-  const legacyHelpers=helpers({overrides:{[`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`]:{content:Buffer.from(JSON.stringify(legacyConfig)).toString('base64')}}});
-  const response=await repositoryApi(get('/api/projects'),env,session,legacyHelpers);
+test('reviewed agentic scanner profiles remain listable while portable profiles are validated',async()=>{
+  const agenticConfig={...config,projects:config.projects.map((project,index)=>index===0?{...project,profile:{mode:'agentic-soc',python_root:'backend',python_test_command:['python','-m','pytest'],snyk_python_manifests:['backend/requirements.txt']}}:project)};
+  const agenticHelpers=helpers({overrides:{[`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`]:{content:Buffer.from(JSON.stringify(agenticConfig)).toString('base64')}}});
+  const response=await repositoryApi(get('/api/projects'),env,session,agenticHelpers);
   assert.equal(response.status,200);
   assert.equal((await response.json()).projects.length,CONFIGURED_TARGETS.length);
 
@@ -145,16 +145,11 @@ test('confirmation rejects refs that move after the signed preview',async()=>{
 
 test('launch persists a pinned v2 envelope and idempotent request identity',async()=>{
   const source=CONFIGURED_TARGETS[0];
-  const h=helpers({overrides:{[`repos/${source.repository}/pulls/7`]:{number:7,title:'Fix',draft:true,head:{ref:'topic',sha:'d'.repeat(40),repo:{id:999,full_name:'fork/repo'}},base:{ref:'Testing',sha:'e'.repeat(40),repo:{full_name:source.repository}}},[`repos/${EXECUTION_REPOSITORY}/actions/workflows/code-analysis-reconcile.yml/dispatches`]:{workflow_run_id:91}}});
-  const queue={id:44,tag_name:'analysis-requests'};const assets=[];
-  h.pages=async path=>path.endsWith('/releases')?[queue]:path.endsWith('/assets')?assets:[];
+  const h=helpers({overrides:{[`repos/${source.repository}/pulls/7`]:{number:7,title:'Fix',draft:true,head:{ref:'topic',sha:'d'.repeat(40),repo:{id:999,full_name:'fork/repo'}},base:{ref:'Testing',sha:'e'.repeat(40),repo:{full_name:source.repository}}}}});
   const preview=await (await repositoryApi(post('/api/project-preview',{project_id:source.id,selection:{kind:'pr',ref:'7'}}),env,session,h)).json();
   const input={project_id:source.id,preview_token:preview.preview_token,requested_channels:['semgrep'],idempotency_key:'22222222-2222-4222-8222-222222222222'};
-  const originalFetch=globalThis.fetch;
-  let envelope;
-  globalThis.fetch=async(url,options)=>{if(String(url).includes('uploads.github.com')){envelope=JSON.parse(options.body);assets.push({id:501,name:`request-${envelope.request_id}.json`});return new Response('{}',{status:201});}if(String(url).includes('/releases/assets/501'))return new Response(JSON.stringify(envelope),{status:200,headers:{'Content-Type':'application/json'}});if(String(url).startsWith('https://api.github.com/'))return new Response('{}',{status:404});return originalFetch(url,options);};
-  try {
-    const response=await repositoryApi(post('/api/project-launch',input),env,session,h);
+  const response=await repositoryApi(post('/api/project-launch',input),env,session,h);
+  const envelope=h.queueCalls[0].body.request;
     assert.equal(response.status,202);
     assert.equal((await response.clone().json()).queue_position,1);
     assert.equal(envelope.schema_version,'analysis-request-v2');
@@ -169,13 +164,8 @@ test('launch persists a pinned v2 envelope and idempotent request identity',asyn
     assert.deepEqual(envelope.pr_context,preview.pr_context);
     assert.equal(envelope.project_id,source.id);
     assert.equal(envelope.actor_id,73);
-    const duplicate=await repositoryApi(post('/api/project-launch',input),env,session,h);
-    assert.equal(duplicate.status,202);
-    const duplicateBody=await duplicate.json();
-    assert.equal(duplicateBody.request_id,input.idempotency_key);
-    assert.equal(duplicateBody.queue_position,1);
-    assert.equal(h.calls.filter(call=>call.path.endsWith('/dispatches')).length,1);
-  } finally {globalThis.fetch=originalFetch;}
+  assert.equal(h.queueCalls[0].path,'/queue/admit');
+  assert.equal(h.calls.some(call=>call.options.method&&call.options.method!=='GET'),false);
 });
 
 test('write access is required to launch and no user source repository can override the registry',async()=>{
@@ -185,9 +175,8 @@ test('write access is required to launch and no user source repository can overr
   await assert.rejects(()=>repositoryApi(get('/api/projects?repository=attacker/private-repo'),env,session,helpers()),error=>error.status===400&&error.code==='repository_not_configurable');
 });
 
-test('configuration endpoints require an admin and remain managed by the trusted registry',async()=>{
-  await assert.rejects(()=>repositoryApi(post('/api/projects/preview',{project_id:'1278177697',changes:{}}),env,session,helpers({permissions:{pull:true,push:true,admin:false}})),error=>error.status===403&&error.code==='repository_admin_required');
-  await assert.rejects(()=>repositoryApi(post('/api/projects/preview',{project_id:'1278177697',changes:{}}),env,session,helpers({permissions:{pull:true,push:true,admin:true}})),error=>error.status===409&&error.code==='configuration_managed');
+test('retired configuration endpoints are absent',async()=>{
+  assert.equal(await repositoryApi(post('/api/projects/preview',{project_id:'1278177697',changes:{}}),env,session,helpers({permissions:{pull:true,push:true,admin:true}})),null);
 });
 
 test('identity drift or an incomplete target registry fails closed',async()=>{

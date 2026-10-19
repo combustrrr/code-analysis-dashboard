@@ -68,7 +68,7 @@ export function cachedChannelsForSnapshot(snapshot, manifest) {
 }
 
 export async function repositoryApi(request, env, session, helpers) {
-  const {github, json, Failure, pages, serviceToken, seal, unseal} = helpers;
+  const {github,json,Failure,pages,serviceToken,seal,unseal,queue} = helpers;
   const url = new URL(request.url);
   const token = session?.token;
   const requestedRepository = url.searchParams.get('repository');
@@ -107,7 +107,7 @@ export async function repositoryApi(request, env, session, helpers) {
     const project = configuration.projects.find(value => String(value.id) === String(id));
     if (!project || !CONFIGURED_TARGETS.some(value => value.id === String(id))) throw new Failure(404, 'Configured project is unavailable.', 'project_unavailable');
     try {
-      if (!project.profile || typeof project.profile !== 'object' || Array.isArray(project.profile) || !Object.keys(project.profile).length) throw new Error('A project profile is required.');
+      if (!project.profile || typeof project.profile !== 'object' || Array.isArray(project.profile) || !['portable','agentic-soc'].includes(project.profile.mode)) throw new Error('A current project profile is required.');
       if (project.profile.mode === 'portable') validatePortableProfile(project.profile);
     }
     catch { throw new Failure(503, 'The configured project profile is invalid.', 'project_profile_invalid'); }
@@ -220,7 +220,7 @@ export async function repositoryApi(request, env, session, helpers) {
     }
 
     if (url.pathname === '/api/project-integration') {
-      const workflows = await Promise.all(['code-analysis-reconcile.yml','code-analysis-source.yml'].map(name => github(`repos/${repository.full_name}/actions/workflows/${name}`, appToken)));
+      const workflows = await Promise.all(['code-analysis-coordinator.yml'].map(name => github(`repos/${repository.full_name}/actions/workflows/${name}`, appToken)));
       const reportUrl = new URL('/api/public/manifest', url);
       reportUrl.search = new URLSearchParams({repository:repository.full_name, project_id:project.id});
       let storage = {compressed_bytes:null,remaining_bytes:null,history_points:0};
@@ -244,20 +244,12 @@ export async function repositoryApi(request, env, session, helpers) {
 
     const id = url.searchParams.get('request_id');
     if (!/^[a-f0-9-]{36}$/.test(id || '')) throw new Failure(400, 'Choose a project and request.', 'invalid_request');
-    const queuePosition = async () => {
-      try {
-        const releases=await pages(`repos/${repository.full_name}/releases`,appToken);
-        const queue=releases.find(value=>value.tag_name==='analysis-requests');
-        if(!queue)return null;
-        const pending=orderedRequests(await pages(`repos/${repository.full_name}/releases/${queue.id}/assets`,appToken));
-        const index=pending.findIndex(asset=>asset.name===`request-${id}.json`);
-        return index<0?null:index+1;
-      } catch { return null; }
-    };
+    const queued=await queue('/queue/status',{request_id:id});
+    if(queued.ok){const state=await queued.json();if(['queued','running','failed','superseded'].includes(state.status))return json({phase:state.status,request_id:id,queue_position:state.queue_position,attempts:state.attempts,checked_at:new Date().toISOString(),...(state.result||{})},state.status==='queued'?202:200);}
     const reportUrl = new URL('/api/public/manifest', url);
     reportUrl.search = new URLSearchParams({repository:repository.full_name,project_id:project.id});
     const response = await publicReports(new Request(reportUrl), env);
-    if (!response.ok) return json({phase:'queued',request_id:id,queue_position:await queuePosition(),checked_at:new Date().toISOString(),publication_status:'unavailable',message:'Request is queued successfully. Publication status is temporarily unavailable; the request remains retained.'},202);
+    if (!response.ok) return json({phase:'queued',request_id:id,queue_position:null,checked_at:new Date().toISOString(),publication_status:'unavailable'},202);
     const manifest = await response.json();
     const receipt = manifest.requests?.find(row => row.request_id === id);
     const canonical = canonicalReportTarget(manifest);
@@ -269,8 +261,8 @@ export async function repositoryApi(request, env, session, helpers) {
       if (recent && canonical && recent.analyzed_sha === canonical.analyzed_sha && recent.original_target_id === canonical.original_target_id) row = {...canonical,...recent};
       else if (recent) return json({phase:'superseded',source_sha:recent.head_sha,request_id:id,checked_at:new Date().toISOString()});
     }
-    if (!row) return json({phase:'queued',request_id:id,queue_position:await queuePosition(),checked_at:new Date().toISOString()});
-    const result = {request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'queued',queue_position:await queuePosition(),checked_at:new Date().toISOString()};
+    if (!row) return json({phase:'queued',request_id:id,queue_position:null,checked_at:new Date().toISOString()});
+    const result = {request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'queued',queue_position:null,checked_at:new Date().toISOString()};
     if (row.scan_run_id) {
       const run = await github(`repos/${repository.full_name}/actions/runs/${row.scan_run_id}/attempts/${row.run_attempt}`, appToken);
       if (run.head_sha !== row.execution_sha) throw new Failure(409, 'Producer revision does not match the request.', 'producer_mismatch');
@@ -290,7 +282,7 @@ export async function repositoryApi(request, env, session, helpers) {
   if (request.method === 'GET' && /^\/api\/project-runs\/[1-9][0-9]*$/.test(url.pathname)) {
     const {repository,appToken} = await context();
     const run = await github(`repos/${repository.full_name}/actions/runs/${url.pathname.split('/').at(-1)}`, appToken);
-    if (!['.github/workflows/code-analysis-reconcile.yml','.github/workflows/code-analysis-source.yml','.github/workflows/11-source-analysis.yml'].includes(run.path?.split('@')[0])) throw new Failure(404, 'Not an application analysis run.', 'not_found');
+    if (run.path?.split('@')[0] !== '.github/workflows/code-analysis-coordinator.yml') throw new Failure(404, 'Not an application analysis run.', 'not_found');
     return json({run_id:run.id,status:run.status,conclusion:run.conclusion,attempt:run.run_attempt,checked_at:new Date().toISOString()});
   }
 
@@ -316,48 +308,17 @@ export async function repositoryApi(request, env, session, helpers) {
     const targetSha = current.target_sha;
     const requestId = requestIdFromKey(input.idempotency_key);
     const actor = await github('user',token);
-    const releases = await pages(`repos/${repository.full_name}/releases`,token);
-    let queue = releases.find(value => value.tag_name === 'analysis-requests');
-    if (!queue) {
-      try {queue = await github(`repos/${repository.full_name}/releases`,token,{method:'POST',body:JSON.stringify({tag_name:'analysis-requests',name:'Analysis request queue',body:'Durable pending analysis requests. Processed entries are removed.',make_latest:'false'})});}
-      catch {queue=(await pages(`repos/${repository.full_name}/releases`,token)).find(value=>value.tag_name==='analysis-requests');if(!queue)throw new Failure(502,'Could not persist the analysis request.','persistence_failed');}
-    }
-    const pending = orderedRequests(await pages(`repos/${repository.full_name}/releases/${queue.id}/assets`,token));
-    if (pending.length>=100) throw new Failure(429,'The global analysis queue has 100 pending requests. Wait for reconciliation before submitting another.','queue_full');
-    const existingAsset=pending.find(asset=>asset.name===`request-${requestId}.json`);
-    if (existingAsset) {
-      const assetResponse=await fetch(`https://api.github.com/repos/${repository.full_name}/releases/assets/${existingAsset.id}`,{headers:{Authorization:`Bearer ${token}`,Accept:'application/octet-stream','User-Agent':'code-analysis-application'}});
-      if (!assetResponse.ok) throw new Failure(502,'Could not verify the retained idempotency record.','idempotency_unavailable');
-      const previous=await assetResponse.json();
-      const mismatch=previous.project_id!==project.id?'project':previous.target_sha!==targetSha?'target':previous.actor_id!==actor.id?'actor':stable(previous.selection)!==stable(current.selection)?'selection':stable(previous.pr_context||null)!==stable(current.pr_context)?'pull_request':stable([...(previous.requested_channels||[])].sort())!==stable([...input.requested_channels].sort())?'channels':'';
-      if (mismatch) throw new Failure(409,'This idempotency key already identifies a different analysis request.',`idempotency_conflict_${mismatch}`);
-      return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,queue_position:pending.indexOf(existingAsset)+1,warning:'This idempotent analysis request is already persisted and awaiting reconciliation.'},202);
-    }
-    const reportUrl = new URL('/api/public/manifest',url);
-    reportUrl.search = new URLSearchParams({repository:repository.full_name,project_id:project.id});
-    const existingManifest = await publicReports(new Request(reportUrl),env);
-    if (existingManifest.ok) {
-      const receipt=(await existingManifest.json()).requests?.find(value=>value.request_id===requestId);
-      if (receipt) {
-        if (receipt.head_sha!==targetSha || stable(receipt.selection)!==stable(current.selection) || stable(receipt.pr_context||null)!==stable(current.pr_context) || stable([...(receipt.requested_channels||[])].sort())!==stable([...input.requested_channels].sort())) throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
-        return json({status:['published','reused'].includes(receipt.status)?receipt.status:'queued',request_id:requestId,run_id:receipt.scan_run_id||null,repository:repository.full_name,warning:'This idempotent analysis request is already retained.'},202);
-      }
-    }
     const selection = current.selection;
     const checkoutRepository=current.pr_context?.head_repository||source.full_name;
     const checkoutRepositoryId=current.pr_context?.head_repository_id||source.id;
-    const intent = {schema_version:'analysis-request-v2',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection,resolved_selection:{repository:checkoutRepository,repository_id:checkoutRepositoryId,kind:'commit',ref:targetSha},target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...input.requested_channels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:input.idempotency_key.toLowerCase(),run_again:input.run_again===true,preview_id:preview.preview_id,created_at:new Date().toISOString()};
-    const saved = await fetch(`https://uploads.github.com/repos/${repository.full_name}/releases/${queue.id}/assets?name=request-${requestId}.json`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','User-Agent':'code-analysis-application'},body:JSON.stringify(intent)});
-    if (!saved.ok) throw new Failure(502,'Could not persist the analysis request; no scan was confirmed.','persistence_failed');
-    let result;
-    try {result=await github(`repos/${repository.full_name}/actions/workflows/code-analysis-reconcile.yml/dispatches`,token,{method:'POST',body:JSON.stringify({ref:repository.default_branch,return_run_details:true})});}
-    catch {return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,queue_position:pending.length+1,warning:'Request saved. Immediate dispatch failed; repository reconciliation will recover it.'},202);}
-    return json({status:'submitted',request_id:requestId,run_id:result?.workflow_run_id||null,repository:repository.full_name,queue_position:pending.length+1},202);
+    const intent = {schema_version:'analysis-request-v2',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection,resolved_selection:{repository:checkoutRepository,repository_id:checkoutRepositoryId,kind:'commit',ref:targetSha},target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...input.requested_channels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:input.idempotency_key.toLowerCase(),run_again:input.run_again===true,preview_id:preview.preview_id,created_at:new Date().toISOString()};
+    const admitted=await queue('/queue/admit',{request:intent});
+    const admittedBody=await admitted.json();
+    if(admitted.status===429)throw new Failure(429,'The global analysis queue has 100 pending requests.','queue_full');
+    if(admitted.status===409)throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
+    if(!admitted.ok)throw new Failure(503,'The analysis queue is temporarily unavailable; no request was accepted.','queue_unavailable');
+    return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,queue_position:admittedBody.queue_position??null,duplicate:admittedBody.duplicate===true},202);
   }
 
-  if (request.method === 'POST' && ['/api/connections/preview','/api/connections/install','/api/projects/preview'].includes(url.pathname)) {
-    await executionRepository('admin');
-    throw new Failure(409, 'Project profiles are managed in the trusted execution-repository registry.', 'configuration_managed');
-  }
   return null;
 }

@@ -1,6 +1,6 @@
 import {emitDiagnostic} from './diagnostics.mjs';
 import {isCollaborator} from './viewer-access.mjs';
-import { webhook, reportToken } from './github-app.mjs';
+import { reportToken } from './github-app.mjs';
 import { publicReports } from './reports.mjs';
 import { applicationApi } from './application.mjs';
 import {readBody, BodyLimitError, resolveLimit, DEFAULT_LIMITS} from './request-limits.mjs';
@@ -30,30 +30,26 @@ export async function unseal(value, secret, type) {
 class Failure extends Error { constructor(status, message, code) { super(message); this.status = status; if (code) this.code = code; } }
 const cookie = (value, age) => `__Host-analysis-oauth=${value}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${age}`;
 function settings(env) {
-  for (const key of (env.APPLICATION_MODE === 'repositories' ? ['ANALYSIS_REPOSITORY'] : ['SOURCE_REPOSITORY', 'ANALYSIS_REPOSITORY'])) {
-    if (!/^[\w.-]+\/[\w.-]+$/.test(env[key] || '')) throw new Failure(503, 'Launcher repository configuration is unavailable.', 'launcher_misconfigured');
-  }
-  if (env.APPLICATION_MODE !== 'repositories' && env.SOURCE_REPOSITORY.toLowerCase() === env.ANALYSIS_REPOSITORY.toLowerCase()) throw new Failure(503, 'Source and analysis repositories must be separate.', 'launcher_misconfigured');
+  if (env.APPLICATION_MODE !== 'repositories' || !/^[\w.-]+\/[\w.-]+$/.test(env.ANALYSIS_REPOSITORY || '')) throw new Failure(503, 'Configured repository service is unavailable.', 'launcher_misconfigured');
   const dashboardBase = new URL(env.DASHBOARD_BASE_PATH || '/', `${env.DASHBOARD_ORIGIN}/`);
   if (new URL(env.DASHBOARD_ORIGIN).origin !== env.DASHBOARD_ORIGIN || !env.DASHBOARD_ORIGIN.startsWith('https://') || dashboardBase.origin !== env.DASHBOARD_ORIGIN || !dashboardBase.pathname.endsWith('/') || dashboardBase.search || dashboardBase.hash || !env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET || !env.SESSION_KEY) throw new Failure(503, 'Launcher authentication is not configured.', 'launcher_misconfigured');
-  // Legacy mode uses a GitHub OAuth App; keep its grant explicit and minimal.
-  if (env.APPLICATION_MODE !== 'repositories' && env.GITHUB_OAUTH_SCOPES !== 'public_repo') throw new Failure(503, 'Launcher OAuth scope configuration is unavailable.', 'launcher_misconfigured');
 }
 async function github(path, token, init = {}) {
   const read = !init.method || init.method.toUpperCase() === 'GET';
-  let response;
+  if (!read) throw new Failure(405, 'GitHub repository writes are disabled for this service.', 'github_write_disabled');
+  let response, secondary=false;
   for (let attempt = 0; ; attempt++) {
     response = await fetch(`https://api.github.com/${path}`, { ...init, headers: {
       Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'code-analysis-launcher', Authorization: `Bearer ${token}`, ...init.headers,
     } });
-    const secondary = await secondaryRateLimit(response);
+    secondary = await secondaryRateLimit(response);
     if (!read || attempt >= MAX_GITHUB_READ_RETRIES || (!transientReadStatus(response.status) && !secondary)) break;
     await sleep(retryAfterMs(response));
   }
-  if (!response.ok) throw new Failure(response.status === 401 ? 401 : response.status === 403 || response.status === 404 ? 403 : 502,
+  if (!response.ok) throw new Failure(response.status === 401 ? 401 : response.status === 404 ? 403 : response.status === 429 || secondary ? 429 : 503,
     'GitHub could not authorize or complete this request. Check App installation, repository access, and API limits.',
-    response.status === 401 ? 'github_unauthorized' : response.status === 403 || response.status === 404 ? 'github_forbidden' : 'github_unavailable');
+    response.status === 401 ? 'github_unauthorized' : response.status === 404 ? 'github_forbidden' : response.status === 429 || secondary ? 'github_rate_limited' : 'github_unavailable');
   return response.status === 204 ? null : response.json();
 }
 async function access(env, token, permission = 'pull') {
@@ -72,7 +68,7 @@ async function pages(path, token) {
   }
   throw new Failure(422, 'Target inventory exceeds the launcher pagination limit. Use GitHub Actions to launch this repository.', 'pagination_limit');
 }
-const restricted = env => ['allowlist','collaborators'].includes(env.DASHBOARD_ACCESS);
+const restricted = env => env.APPLICATION_MODE === 'repositories' || env.DASHBOARD_ACCESS === 'collaborators';
 const privateReports = env => env.REPORT_ACCESS !== 'public';
 const reportPath = path => path.startsWith('/api/public/') && path !== '/api/public/config';
 const protectedReportResponse = async (request, env) => {
@@ -84,11 +80,7 @@ const protectedReportResponse = async (request, env) => {
 };
 async function viewer(env, token, {dashboard = restricted(env), reports = false} = {}) {
   const user = await github('user', token);
-  if (dashboard && env.DASHBOARD_ACCESS === 'allowlist') {
-    const allowed = (env.DASHBOARD_ALLOWED_USERS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
-    if (!allowed.includes(user.login?.toLowerCase())) throw new Failure(403, 'This GitHub account is not authorized to view this dashboard.', 'viewer_not_authorized');
-  }
-  if (((dashboard && env.DASHBOARD_ACCESS === 'collaborators') || reports) && !await isCollaborator(env,user.login)) throw new Failure(403, 'This GitHub account is not authorized to view these reports.', 'viewer_not_authorized');
+  if ((dashboard || reports) && !await isCollaborator(env,user.login)) throw new Failure(403, 'This GitHub account is not authorized to view these reports.', 'viewer_not_authorized');
   return user;
 }
 const json = (value, status = 200, extra = {}) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json', ...extra } });
@@ -98,16 +90,12 @@ const dashboardLocation = (env, fragment) => {
   return url.toString();
 };
 const authRedirect = (env, status) => new Response(null, { status: 302, headers: { Location: dashboardLocation(env, `analysis_auth_error=${encodeURIComponent(status)}`), 'Cache-Control': 'no-store', 'Set-Cookie': cookie('', 0) } });
-async function exchangeRequest(env, code, action, body) {
+async function controlRequest(env, key, path, body) {
   if (!env.AUTH_EXCHANGES) throw new Failure(503, 'Sign-in exchange storage is unavailable.', 'exchange_store_unavailable');
-  const stub = env.AUTH_EXCHANGES.get(env.AUTH_EXCHANGES.idFromName(code));
-  return stub.fetch(new Request(`https://auth-exchange/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+  const stub = env.AUTH_EXCHANGES.get(env.AUTH_EXCHANGES.idFromName(key));
+  return stub.fetch(new Request(`https://control${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
 }
 async function route(request, env) {
-  if (env.APPLICATION_MODE === 'repositories') {
-    const response = await webhook(request, env);
-    if (response) return response;
-  }
   const url = new URL(request.url);
   
   if (url.pathname.startsWith('/api/state/') || url.pathname.startsWith('/api/report/')) {
@@ -191,6 +179,15 @@ async function route(request, env) {
     }
   }
 
+  if(url.pathname.startsWith('/api/internal/queue/')){
+    if(request.headers.get('Authorization')!==`Bearer ${env.WORKER_API_TOKEN}`)throw new Failure(401,'Unauthorized queue access.','unauthorized');
+    if(request.method!=='POST')throw new Failure(405,'Method not allowed.','method_not_allowed');
+    let body={};try{body=await request.json();}catch{}
+    const action=url.pathname.endsWith('/claim')?'/queue/claim':url.pathname.endsWith('/complete')?'/queue/complete':null;
+    if(!action)throw new Failure(404,'Not found.','not_found');
+    return controlRequest(env,'control-plane',action,body);
+  }
+
   settings(env);
   if (request.method === 'GET' && url.pathname === '/auth/login') {
     const challenge = url.searchParams.get('challenge');
@@ -202,7 +199,6 @@ async function route(request, env) {
     const authorize = new URL('https://github.com/login/oauth/authorize');
     const parameters = { client_id: env.GITHUB_CLIENT_ID, state, redirect_uri: `${url.origin}/auth/callback`, code_challenge: oauthChallenge, code_challenge_method: 'S256' };
     // GitHub App user authorization is permissioned by the App registration, not OAuth scopes.
-    if (env.APPLICATION_MODE !== 'repositories') parameters.scope = env.GITHUB_OAUTH_SCOPES;
     authorize.search = new URLSearchParams(parameters).toString();
     return new Response(null, { status: 302, headers: { Location: authorize.toString(), 'Set-Cookie': cookie(pending, 600) } });
   }
@@ -219,11 +215,14 @@ async function route(request, env) {
         body: JSON.stringify({ client_id: env.GITHUB_CLIENT_ID, client_secret: env.GITHUB_CLIENT_SECRET, code: url.searchParams.get('code'), redirect_uri: `${url.origin}/auth/callback`, code_verifier: pending.verifier }) });
       const grant = await response.json();
       if (!response.ok || !grant.access_token) return authRedirect(env, 'retry');
-      if (env.APPLICATION_MODE !== 'repositories') await access(env, grant.access_token, 'push');
       const user = await viewer(env, grant.access_token, { dashboard: restricted(env), reports: privateReports(env) });
-      const token = await seal({ type: 'session', token: grant.access_token, exp: Date.now() + Math.min(3600, grant.expires_in || 3600) * 1000 }, env.SESSION_KEY);
+      const grantExpiresAt=Date.now()+Math.min(8*3600,grant.expires_in||8*3600)*1000;
+      const encryptedGrant=await seal({type:'grant',token:grant.access_token,exp:grantExpiresAt},env.SESSION_KEY);
+      const handle=random();
+      const stored=await controlRequest(env,'control-plane','/session/create',{handle,grant:encryptedGrant,user_id:user.id,login:user.login,grant_expires_at:grantExpiresAt});
+      if(!stored.ok)return authRedirect(env,'retry');
       const code = random();
-      const issued = await exchangeRequest(env, code, 'issue', { verifier_hash: pending.challenge, token, login: user.login });
+      const issued = await controlRequest(env,'control-plane','/exchange/issue',{code,verifier_hash:pending.challenge,session_handle:handle});
       if (!issued.ok) return authRedirect(env, 'retry');
       return new Response(null, { status: 302, headers: { Location: dashboardLocation(env, `analysis_auth=${code}`), 'Cache-Control': 'no-store', 'Set-Cookie': cookie('', 0) } });
     } catch (error) {
@@ -231,14 +230,12 @@ async function route(request, env) {
       return authRedirect(env, 'retry');
     }
   }
-  if (env.APPLICATION_MODE === 'repositories') {
-    if (request.method === 'GET' && url.pathname === '/api/public/config') {
-      return json({mode:'repositories', require_login:restricted(env), require_report_login:privateReports(env), execution_repository:{id:Number(env.ANALYSIS_REPOSITORY_ID || EXECUTION_REPOSITORY_ID),full_name:env.ANALYSIS_REPOSITORY}});
-    }
-    if (env.REPORT_ACCESS === 'public') {
-      const report = await publicReports(request,env);
-      if (report) return report;
-    }
+  if (request.method === 'GET' && url.pathname === '/api/public/config') {
+    return json({mode:'repositories', require_login:restricted(env), require_report_login:privateReports(env), execution_repository:{id:Number(env.ANALYSIS_REPOSITORY_ID || EXECUTION_REPOSITORY_ID),full_name:env.ANALYSIS_REPOSITORY}});
+  }
+  if (env.REPORT_ACCESS === 'public') {
+    const report = await publicReports(request,env);
+    if (report) return report;
   }
   if (!url.pathname.startsWith('/api/')) throw new Failure(404, 'Not found.', 'not_found');
   if (request.headers.get('Origin') !== env.DASHBOARD_ORIGIN) throw new Failure(403, 'Dashboard origin required.', 'origin_required');
@@ -252,20 +249,35 @@ async function route(request, env) {
       throw new Failure(400, 'Invalid exchange request.', 'invalid_request');
     }
     if (!/^[A-Za-z0-9_-]{43}$/.test(body.code || '') || !/^[A-Za-z0-9_-]{43}$/.test(body.verifier || '')) throw new Failure(400, 'Invalid exchange request.', 'invalid_request');
-    const result = await exchangeRequest(env, body.code, 'consume', { verifier_hash: await digest(body.verifier) });
+    const result = await controlRequest(env,'control-plane','/exchange/consume',{code:body.code,verifier_hash:await digest(body.verifier)});
     if (!result.ok) {
       const failure = result.status === 410 ? 'exchange_expired' : result.status === 401 || result.status === 404 ? 'exchange_invalid' : 'exchange_store_unavailable';
       throw new Failure(result.status === 410 || result.status === 401 || result.status === 404 ? 401 : 503, 'Sign-in could not be completed. Retry GitHub sign-in.', failure);
     }
-    return new Response(result.body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    const exchanged=await result.json();
+    const stored=await controlRequest(env,'control-plane','/session/get',{handle:exchanged.session_handle});
+    if(!stored.ok)throw new Failure(503,'Sign-in could not be completed. Retry GitHub sign-in.','exchange_store_unavailable');
+    const metadata=await stored.json();
+    return json({token:exchanged.session_handle,login:metadata.login},200,{'Cache-Control':'no-store'});
   }
-  const session = await unseal((request.headers.get('Authorization') || '').replace(/^Bearer /, ''), env.SESSION_KEY, 'session');
+  const handle=(request.headers.get('Authorization')||'').replace(/^Bearer /,'');
+  if(!/^[A-Za-z0-9_-]{43}$/.test(handle))throw new Failure(401,'Sign in again; the session is invalid or expired.','session_invalid');
+  if(request.method==='POST'&&url.pathname==='/api/logout'){
+    const current=await controlRequest(env,'control-plane','/session/get',{handle});
+    await controlRequest(env,'control-plane','/session/delete',{handle});
+    if(current.ok){try{const stored=await current.json(),grant=await unseal(stored.grant,env.SESSION_KEY,'grant');await fetch('https://api.github.com/applications/'+env.GITHUB_CLIENT_ID+'/token',{method:'DELETE',headers:{Authorization:'Basic '+btoa(`${env.GITHUB_CLIENT_ID}:${env.GITHUB_CLIENT_SECRET}`),'Content-Type':'application/json'},body:JSON.stringify({access_token:grant.token})});}catch{}}
+    return json({ok:true});
+  }
+  const storedSession=await controlRequest(env,'control-plane','/session/get',{handle});
+  if(!storedSession.ok)throw new Failure(401,'Sign in again; the session is invalid or expired.','session_invalid');
+  const sessionRow=await storedSession.json(),grant=await unseal(sessionRow.grant,env.SESSION_KEY,'grant');
+  const session={token:grant.token,user_id:sessionRow.user_id,login:sessionRow.login,handle};
   if (restricted(env) || url.pathname === '/api/session' || (reportPath(url.pathname) && privateReports(env))) {
     const user = await viewer(env, session.token, { dashboard: restricted(env), reports: reportPath(url.pathname) && privateReports(env) || (url.pathname === '/api/session' && privateReports(env)) });
-    if (request.method === 'GET' && url.pathname === '/api/session') return json({login:user.login});
+    if(user.id!==session.user_id)throw new Failure(401,'Sign in again; the session identity changed.','session_invalid');
+    if (request.method === 'GET' && url.pathname === '/api/session') {const repo=await access(env,session.token,'pull');return json({login:user.login,user_id:user.id,role:repo.permissions?.admin?'admin':repo.permissions?.push?'write':'read',capabilities:{read:true,write:!!repo.permissions?.push,admin:!!repo.permissions?.admin}});}
   }
-  if (env.APPLICATION_MODE === 'repositories') {
-    const helpers = {github, json, Failure, seal, unseal, pages, serviceToken:() => reportToken(env, env.ANALYSIS_REPOSITORY, {contents:'read',actions:'read'})};
+  const helpers = {github,json,Failure,seal,unseal,pages,serviceToken:()=>reportToken(env,env.ANALYSIS_REPOSITORY,{contents:'read',actions:'read'}),queue:async(path,body)=>controlRequest(env,'control-plane',path,body)};
     if (reportPath(url.pathname)) {
       await access(env, session.token, 'pull');
       if (privateReports(env) && url.searchParams.has('project_id')) {
@@ -280,74 +292,15 @@ async function route(request, env) {
     if (report) return report;
     const response = await applicationApi(request, env, session, helpers);
     if (response) return response;
-    throw new Failure(404, 'Unknown application endpoint.', 'not_found');
-  }
-  const repo = await access(env, session.token, 'push'); // Recheck current permissions for every API call.
-  if (request.method === 'GET' && url.pathname === '/api/integration') {
-    const [configFile, workflow] = await Promise.all([
-      github(`repos/${env.ANALYSIS_REPOSITORY}/contents/config/code-analysis/service.json?ref=${encodeURIComponent(repo.default_branch)}`, session.token),
-      github(`repos/${env.ANALYSIS_REPOSITORY}/actions/workflows/10-analysis-discovery.yml`, session.token),
-    ]);
-    if (configFile.encoding !== 'base64' || typeof configFile.content !== 'string') throw new Failure(502, 'Analysis configuration could not be read.', 'configuration_unreadable');
-    const config = JSON.parse(new TextDecoder().decode(bytes(configFile.content.replace(/\s/g, ''))));
-    const matches = config.source_repository === env.SOURCE_REPOSITORY && config.analysis_repository === env.ANALYSIS_REPOSITORY && config.launch_endpoint === url.origin;
-    return json({ source_repository: env.SOURCE_REPOSITORY, analysis_repository: env.ANALYSIS_REPOSITORY,
-      publishing_repository: config.publishing_repository, workflow_branch: repo.default_branch,
-      workflow_state: workflow.state, configuration_matches: matches,
-      ready: matches && workflow.state === 'active', enabled_scanners: config.enabled_scanners || [],
-      checked_at: new Date().toISOString() });
-  }
-  if (request.method === 'GET' && /^\/api\/runs\/[1-9][0-9]*$/.test(url.pathname)) {
-    const id = url.pathname.split('/').at(-1);
-    const run = await github(`repos/${env.ANALYSIS_REPOSITORY}/actions/runs/${id}`, session.token);
-    if (run.path?.split('@')[0] !== '.github/workflows/10-analysis-discovery.yml') throw new Failure(404, 'This run is not an analysis request workflow.', 'not_found');
-    return json({ run_id: run.id, status: run.status, conclusion: run.conclusion, attempt: run.run_attempt,
-      updated_at: run.updated_at, checked_at: new Date().toISOString(),
-      url: `https://github.com/${env.ANALYSIS_REPOSITORY}/actions/runs/${id}` });
-  }
-  if (request.method === 'GET' && url.pathname === '/api/targets') {
-    const [branches, prs] = await Promise.all([pages(`repos/${env.SOURCE_REPOSITORY}/branches`, session.token), pages(`repos/${env.SOURCE_REPOSITORY}/pulls?state=open`, session.token)]);
-    const checked_at = new Date().toISOString();
-    if (prs.some(p => !p.head.repo)) throw new Failure(502, 'A PR source is unavailable; target discovery is incomplete.', 'inventory_incomplete');
-    return json({ repository: env.SOURCE_REPOSITORY, analysis_repository: env.ANALYSIS_REPOSITORY, targets: [
-      ...branches.map(b => ({ id: `branch:${b.name}`, repository: env.SOURCE_REPOSITORY, source_repository: env.SOURCE_REPOSITORY, kind: 'branch', branch: b.name, label: b.name, head_sha: b.commit.sha, checked_at })),
-      ...prs.map(p => ({ id: `pr:${p.number}`, repository: env.SOURCE_REPOSITORY, source_repository: p.head.repo.full_name, kind: 'pr', branch: p.head.ref, pr: p.number, label: `PR #${p.number}: ${p.head.ref}`, head_sha: p.head.sha, base_branch: p.base.ref, checked_at })),
-    ] });
-  }
-  if (request.method === 'POST' && url.pathname === '/api/launch') {
-    if (!(request.headers.get('Content-Type') || '').startsWith('application/json')) throw new Failure(415, 'JSON required.', 'unsupported_media_type');
-    let body;
-    try { body = JSON.parse(new TextDecoder().decode(await readBody(request, resolveLimit(env.MAX_LAUNCH_BYTES, DEFAULT_LIMITS.launch)))); }
-    catch (error) {
-      if (error instanceof BodyLimitError) throw new Failure(413, error.message, 'request_too_large');
-      throw new Failure(400, 'Invalid JSON.', 'invalid_json');
-    }
-    if (!body || body.repository !== env.SOURCE_REPOSITORY || !['branch', 'pr', 'commit'].includes(body.kind) || typeof body.ref !== 'string' || !body.ref || body.ref.length > 255) throw new Failure(400, 'Choose a configured codebase and revision.', 'invalid_launch_selection');
-    let path;
-    if (body.kind === 'pr') {
-      if (!/^[1-9][0-9]*$/.test(body.ref)) throw new Failure(400, 'Invalid PR number.', 'invalid_launch_selection');
-      path = `pulls/${body.ref}`;
-    } else if (body.kind === 'commit') {
-      if (!/^[a-fA-F0-9]{40}$/.test(body.ref)) throw new Failure(400, 'Full commit SHA required.', 'invalid_launch_selection');
-      path = `commits/${body.ref}`;
-    } else path = `branches/${encodeURIComponent(body.ref)}`;
-    await github(`repos/${env.SOURCE_REPOSITORY}/${path}`, session.token);
-    const dispatched = await github(`repos/${env.ANALYSIS_REPOSITORY}/actions/workflows/10-analysis-discovery.yml/dispatches`, session.token, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: repo.default_branch, return_run_details: true,
-        inputs: { refresh_target: JSON.stringify({ repository: env.SOURCE_REPOSITORY, kind: body.kind, ref: body.ref }) } }),
-    });
-    const id = dispatched?.workflow_run_id;
-    return json({ status: 'submitted', run_id: id || null, url: `https://github.com/${env.ANALYSIS_REPOSITORY}/actions/${id ? `runs/${id}` : 'workflows/10-analysis-discovery.yml'}` }, 202);
-  }
-  throw new Failure(404, 'Not found.', 'not_found');
+  throw new Failure(404, 'Unknown application endpoint.', 'not_found');
 }
 export default { async fetch(request, env) {
   const started=Date.now();const requestId=crypto.randomUUID();
-  if (env.APPLICATION_MODE === 'repositories' && env.NEXT_GITHUB_CLIENT_ID) {
-    env = {...env, GITHUB_CLIENT_ID:env.NEXT_GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET:env.NEXT_GITHUB_CLIENT_SECRET,
-      GITHUB_APP_ID:env.NEXT_GITHUB_APP_ID, GITHUB_APP_SLUG:env.NEXT_GITHUB_APP_SLUG,
-      GITHUB_APP_PRIVATE_KEY:env.NEXT_GITHUB_APP_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET:env.NEXT_GITHUB_WEBHOOK_SECRET};
-  }
+  // Bind the currently provisioned central App credentials to the sole
+  // production runtime. Values remain encrypted in Cloudflare and are never
+  // returned, logged, or copied through the client.
+  env = {...env, GITHUB_CLIENT_SECRET:env.NEXT_GITHUB_CLIENT_SECRET || env.GITHUB_CLIENT_SECRET,
+    GITHUB_APP_PRIVATE_KEY:env.NEXT_GITHUB_APP_PRIVATE_KEY || env.GITHUB_APP_PRIVATE_KEY};
   let response; let failureCode;
   try { response = await route(request, env); } catch (e) {
     const known = e instanceof Failure || e instanceof BodyLimitError;

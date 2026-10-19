@@ -206,6 +206,25 @@ collaborator live login stays deferred. Triage/suppression, SLA tracking, DAST/m
 adapters and unrestricted external-owner onboarding are roadmap items, not implemented
 or live-proven. No paid plan or upstream write is authorized.
 
+## 2026-10-19 Phase 1 read-only cutover preparation
+
+The retired Release queue contains no active `request-*.json` assets; retained assets are
+explicitly named `superseded-request-*`. A `production` GitHub Environment restricted
+to the `main` branch and the non-secret `WORKER_URL` repository variable were created.
+The `CLOUDFLARE_ACCOUNT_ID` Environment secret is configured, but the least-privilege
+`CLOUDFLARE_API_TOKEN` is not, so the Phase 1 Worker/coordinator cutover has deliberately
+not been deployed. Do not publish the matching Pages change or enable Durable Object
+queue admission until those two deployment prerequisites exist and the Worker deploy
+workflow passes.
+
+The Phase 1 service now has one supported runtime architecture. The Worker routes only
+to the fixed repository service, `/webhook` and direct workflow-dispatch launcher routes
+are absent, and `code-analysis-coordinator.yml` is the only automatic orchestration entry
+point. The old discovery/source/reconcile workflows were removed rather than retained as
+compatibility shims. The sole production runtime consumes the already-provisioned
+central App credentials through Cloudflare's encrypted `NEXT_GITHUB_CLIENT_SECRET` and
+`NEXT_GITHUB_APP_PRIVATE_KEY` bindings; the values are never exposed or copied.
+
 ## 2026-10-13 repository journey release
 
 Main commit `5b07952` deployed to Pages in workflow run `38441170421`; the matching

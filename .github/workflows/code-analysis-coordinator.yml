@@ -1,0 +1,132 @@
+name: Code analysis queue coordinator
+run-name: Queue coordinator ${{ github.run_id }}
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: source-revision-global
+  cancel-in-progress: false
+jobs:
+  claim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    outputs:
+      claimed: ${{ steps.claim.outputs.claimed }}
+      request_id: ${{ steps.contract.outputs.request_id }}
+      tooling_sha: ${{ steps.contract.outputs.tooling_sha }}
+      profile_mode: ${{ steps.contract.outputs.profile_mode }}
+      target: ${{ steps.contract.outputs.target }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Claim the FIFO head
+        id: claim
+        env:
+          WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error --output claim.json --write-out '%{http_code}' \
+            --request POST --header "Authorization: Bearer ${WORKER_API_TOKEN}" \
+            --header 'Content-Type: application/json' --data '{}' \
+            "${WORKER_URL}/api/internal/queue/claim")
+          if [[ "$status" == 204 || "$status" == 409 ]]; then
+            echo 'claimed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test "$status" == 200
+          echo 'claimed=true' >> "$GITHUB_OUTPUT"
+      - name: Validate immutable queue contract
+        if: steps.claim.outputs.claimed == 'true'
+        id: contract
+        run: python -m scripts.code_analysis.queue_contract claim.json
+  vendor:
+    if: needs.claim.outputs.claimed == 'true'
+    needs: claim
+    permissions:
+      contents: read
+    uses: ./.github/workflows/reusable-vendor.yml
+    with:
+      tooling_sha: ${{ needs.claim.outputs.tooling_sha }}
+      target: ${{ needs.claim.outputs.target }}
+      request_id: ${{ needs.claim.outputs.request_id }}
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
+      CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
+  portable:
+    if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'portable'
+    needs: [claim, vendor]
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/reusable-source.yml
+    with:
+      tooling_sha: ${{ needs.claim.outputs.tooling_sha }}
+      target: ${{ needs.claim.outputs.target }}
+      request_id: ${{ needs.claim.outputs.request_id }}
+  configured:
+    if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'agentic-soc'
+    needs: [claim, vendor]
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/reusable-source-full.yml
+    with:
+      tooling_sha: ${{ needs.claim.outputs.tooling_sha }}
+      target: ${{ needs.claim.outputs.target }}
+      request_id: ${{ needs.claim.outputs.request_id }}
+  publish:
+    if: always() && needs.claim.outputs.claimed == 'true'
+    needs: [claim, vendor, portable, configured]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.claim.outputs.tooling_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.11'
+      - name: Publish only validated artifacts from this coordinator attempt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
+          QUEUE_INTENT: ${{ toJSON(fromJSON(needs.claim.outputs.target).queue_intent) }}
+        run: python -m scripts.code_analysis.repository_service
+  complete:
+    if: always() && needs.claim.outputs.claimed == 'true'
+    needs: [claim, vendor, portable, configured, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Record terminal queue state
+        env:
+          WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          REQUEST_ID: ${{ needs.claim.outputs.request_id }}
+          PORTABLE_RESULT: ${{ needs.portable.result }}
+          CONFIGURED_RESULT: ${{ needs.configured.result }}
+          VENDOR_RESULT: ${{ needs.vendor.result }}
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+        run: |
+          set -euo pipefail
+          status=published
+          if [[ "$VENDOR_RESULT" == failure || "$PORTABLE_RESULT" == failure || "$CONFIGURED_RESULT" == failure || "$PUBLISH_RESULT" != success ]]; then status=failed; fi
+          curl --fail --silent --show-error --request POST \
+            --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
+            --data "{\"request_id\":\"${REQUEST_ID}\",\"status\":\"${status}\",\"result\":{\"run_id\":${GITHUB_RUN_ID},\"run_attempt\":${GITHUB_RUN_ATTEMPT}}}" \
+            "${WORKER_URL}/api/internal/queue/complete"

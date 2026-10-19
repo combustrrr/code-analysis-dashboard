@@ -34,7 +34,6 @@ All four use read-only repository access (`persist-credentials: false`), accept 
 | `05-issue-aggregation.yml` | Issue Wall | `workflow_call` | contents:read, checks:write, actions:read, pull-requests:read | Aggregates the four scanner groups into the exact-commit dashboard artifact |
 | `08-full-code-analysis.yml` | Full Code Analysis (Manual) | `workflow_dispatch` | contents:read, actions:write, checks:read | One operator action: resolves branch head, dispatches 01-04, waits, builds Issue Wall |
 | `09-coderabbit-advisory-refresh.yml` | CodeRabbit Advisory Evidence | `pull_request_review`, `issue_comment` | contents:read, pull-requests:read | Retains exact-head AI advisory evidence as a separate lane |
-| `10-analysis-discovery.yml` | Legacy analysis discovery (disabled) | `workflow_dispatch` | contents:read | Explains that automatic discovery is retired; it creates no scan work |
 
 ## Validation and fuzzing (06, 07)
 
@@ -80,8 +79,7 @@ These are manual-dispatch scanners. They are not dispatched by `08-full-code-ana
 
 | File | Name | Trigger | Permissions | Purpose |
 |---|---|---|---|---|
-| `code-analysis-source.yml` | Code analysis source | `workflow_dispatch` | contents:read | Entry point: dispatches `reusable-source.yml` (portable) or `reusable-source-full.yml` (agentic-soc) based on profile mode |
-| `code-analysis-reconcile.yml` | Code analysis reconciliation | `workflow_dispatch`, `workflow_run`, `schedule` (hourly :23) | contents:read, actions:write | Dispatches `reusable-reconcile.yml` to reconcile analyses and publish current reports |
+| `code-analysis-coordinator.yml` | Queue coordinator | `schedule` (every 15 minutes) | contents:read | Claims one Durable Object request, invokes approved reusable scanners locally, publishes validated evidence, and records terminal queue status |
 | `reusable-reconcile.yml` | Reusable repository reconciliation | `workflow_call` | workflow: contents:read; reconcile job: contents/actions:write | Recovers accepted requests, validates exact-source evidence, and publishes service-managed reports without native feedback |
 | `pages.yml` | Deploy code analysis application | `workflow_dispatch`, `push` to main | contents:read | Builds and deploys the React dashboard to GitHub Pages |
 

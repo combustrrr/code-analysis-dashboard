@@ -62,9 +62,6 @@ def main() -> None:
     parser.add_argument("--worker-origin", required=True)
     parser.add_argument("--dashboard-url", required=True)
     parser.add_argument("--app-name", default="Code Analysis Launcher")
-    parser.add_argument(
-        "--application", action="store_true", help="Register the public repository onboarding application"
-    )
     args = parser.parse_args()
     worker = urllib.parse.urlsplit(args.worker_origin)
     dashboard = urllib.parse.urlsplit(args.dashboard_url)
@@ -82,13 +79,13 @@ def main() -> None:
         "redirect_url": "http://127.0.0.1:8979/created",
         "callback_urls": [args.worker_origin.rstrip("/") + "/auth/callback"],
         "setup_url": args.dashboard_url,
-        "public": args.application,
+        "public": False,
         "request_oauth_on_install": False,
-        "hook_attributes": {"url": args.worker_origin.rstrip("/") + "/webhook", "active": args.application},
-        "default_events": ["push", "pull_request", "workflow_run"] if args.application else [],
+        "hook_attributes": {"active": False},
+        "default_events": [],
         "default_permissions": {
-            "actions": "write",
-            "contents": "write" if args.application else "read",
+            "actions": "read",
+            "contents": "read",
             "metadata": "read",
             "pull_requests": "read",
         },
@@ -147,28 +144,21 @@ def main() -> None:
     client_id = app["client_id"]
 
     npx_cmd = _find_npx()
-    secret_name = "NEXT_GITHUB_CLIENT_SECRET" if args.application else "GITHUB_CLIENT_SECRET"
-    _run_wrangler_secret_put(npx_cmd, secret_name, app["client_secret"])
+    _run_wrangler_secret_put(npx_cmd, "GITHUB_CLIENT_SECRET", app["client_secret"])
 
-    if args.application:
-        openssl = _find_openssl()
-        if not openssl:
-            raise SystemExit("OpenSSL is needed to prepare the App private key; no key was printed")
-        converted = subprocess.run(
-            [openssl, "pkcs8", "-topk8", "-nocrypt"], input=app["pem"], text=True, capture_output=True, check=True
-        )
-        for name, value in {
-            "NEXT_GITHUB_APP_PRIVATE_KEY": converted.stdout,
-            "NEXT_GITHUB_WEBHOOK_SECRET": app["webhook_secret"],
-        }.items():
-            _run_wrangler_secret_put(npx_cmd, name, value)
+    openssl = _find_openssl()
+    if not openssl:
+        raise SystemExit("OpenSSL is needed to prepare the App private key; no key was printed")
+    converted = subprocess.run(
+        [openssl, "pkcs8", "-topk8", "-nocrypt"], input=app["pem"], text=True, capture_output=True, check=True
+    )
+    _run_wrangler_secret_put(npx_cmd, "GITHUB_APP_PRIVATE_KEY", converted.stdout)
 
     config_path = Path(__file__).resolve().parents[2] / "analysis-launcher/wrangler.jsonc"
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    config["vars"]["NEXT_GITHUB_CLIENT_ID" if args.application else "GITHUB_CLIENT_ID"] = client_id
-    if args.application:
-        config["vars"]["NEXT_GITHUB_APP_ID"] = str(app["id"])
-        config["vars"]["NEXT_GITHUB_APP_SLUG"] = app["slug"]
+    config["vars"]["GITHUB_CLIENT_ID"] = client_id
+    config["vars"]["GITHUB_APP_ID"] = str(app["id"])
+    config["vars"]["GITHUB_APP_SLUG"] = app["slug"]
     config["preview_urls"] = False
     config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     print(f"GitHub App created: {app['html_url']}")

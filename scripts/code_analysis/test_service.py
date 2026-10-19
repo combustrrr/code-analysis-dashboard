@@ -479,10 +479,9 @@ class MonitoringTests(unittest.TestCase):
         self.assertNotIn("issues: write",text);self.assertNotIn("pull-requests: write",text);self.assertNotIn("contents: write",text)
     def test_native_sarif_permission_is_limited_to_trusted_reconciliation(self):
         import yaml
-        discovery=yaml.safe_load(Path(".github/workflows/10-analysis-discovery.yml").read_text(encoding="utf-8"))
-        self.assertEqual(discovery["permissions"], {"contents": "read"})
-        self.assertEqual(set(discovery["on"]), {"workflow_dispatch"})
-        self.assertIn("Automatic discovery is disabled", discovery["jobs"]["retired"]["steps"][0]["run"])
+        coordinator=yaml.safe_load(Path(".github/workflows/code-analysis-coordinator.yml").read_text(encoding="utf-8"))
+        self.assertEqual(coordinator["permissions"], {"contents": "read"})
+        self.assertEqual(set(coordinator.get("on", coordinator.get(True))), {"schedule"})
 
         for name in ("11-source-analysis.yml", "12-scanner-diagnostics.yml"):
             workflow=yaml.safe_load(Path(".github/workflows", name).read_text(encoding="utf-8"))
@@ -559,17 +558,15 @@ class MonitoringTests(unittest.TestCase):
             self.assertEqual(state['malformed_artifacts'],['radon-cc.json'])
             self.assertEqual(state['status'],'PARTIAL')
 
-    def test_legacy_scanners_are_manual_and_hourly_discovery_is_the_automatic_path(self):
+    def test_manual_scanners_and_coordinator_have_distinct_entrypoints(self):
         for name in ("01-code-quality.yml","02-security-sast.yml",
                      "03-dependency-security.yml","04-code-health.yml"):
             workflow=Path(".github/workflows",name).read_text(encoding="utf-8")
             self.assertIn('workflow_dispatch:',workflow)
             self.assertNotIn('\n  push:\n',workflow)
             self.assertNotIn('\n  pull_request:\n',workflow)
-        discovery=Path('.github/workflows/10-analysis-discovery.yml').read_text(encoding='utf-8')
-        self.assertNotIn("schedule:",discovery)
-        scheduler=Path(".github/workflows/code-analysis-reconcile.yml").read_text(encoding="utf-8")
-        self.assertIn("cron: '23 * * * *'",scheduler)
+        scheduler=Path(".github/workflows/code-analysis-coordinator.yml").read_text(encoding="utf-8")
+        self.assertIn("cron: '*/15 * * * *'",scheduler)
         aggregator=Path(".github/workflows/05-issue-aggregation.yml").read_text(encoding="utf-8")
         self.assertIn("workflow_call:",aggregator)
         self.assertNotIn("workflow_run:",aggregator)

@@ -29,7 +29,6 @@ SERVICE_LAYERS = {
     "presentation",
     "infrastructure_adapters",
     "verification",
-    "compatibility_entrypoints",
 }
 APPLICATION_IMPORT = re.compile(r"^\s*(?:from|import)\s+(?:backend|app|webui)(?:\.|\s|$)", re.MULTILINE)
 ANALYSIS_COUPLING = re.compile(
@@ -112,8 +111,7 @@ def audit_service_layout() -> list[str]:
             if not target.is_file():
                 errors.append(f"{relative}: layer {layer} references missing file {entry}")
                 continue
-            if layer != "compatibility_entrypoints":
-                declared.add(entry)
+            declared.add(entry)
             if Path(entry).parts[:2] in {("backend", "app"), ("webui", "src")}:
                 errors.append(f"{relative}: analysis-owned file enters product runtime: {entry}")
     for entry in sorted(declared):
@@ -164,8 +162,6 @@ def audit() -> list[str]:
     errors = [*audit_service_layout(), *audit_runtime_isolation()]
     for path in sorted(WORKFLOWS.glob("*.y*ml")):
         relative = path.relative_to(ROOT).as_posix()
-        if path.name == "code-analysis-source.yml" and "secrets: inherit" in path.read_text(encoding="utf-8"):
-            errors.append(f"{relative}: source workflow must not inherit repository secrets")
         try:
             document = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
         except yaml.YAMLError as exc:

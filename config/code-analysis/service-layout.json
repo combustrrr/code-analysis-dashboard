@@ -52,7 +52,7 @@
     "infrastructure_adapters": [
       ".github/workflows/05-issue-aggregation.yml",
       "scripts/code_analysis/github_service.py",
-      ".github/workflows/10-analysis-discovery.yml",
+      ".github/workflows/code-analysis-coordinator.yml",
       ".github/workflows/11-source-analysis.yml",
       "config/code-analysis/dashboard-pages.yml",
       "analysis-launcher/worker.mjs",
@@ -68,13 +68,6 @@
       "scripts/code_analysis/generate_source_workflow.py",
       "scripts/code_analysis/test_extensions.py",
       "analysis-launcher/worker.test.mjs"
-    ],
-    "compatibility_entrypoints": [
-      "scripts/code_analysis/normalizer.py",
-      "scripts/code_analysis/pipeline.py",
-      "scripts/code_analysis/collect_coderabbit.py",
-      "scripts/code_analysis/validate_canary.py",
-      "scripts/code_analysis/audit_workflows.py"
     ]
   },
   "forbidden_runtime_dependencies": [

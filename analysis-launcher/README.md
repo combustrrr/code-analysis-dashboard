@@ -54,15 +54,14 @@ source setup or App installation.
 Repository mode uses the installed GitHub App. The sign-in redirect intentionally
 omits an OAuth `scope` parameter: the signed-in user token establishes identity,
 while registry/workflow reads, collaborator checks, and reports use a scoped central
-installation token. Explicit launches use the user's token after a `push` check. The App registration requires repository permissions for
-`actions: write`, `contents: write`, `metadata: read`, and `pull_requests: read`.
+installation token. Explicit launches verify the user's current `push` permission, then commit an immutable request to the Durable Object queue. The App registration requires only
+`actions: read`, `contents: read`, `metadata: read`, and `pull_requests: read`.
 It does not require `workflows: write`. App permissions are distinct from OAuth
 scopes and are approved when the App is installed on the execution repository.
 
 Legacy mode is separate and requires the explicit Worker variable
-`GITHUB_OAUTH_SCOPES=public_repo`. That legacy OAuth grant is limited to the
-public-repository API flow; it is not a fallback for repository-mode App access.
-Deployment validation rejects a missing or broader legacy scope value.
+GitHub App authorization is defined by the centrally managed App registration;
+the Worker does not request a repository OAuth scope or support another mode.
 
 ## Report and target boundaries
 

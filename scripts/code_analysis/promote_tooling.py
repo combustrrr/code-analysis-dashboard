@@ -6,7 +6,7 @@ import re
 import subprocess
 from scripts.code_analysis import github_service as github
 
-FILES=('.github/code-analysis/projects.json','.github/workflows/code-analysis-reconcile.yml','.github/workflows/code-analysis-source.yml')
+FILES=('.github/code-analysis/projects.json',)
 PREFIX='tooling-rollout/'
 
 def replacement(files,candidate):

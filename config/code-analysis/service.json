@@ -4,7 +4,7 @@
   "analysis_repository": "combustrrr/code-analysis-dashboard",
   "publishing_repository": "combustrrr/code-analysis-dashboard",
   "preferred_branch": "Testing",
-  "source_workflow": ".github/workflows/code-analysis-source.yml",
+  "source_workflow": ".github/workflows/code-analysis-coordinator.yml",
   "max_parallel_analyses": 1,
   "artifact_retention_days": 7,
   "site_limit_bytes": 900000000,

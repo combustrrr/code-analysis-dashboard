@@ -31,6 +31,7 @@ test('view access requires login and clears on logout',async({page,context})=>{
     if(u.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
     if(u.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'opaque-session',login:'combustrrr'}});
   expect(route.request().headers().authorization).toBe('Bearer opaque-session');
+  if(u.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
     if(u.pathname==='/api/session')return route.fulfill({headers,status:allowed?200:403,json:allowed?{login:'combustrrr'}:{error:'Account not authorized',code:'viewer_not_authorized'}});
   if(u.pathname==='/api/projects')return route.fulfill({headers,json:registry});
   if(u.pathname==='/api/public/manifest'){reports++;return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:'1278177697',targets:[]}});}
@@ -88,6 +89,7 @@ test('a revoked workspace API request clears the session immediately',async({pag
   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`} });
   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'revoked-session',login:'developer'}});
   expect(route.request().headers().authorization).toBe('Bearer revoked-session');
+  if(url.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
   if(url.pathname==='/api/projects')return route.fulfill({headers,status:revoked?403:200,json:revoked?{code:'viewer_not_authorized'}:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[]}});
     reportRequests++;
@@ -111,6 +113,7 @@ test('a mismatched target registry is shown as an error, not an empty project li
   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`} });
   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'registry-error-session',login:'developer'}});
+  if(url.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
   if(url.pathname==='/api/projects')return route.fulfill({headers,status:503,json:{code:'target_registry_invalid',error:'The configured target registry does not match the approved project identities.'}});
   writes++;
@@ -136,6 +139,7 @@ test('visible tabs recheck collaborator access and clear the session when revoke
   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'visible-tab-session',login:'developer'}});
+  if(url.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
    if(url.pathname==='/api/session'){
     sessionChecks++;
     return route.fulfill({headers,status:sessionChecks===1?200:403,json:sessionChecks===1?{login:'developer'}:{code:'viewer_not_authorized'}});

@@ -153,10 +153,12 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
     return result as T;
   }, [origin, session]);
   const signOut = useCallback(() => {
+    const handle = session?.token;
     setSession(undefined);
     setVerified(false);
     setError('');
     try { sessionStorage.removeItem(VERIFIER_KEY); sessionStorage.removeItem(RETURN_KEY); sessionStorage.removeItem(ENDPOINT_KEY); } catch {}
-  }, []);
+    if (origin && handle) void fetch(`${origin}/api/logout`, { method:'POST', cache:'no-store', credentials:'omit', headers:{Authorization:`Bearer ${handle}`}}).catch(()=>{});
+  }, [origin, session]);
   return useMemo(() => ({ available: !!origin, session, verified, error, signIn, signOut, api }), [origin, session, verified, error, signIn, signOut, api]);
 }

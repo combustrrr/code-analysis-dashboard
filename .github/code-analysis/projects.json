@@ -18,6 +18,7 @@
       "relationship": "observer",
       "native_feedback_enabled": false,
       "profile": {
+        "mode": "agentic-soc",
         "snyk_python_manifests": [
           ".ci/requirements.txt",
           "backend/requirements.txt",
@@ -118,6 +119,7 @@
       "relationship": "observer",
       "native_feedback_enabled": false,
       "profile": {
+        "mode": "agentic-soc",
         "snyk_python_manifests": [
           ".ci/requirements.txt",
           "backend/requirements.txt",
