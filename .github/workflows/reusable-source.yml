@@ -766,6 +766,8 @@ jobs:
         ref: ${{ fromJSON(inputs.target).head_sha }}
         path: .source
         persist-credentials: false
+    - name: Prepare OSV output directory
+      run: mkdir -p portable-output/osv
     - name: Run portable OSV-Scanner
       continue-on-error: true
       uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67

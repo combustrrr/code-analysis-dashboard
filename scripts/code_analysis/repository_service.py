@@ -33,6 +33,28 @@ def owns_active_request(row, intent):
     return bool(request_id and request_id == intent.get('request_id'))
 
 
+def terminal_queue_request(state, published, request_id):
+    """Recover a terminal queue owner even when inventory dropped its target row."""
+    active = next((row for row in state.get('targets', [])
+                   if row.get('client_request_id') == request_id), None)
+    if active and active.get('status') in {'collected', 'cached'}:
+        return active
+    receipt = next((row for row in state.get('requests', [])
+                    if row.get('request_id') == request_id), None)
+    if not receipt or not receipt.get('scan_run_id'):
+        return None
+    recent = next((run for run in published.get('recent_runs', [])
+                   if (run.get('client_request_id') or run.get('request_id')) == request_id
+                   and run.get('scan_run_id') == receipt.get('scan_run_id')
+                   and run.get('run_attempt') == receipt.get('run_attempt')), None)
+    if not recent:
+        return None
+    return {**receipt, **recent, 'client_request_id': request_id,
+            'status': 'collected',
+            'execution_channels': receipt.get('execution_channels', []),
+            'remaining_channels': receipt.get('remaining_channels', [])}
+
+
 def channel_execution_plan(requested, cached_channels, run_again=False):
     reusable={'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE'}
     cached={value.get('channel'):value for value in cached_channels}
@@ -700,8 +722,8 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         summaries.append(published['metrics'])
         # Keep the FIFO head durable until every selected lane reaches a terminal state.
         if queued_asset is not None and str(project['id'])==str(project_id):
-            active_request=next((row for row in state['targets'] if row.get('client_request_id')==request_id),None)
-            if active_request and active_request.get('status') in {'collected','cached'}:
+            active_request=terminal_queue_request(state,published,request_id)
+            if active_request:
                 receipt=next((row for row in state['requests'] if row.get('request_id')==request_id),None)
                 if receipt:
                     if active_request.get('status')=='cached':
