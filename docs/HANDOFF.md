@@ -16,8 +16,12 @@ Local validation passed: 71 service tests, 14 deployment tests, 14 launcher test
 workflow audit, production UI build, and 18 active fixture browser tests (18 historical
 fixtures skipped). The browser suite includes a new large-threat-report regression.
 Phase 2 Pages run `39285623937` and Worker run `39285623900` subsequently completed
-successfully; the follow-up frontend fix still requires its own Pages deployment and
-live authenticated verification before this section can call it production-verified.
+successfully. Follow-up Pages run `39296740277` deployed commit
+`29b4be4aff2ef5250947ef18bece1a832c031404`; live HTML and JavaScript asset
+`assets/index-tVn_UYiM.js` returned `200` and matched the deployment artifact. Public
+configuration still requires login for both workspace and reports, and anonymous
+project access returned `403`. A fresh authenticated recording of the 36,466-finding
+production report remains the final browser-level confirmation.
 
 ## 2026-10-19 Phase 2 production rollout
 
