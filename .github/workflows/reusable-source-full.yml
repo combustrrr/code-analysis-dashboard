@@ -1293,7 +1293,4 @@ jobs:
       request_id:
         required: true
         type: string
-      dispatch_id:
-        required: true
-        type: string
     secrets: {}

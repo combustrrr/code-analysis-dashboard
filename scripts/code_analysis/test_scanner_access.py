@@ -17,6 +17,16 @@ from scripts.code_analysis.generate_source_workflow import generate, diagnostics
 
 
 class ScannerAccessTests(unittest.TestCase):
+    def test_reusable_source_inputs_match_trusted_caller(self):
+        for path in ('.github/workflows/reusable-source.yml',
+                     '.github/workflows/reusable-source-full.yml'):
+            workflow = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
+            trigger = workflow.get('on', workflow.get(True))
+            self.assertEqual(
+                set(trigger['workflow_call']['inputs']),
+                {'target', 'tooling_sha', 'request_id'},
+            )
+
     def test_vendor_diagnostics_cannot_publish_a_target_report(self):
         workflow = yaml.safe_load(diagnostics())
         self.assertEqual(set(workflow['jobs']), {'identity'})
