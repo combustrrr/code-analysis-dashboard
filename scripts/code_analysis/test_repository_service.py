@@ -19,6 +19,15 @@ class RepositoryExecutionTests(unittest.TestCase):
         self.assertEqual(recovered['status'], 'collected')
         self.assertEqual(recovered['scan_run_id'], 42)
 
+    def test_terminal_queue_request_recovers_from_canonical_target_without_receipt(self):
+        from scripts.code_analysis.repository_service import terminal_queue_request
+        target = {'client_request_id':'request-1','scan_run_id':42,'run_attempt':1,
+                  'execution_channels':['osv'],'remaining_channels':[]}
+        recovered = terminal_queue_request({'targets':[], 'requests':[]},
+                                           {'targets':[target]}, 'request-1')
+        self.assertEqual(recovered['scan_run_id'], 42)
+        self.assertEqual(recovered['status'], 'collected')
+
     def test_terminal_queue_request_does_not_guess_from_unmatched_publication(self):
         from scripts.code_analysis.repository_service import terminal_queue_request
         receipt = {'request_id':'request-1'}
