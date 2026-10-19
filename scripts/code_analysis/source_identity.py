@@ -47,7 +47,7 @@ def main():
                        source_repository=row['source_repository'], base_sha=row.get('base_sha'), base_branch=row.get('base_branch'), kind=row.get('kind'))
     import subprocess
     tooling_revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() if os.environ.get('IS_REUSABLE_ANALYSIS') == 'true' else os.environ['GITHUB_SHA']
-    if validated.get('target_sha') != row['head_sha'] or os.environ['TOOLING_SHA'] != tooling_revision:
+    if validated.get('head_sha') != row['head_sha'] or os.environ['TOOLING_SHA'] != tooling_revision:
         raise ValueError('dispatch identity or tooling revision mismatch')
     if Path('.source').exists():
         checkout_sha=subprocess.check_output(['git','-C','.source','rev-parse','HEAD'],text=True).strip()
