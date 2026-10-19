@@ -19,8 +19,8 @@ exactly these three public project identities: `ARYDESTROYER/Kavach-AgenticSOC`
 (`1267340546`, observer), `combustrrr/code-analysis-dashboard` (`1360051890`, connected
 self-analysis), and `combustrrr/Agentic-Kibana` (`1278177697`, observer). The Worker
 validates IDs, names, relationships, branches, and native-feedback policy and fails
-closed on mismatch. The self-analysis target is the only one allowed to publish native
-findings back to its source repository.
+closed on mismatch. Native feedback is disabled for self-analysis and observer targets
+alike; all configured targets remain read-only analysis sources.
 
 Read-only collaborators can list, select, and inspect configured projects. Launching
 requires `push` permission on the fixed execution repository; configuration changes

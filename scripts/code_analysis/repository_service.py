@@ -23,7 +23,7 @@ GENERATED_WORKFLOW = '.github/workflows/11-source-analysis.yml'
 def project_profile_digest(project):
     profile = {'enabled_scanners':sorted(project.get('enabled_scanners', [])),
                'deferred_channels':project.get('deferred_channels', {}),
-               'native_feedback_enabled':project.get('native_feedback_enabled', True),
+               'native_feedback_enabled':False,
                'profile':project.get('profile', {})}
     return hashlib.sha256(json.dumps(profile, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
@@ -52,6 +52,11 @@ def channel_lanes(channels):
         lanes.append(lane)
         seen.update(lane)
     return lanes
+
+
+def concurrent_execution_channels(channels):
+    """Flatten trusted shared-producer groups into one concurrent workflow dispatch."""
+    return [channel for lane in channel_lanes(channels) for channel in lane]
 
 
 def producer_dispatch_id(request_id, channels):
@@ -619,10 +624,11 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                 if matching_pr_overlay(overlay,intent):
                     cached_status.append({'channel':'coderabbit-ai-advisory','status':'COMPLETED','evidence_reused':True})
                 execution,reused=channel_execution_plan(requested,cached_status,accepted['run_again'])
-                lanes=channel_lanes(execution)
-                current_lane=lanes[0] if lanes else []
-                remaining=[channel for lane in lanes[1:] for channel in lane]
-                accepted.update(execution_channels=current_lane,remaining_channels=remaining,reused_channels=reused,
+                # One durable request owns the global slot. Dispatch every missing
+                # producer lane in that one workflow so its jobs can fan out while
+                # all lanes remain pinned to the same immutable source revision.
+                execution_channels=concurrent_execution_channels(execution)
+                accepted.update(execution_channels=execution_channels,remaining_channels=[],reused_channels=reused,
                                 completed_channels=list(reused),failed_channels=[])
                 if reused:
                     cached_by_id={value['channel']:value for value in cached_status}
@@ -714,24 +720,11 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                                 failed.add(channel);completed.discard(channel)
                         receipt.update(completed_channels=sorted(completed),failed_channels=sorted(failed),
                                        channel_statuses=list(progress.values()))
-                        remaining=receipt.get('remaining_channels',[])
-                        if remaining:
-                            lanes=channel_lanes(remaining)
-                            next_lane=lanes[0]
-                            remaining=[channel for lane in lanes[1:] for channel in lane]
-                            active_request.update(status='queued',execution_channels=next_lane,remaining_channels=remaining)
-                            for field in ('request_id','scan_run_id','run_attempt','execution_sha','run_conclusion','dispatch_id'):
-                                active_request.pop(field,None)
-                            receipt.update(status='queued',execution_channels=next_lane,remaining_channels=remaining)
-                            for field in ('scan_run_id','run_attempt','execution_sha','dispatch_id'):
-                                receipt.pop(field,None)
-                            queue_advanced=True
-                        else:
-                            receipt.update(status='published' if completed else 'failed',target_id=published.get('current_target_id',receipt.get('target_id')))
-                            overlay=published.get('current_overlay',{})
-                            if overlay.get('client_request_id')==request_id and overlay.get('head_sha')==receipt.get('head_sha'):
-                                receipt['overlay_id']=overlay.get('overlay_key')
-                            queue_advanced=True
+                        receipt.update(status='published' if completed else 'failed',target_id=published.get('current_target_id',receipt.get('target_id')))
+                        overlay=published.get('current_overlay',{})
+                        if overlay.get('client_request_id')==request_id and overlay.get('head_sha')==receipt.get('head_sha'):
+                            receipt['overlay_id']=overlay.get('overlay_key')
+                        queue_advanced=True
                     published['requests']=state['requests']
                     release_manifest.write(config,current,published)
                 if not active_request.get('remaining_channels') and active_request.get('status') in {'collected','cached'}:

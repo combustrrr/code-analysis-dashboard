@@ -57,8 +57,10 @@ deploy the Worker, report reader, UI, or workflows and does not trigger a live s
   SHA. `actions/checkout` creates a temporary read-only checkout inside the worker;
   there is no operator-machine clone and checkout credentials are not persisted.
 - Source-executing jobs have `contents: read` only. They receive no GitHub write token,
-  scanner vendor token, or report-publication credentials. Vendor scans run separately
-  in the isolated vendor workflow. Missing credentials/entitlements remain explicit
+  scanner vendor token, or report-publication credentials. A credentialless checkout
+  produces a one-day pinned source snapshot for the isolated vendor workflow; its
+  credential-bearing jobs cannot check out the repository or run project-controlled
+  setup/test commands. Missing credentials/entitlements remain explicit
   incomplete evidence.
 - Native feedback is disabled for observer and connected self-analysis targets alike.
   Source-executing jobs receive no publication credentials and do not create checks,

@@ -16,6 +16,7 @@ export type ProjectRunRequest = {
   channel_progress?: {channel:string;status:string;reason?:string;evidence_reused?:boolean;last_attempt_status?:string}[];
   request_id: string;
   run_id: number | null;
+  queue_position?: number | null;
   submittedAt: string;
   previousReport?: string;
   previousTargetLabel?: string;
@@ -32,6 +33,7 @@ type Activity = {
   completeness?: string;
   error?: string;
   message?: string;
+  queue_position?: number | null;
   channel_progress?: {channel:string;status:string;reason?:string;evidence_reused?:boolean;last_attempt_status?:string}[];
   producer?: { url: string; attempt: number; status: string };
   checked_at?: string;
@@ -131,6 +133,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
       <p><strong>{request.source_repository||request.repository}</strong> · {request.kind} <code>{request.ref}</code>{request.target_sha&&<> · pinned <code>{request.target_sha}</code></>} · execution <code>{request.repository}</code> · submitted {new Date(request.submittedAt).toLocaleString()} · request <code>{request.request_id}</code></p>
       {request.pr_context&&<p>PR head {request.pr_context.head_repository}:{request.pr_context.head_branch} at <code>{request.pr_context.head_sha}</code>; base {request.pr_context.base_repository}:{request.pr_context.base_branch} at <code>{request.pr_context.base_sha}</code>.</p>}
       {request.requested_channels&&<p>Requested channels: {request.requested_channels.join(', ')}</p>}
+      {(activity?.queue_position||request.queue_position)&&<p>FIFO queue position: <strong>{activity?.queue_position||request.queue_position}</strong>. One source-revision request is active globally.</p>}
       <p>{activity?.message || activity?.error || previousReportNote}</p>
       {activity?.source_sha && <p>Resolved source commit: <code>{activity.source_sha}</code></p>}
       {activity?.producer && <p>Scanner workflow, attempt {activity.producer.attempt}: {activity.producer.status}</p>}

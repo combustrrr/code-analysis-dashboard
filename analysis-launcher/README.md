@@ -70,7 +70,7 @@ Deployment validation rejects a missing or broader legacy scope value.
   publication is limited to the explicitly scoped reconciliation/native-publication
   job with `security-events: write`; generated source and diagnostic jobs cannot
   publish SARIF. Observer projects do not upload findings to their source. Only the
-  connected self-analysis project can publish native findings back to its own repository.
+  connected self-analysis project also has native feedback disabled; no configured target receives findings, checks, or SARIF.
 - Reports are current-only. The Worker serves the current manifest and its current
   assets after freshness and identity checks; superseded, stale, undated, or
   unpublished targets are not reconstructed or served as empty results. Rerun

@@ -67,20 +67,25 @@ class ScannerAccessTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 ensure_browse.ensure(Path(tempfile.mkdtemp()) / 'grant.json')
 
-    def test_vendor_jobs_are_opt_in_and_checkout_the_pinned_head_read_only(self):
+    def test_vendor_jobs_are_opt_in_and_receive_a_credentialless_pinned_snapshot(self):
         workflow = yaml.safe_load(Path('.github/workflows/reusable-vendor.yml').read_text())
         self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'snyk')", workflow['jobs']['snyk']['if'])
         self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'sonarqube-cloud')", workflow['jobs']['sonar']['if'])
         self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'coderabbit-ai-advisory')", workflow['jobs']['coderabbit']['if'])
-        source_checkouts = [step for job in ('snyk', 'sonar')
-                            for step in workflow['jobs'][job]['steps']
-                            if step.get('uses', '').startswith('actions/checkout@')
-                            and step.get('with', {}).get('path') == '.source']
-        self.assertEqual(len(source_checkouts), 2)
-        for step in source_checkouts:
-            self.assertEqual(step['with']['repository'], '${{ fromJSON(inputs.target).source_repository }}')
-            self.assertEqual(step['with']['ref'], '${{ fromJSON(inputs.target).head_sha }}')
-            self.assertFalse(step['with']['persist-credentials'])
+        snapshot = workflow['jobs']['source-snapshot']
+        checkout = next(step for step in snapshot['steps'] if step.get('uses', '').startswith('actions/checkout@'))
+        self.assertEqual(checkout['with']['repository'], '${{ fromJSON(inputs.target).source_repository }}')
+        self.assertEqual(checkout['with']['ref'], '${{ fromJSON(inputs.target).head_sha }}')
+        self.assertFalse(checkout['with']['persist-credentials'])
+        self.assertNotIn('secrets.', yaml.safe_dump(snapshot))
+        package = next(step for step in snapshot['steps'] if step.get('name') == 'Package source without checkout metadata')
+        self.assertIn('--exclude=.git', package['run'])
+        for job_name in ('snyk', 'sonar'):
+            job = workflow['jobs'][job_name]
+            self.assertEqual(job['needs'], 'source-snapshot')
+            self.assertEqual(job['permissions']['contents'], 'none')
+            self.assertFalse(any(step.get('uses', '').startswith('actions/checkout@') and step.get('with', {}).get('path') == '.source' for step in job['steps']))
+            self.assertTrue(any(step.get('uses', '').startswith('actions/download-artifact@') for step in job['steps']))
 
     def test_portable_sonar_does_not_trust_source_controlled_project_properties(self):
         workflow = yaml.safe_load(Path('.github/workflows/reusable-vendor.yml').read_text())

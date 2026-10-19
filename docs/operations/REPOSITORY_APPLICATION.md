@@ -10,8 +10,11 @@ or mismatched registry fails closed instead of silently listing a partial catalo
 The configured targets are Kavach-AgenticSOC (`1267340546`, `observer`), this service's
 self-analysis project (`1360051890`, `connected`), and Agentic-Kibana (`1278177697`,
 `observer`). Preferred branches and project profiles are kept in the versioned registry.
-Only the connected self-analysis target may publish native findings back to its source.
-The execution repository is also the Actions and Release queue host for every target.
+Native feedback is disabled for observer and connected self-analysis targets alike. The
+later configured-source policy supersedes the earlier sign-in rollout's connected-only
+feedback allowance: no findings, checks, SARIF, comments, commits, or pull requests are
+written to any analyzed source. The execution repository is also the Actions and Release
+queue host for every target.
 
 ## Access roles
 
@@ -35,7 +38,10 @@ launch/setup capabilities.
 ## Execution and storage
 
 Source execution is isolated in GitHub Actions jobs against immutable source SHAs.
-Scanner jobs receive no publication credentials. Trusted validation and publishing run
+Portable source-executing jobs receive no vendor or publication credentials. Opt-in
+vendor scanners consume a short-lived source snapshot produced by a separate
+credentialless checkout job; credentialed vendor jobs cannot check out the repository
+or run project-controlled setup/test commands. Trusted validation and publishing run
 separately and preserve source, execution host, workflow run, attempt, and tooling
 provenance. The service App is installed only on the fixed execution host; never install
 it on an upstream/source repository as part of dashboard onboarding.

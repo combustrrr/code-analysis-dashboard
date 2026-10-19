@@ -59,7 +59,9 @@ completed.
 Native feedback is disabled for all configured projects, including service
 self-analysis. No scanner findings, comments, checks, SARIF, commits, or pull requests
 are written to an analyzed source repository. Source-executing jobs receive no vendor or
-publication credentials; vendor lanes execute separately in isolated jobs. GitHub
+publication credentials. A credentialless job snapshots the pinned source for opt-in
+vendor lanes; credential-bearing vendor jobs cannot check out the repository or run
+project-controlled setup/test commands. GitHub
 Actions artifacts in the public execution repository remain publicly accessible outside
 the authenticated dashboard. Dashboard sign-in and report authorization do not make
 those artifacts confidential; private artifact handling is a separate workstream.

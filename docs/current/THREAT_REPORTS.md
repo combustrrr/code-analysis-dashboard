@@ -38,11 +38,10 @@ report view; controls and navigation are hidden in print media.
 
 ## Publication and target boundaries
 
-Native SARIF publication is not a property of every scan. Only the explicitly
-scoped reconciliation/native-publication job receives `security-events: write`.
-Source-executing and diagnostic jobs are read-only; source-only observer projects
-do not upload checks or findings to the source repository. A connected project can
-publish supported native findings only to its configured execution repository.
+Native SARIF publication is disabled for every configured target. Source-executing and
+diagnostic jobs are read-only, reconciliation has no checks or security-events write
+authority, and connected self-analysis follows the same no-source-feedback rule as the
+observer projects.
 
 Reports are current-only: the Worker serves the current manifest and current
 assets, subject to identity and freshness checks. Superseded, stale, undated, or

@@ -4,8 +4,8 @@ The [handoff](../HANDOFF.md) is the current deployment/evidence record. The UI/A
 rollout is deployed; full scanner acceptance is not claimed.
 
 Verified: product/service separation, current-release storage, exact producer/source
-provenance, login/launch/report round trip, correctly scoped connected native SARIF,
-observer no-source-write behavior, validated update adoption, combined issue filters,
+provenance, login/launch/report round trip, no-source-write behavior for all three
+configured projects, validated update adoption, combined issue filters,
 source details, charts/themes/mobile navigation, connection verification, configuration
 preview/confirmation, retry behavior and login/logout/revocation regression coverage.
 

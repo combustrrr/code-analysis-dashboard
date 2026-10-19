@@ -36,11 +36,12 @@ class RepositoryExecutionTests(unittest.TestCase):
         self.assertEqual(forced,['semgrep','snyk'])
         self.assertEqual(forced_reused,[])
 
-    def test_selected_channels_are_dispatched_as_deterministic_producer_lanes(self):
-        from scripts.code_analysis.repository_service import channel_lanes,producer_dispatch_id
+    def test_selected_channels_are_dispatched_together_with_deterministic_producer_lanes(self):
+        from scripts.code_analysis.repository_service import channel_lanes,concurrent_execution_channels,producer_dispatch_id
         channels=['semgrep','eslint','typescript','snyk']
         lanes=channel_lanes(channels)
         self.assertEqual(lanes,[['semgrep'],['eslint','typescript'],['snyk']])
+        self.assertEqual(concurrent_execution_channels(channels),channels)
         self.assertEqual(producer_dispatch_id('12345678-1111-4111-8111-111111111111',lanes[0]),
                          producer_dispatch_id('12345678-1111-4111-8111-111111111111',lanes[0]))
         self.assertNotEqual(producer_dispatch_id('12345678-1111-4111-8111-111111111111',lanes[0]),
@@ -68,16 +69,16 @@ class RepositoryExecutionTests(unittest.TestCase):
         api.assert_not_called()
         pages.assert_not_called()
 
-    def test_incomplete_security_does_not_clear_existing_alerts(self):
+    def test_connected_security_never_publishes_native_feedback(self):
         doc=config();project=doc['projects'][0]
         project.update(id='1',relationship='connected',source_repository=doc['execution_repository'])
         report={'analyzed_sha':'b'*40,'target':{'repository':'owner/runner','source_repository':'owner/runner','head_sha':'b'*40},'status':'partial','finding_count':0,'channels':[]}
         row={'id':'target','scan_run_id':2,'run_attempt':1,'kind':'branch','branch':'main'}
-        with patch('scripts.code_analysis.native_feedback.github.api',return_value={'id':3}) as api,patch('scripts.code_analysis.native_feedback.github.pages',return_value=[]):
+        with patch('scripts.code_analysis.native_feedback.github.api',return_value={'id':3}) as api,patch('scripts.code_analysis.native_feedback.github.pages',return_value=[]) as pages:
             result=publish(doc,'1',row,report,[],dashboard_url='https://example.test')
-            self.assertEqual(result['status'],'partial')
-            self.assertEqual(api.call_count,1)
-            self.assertTrue(api.call_args.args[0].endswith('/check-runs'))
+            self.assertEqual(result['status'],'not_applicable')
+            api.assert_not_called()
+            pages.assert_not_called()
 
     def test_quality_and_unsafe_paths_not_exported_as_security(self):
         finding={'id':'a','file':'file.py','line':1,'scanners':['Ruff'],'message':'style','rules':['R1']}
@@ -193,7 +194,7 @@ class ExternalServiceBoundaryTests(unittest.TestCase):
 
 
 class IndependentSecurityChannelsTests(unittest.TestCase):
-    def test_available_security_channels_publish_without_clearing_missing_channels(self):
+    def test_available_security_channels_remain_dashboard_only(self):
         from scripts.code_analysis.native_feedback import publish
         import gzip,base64,json
         doc=config();project=doc['projects'][0]
@@ -202,11 +203,8 @@ class IndependentSecurityChannelsTests(unittest.TestCase):
         row={'id':'target','scan_run_id':2,'run_attempt':1,'kind':'branch','branch':'main'}
         with patch('scripts.code_analysis.native_feedback.github.api',return_value={'id':3}) as api,patch('scripts.code_analysis.native_feedback.github.pages',return_value=[]):
             result=publish(doc,'1',row,report,[],dashboard_url='https://example.test')
-        self.assertEqual(result['expected_uploads'],16)
-        self.assertIn('bandit',result['unavailable_channels'])
-        payloads=[c.kwargs['payload']['sarif'] for c in api.call_args_list if 'sarif' in c.kwargs.get('payload',{})]
-        categories=[json.loads(gzip.decompress(base64.b64decode(p)))['runs'][0]['automationDetails']['id'] for p in payloads]
-        self.assertTrue(all('/trivy/' in c for c in categories))
+        self.assertEqual(result['status'],'not_applicable')
+        api.assert_not_called()
 
 
 class PublicationCompletenessTests(unittest.TestCase):
