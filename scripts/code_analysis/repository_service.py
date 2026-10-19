@@ -40,19 +40,19 @@ def terminal_queue_request(state, published, request_id):
     if active and active.get('status') in {'collected', 'cached'}:
         return active
     receipt = next((row for row in state.get('requests', [])
-                    if row.get('request_id') == request_id), None)
-    if not receipt:
-        return None
-    recent = next((run for run in published.get('recent_runs', [])
+                    if row.get('request_id') == request_id), {})
+    published_runs = [*published.get('targets', []), *published.get('recent_runs', [])]
+    recent = next((run for run in published_runs
                    if (run.get('client_request_id') or run.get('request_id')) == request_id
+                   and run.get('scan_run_id') and run.get('run_attempt')
                    and (not receipt.get('scan_run_id') or run.get('scan_run_id') == receipt.get('scan_run_id'))
                    and (not receipt.get('run_attempt') or run.get('run_attempt') == receipt.get('run_attempt'))), None)
     if not recent:
         return None
     return {**receipt, **recent, 'client_request_id': request_id,
             'status': 'collected',
-            'execution_channels': receipt.get('execution_channels', []),
-            'remaining_channels': receipt.get('remaining_channels', [])}
+            'execution_channels': receipt.get('execution_channels', recent.get('execution_channels', [])),
+            'remaining_channels': receipt.get('remaining_channels', recent.get('remaining_channels', []))}
 
 
 def channel_execution_plan(requested, cached_channels, run_again=False):
