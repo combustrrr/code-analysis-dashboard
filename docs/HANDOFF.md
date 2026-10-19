@@ -118,7 +118,7 @@ read was not run because no signed-in browser session was available.
 The deployed source implements an Ant Design application with light/dark themes, current
 source/target/revision provenance, overview charts, issues, scanners, connections and a
 fixed-host project catalog. Its repository-mode flow is: sign in, choose one of the three
-trusted projects, inspect its current report, then (with execution-host write access)
+trusted projects, inspect its current report, then (with current collaborator access)
 choose a branch, open PR, or full SHA, review the resolved SHA and selected scanner
 channels, and explicitly confirm. Project selection, inventory, and preview are read-only.
 Per-user execution-host selection, generic repository discovery, source setup and
@@ -138,7 +138,7 @@ the three-entry registry using a centrally installed, repository-scoped App toke
 
 The Worker requires GitHub login and current collaborator membership in the fixed
 execution repository for dashboard/API viewing. Public repo read permission alone does
-not qualify. Collaborators with `pull` can browse reports; `push` is required to launch;
+not qualify. Collaborators with `pull` can browse reports and explicitly launch analysis;
 `admin` is required for configuration changes. Report assets are delivered through the
 Worker/R2 path and access gating is an application boundary, not a substitute for
 confidential storage guarantees.

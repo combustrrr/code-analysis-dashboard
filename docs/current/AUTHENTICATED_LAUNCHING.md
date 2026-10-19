@@ -9,12 +9,12 @@ project-registry entries. Users do not choose or install an execution repository
 Users sign in to a dashboard home with aggregate health, alerts, recent-request metadata,
 global search, and project summaries. Opening **Projects** or a project remains read-only.
 On a project, **Run analysis** is the Fast Path: one action asks the Worker to resolve the
-configured preferred branch, apply trusted default channels, verify current write access,
+configured preferred branch, apply trusted default channels, verify current collaborator access,
 and queue the exact SHA. The retained report stays visible while the request is active.
 **Choose revision and scanners** opens the separate three-step custom wizard for branch,
 open-PR, or full-SHA selection, explicit channel selection, immutable-SHA review, and final
 confirmation. The Worker
-checks write access and transactionally persists an immutable `analysis-request-v2` envelope in the SQLite-backed Durable Object with source
+checks collaborator access and transactionally persists an immutable `analysis-request-v2` envelope in the SQLite-backed Durable Object with source
 and fork identities, original/resolved selection, pinned SHA, optional PR context,
 requested channels, tooling/profile digests, actor, and idempotency key. A 202 means
 accepted/queued, never scanner completion. Retries with the same idempotency key return
@@ -52,8 +52,8 @@ tab's `sessionStorage`, and expires after two minutes. The resulting opaque sess
 kept only in UI memory; reloads and new tabs require another sign-in.
 
 Repository mode always requires current collaborator access for dashboard and project-registry APIs.
-Read access is sufficient to browse configured projects; execution-host write access
-is required to launch; repository-admin access is required for configuration changes.
+Current collaborator access is sufficient to browse configured projects and explicitly
+launch; repository-admin access is required for configuration changes.
 `REPORT_ACCESS` is a
 separate control and defaults to `collaborators`; only the explicit value `public`
 allows anonymous report API reads. Keep reports private when changing or disabling the
@@ -102,9 +102,11 @@ The sign-in redirect deliberately sends no OAuth `scope` parameter. The user tok
 used for identity and GitHub's read/write/admin permission checks. A repository-scoped
 central App token reads the trusted project registry and Actions readiness, checks
 collaborator membership, and serves reports. Launch admission uses the signed-in user's
-server-held token only for read/permission checks and is refused without execution-host
-write permission. The central App has read-only Actions, contents, metadata, and
-pull-request permissions. Treat any scope change
+server-held token only for read/permission checks and is refused without current
+collaborator access. Runtime installation tokens request read-only Actions and contents
+access. The App registration itself currently advertises broader Actions, contents, and
+workflows write permissions; reduce those registration permissions through the GitHub
+App owner settings and accept the installation update before calling the App least-privilege. Treat any scope change
 as an authorization-boundary change.
 
 
@@ -119,7 +121,7 @@ separate deployment in `pages.yml`.
 
 Read [dashboard access](../operations/DASHBOARD-ACCESS.md) before changing authorization.
 Project configuration is versioned in the execution-host registry; dashboard APIs do
-not accept arbitrary source/execution repositories. Scan requests require write access.
+not accept arbitrary source/execution repositories. Scan requests require current collaborator access.
 Current reports are served through the Worker/R2 path and require the
 independent `REPORT_ACCESS=collaborators` policy. Public GitHub Releases and Actions
 artifacts may still expose scanner outputs; this is not complete Trust Lab-only

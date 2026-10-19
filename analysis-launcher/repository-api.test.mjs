@@ -40,13 +40,13 @@ test('channel progress follows selected lanes and shared producers',()=>{
   assert.deepEqual(progress.map(value=>value.status),['in_progress','success','success','queued']);
 });
 
-test('read-only collaborators can list the exact fixed target registry',async()=>{
+test('pull-only collaborators can list and launch from the exact fixed target registry',async()=>{
   const h=helpers({permissions:{pull:true,push:false,admin:false}});
   const response=await repositoryApi(get('/api/projects'),env,session,h);
   const result=await response.json();
   assert.equal(response.status,200);
   assert.equal(result.execution_repository.full_name,EXECUTION_REPOSITORY);
-  assert.equal(result.can_launch,false);
+  assert.equal(result.can_launch,true);
   assert.equal(result.can_configure,false);
   assert.deepEqual(result.projects.map(project=>project.id),CONFIGURED_TARGETS.map(project=>project.id));
   assert.deepEqual(result.projects.map(({id,relationship})=>[id,relationship]),CONFIGURED_TARGETS.map(({id,relationship})=>[id,relationship]));
@@ -72,7 +72,7 @@ test('read-only collaborators can inspect configured project readiness',async()=
   assert.equal(response.status,200);
   assert.equal(result.project_id,'1278177697');
   assert.equal(result.preferred_branch,'Testing');
-  assert.ok(result.channels.some(channel=>channel.channel==='semgrep'&&channel.status==='configured'));
+  assert.ok(result.channels.some(channel=>channel.channel==='semgrep'&&channel.status==='profile_declared'&&channel.last_observed===null));
   assert.ok(result.channels.every(channel=>channel.status!=='completed'));
 });
 
@@ -144,9 +144,9 @@ test('confirmation rejects refs that move after the signed preview',async()=>{
   await assert.rejects(()=>repositoryApi(post('/api/project-launch',{project_id:source.id,preview_token:preview.preview_token,requested_channels:['semgrep'],idempotency_key:'11111111-1111-4111-8111-111111111111'}),env,session,h),error=>error.status===409&&error.code==='stale_preview');
 });
 
-test('launch persists a pinned v2 envelope and idempotent request identity',async()=>{
+test('pull-only collaborator launch persists a pinned v2 envelope and idempotent request identity',async()=>{
   const source=CONFIGURED_TARGETS[0];
-  const h=helpers({overrides:{[`repos/${source.repository}/pulls/7`]:{number:7,title:'Fix',draft:true,head:{ref:'topic',sha:'d'.repeat(40),repo:{id:999,full_name:'fork/repo'}},base:{ref:'Testing',sha:'e'.repeat(40),repo:{full_name:source.repository}}}}});
+  const h=helpers({permissions:{pull:true,push:false,admin:false},overrides:{[`repos/${source.repository}/pulls/7`]:{number:7,title:'Fix',draft:true,head:{ref:'topic',sha:'d'.repeat(40),repo:{id:999,full_name:'fork/repo'}},base:{ref:'Testing',sha:'e'.repeat(40),repo:{full_name:source.repository}}}}});
   const preview=await (await repositoryApi(post('/api/project-preview',{project_id:source.id,selection:{kind:'pr',ref:'7'}}),env,session,h)).json();
   const input={project_id:source.id,preview_token:preview.preview_token,requested_channels:['semgrep'],idempotency_key:'22222222-2222-4222-8222-222222222222'};
   const response=await repositoryApi(post('/api/project-launch',input),env,session,h);
@@ -169,9 +169,9 @@ test('launch persists a pinned v2 envelope and idempotent request identity',asyn
   assert.equal(h.calls.some(call=>call.options.method&&call.options.method!=='GET'),false);
 });
 
-test('Fast Path resolves the preferred branch and admits only trusted default channels',async()=>{
+test('Fast Path allows a pull-only collaborator and admits only trusted default channels',async()=>{
   const source=CONFIGURED_TARGETS[0],key='44444444-4444-4444-8444-444444444444';
-  const h=helpers({overrides:{[`repos/${source.repository}/branches/${source.branch}`]:{commit:{sha:'f'.repeat(40)}}}});
+  const h=helpers({permissions:{pull:true,push:false,admin:false},overrides:{[`repos/${source.repository}/branches/${source.branch}`]:{commit:{sha:'f'.repeat(40)}}}});
   const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,refType:'PREFERRED_BRANCH'},key),env,session,h);
   const result=await response.json(),intent=h.queueCalls.find(call=>call.path==='/queue/admit').body.request;
   assert.equal(response.status,202);
@@ -182,11 +182,11 @@ test('Fast Path resolves the preferred branch and admits only trusted default ch
   assert.ok(h.queueCalls.some(call=>call.path==='/queue/status'));
 });
 
-test('Fast Path requires a key, exact intent, and current write access',async()=>{
+test('Fast Path requires a key, exact intent, and current collaborator access',async()=>{
   const source=CONFIGURED_TARGETS[0],intent={projectId:source.id,refType:'PREFERRED_BRANCH'};
   await assert.rejects(()=>repositoryApi(post('/api/project-launch-fast',intent),env,session,helpers()),error=>error.status===400&&error.code==='invalid_idempotency_key');
   await assert.rejects(()=>repositoryApi(postWithKey('/api/project-launch-fast',{...intent,channels:['semgrep']},'55555555-5555-4555-8555-555555555555'),env,session,helpers()),error=>error.status===400&&error.code==='invalid_fast_path_intent');
-  await assert.rejects(()=>repositoryApi(postWithKey('/api/project-launch-fast',intent,'55555555-5555-4555-8555-555555555555'),env,session,helpers({permissions:{pull:true,push:false,admin:false}})),error=>error.status===403&&error.code==='repository_write_required');
+  await assert.rejects(()=>repositoryApi(postWithKey('/api/project-launch-fast',intent,'55555555-5555-4555-8555-555555555555'),env,session,helpers({permissions:{pull:false,push:false,admin:false}})),error=>error.status===403&&error.code==='repository_read_required');
 });
 
 test('Fast Path retries return the original accepted request',async()=>{
@@ -202,9 +202,9 @@ test('dashboard aggregate exposes bounded request metadata without credentials',
   assert.equal(response.status,200);assert.equal(result.projects.length,CONFIGURED_TARGETS.length);assert.equal(result.recent_requests.length,1);assert.ok(!JSON.stringify(result).includes('user-token'));
 });
 
-test('write access is required to launch and no user source repository can override the registry',async()=>{
-  const h=helpers({permissions:{pull:true,push:false,admin:false}});
-  await assert.rejects(()=>repositoryApi(post('/api/project-launch',{project_id:'1267340546',kind:'branch',ref:'Testing'}),env,session,h),error=>error.status===403&&error.code==='repository_write_required');
+test('non-collaborators cannot launch and no user source repository can override the registry',async()=>{
+  const h=helpers({permissions:{pull:false,push:false,admin:false}});
+  await assert.rejects(()=>repositoryApi(post('/api/project-launch',{project_id:'1267340546',kind:'branch',ref:'Testing'}),env,session,h),error=>error.status===403&&error.code==='repository_read_required');
   assert.ok(h.calls.every(call=>!call.options.method));
   await assert.rejects(()=>repositoryApi(get('/api/projects?repository=attacker/private-repo'),env,session,helpers()),error=>error.status===400&&error.code==='repository_not_configurable');
 });

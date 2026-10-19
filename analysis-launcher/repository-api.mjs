@@ -80,8 +80,8 @@ export async function repositoryApi(request, env, session, helpers) {
       throw new Failure(409, 'Configured execution repository identity mismatch.', 'repository_identity');
     }
     if (!repository.permissions?.[permission]) {
-      const code = permission === 'admin' ? 'repository_admin_required' : permission === 'push' ? 'repository_write_required' : 'repository_read_required';
-      const message = permission === 'admin' ? 'Repository administration access is required for configuration changes.' : permission === 'push' ? 'Write access is required to launch analysis.' : 'Read access is required to view configured targets.';
+      const code = permission === 'admin' ? 'repository_admin_required' : 'repository_read_required';
+      const message = permission === 'admin' ? 'Repository administration access is required for configuration changes.' : 'Current collaborator access is required to view configured targets or launch analysis.';
       throw new Failure(403, message, code);
     }
     return repository;
@@ -160,7 +160,7 @@ export async function repositoryApi(request, env, session, helpers) {
     const verified = await Promise.all(configuration.projects.map(project => projectFor(configuration, project.id)));
     return json({
       execution_repository: {id:repository.id, full_name:repository.full_name},
-      can_launch: repository.permissions.push === true,
+      can_launch: repository.permissions.pull === true,
       can_configure: repository.permissions.admin === true,
       projects: await Promise.all(verified.map(async ({project}) => {
         let current_report=null,current_overlay=null,queued_requests=0;
@@ -191,7 +191,7 @@ export async function repositoryApi(request, env, session, helpers) {
       catch{alerts.push({id:`report-${project.id}`,project_id:String(project.id),severity:'warning',title:'Project summary unavailable',message:'The current report summary could not be read.'});}
       return{id:String(project.id),source_repository:project.source_repository.full_name,preferred_branch:project.preferred_branch,current_report,queued_requests};}));
     let recent=[];try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();const allowed=new Map(projects.map(project=>[project.id,project.source_repository]));recent=(payload.requests||[]).filter(row=>allowed.has(String(row.intent?.project_id))).map(row=>({request_id:row.request_id,project_id:String(row.intent.project_id),source_repository:allowed.get(String(row.intent.project_id)),ref_type:row.intent.selection?.kind||'revision',ref:row.intent.selection?.ref||row.intent.target_sha,target_sha:row.intent.target_sha,status:row.status,created_at:row.created_at,updated_at:row.completed_at||row.created_at,run_url:row.result?.run_id?`https://github.com/${repository.full_name}/actions/runs/${row.result.run_id}`:undefined}));}}catch{alerts.push({id:'recent-requests',severity:'warning',title:'Recent request metadata unavailable',message:'Current project reports remain available.'});}
-    return json({checked_at:checkedAt,freshness:'fresh',health:{status:alerts.some(alert=>alert.severity==='error')?'degraded':alerts.length?'unknown':'healthy',message:alerts.length?'Some aggregate evidence is unavailable.':'Control plane and project summaries responded.'},alerts,projects,recent_requests:recent,execution_repository:{id:repository.id,full_name:repository.full_name},can_launch:repository.permissions.push===true,can_configure:repository.permissions.admin===true});
+    return json({checked_at:checkedAt,freshness:'fresh',health:{status:alerts.some(alert=>alert.severity==='error')?'degraded':alerts.length?'unknown':'healthy',message:alerts.length?'Some aggregate evidence is unavailable.':'Control plane and project summaries responded.'},alerts,projects,recent_requests:recent,execution_repository:{id:repository.id,full_name:repository.full_name},can_launch:repository.permissions.pull===true,can_configure:repository.permissions.admin===true});
   }
   if (request.method === 'GET' && url.pathname === '/api/project-identity') {
     const {configuration} = await context();
@@ -204,7 +204,7 @@ export async function repositoryApi(request, env, session, helpers) {
     if(!input||Object.keys(input).sort().join(',')!=='projectId,refType'||input.refType!=='PREFERRED_BRANCH')throw new Failure(400,'Fast Path accepts only the configured preferred branch intent.','invalid_fast_path_intent');
     const idempotencyKey=request.headers.get('Idempotency-Key')||'';
     if(!/^[0-9a-f-]{36}$/i.test(idempotencyKey))throw new Failure(400,'A request idempotency key is required.','invalid_idempotency_key');
-    const {repository,configuration}=await context('push');
+    const {repository,configuration}=await context('pull');
     const {project,source}=await projectFor(configuration,input.projectId);
     if(!project.preferred_branch)throw new Failure(409,'The trusted project has no preferred branch.','preferred_branch_unavailable');
     const requestId=requestIdFromKey(idempotencyKey);
@@ -253,7 +253,13 @@ export async function repositoryApi(request, env, session, helpers) {
     const {project, source} = await projectFor(configuration, url.searchParams.get('project_id'));
 
     if (url.pathname === '/api/project-readiness') {
-      const channels = scannerChoices(project).map(value=>({...value,channel:value.id,status:value.status==='READY'?'configured':value.status.toLowerCase(),reason:value.reason||'Configured for execution; completed evidence is still required.'}));
+      let observed=new Map(),observedAt=null;
+      try {
+        const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
+        const response=await publicReports(new Request(reportUrl),env);
+        if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);observed=new Map((target?.channel_statuses||[]).map(value=>[value.channel,value]));observedAt=target?.generated_at||target?.checked_at||null;}
+      } catch {}
+      const channels = scannerChoices(project).map(value=>{const last=observed.get(value.id);return {...value,channel:value.id,status:value.status==='READY'?'profile_declared':value.status.toLowerCase(),reason:value.reason||'Declared in the trusted profile; completed evidence is still required.',last_observed:last?{status:String(last.status||'unknown').toLowerCase(),reason:last.reason||null,findings:Number.isFinite(last.findings)?last.findings:null,checked_at:observedAt}:null};});
       return json({project_id:project.id,preferred_branch:project.preferred_branch,tooling_sha:configuration.tooling_sha,channels,checked_at:new Date().toISOString()});
     }
 
@@ -326,7 +332,7 @@ export async function repositoryApi(request, env, session, helpers) {
 
   if (request.method === 'POST' && url.pathname === '/api/project-launch') {
     const input = await requestBody();
-    const {repository,configuration} = await context('push');
+    const {repository,configuration} = await context('pull');
     const {project,source} = await projectFor(configuration,input.project_id);
     if (typeof input.preview_token !== 'string' || input.preview_token.length > 4096) throw new Failure(400,'A valid revision preview is required before confirmation.','preview_required');
     let signedPreview;

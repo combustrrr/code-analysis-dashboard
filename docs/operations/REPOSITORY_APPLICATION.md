@@ -18,10 +18,9 @@ queue host for every target.
 
 ## Access roles
 
-- A current service-repository collaborator with `pull` access can list, select, and
-  inspect configured targets and reports.
-- `push` access on the fixed execution repository is required to submit an analysis
-  request. Target selection and report refreshes are read-only.
+- A current service-repository collaborator with `pull` access can list, select, inspect,
+  and explicitly launch analysis for configured targets.
+- Target selection and report refreshes are read-only and never submit a request.
 - `admin` access is required for configuration changes. Profiles are maintained in the
   trusted, versioned project registry; the dashboard has no arbitrary-repository setup
   or per-user GitHub App installation flow.

@@ -22,19 +22,19 @@ validates IDs, names, relationships, branches, and native-feedback policy and fa
 closed on mismatch. Native feedback is disabled for self-analysis and observer targets
 alike; all configured targets remain read-only analysis sources.
 
-Read-only collaborators can list, select, and inspect configured projects. Launching
-requires `push` permission on the fixed execution repository; configuration changes
-require `admin` and are made through its trusted versioned registry. Project selection
+Current collaborators with `pull` access can list, select, inspect, and explicitly
+launch analysis for configured projects. Configuration changes require `admin` and are
+made through the trusted versioned registry. Project selection
 does not create workflow runs. Application and report routes accept the fixed execution
 repository plus a configured project ID, never a user-selected source repository.
 The authenticated `/api/projects` route returns the registry and caller capabilities;
 there is no anonymous project-list or arbitrary repository-discovery endpoint.
 
 The OAuth authorization request intentionally omits a `scope` parameter. The user
-token supplies identity and GitHub `pull`/`push`/`admin` permission checks. The central
+token supplies identity and GitHub `pull`/`admin` permission checks. The central
 App token reads the trusted registry and workflow readiness, checks collaborator
 membership, and serves reports. Launches use the user's token and are refused without
-execution-host write permission. Do not infer broader access from successful sign-in,
+current execution-host collaborator access. Do not infer broader access from successful sign-in,
 and do not add scopes without reviewing the authorization boundary.
 
 Sign-in uses a same-tab GitHub redirect. OAuth state and PKCE remain validated by the

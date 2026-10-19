@@ -8,7 +8,7 @@ scan and configuration permissions are checked separately. Both themes are suppo
    the current source-only report from an optional separately retained PR overlay and
    shows compact readiness, queued work, source/analyzed SHA, and timestamps. Opening a
    project or browsing revisions is read-only.
-2. Users with write permission choose a revision kind (branch, open PR including drafts,
+2. Authorized collaborators choose a revision kind (branch, open PR including drafts,
    or full 40-character commit SHA), select the exact ref, and choose scanner channels.
    Portable channels are selected by default; vendor lanes are opt-in. Shared producer
    groups must be selected together. Disabled channels explain whether they are deferred,
@@ -45,8 +45,8 @@ scan and configuration permissions are checked separately. Both themes are suppo
 6. Connections verifies the selected project through the live project-integration
    API, including App access and both workflows. An unavailable check disables its
    launch shortcut. Successful routing does not prove all scanners completed.
-7. Repositories lists only the fixed trusted projects. Read-only collaborators can inspect
-   reports and preview revisions; execution-host writers can submit; administrators alone
+7. Repositories lists only the fixed trusted projects. Authorized collaborators can inspect
+   reports, preview revisions, and explicitly submit; administrators alone
    manage the central registry. The connected self-analysis target does not publish native
    findings back to its source repository.
 

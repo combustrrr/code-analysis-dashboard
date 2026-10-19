@@ -38,7 +38,7 @@ automatically.
 The default-branch `.github/code-analysis/projects.json` contains execution identity,
 source projects, profiles, scanner setup and immutable tooling. Installation writes
 small wrappers and a profile only after an owner reviews and confirms exact files.
-Admin is required for configuration, write permission for scan requests. Branch
+Admin is required for configuration; current collaborator access is required for scan requests. Branch
 protection blocks a direct commit rather than being bypassed.
 
 The Worker application policy refactor keeps portable-profile detection and validation

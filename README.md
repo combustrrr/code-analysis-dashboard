@@ -99,9 +99,9 @@ comments, checks, SARIF, commits, or PRs are written to any analyzed source, inc
 self-analysis.
 
 Readiness verifies the selected project's profile and execution workflows. A successful
-readiness check does not imply complete scanner evidence. Read-only collaborators can
-inspect configured targets and reports; only execution-host writers can submit a scan
-request, and only administrators can change the trusted registry. GitHub Actions
+readiness check does not imply complete scanner evidence. Authorized collaborators can
+inspect configured targets and reports and explicitly submit a scan request; only
+administrators can change the trusted registry. GitHub Actions
 artifacts in the public service repository remain publicly accessible; dashboard sign-in
 does not make scanner evidence confidential.
 

@@ -39,8 +39,8 @@ for dashboard and report routes, and anonymous project/report API checks returne
 The deployed source fixes execution, storage and publishing to
 `combustrrr/code-analysis-dashboard` (ID `1360051890`). Its trusted registry contains
 Kavach-AgenticSOC (`1267340546`), service self-analysis (`1360051890`), and
-Agentic-Kibana (`1278177697`). Read-only collaborators can browse reports; execution
-write access is required to launch; repository admin access is required to change the
+Agentic-Kibana (`1278177697`). Authorized collaborators can browse reports and explicitly
+launch analysis; repository admin access is required to change the
 versioned registry. Selecting a project does not trigger a workflow. The repository
 setup, arbitrary execution-host selection, and per-user App installation screens are
 removed from the repository-mode UI.

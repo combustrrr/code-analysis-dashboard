@@ -24,9 +24,9 @@ repository write was performed as part of this implementation.
 1. Open the deployed dashboard and sign in with an authorized collaborator account.
 2. Open **Projects** and choose one of the configured source targets. Selection opens its
    current report and is read-only; it does not submit a workflow or change configuration.
-3. Users with write access to the fixed execution repository may separately choose
-   **Run analysis**. Read-only collaborators can inspect existing reports without write
-   access; repository administration is required to change the trusted project registry.
+3. Authorized collaborators on the fixed execution repository may separately choose
+   **Run analysis**. Project selection and report inspection remain read-only;
+   repository administration is required to change the trusted project registry.
 4. Choose the target's configured branch (`Testing` for Kavach and Agentic-Kibana,
    `main` for dashboard self-analysis), an open pull request, or a full 40-character
    commit SHA. Choose the scanner channels; the common portable baseline is preselected

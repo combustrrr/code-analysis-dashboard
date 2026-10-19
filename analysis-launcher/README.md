@@ -21,7 +21,7 @@ development variables are generated or ignored and must not be committed.
 Repository mode fixes the execution host to `combustrrr/code-analysis-dashboard` and
 validates the three centrally configured public projects by repository ID, name,
 relationship, branch, and native-feedback policy. Read access lists and inspects
-targets; `push` is required to launch; `admin` is required for configuration changes.
+targets; current collaborator `pull` access is required to launch; `admin` is required for configuration changes.
 Target profiles are managed in the versioned central registry, not through per-user
 source setup or App installation.
 
