@@ -15,6 +15,9 @@ def reusable_source(portable=True):
     document = yaml.safe_load(generate(config))
     document['name'] = 'Reusable source analysis'
     document.pop('run-name', None)
+    # The trusted caller owns the global source-revision concurrency group.
+    # A called workflow using the same group would wait on its own parent.
+    document.pop('concurrency', None)
     trigger = document.pop('on', document.pop(True, None))
     import re
     secret_names = sorted(set(re.findall(r'secrets\.([A-Z_]+)', yaml.safe_dump(document))))

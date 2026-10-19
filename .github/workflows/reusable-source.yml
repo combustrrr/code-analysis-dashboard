@@ -2,9 +2,6 @@
 name: Reusable source analysis
 permissions:
   contents: read
-concurrency:
-  group: source-revision-global
-  cancel-in-progress: false
 jobs:
   identity:
     runs-on: ubuntu-latest

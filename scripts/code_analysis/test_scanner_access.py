@@ -22,6 +22,7 @@ class ScannerAccessTests(unittest.TestCase):
                      '.github/workflows/reusable-source-full.yml'):
             workflow = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
             trigger = workflow.get('on', workflow.get(True))
+            self.assertNotIn('concurrency', workflow)
             self.assertEqual(
                 set(trigger['workflow_call']['inputs']),
                 {'target', 'tooling_sha', 'request_id'},
