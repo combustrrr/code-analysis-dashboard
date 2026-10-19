@@ -8,5 +8,11 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_APPLICATION_MODE': JSON.stringify('repositories'),
       'import.meta.env.VITE_LAUNCH_ENDPOINT': JSON.stringify('https://launcher.example'),
     } : {},
+    plugins: accessTest ? [{
+      name: 'access-test-csp',
+      transformIndexHtml(html: string) {
+        return html.replace('https://code-analysis-launcher.icsarthak9.workers.dev', 'https://launcher.example');
+      },
+    }] : [],
   };
 });

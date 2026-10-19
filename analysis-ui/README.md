@@ -16,7 +16,7 @@ The UI contains no report data. It retrieves current manifests/assets through th
 Worker and must preserve exact source, target, request, and publication provenance.
 The authenticated project list comes from the fixed execution-host registry. Selecting
 a configured target only opens its report; the separate launch action is shown only
-when the signed-in user has execution-host write access. The dashboard has no arbitrary
+when the signed-in user is an authorized execution-host collaborator. The dashboard has no arbitrary
 repository picker, per-user App installation, or setup-commit workflow.
 The dashboard includes a **Threat Report** view for newly published analyses. It
 summarizes severity/category coverage and deterministic catalog guidance, then links

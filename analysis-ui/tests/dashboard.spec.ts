@@ -320,10 +320,10 @@ test.skip('superseded local-auth connection fixture', async ({page,context}, tes
   });
   await page.goto('/#'+new URLSearchParams({tab:'connections',repository:execution,project:'1278177697'}));
   await expect(page.getByRole('heading',{name:'Application connections'})).toBeVisible();
-  await expect(page.getByText('Launch configuration verified')).not.toBeVisible();
+  await expect(page.getByText('Trusted workflow reachable')).not.toBeVisible();
   await page.getByRole('button',{name:'Sign in to verify connections'}).click();
   await page.getByRole('button',{name:'Verify connections'}).click();
-  await expect(page.getByText('Launch configuration verified')).toBeVisible();
+  await expect(page.getByText('Trusted workflow reachable')).toBeVisible();
   await expect(page.getByText('This verifies routing and workflow availability. Scanner results determine which channels actually completed.')).toBeVisible();
   const channelReadiness=page.getByRole('region',{name:'Scanner channel readiness'});
   await expect(channelReadiness).toContainText('configured');

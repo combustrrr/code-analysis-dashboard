@@ -87,8 +87,12 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
       if (destination) {
         try {
           const target = new URL(destination, location.origin);
-          const parameters = new URLSearchParams(target.hash.slice(1));
-          const project = parameters.get('project');
+          const rawHash = target.hash.slice(1);
+          const modern = rawHash.startsWith('/') ? rawHash.slice(1) : '';
+          const [modernPath, modernQuery = ''] = modern.split('?', 2);
+          const modernParts = modernPath.split('/').filter(Boolean);
+          const parameters = new URLSearchParams(modern ? modernQuery : rawHash);
+          const project = modernParts[0] === 'projects' && /^\d+$/.test(modernParts[1] || '') ? modernParts[1] : parameters.get('project');
           if (target.origin === location.origin && project) requestedProject = { repository: parameters.get('repository'), id: project };
         } catch {}
       }
