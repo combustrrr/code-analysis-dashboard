@@ -723,7 +723,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         # Keep the FIFO head durable until every selected lane reaches a terminal state.
         if queued_asset is not None and str(project['id'])==str(project_id):
             active_request=terminal_queue_request(state,published,request_id)
-            if not active_request:
+            if request_id and not active_request:
                 completed_runs = [run for run in runs
                                   if run.get('status') == 'completed'
                                   and run.get('display_title', '').startswith('Source analysis ' + request_id[:8] + '-')]
