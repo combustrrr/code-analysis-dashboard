@@ -10,8 +10,8 @@ from pathlib import Path
 class RepositoryExecutionTests(unittest.TestCase):
     def test_terminal_queue_request_recovers_published_run_without_target_row(self):
         from scripts.code_analysis.repository_service import terminal_queue_request
-        receipt = {'request_id':'request-1','scan_run_id':42,'run_attempt':1,
-                   'execution_channels':['semgrep'],'remaining_channels':[]}
+        receipt = {'request_id':'request-1','execution_channels':['semgrep'],
+                   'remaining_channels':[]}
         recent = {'client_request_id':'request-1','scan_run_id':42,'run_attempt':1,
                   'attempt_channel_statuses':[{'channel':'semgrep','status':'COMPLETED'}]}
         recovered = terminal_queue_request({'targets':[], 'requests':[receipt]},
@@ -20,6 +20,13 @@ class RepositoryExecutionTests(unittest.TestCase):
         self.assertEqual(recovered['scan_run_id'], 42)
 
     def test_terminal_queue_request_does_not_guess_from_unmatched_publication(self):
+        from scripts.code_analysis.repository_service import terminal_queue_request
+        receipt = {'request_id':'request-1'}
+        recent = {'client_request_id':'request-2','scan_run_id':43,'run_attempt':1}
+        self.assertIsNone(terminal_queue_request({'targets':[], 'requests':[receipt]},
+                                                {'recent_runs':[recent]}, 'request-1'))
+
+    def test_terminal_queue_request_rejects_conflicting_recorded_run(self):
         from scripts.code_analysis.repository_service import terminal_queue_request
         receipt = {'request_id':'request-1','scan_run_id':42,'run_attempt':1}
         recent = {'client_request_id':'request-1','scan_run_id':43,'run_attempt':1}
