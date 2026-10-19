@@ -31,8 +31,8 @@ class ScannerAccessTests(unittest.TestCase):
         workflow = yaml.safe_load(Path('.github/workflows/code-analysis-source.yml').read_text(encoding='utf-8'))
         for name in ('analyze', 'configured-profile'):
             condition = workflow['jobs'][name]['if']
-            self.assertIn("needs.isolated-vendor.result == 'skipped'", condition)
-            self.assertIn("needs.validate-request.result == 'success'", condition)
+            self.assertIn("needs['isolated-vendor'].result == 'skipped'", condition)
+            self.assertIn("needs['validate-request'].result == 'success'", condition)
 
     def test_vendor_diagnostics_cannot_publish_a_target_report(self):
         workflow = yaml.safe_load(diagnostics())
