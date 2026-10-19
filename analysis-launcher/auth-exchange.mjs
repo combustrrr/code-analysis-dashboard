@@ -56,6 +56,11 @@ export class AuthExchangeStore {
       const queue_position=row.status==='queued'?([...entries.values()].indexOf(row.request_id)+1||null):null;
       return json({...row,queue_position});
     }
+    if(path==='/queue/recent'){
+      const entries=await this.state.storage.list({prefix:'queue:id:'});
+      const rows=[...entries.values()].sort((a,b)=>(b.sequence||0)-(a.sequence||0)).slice(0,20);
+      return json({checked_at:new Date().toISOString(),requests:rows.map(row=>({request_id:row.request_id,status:row.status,created_at:row.created_at,completed_at:row.completed_at||null,intent:row.intent,result:row.result||null}))});
+    }
     if(path==='/queue/claim')return this.transact(async s=>{
       const meta=(await s.get('queue:meta'))||{next_sequence:1,pending:0,active:null},timestamp=now();
       if(meta.active&&meta.active.lease_expires_at>timestamp)return json({status:'busy'},409);

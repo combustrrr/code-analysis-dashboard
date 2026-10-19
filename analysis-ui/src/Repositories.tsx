@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 import {Alert,Button,Empty,Select,Space,Tag} from 'antd';
 import type {useLaunchAuth} from './useLaunchAuth';
+import {routeHash} from './appRoutes';
 
 export type ConfiguredProject={id:string;source_repository:string;source_repository_id:number;relationship:'observer'|'connected';preferred_branch:string;native_feedback_enabled:boolean;readiness_summary?:{configured_channels:number;vendor_channels:number};current_report?:{source_sha?:string;analyzed_sha?:string;generated_at?:string|null;status:string}|null;current_overlay?:{overlay_key:string;status:string;head_sha?:string;checked_at?:string;pr_context:{number:number;title?:string;head_repository:string;head_branch:string;base_repository:string;base_branch:string;base_sha:string};channel:{status:string;reason?:string}}|null;queued_requests?:number};
 type Registry={execution_repository:{id:number;full_name:string};can_launch:boolean;can_configure:boolean;projects:ConfiguredProject[]};
@@ -29,7 +30,7 @@ function useRegistry(auth:Auth){
 }
 
 function openProject(registry:Registry,project:ConfiguredProject){
- location.hash=new URLSearchParams({repository:registry.execution_repository.full_name,project:project.id,tab:'overview'}).toString();
+ location.hash=routeHash({kind:'project',repository:registry.execution_repository.full_name,projectId:project.id,view:'overview'});
 }
 
 export function Repositories({auth}:{auth:Auth}){

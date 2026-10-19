@@ -310,7 +310,7 @@ export default { async fetch(request, env) {
   if (request.headers.get('Origin') === env.DASHBOARD_ORIGIN) {
     headers.set('Access-Control-Allow-Origin', env.DASHBOARD_ORIGIN); headers.set('Vary', 'Origin');
     headers.set('Access-Control-Expose-Headers','X-Request-ID, Retry-After');
-    headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, Idempotency-Key');
   }
   return new Response(response.body, { status: response.status, headers });
 } };

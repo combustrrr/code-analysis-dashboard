@@ -34,11 +34,12 @@ npm run build
 
 ## Browse configured projects
 
-For the already configured analysis instance, sign in and open **Projects** to browse
-the service's three trusted targets. Selecting a project opens its current report and
-does not trigger a scan. Users with write access to the fixed execution host can
-separately choose **Run analysis**, select a branch, open PR, or full commit SHA, inspect
-the resolved SHA and scanner selection, and explicitly confirm the request. A 202 means
+For the already configured analysis instance, sign in to the aggregate dashboard or open
+**Projects** to browse the service's three trusted targets. Search, project selection,
+settings, and report viewing do not trigger a scan. On a project, **Run analysis** queues
+the configured preferred branch with trusted default channels in one Fast Path action.
+Use **Choose revision and scanners** for the three-step custom flow and exact-SHA review.
+The service verifies the resolved immutable SHA before queueing the request. A 202 means
 queued, not completed. Requests run FIFO with one active source revision globally;
 selected scanner lanes for that revision may run concurrently. Repository administration
 is required to change the versioned target registry. There is no per-user
@@ -51,8 +52,8 @@ SHA. They do not push commits, edit files, change refs, create pull requests, or
 checks/SARIF to either analyzed source. Service request state and reports are stored
 separately by the control plane, as documented in the runbook.
 
-Each execution repository runs its own Actions. GitHub Releases retain the bounded
-manual request queue and compatibility state; current source-only reports, the single
+The fixed execution repository runs the Actions workflows. A SQLite-backed Durable Object
+retains the bounded manual request queue; current source-only reports, the single
 current PR overlay, and temporary producer artifacts are stored in Cloudflare R2. Small wrappers reference immutable shared
 workflows in this service repository. Scanner credentials are supplied by that
 repository's owner; configuration alone does not prove usable scanner evidence.

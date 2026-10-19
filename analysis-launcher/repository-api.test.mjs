@@ -23,12 +23,13 @@ function helpers({permissions,overrides={}}={}) {
     if(source)return {id:source.repository_id,full_name:source.repository,private:false,default_branch:source.branch,permissions:{pull:true}};
     throw new Error(`Unexpected GitHub request: ${path}`);
   };
-  return {calls,queueCalls,Failure,json,github,serviceToken,pages:async()=>[],queue:async(path,body)=>{queueCalls.push({path,body});return json({...body.request,status:'queued',queue_position:1},201);},seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
+  return {calls,queueCalls,Failure,json,github,serviceToken,pages:async()=>[],queue:async(path,body)=>{queueCalls.push({path,body});if(path==='/queue/status')return json({error:'not_found'},404);if(path==='/queue/recent')return json({requests:[]});return json({...body.request,status:'queued',queue_position:1},201);},seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
 }
 
 const session={token:'user-token'};
 const get=(path)=>new Request(`https://worker.example${path}`);
 const post=(path,value)=>new Request(`https://worker.example${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});
+const postWithKey=(path,value,key)=>new Request(`https://worker.example${path}`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(value)});
 
 test('channel progress follows selected lanes and shared producers',()=>{
   const progress=channelProgress(['semgrep','eslint','typescript','snyk'],[
@@ -166,6 +167,39 @@ test('launch persists a pinned v2 envelope and idempotent request identity',asyn
     assert.equal(envelope.actor_id,73);
   assert.equal(h.queueCalls[0].path,'/queue/admit');
   assert.equal(h.calls.some(call=>call.options.method&&call.options.method!=='GET'),false);
+});
+
+test('Fast Path resolves the preferred branch and admits only trusted default channels',async()=>{
+  const source=CONFIGURED_TARGETS[0],key='44444444-4444-4444-8444-444444444444';
+  const h=helpers({overrides:{[`repos/${source.repository}/branches/${source.branch}`]:{commit:{sha:'f'.repeat(40)}}}});
+  const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,refType:'PREFERRED_BRANCH'},key),env,session,h);
+  const result=await response.json(),intent=h.queueCalls.find(call=>call.path==='/queue/admit').body.request;
+  assert.equal(response.status,202);
+  assert.equal(result.request_id,key);
+  assert.equal(intent.target_sha,'f'.repeat(40));
+  assert.equal(intent.selection.ref,source.branch);
+  assert.deepEqual(intent.requested_channels,['semgrep']);
+  assert.ok(h.queueCalls.some(call=>call.path==='/queue/status'));
+});
+
+test('Fast Path requires a key, exact intent, and current write access',async()=>{
+  const source=CONFIGURED_TARGETS[0],intent={projectId:source.id,refType:'PREFERRED_BRANCH'};
+  await assert.rejects(()=>repositoryApi(post('/api/project-launch-fast',intent),env,session,helpers()),error=>error.status===400&&error.code==='invalid_idempotency_key');
+  await assert.rejects(()=>repositoryApi(postWithKey('/api/project-launch-fast',{...intent,channels:['semgrep']},'55555555-5555-4555-8555-555555555555'),env,session,helpers()),error=>error.status===400&&error.code==='invalid_fast_path_intent');
+  await assert.rejects(()=>repositoryApi(postWithKey('/api/project-launch-fast',intent,'55555555-5555-4555-8555-555555555555'),env,session,helpers({permissions:{pull:true,push:false,admin:false}})),error=>error.status===403&&error.code==='repository_write_required');
+});
+
+test('Fast Path retries return the original accepted request',async()=>{
+  const source=CONFIGURED_TARGETS[0],key='66666666-6666-4666-8666-666666666666';
+  const h=helpers();h.queue=async(path,body)=>{h.queueCalls.push({path,body});if(path==='/queue/status')return json({request_id:key,status:'queued',queue_position:3,intent:{project_id:source.id,selection:{kind:'branch',ref:source.branch},target_sha:'d'.repeat(40),requested_channels:['semgrep']}},200);throw new Error('must not admit duplicate');};
+  const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,refType:'PREFERRED_BRANCH'},key),env,session,h);
+  assert.equal(response.status,202);assert.deepEqual(await response.json(),{status:'queued',request_id:key,run_id:null,repository:EXECUTION_REPOSITORY,source_repository:source.repository,target_sha:'d'.repeat(40),preferred_branch:source.branch,requested_channels:['semgrep'],queue_position:3,duplicate:true});
+});
+
+test('dashboard aggregate exposes bounded request metadata without credentials',async()=>{
+  const h=helpers();h.queue=async path=>path==='/queue/recent'?json({requests:[{request_id:'77777777-7777-4777-8777-777777777777',status:'queued',created_at:'2026-10-19T00:00:00Z',intent:{project_id:CONFIGURED_TARGETS[0].id,selection:{kind:'branch',ref:CONFIGURED_TARGETS[0].branch},target_sha:'e'.repeat(40)}}]}):json({error:'not_found'},404);
+  const response=await repositoryApi(get('/api/dashboard'),env,session,h),result=await response.json();
+  assert.equal(response.status,200);assert.equal(result.projects.length,CONFIGURED_TARGETS.length);assert.equal(result.recent_requests.length,1);assert.ok(!JSON.stringify(result).includes('user-token'));
 });
 
 test('write access is required to launch and no user source repository can override the registry',async()=>{

@@ -6,15 +6,25 @@ viewer authorization, fixed-host APIs, explicit launch requests and report deliv
 `combustrrr/code-analysis-dashboard` is the only execution host for the three trusted
 project-registry entries. Users do not choose or install an execution repository.
 
-Users sign in, choose one configured project, and inspect its current report. Selecting
-a project, reading branch/PR inventory, and resolving a preview are read-only. Users
-with execution-host write access may choose a branch, open PR, or full 40-character SHA,
-review the resolved full SHA and scanner channels, and explicitly confirm. The Worker
+Users sign in to a dashboard home with aggregate health, alerts, recent-request metadata,
+global search, and project summaries. Opening **Projects** or a project remains read-only.
+On a project, **Run analysis** is the Fast Path: one action asks the Worker to resolve the
+configured preferred branch, apply trusted default channels, verify current write access,
+and queue the exact SHA. The retained report stays visible while the request is active.
+**Choose revision and scanners** opens the separate three-step custom wizard for branch,
+open-PR, or full-SHA selection, explicit channel selection, immutable-SHA review, and final
+confirmation. The Worker
 checks write access and transactionally persists an immutable `analysis-request-v2` envelope in the SQLite-backed Durable Object with source
 and fork identities, original/resolved selection, pinned SHA, optional PR context,
 requested channels, tooling/profile digests, actor, and idempotency key. A 202 means
 accepted/queued, never scanner completion. Retries with the same idempotency key return
 the existing durable request.
+
+The canonical client routes are `#/dashboard`, `#/projects`,
+`#/projects/:projectId`, `#/projects/:projectId/custom-run`, and
+`#/projects/:projectId/settings`. Older query-hash links are mapped to these routes; new
+links must use the canonical path form. Settings is read-only, and the GitHub configuration
+history link is visible only when current access includes `can_configure`.
 
 The bounded Durable Object queue is FIFO (maximum 100) with one active source-revision request globally.
 Selected channel producers for that revision may run concurrently; a request remains
@@ -22,8 +32,8 @@ active until every selected lane is terminal. The 15-minute scheduled
 `code-analysis-coordinator.yml` claims only durable accepted requests and invokes
 reusable jobs inside that same run; the Worker never dispatches workflows or uses
 GitHub Releases as a queue. Each lane
-checks out the same immutable SHA. Matching channel evidence is reused unless the user
-explicitly chooses **Run again**. Same-SHA publication replaces only successfully
+checks out the same immutable SHA. Matching channel evidence is reused automatically.
+Same-SHA publication replaces only successfully
 validated selected channels; other statuses remain distinct, including `NOT_SELECTED`,
 `NOT_APPLICABLE`, `DEFERRED`, and failure. Keep one current source-only report per
 configured project and one separately keyed PR overlay (project, PR, head repository/SHA,

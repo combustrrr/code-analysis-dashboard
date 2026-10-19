@@ -13,7 +13,10 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
   into an upstream/product repository.
 - Source-executing jobs use the configured immutable tooling revision and do not receive
   vendor or publication credentials.
-- Analysis launches are explicit only. The `analysis-request-v2` envelope pins the
+- Preferred-branch analysis launches require one explicit Fast Path action. The Worker
+  applies the operator-configured default scanner policy and resolves the immutable
+  revision before admission. Non-default revisions or channels use the separate
+  revision -> scanners -> exact-SHA review custom wizard. The `analysis-request-v2` envelope pins the
   configured project, selected SHA, tooling/profile digests, requested channels, actor,
   and idempotency key; 202 is accepted/queued, not complete.
 - Accepted requests drain FIFO from a bounded queue with one active source revision
@@ -56,6 +59,14 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
    [HANDOFF.md](HANDOFF.md) for the Worker version and Pages run.
 6. Do not retire an active host or alter an upstream repository without separate,
    explicit authorization.
+
+## Frontend route cutover
+
+The authenticated information architecture uses `#/dashboard`, `#/projects`, and
+project-scoped report, custom-run, and settings routes. Legacy query hashes are accepted
+only as inbound aliases and immediately normalized; generated navigation uses the path
+routes. Project listing, report opening, dashboard search, and settings do not enqueue
+analysis. Only Fast Path or the final custom-wizard confirmation can create a request.
 
 ## Storage Key Compatibility
 

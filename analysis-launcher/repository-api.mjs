@@ -183,10 +183,48 @@ export async function repositoryApi(request, env, session, helpers) {
       })),
     });
   }
+  if(request.method==='GET'&&url.pathname==='/api/dashboard'){
+    const {repository,configuration}=await context();const checkedAt=new Date().toISOString();const alerts=[];
+    const projects=await Promise.all(configuration.projects.map(async project=>{let current_report=null,queued_requests=0;
+      const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
+      try{const response=await publicReports(new Request(reportUrl),env);if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);queued_requests=(manifest.requests||[]).filter(value=>!['published','reused','failed','superseded'].includes(value.status)).length;if(target)current_report={status:target.report_status||target.status,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null};if(manifest.publication_error)alerts.push({id:`publication-${project.id}`,project_id:String(project.id),severity:'error',title:'Report publication needs attention',message:String(manifest.publication_error)});}}
+      catch{alerts.push({id:`report-${project.id}`,project_id:String(project.id),severity:'warning',title:'Project summary unavailable',message:'The current report summary could not be read.'});}
+      return{id:String(project.id),source_repository:project.source_repository.full_name,preferred_branch:project.preferred_branch,current_report,queued_requests};}));
+    let recent=[];try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();const allowed=new Map(projects.map(project=>[project.id,project.source_repository]));recent=(payload.requests||[]).filter(row=>allowed.has(String(row.intent?.project_id))).map(row=>({request_id:row.request_id,project_id:String(row.intent.project_id),source_repository:allowed.get(String(row.intent.project_id)),ref_type:row.intent.selection?.kind||'revision',ref:row.intent.selection?.ref||row.intent.target_sha,target_sha:row.intent.target_sha,status:row.status,created_at:row.created_at,updated_at:row.completed_at||row.created_at,run_url:row.result?.run_id?`https://github.com/${repository.full_name}/actions/runs/${row.result.run_id}`:undefined}));}}catch{alerts.push({id:'recent-requests',severity:'warning',title:'Recent request metadata unavailable',message:'Current project reports remain available.'});}
+    return json({checked_at:checkedAt,freshness:'fresh',health:{status:alerts.some(alert=>alert.severity==='error')?'degraded':alerts.length?'unknown':'healthy',message:alerts.length?'Some aggregate evidence is unavailable.':'Control plane and project summaries responded.'},alerts,projects,recent_requests:recent,execution_repository:{id:repository.id,full_name:repository.full_name},can_launch:repository.permissions.push===true,can_configure:repository.permissions.admin===true});
+  }
   if (request.method === 'GET' && url.pathname === '/api/project-identity') {
     const {configuration} = await context();
     const {project,source} = await projectFor(configuration,url.searchParams.get('project_id'));
     return json({project_id:String(project.id),source_repository_id:source.id});
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/project-launch-fast') {
+    const input=await requestBody();
+    if(!input||Object.keys(input).sort().join(',')!=='projectId,refType'||input.refType!=='PREFERRED_BRANCH')throw new Failure(400,'Fast Path accepts only the configured preferred branch intent.','invalid_fast_path_intent');
+    const idempotencyKey=request.headers.get('Idempotency-Key')||'';
+    if(!/^[0-9a-f-]{36}$/i.test(idempotencyKey))throw new Failure(400,'A request idempotency key is required.','invalid_idempotency_key');
+    const {repository,configuration}=await context('push');
+    const {project,source}=await projectFor(configuration,input.projectId);
+    if(!project.preferred_branch)throw new Failure(409,'The trusted project has no preferred branch.','preferred_branch_unavailable');
+    const requestId=requestIdFromKey(idempotencyKey);
+    const prior=await queue('/queue/status',{request_id:requestId});
+    if(prior.ok){
+      const row=await prior.json();
+      if(String(row.intent?.project_id)!==String(project.id)||row.intent?.selection?.kind!=='branch'||row.intent?.selection?.ref!==project.preferred_branch)throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
+      return json({status:row.status,request_id:requestId,run_id:row.result?.run_id||null,repository:repository.full_name,source_repository:source.full_name,target_sha:row.intent.target_sha,preferred_branch:project.preferred_branch,requested_channels:row.intent.requested_channels,queue_position:row.queue_position??null,duplicate:true},202);
+    }
+    const current=await revisionSnapshot(configuration,project,source,{kind:'branch',ref:project.preferred_branch});
+    const requestedChannels=current.channels.filter(channel=>channel.default_selected&&channel.selectable).map(channel=>channel.id);
+    if(!requestedChannels.length)throw new Failure(409,'The trusted project has no usable default scanner channel.','default_channels_unavailable');
+    if(SCANNER_GROUPS.some(group=>group.some(channel=>requestedChannels.includes(channel))&&!group.every(channel=>requestedChannels.includes(channel))))throw new Failure(409,'The trusted default scanner policy contains an incomplete shared lane.','default_channels_unavailable');
+    const actor=await github('user',token);const targetSha=current.target_sha;
+    const intent={schema_version:'analysis-request-v2',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection:current.selection,resolved_selection:{repository:source.full_name,repository_id:source.id,kind:'commit',ref:targetSha},target_sha:targetSha,pr_context:null,requested_channels:[...requestedChannels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:idempotencyKey.toLowerCase(),run_again:false,preview_id:crypto.randomUUID(),created_at:new Date().toISOString()};
+    const admitted=await queue('/queue/admit',{request:intent});const admittedBody=await admitted.json();
+    if(admitted.status===429)throw new Failure(429,'The global analysis queue has 100 pending requests.','queue_full');
+    if(admitted.status===409)throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
+    if(!admitted.ok)throw new Failure(503,'The analysis queue is temporarily unavailable; no request was accepted.','queue_unavailable');
+    return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,source_repository:source.full_name,target_sha:targetSha,preferred_branch:project.preferred_branch,requested_channels:[...requestedChannels].sort(),queue_position:admittedBody.queue_position??null,duplicate:admittedBody.duplicate===true},202);
   }
 
   if (request.method === 'POST' && url.pathname === '/api/project-preview') {

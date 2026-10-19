@@ -48,7 +48,7 @@ test('view access requires login and clears on logout',async({page,context})=>{
 
 test('cancellation and exchange failures stay on the public shell',async({page,context})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
- const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+ const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type, Idempotency-Key','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
  let attempts=0;let sessionChecks=0;let reportRequests=0;
  await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());
@@ -336,17 +336,18 @@ test('authorized user follows one repository project from selection through publ
      {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false},
      {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:false},
     ]}});
+    if(url.pathname==='/api/dashboard')return route.fulfill({headers,json:{checked_at:new Date().toISOString(),freshness:'fresh',health:{status:'healthy',message:'Control plane and project summaries responded.'},alerts:[],projects:[{id:project,source_repository:source,preferred_branch:'Testing',current_report:null,queued_requests:0}],recent_requests:[],execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false}});
    if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:project,checked_at:new Date().toISOString(),preferred_branch:'Testing',current_overlay:{schema_version:'analysis-pr-overlay-v1',overlay_key:'overlay-seven',status:'complete',head_sha:sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel,documents:{'pr-overlay.json':overlayAssetName},assets:{[overlayAssetName]:{sha256:createHash('sha256').update(compressedOverlay).digest('hex'),bytes:compressedOverlay.byteLength}}},targets:published?[{id:'published-target',label:'Testing',repository:source,source_repository:source,head_sha:sha,kind:'branch',branch:'Testing',checked_at:new Date().toISOString(),status:'partial',collected_run:43,documents:{'report.json':assetName,'findings.json':assetName},assets}]:[]}});
    if(url.pathname==='/api/public/asset')return route.fulfill({headers,body:url.searchParams.get('overlay')==='current'?compressedOverlay:compressedReport});
   if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:source,branches:[{name:'Testing',sha}],prs:[]}});
    const channels=[{id:'semgrep',channel:'semgrep',mode:'portable',group:'semgrep',status:'configured',reason:'',default_selected:true,selectable:true}];
    if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{tooling_sha:'e'.repeat(40),channels}});
    if(url.pathname==='/api/project-preview')return route.fulfill({headers,json:{preview_id:'preview-access',preview_token:'signed-preview',previewed_at:new Date().toISOString(),project_id:project,source_repository:source,source_repository_id:1278177697,selection:{kind:'branch',ref:'Testing'},target_sha:sha,pr_context:null,tooling_sha:'e'.repeat(40),profile_digest:'f'.repeat(64),channels,cached_channels:[]}});
-   if(url.pathname==='/api/project-launch'){
+    if(url.pathname==='/api/project-launch-fast'){
     launches++;
-     expect(route.request().postDataJSON()).toMatchObject({project_id:project,preview_token:'signed-preview',requested_channels:['semgrep'],run_again:false});
-     expect(route.request().postDataJSON().idempotency_key).toMatch(/^[a-f0-9-]{36}$/);
-   return route.fulfill({headers,status:202,json:{request_id:'flow-request',run_id:42,queue_position:2}});
+      expect(route.request().postDataJSON()).toEqual({projectId:project,refType:'PREFERRED_BRANCH'});
+      expect(route.request().headers()['idempotency-key']).toMatch(/^[a-f0-9-]{36}$/);
+    return route.fulfill({headers,status:202,json:{status:'queued',request_id:'flow-request',run_id:42,queue_position:2,source_repository:source,target_sha:sha,preferred_branch:'Testing',requested_channels:['semgrep']}});
   }
   if(url.pathname==='/api/project-activity'){
    activityReads++;const isPublished=activityReads>1;published=isPublished;
@@ -359,29 +360,22 @@ test('authorized user follows one repository project from selection through publ
    await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
    await expect(page.locator('.landing-actions').getByRole('button',{name:'Open workspace'})).toBeVisible();
    await page.locator('.landing-actions').getByRole('button',{name:'Open workspace'}).click();
-    await expect(page.getByRole('heading',{name:'Choose a codebase'})).toBeVisible();
+     await expect(page.getByRole('heading',{name:'Evidence across your codebases'})).toBeVisible();
+     await page.getByRole('link',{name:'Projects',exact:true}).click();
+     await expect(page.getByRole('heading',{name:'Choose a codebase'})).toBeVisible();
     await expect(page.locator('.target-card')).toHaveCount(3);
     await expect(page.locator('.target-card').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('analyzed Unavailable');
     await expect(page.getByText('OBSERVER · READ-ONLY SOURCE')).toHaveCount(2);
     await expect(page.getByText('CONNECTED · SELF-ANALYSIS')).toHaveCount(1);
     await page.locator('.target-card').filter({hasText:source}).getByRole('button',{name:'Open report'}).click();
-    await expect(page).toHaveURL(new RegExp(`#repository=${encodeURIComponent(execution)}&project=${project}&tab=overview`));
+     await expect(page).toHaveURL(new RegExp(`#/projects/${project}`));
     await expect(page.getByRole('heading',{name:'Separate PR review overlay · #7'})).toBeVisible();
    await expect(page.getByText('Review fixture advisory')).toBeVisible();
   await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toBeVisible();
-  const selected=new URLSearchParams(new URL(page.url()).hash.slice(1));
-  expect(selected.get('repository')).toBe(execution);
-  expect(selected.get('project')).toBe(project);
+   expect(new URL(page.url()).hash).toContain(`#/projects/${project}`);
   expect(new URL(page.url()).hash).not.toContain(source);
   expect(launches).toBe(0);
   await page.getByRole('button',{name:'Run analysis',exact:true}).click();
-   const dialog=page.getByRole('dialog',{name:'Choose revision and scanners'});
-   await dialog.getByRole('radio',{name:'Branch'}).click();
-    await dialog.getByRole('combobox',{name:'Revision'}).click();
-   await dialog.getByRole('combobox',{name:'Revision'}).press('ArrowDown');
-   await dialog.getByRole('combobox',{name:'Revision'}).press('Enter');
-  await dialog.getByRole('button',{name:'Review exact revision'}).click();
-  await page.getByRole('dialog',{name:'Review analysis request'}).getByRole('button',{name:'Confirm and queue analysis'}).click();
  await expect(page.getByText('Analysis is running against the selected revision.')).toBeVisible();
  await expect(page.getByText(/FIFO queue position:/)).toContainText('2');
  await expect(page.getByText(`Resolved source commit: ${sha}`)).toBeVisible();

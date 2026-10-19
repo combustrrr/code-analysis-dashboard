@@ -1,0 +1,16 @@
+import {useRef,useState} from 'react';
+import {Alert,Button,message,Space,Tooltip} from 'antd';
+import {PlayCircleOutlined} from '@ant-design/icons';
+import type {useLaunchAuth} from './useLaunchAuth';
+import type {ProjectRunRequest} from './ProjectRunTracker';
+
+type Auth=ReturnType<typeof useLaunchAuth>;
+type Receipt={status:'queued';request_id:string;run_id:number|null;queue_position?:number|null;source_repository:string;target_sha:string;preferred_branch:string;requested_channels:string[]};
+export function FastPathRunAction({auth,projectId,repository,preferredBranch,canLaunch,active,blockedReason,warning,onAccepted}:{auth:Auth;projectId:string;repository:string;preferredBranch?:string;canLaunch:boolean;active:boolean;blockedReason?:string;warning?:string;onAccepted:(request:ProjectRunRequest)=>void}){
+ const [state,setState]=useState<'idle'|'resolving'|'error'>('idle');const [error,setError]=useState('');const key=useRef('');const locked=useRef(false);
+ const disabledReason=active?'An analysis request for this project is already queued or active.':!canLaunch?'Write access to the execution host is required.':blockedReason||(!preferredBranch?'The trusted project has no preferred branch.':undefined);
+ const run=async()=>{if(locked.current||disabledReason)return;locked.current=true;if(!key.current)key.current=crypto.randomUUID();setState('resolving');setError('');
+  try{const receipt=await auth.api<Receipt>('project-launch-fast',{projectId,refType:'PREFERRED_BRANCH'},{'Idempotency-Key':key.current});onAccepted({repository,source_repository:receipt.source_repository,project:projectId,kind:'branch',ref:receipt.preferred_branch,target_sha:receipt.target_sha,requested_channels:receipt.requested_channels,request_id:receipt.request_id,run_id:receipt.run_id,queue_position:receipt.queue_position,submittedAt:new Date().toISOString(),phase:'queued'});message.success('Analysis queued. The current report remains visible while evidence is collected.');key.current='';setState('idle');}
+  catch(reason){setError(reason instanceof Error?reason.message:'The request was not accepted.');setState('error');}finally{locked.current=false;}};
+ return <section className="fast-path" aria-label="Preferred branch analysis"><div><div className="eyebrow">FAST PATH</div><h2>Analyze the preferred branch</h2><p><code>{preferredBranch||'Not configured'}</code> · trusted default scanners · exact commit resolved by the service</p></div><Space direction="vertical" align="end"><Tooltip title={disabledReason}><span><Button size="large" type="primary" icon={<PlayCircleOutlined/>} disabled={!!disabledReason} loading={state==='resolving'} onClick={run}>{state==='resolving'?'Resolving preferred branch…':active?'Analysis in progress':'Run analysis'}</Button></span></Tooltip><a href={`#/projects/${encodeURIComponent(projectId)}/custom-run?repository=${encodeURIComponent(repository)}`}>Choose revision and scanners</a></Space>{warning&&<Alert type="warning" showIcon title="Coverage limitation" description={warning}/>} {error&&<Alert type="error" showIcon title="Analysis was not queued" description={<>{error} <Button size="small" onClick={run}>Retry same request</Button></>}/>}<span className="sr-only" aria-live="polite">{state==='resolving'?'Resolving preferred branch.':''}</span></section>;
+}

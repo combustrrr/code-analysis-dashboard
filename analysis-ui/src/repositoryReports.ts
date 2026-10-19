@@ -15,7 +15,7 @@ export async function reportFetch(path:string,init:RequestInit={}) {
  if(reportBearer && [401,403].includes(response.status))window.dispatchEvent(new Event('analysis-access-denied'));
  return response;
 }
-function selection() {const p=new URLSearchParams(location.hash.slice(1));return {repository:p.get('repository'),project:p.get('project'),target:p.get('target')};}
+function selection() {const route=parseAppRoute();return 'projectId' in route?{repository:route.repository||import.meta.env.VITE_DEFAULT_EXECUTION_REPOSITORY||'combustrrr/code-analysis-dashboard',project:route.projectId,target:route.kind==='project'?route.target||null:null}:{repository:null,project:null,target:null};}
 export function hasRepositorySelection() {const s=selection();return !!(applicationEndpoint&&s.repository&&s.project);}
 async function response(path:string,signal?:AbortSignal) {
  const r=await reportFetch(path,{signal});if(!r.ok){let payload:{error?:string;code?:string}={};try{payload=await r.json();}catch{}const error=new Error(payload.error||'Report unavailable.') as Error & {status?:number;code?:string};error.status=r.status;error.code=payload.code;throw error;}return r;
@@ -63,3 +63,4 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
  if(!(document in documents))throw new Error('Report document missing from verified asset.');
  return documents[document] as T;
 }
+import {parseAppRoute} from './appRoutes';

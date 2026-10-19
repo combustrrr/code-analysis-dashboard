@@ -2,19 +2,20 @@ import {useEffect,useState,type ReactNode} from 'react';
 import {Alert,Button,ConfigProvider,Segmented,Space,theme} from 'antd';
 import {pendingAuthDestination,restoreAuthDestination,useLaunchAuth} from './useLaunchAuth';
 import {applicationEndpoint,setReportSession} from './repositoryReports';
+import {isWorkspaceRoute,routeHash} from './appRoutes';
 
 export function DashboardAccess({children,publicFallback}:{children:(auth?:ReturnType<typeof useLaunchAuth>)=>ReactNode;publicFallback?:(auth:ReturnType<typeof useLaunchAuth>,accessError?:string,accessPending?:boolean,workspaceRequested?:boolean)=>ReactNode}) {
  const auth=useLaunchAuth(applicationEndpoint);
  const [required,setRequired]=useState<boolean>();
   const [verified,setVerified]=useState<string>();
   const [error,setError]=useState('');
-  const [workspaceRequested,setWorkspaceRequested]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories'||new URLSearchParams((pendingAuthDestination()||'').split('#')[1]||'').get('tab')==='repositories');
+  const [workspaceRequested,setWorkspaceRequested]=useState(()=>isWorkspaceRoute()||Boolean(pendingAuthDestination()?.includes('#/')));
  const [dark,setDark]=useState(()=>localStorage.getItem('analysis-theme')!=='light');
   useEffect(()=>{if(!applicationEndpoint)return;let active=true;
    fetch(applicationEndpoint+'/api/public/config',{cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error('Access configuration unavailable.');return r.json();}).then(c=>{if(active)setRequired(c.require_login===true||c.require_report_login===true);}).catch(()=>{if(active)setError('Could not verify dashboard access. Reload to retry.');});return()=>{active=false;};
   },[]);
   useEffect(()=>{
-   const update=()=>setWorkspaceRequested(new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories');
+   const update=()=>setWorkspaceRequested(isWorkspaceRoute());
    window.addEventListener('hashchange',update);
    return()=>window.removeEventListener('hashchange',update);
   },[]);
@@ -31,9 +32,9 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
      const restored=restoreAuthDestination();
      if(sessionStorage.getItem('analysis-workspace-requested')==='true') {
       sessionStorage.removeItem('analysis-workspace-requested');
-      if(new URLSearchParams(location.hash.slice(1)).get('tab')!=='repositories')location.hash='#tab=repositories';
+      if(!isWorkspaceRoute())location.hash=routeHash({kind:'dashboard'});
       setWorkspaceRequested(true);
-     } else if(restored) setWorkspaceRequested(new URLSearchParams(location.hash.slice(1)).get('tab')==='repositories');
+     } else if(restored) setWorkspaceRequested(isWorkspaceRoute());
    } catch {}
   },[auth.session?.token,verified]);
    if(!applicationEndpoint)return children(auth.available?auth:undefined);

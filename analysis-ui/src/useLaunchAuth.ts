@@ -136,10 +136,10 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
     })();
   }, [origin]);
 
-  const api = useCallback(async function api<T>(path: string, body?: unknown): Promise<T> {
+  const api = useCallback(async function api<T>(path: string, body?: unknown, extraHeaders: Record<string,string> = {}): Promise<T> {
     if (!origin || !session) throw new Error('Sign in to view dashboard data.');
     const response = await fetch(`${origin}/api/${path}`, { method: body ? 'POST' : 'GET', cache: 'no-store', credentials: 'omit',
-      headers: { Authorization: `Bearer ${session.token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+      headers: { Authorization: `Bearer ${session.token}`, ...(body ? { 'Content-Type': 'application/json' } : {}), ...extraHeaders }, ...(body ? { body: JSON.stringify(body) } : {}) });
     const result = await response.json();
     if (!response.ok) {
       const authFailure = ['viewer_not_authorized','session_invalid','exchange_invalid','exchange_expired','exchange_store_unavailable','oauth_exchange_failed','oauth_state_mismatch'].includes(result.code || '');
