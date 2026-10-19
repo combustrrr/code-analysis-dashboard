@@ -48,7 +48,7 @@ jobs:
     permissions:
       contents: read
       actions: read
-    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source.yml@f10e6a6fe64998908c1f19ec560238448621d1e9
+    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source.yml@2406a4ecea9634b201b44a1c8f1aa0e8fbff4537
     with:
       tooling_sha: ${{ inputs.tooling_sha }}
       target: ${{ inputs.target }}
@@ -59,7 +59,7 @@ jobs:
     permissions:
       contents: read
       actions: read
-    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source-full.yml@f10e6a6fe64998908c1f19ec560238448621d1e9
+    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-source-full.yml@2406a4ecea9634b201b44a1c8f1aa0e8fbff4537
     with:
       tooling_sha: ${{ inputs.tooling_sha }}
       target: ${{ inputs.target }}
@@ -68,7 +68,7 @@ jobs:
     needs: validate-request
     permissions:
       contents: read
-    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-vendor.yml@f10e6a6fe64998908c1f19ec560238448621d1e9
+    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-vendor.yml@2406a4ecea9634b201b44a1c8f1aa0e8fbff4537
     with:
       tooling_sha: ${{ inputs.tooling_sha }}
       target: ${{ inputs.target }}
