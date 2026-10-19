@@ -41,12 +41,12 @@ def terminal_queue_request(state, published, request_id):
         return active
     receipt = next((row for row in state.get('requests', [])
                     if row.get('request_id') == request_id), None)
-    if not receipt or not receipt.get('scan_run_id'):
+    if not receipt:
         return None
     recent = next((run for run in published.get('recent_runs', [])
                    if (run.get('client_request_id') or run.get('request_id')) == request_id
-                   and run.get('scan_run_id') == receipt.get('scan_run_id')
-                   and run.get('run_attempt') == receipt.get('run_attempt')), None)
+                   and (not receipt.get('scan_run_id') or run.get('scan_run_id') == receipt.get('scan_run_id'))
+                   and (not receipt.get('run_attempt') or run.get('run_attempt') == receipt.get('run_attempt'))), None)
     if not recent:
         return None
     return {**receipt, **recent, 'client_request_id': request_id,
