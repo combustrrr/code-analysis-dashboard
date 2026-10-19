@@ -18,7 +18,12 @@ def reusable_source(portable=True):
     trigger = document.pop('on', document.pop(True, None))
     import re
     secret_names = sorted(set(re.findall(r'secrets\.([A-Z_]+)', yaml.safe_dump(document))))
-    document['on'] = {'workflow_call': {'inputs':trigger['workflow_dispatch']['inputs'], 'secrets':{name:{'required':False} for name in secret_names}}}
+    # dispatch_id names the outer source workflow run. The nested reusable
+    # producers validate and assemble by durable request_id, so requiring the
+    # outer-only input makes an otherwise valid caller fail at workflow startup.
+    reusable_inputs = {name: value for name, value in trigger['workflow_dispatch']['inputs'].items()
+                       if name != 'dispatch_id'}
+    document['on'] = {'workflow_call': {'inputs':reusable_inputs, 'secrets':{name:{'required':False} for name in secret_names}}}
     for job in document['jobs'].values():
         steps = []
         for step in job['steps']:
