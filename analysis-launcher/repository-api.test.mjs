@@ -156,6 +156,7 @@ test('launch persists a pinned v2 envelope and idempotent request identity',asyn
   try {
     const response=await repositoryApi(post('/api/project-launch',input),env,session,h);
     assert.equal(response.status,202);
+    assert.equal((await response.clone().json()).queue_position,1);
     assert.equal(envelope.schema_version,'analysis-request-v2');
     assert.equal(envelope.selection.kind,'pr');
     assert.equal(envelope.resolved_selection.kind,'commit');
@@ -170,7 +171,9 @@ test('launch persists a pinned v2 envelope and idempotent request identity',asyn
     assert.equal(envelope.actor_id,73);
     const duplicate=await repositoryApi(post('/api/project-launch',input),env,session,h);
     assert.equal(duplicate.status,202);
-    assert.equal((await duplicate.json()).request_id,input.idempotency_key);
+    const duplicateBody=await duplicate.json();
+    assert.equal(duplicateBody.request_id,input.idempotency_key);
+    assert.equal(duplicateBody.queue_position,1);
     assert.equal(h.calls.filter(call=>call.path.endsWith('/dispatches')).length,1);
   } finally {globalThis.fetch=originalFetch;}
 });

@@ -1,5 +1,16 @@
 # Current implementation state
 
+## Local post-rollout hardening (not deployed)
+
+The current worktree closes configured-source follow-up gaps without changing the
+same-tab sign-in boundary: all missing scanner lane groups for one accepted revision
+fan out in one producer workflow, launch/activity responses expose FIFO queue position,
+and Python registry validation now rejects native feedback for every target. Opt-in
+vendor jobs consume a one-day source snapshot made by a separate credentialless
+checkout job; credential-bearing jobs cannot check out source or run project-controlled
+setup/test commands. These changes are locally validated only until a later authorized
+deployment updates the verified versions below.
+
 The latest verified Pages deployment is run `38889165977` for main commit
 `5fac872f0b30fe1f116185793a8ffe0846b6304a`; live HTML references
 `assets/index-DBJkr9AJ.js` and `assets/index-DnQgVVvr.css`, both verified `200`. The

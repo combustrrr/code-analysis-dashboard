@@ -8,6 +8,7 @@ const SHA = /^[a-f0-9]{40}$/i;
 const DIGEST = /^[a-f0-9]{64}$/i;
 
 const stable = value => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value);
+const orderedRequests = assets => (assets||[]).filter(asset=>asset.name?.startsWith('request-')&&asset.name.endsWith('.json')).sort((left,right)=>String(left.created_at||'').localeCompare(String(right.created_at||''))||Number(left.id||0)-Number(right.id||0));
 const CHANNEL_LANES = {'eslint':'typescript-quality','typescript':'typescript-quality','github-secret-protection-posture':'workflow-security-posture','github-actions-security':'workflow-security-posture','radon':'complexity','xenon':'complexity','shipping-image-cves':'shipping-image-security','sbom-license-provenance':'shipping-image-security','bandit':'python-bandit','ruff':'python-ruff','pyright':'python-types','coverage':'test-coverage','vulture':'dead-code','atheris':'atheris-state-machine','schemathesis':'schemathesis-fuzz','osv':'osv-scanner','snyk':'snyk','sonarqube-cloud':'sonar','coderabbit-ai-advisory':'coderabbit'};
 export function channelProgress(requested, jobs, runStatus) {
   return (requested||[]).map(channel=>{
@@ -145,7 +146,7 @@ export async function repositoryApi(request, env, session, helpers) {
       if (!resolved.head?.repo?.full_name || !Number.isSafeInteger(resolved.head.repo.id) || !SHA.test(resolved.base?.sha || '') || !resolved.base?.ref) throw new Failure(409, 'Pull request source or base is unavailable; refresh the inventory.', 'revision_unavailable');
       prContext = {number:resolved.number, title:String(resolved.title || ''), draft:resolved.draft === true, head_repository:resolved.head.repo.full_name, head_repository_id:resolved.head.repo.id, head_branch:resolved.head.ref, head_sha:resolved.head.sha.toLowerCase(), base_repository:resolved.base.repo?.full_name || source.full_name, base_branch:resolved.base.ref, base_sha:resolved.base.sha.toLowerCase()};
     }
-    const profile = {enabled_scanners:[...project.enabled_scanners].sort(),deferred_channels:project.deferred_channels || {},native_feedback_enabled:project.native_feedback_enabled===true,profile:project.profile || {}};
+    const profile = {enabled_scanners:[...project.enabled_scanners].sort(),deferred_channels:project.deferred_channels || {},native_feedback_enabled:false,profile:project.profile || {}};
     const profileDigest = await digest(profile);
     const channels = scannerChoices(project).map(channel=>{
       if(channel.id==='coderabbit-ai-advisory'&&selection.kind!=='pr')return {...channel,status:'NOT_APPLICABLE',reason:'CodeRabbit review evidence requires an open pull request.',default_selected:false,selectable:false};
@@ -175,7 +176,7 @@ export async function repositoryApi(request, env, session, helpers) {
         source_repository_id: project.source_repository.id,
         relationship: project.relationship,
         preferred_branch: project.preferred_branch,
-        native_feedback_enabled: project.native_feedback_enabled === true,
+        native_feedback_enabled: false,
         readiness_summary:{configured_channels:project.enabled_scanners.length,vendor_channels:project.enabled_scanners.filter(channel=>VENDOR_SCANNERS.has(channel)).length},
          current_report,current_overlay,queued_requests,
        };
@@ -243,10 +244,20 @@ export async function repositoryApi(request, env, session, helpers) {
 
     const id = url.searchParams.get('request_id');
     if (!/^[a-f0-9-]{36}$/.test(id || '')) throw new Failure(400, 'Choose a project and request.', 'invalid_request');
+    const queuePosition = async () => {
+      try {
+        const releases=await pages(`repos/${repository.full_name}/releases`,appToken);
+        const queue=releases.find(value=>value.tag_name==='analysis-requests');
+        if(!queue)return null;
+        const pending=orderedRequests(await pages(`repos/${repository.full_name}/releases/${queue.id}/assets`,appToken));
+        const index=pending.findIndex(asset=>asset.name===`request-${id}.json`);
+        return index<0?null:index+1;
+      } catch { return null; }
+    };
     const reportUrl = new URL('/api/public/manifest', url);
     reportUrl.search = new URLSearchParams({repository:repository.full_name,project_id:project.id});
     const response = await publicReports(new Request(reportUrl), env);
-    if (!response.ok) return json({phase:'queued',request_id:id,checked_at:new Date().toISOString(),publication_status:'unavailable',message:'Request is queued successfully. Publication status is temporarily unavailable; the request remains retained.'},202);
+    if (!response.ok) return json({phase:'queued',request_id:id,queue_position:await queuePosition(),checked_at:new Date().toISOString(),publication_status:'unavailable',message:'Request is queued successfully. Publication status is temporarily unavailable; the request remains retained.'},202);
     const manifest = await response.json();
     const receipt = manifest.requests?.find(row => row.request_id === id);
     const canonical = canonicalReportTarget(manifest);
@@ -258,8 +269,8 @@ export async function repositoryApi(request, env, session, helpers) {
       if (recent && canonical && recent.analyzed_sha === canonical.analyzed_sha && recent.original_target_id === canonical.original_target_id) row = {...canonical,...recent};
       else if (recent) return json({phase:'superseded',source_sha:recent.head_sha,request_id:id,checked_at:new Date().toISOString()});
     }
-    if (!row) return json({phase:'queued',request_id:id,checked_at:new Date().toISOString()});
-    const result = {request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'queued',checked_at:new Date().toISOString()};
+    if (!row) return json({phase:'queued',request_id:id,queue_position:await queuePosition(),checked_at:new Date().toISOString()});
+    const result = {request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'queued',queue_position:await queuePosition(),checked_at:new Date().toISOString()};
     if (row.scan_run_id) {
       const run = await github(`repos/${repository.full_name}/actions/runs/${row.scan_run_id}/attempts/${row.run_attempt}`, appToken);
       if (run.head_sha !== row.execution_sha) throw new Failure(409, 'Producer revision does not match the request.', 'producer_mismatch');
@@ -311,8 +322,8 @@ export async function repositoryApi(request, env, session, helpers) {
       try {queue = await github(`repos/${repository.full_name}/releases`,token,{method:'POST',body:JSON.stringify({tag_name:'analysis-requests',name:'Analysis request queue',body:'Durable pending analysis requests. Processed entries are removed.',make_latest:'false'})});}
       catch {queue=(await pages(`repos/${repository.full_name}/releases`,token)).find(value=>value.tag_name==='analysis-requests');if(!queue)throw new Failure(502,'Could not persist the analysis request.','persistence_failed');}
     }
-    const pending = await pages(`repos/${repository.full_name}/releases/${queue.id}/assets`,token);
-    if (pending.filter(asset=>asset.name.startsWith('request-')).length>=100) throw new Failure(429,'The global analysis queue has 100 pending requests. Wait for reconciliation before submitting another.','queue_full');
+    const pending = orderedRequests(await pages(`repos/${repository.full_name}/releases/${queue.id}/assets`,token));
+    if (pending.length>=100) throw new Failure(429,'The global analysis queue has 100 pending requests. Wait for reconciliation before submitting another.','queue_full');
     const existingAsset=pending.find(asset=>asset.name===`request-${requestId}.json`);
     if (existingAsset) {
       const assetResponse=await fetch(`https://api.github.com/repos/${repository.full_name}/releases/assets/${existingAsset.id}`,{headers:{Authorization:`Bearer ${token}`,Accept:'application/octet-stream','User-Agent':'code-analysis-application'}});
@@ -320,7 +331,7 @@ export async function repositoryApi(request, env, session, helpers) {
       const previous=await assetResponse.json();
       const mismatch=previous.project_id!==project.id?'project':previous.target_sha!==targetSha?'target':previous.actor_id!==actor.id?'actor':stable(previous.selection)!==stable(current.selection)?'selection':stable(previous.pr_context||null)!==stable(current.pr_context)?'pull_request':stable([...(previous.requested_channels||[])].sort())!==stable([...input.requested_channels].sort())?'channels':'';
       if (mismatch) throw new Failure(409,'This idempotency key already identifies a different analysis request.',`idempotency_conflict_${mismatch}`);
-      return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,warning:'This idempotent analysis request is already persisted and awaiting reconciliation.'},202);
+      return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,queue_position:pending.indexOf(existingAsset)+1,warning:'This idempotent analysis request is already persisted and awaiting reconciliation.'},202);
     }
     const reportUrl = new URL('/api/public/manifest',url);
     reportUrl.search = new URLSearchParams({repository:repository.full_name,project_id:project.id});
@@ -340,8 +351,8 @@ export async function repositoryApi(request, env, session, helpers) {
     if (!saved.ok) throw new Failure(502,'Could not persist the analysis request; no scan was confirmed.','persistence_failed');
     let result;
     try {result=await github(`repos/${repository.full_name}/actions/workflows/code-analysis-reconcile.yml/dispatches`,token,{method:'POST',body:JSON.stringify({ref:repository.default_branch,return_run_details:true})});}
-    catch {return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,warning:'Request saved. Immediate dispatch failed; repository reconciliation will recover it.'},202);}
-    return json({status:'submitted',request_id:requestId,run_id:result?.workflow_run_id||null,repository:repository.full_name},202);
+    catch {return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,queue_position:pending.length+1,warning:'Request saved. Immediate dispatch failed; repository reconciliation will recover it.'},202);}
+    return json({status:'submitted',request_id:requestId,run_id:result?.workflow_run_id||null,repository:repository.full_name,queue_position:pending.length+1},202);
   }
 
   if (request.method === 'POST' && ['/api/connections/preview','/api/connections/install','/api/projects/preview'].includes(url.pathname)) {

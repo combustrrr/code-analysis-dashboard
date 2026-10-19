@@ -5,8 +5,10 @@ import type {ProjectRunRequest} from './ProjectRunTracker';
 type Auth=ReturnType<typeof useLaunchAuth>;
 type Selection={kind:'branch'|'pr'|'commit';ref:string};
 type Channel={id:string;mode:'portable'|'vendor';group:string;status:string;reason:string;default_selected:boolean;selectable:boolean};
-type Inventory={repository:string;checked_at:string;inventory_complete:boolean;inventory_warning?:string|null;branches:{name:string;sha:string}[];prs:{number:number;title:string;draft:boolean;available:boolean;unavailable_reason?:string;head_branch:string;head_sha:string;head_repository:string|null;base_sha:string;base_branch:string}[]};
+type Inventory={repository:string;checked_at:string;inventory_complete:boolean;inventory_warning?:string|null;branches:{name:string;sha?:string}[];prs:{number:number;title:string;draft:boolean;available:boolean;unavailable_reason?:string;head_branch:string;head_sha:string;head_repository:string|null;base_sha:string;base_branch:string}[]};
 type Preview={preview_id:string;preview_token:string;previewed_at:string;project_id:string;source_repository:string;source_repository_id:number;selection:Selection;target_sha:string;pr_context:{number:number;title:string;draft:boolean;head_repository:string;head_branch:string;head_sha:string;base_repository:string;base_branch:string;base_sha:string}|null;tooling_sha:string;profile_digest:string;channels:Channel[];cached_channels:string[]};
+
+function shortSha(value:unknown){return typeof value==='string'&&value?value.slice(0,12):'Unavailable';}
 
 export function ProjectLauncher({auth,repository,project,close,onSubmitted}:{auth:Auth;repository:string;project:string;close:()=>void;onSubmitted:(request:ProjectRunRequest)=>void}) {
  const [readiness,setReadiness]=useState<{channels:Channel[];tooling_sha:string}>();
@@ -50,7 +52,7 @@ export function ProjectLauncher({auth,repository,project,close,onSubmitted}:{aut
   if(!preview)return;
   setBusy(true);setError('');
   try {
-   const receipt=await auth.api<{run_id:number|null;request_id:string}>('project-launch',{project_id:project,preview_token:preview.preview_token,requested_channels:channels,idempotency_key:idempotencyKey,run_again:runAgain});
+   const receipt=await auth.api<{run_id:number|null;request_id:string;queue_position?:number|null}>('project-launch',{project_id:project,preview_token:preview.preview_token,requested_channels:channels,idempotency_key:idempotencyKey,run_again:runAgain});
    onSubmitted({...receipt,repository,source_repository:preview.source_repository,project,kind:preview.selection.kind,ref:preview.selection.ref,target_sha:preview.target_sha,requested_channels:channels,pr_context:preview.pr_context||undefined,submittedAt:new Date().toISOString()});
   } catch(reason) {setError(reason instanceof Error?reason.message:'Could not queue this analysis request.');setBusy(false);}
  };
@@ -62,7 +64,7 @@ export function ProjectLauncher({auth,repository,project,close,onSubmitted}:{aut
   <Descriptions column={1} items={[{key:'execution',label:'Execution repository',children:repository},{key:'source',label:'Source',children:inventory?.repository||'Loading…'}]}/>
   {!review&&<>
     <Radio.Group aria-label="Revision type" value={kind} onChange={event=>{setKind(event.target.value);setRef('');setPreview(undefined);setNotice('');}} options={[{label:'Branch',value:'branch'},{label:'Pull request',value:'pr'},{label:'Commit SHA',value:'commit'}]}/>
-   {kind==='commit'?<Input aria-label="Full commit SHA" value={ref} onChange={event=>setRef(event.target.value.trim())} placeholder="Full 40-character commit SHA"/>:kind&&<Select style={{width:'100%'}} showSearch optionFilterProp="label" aria-label="Revision" value={ref||undefined} onChange={setRef} placeholder={kind==='branch'?'Select a branch':'Select an open pull request'} options={kind==='branch'?inventory?.branches.map(branch=>({value:branch.name,label:`${branch.name} · ${branch.sha.slice(0,12)}`})):inventory?.prs.map(pr=>({value:String(pr.number),disabled:!pr.available,label:`PR #${pr.number}${pr.draft?' · Draft':''} · ${pr.title} · ${pr.head_branch} → ${pr.base_branch}`}))}/>}
+    {kind==='commit'?<Input aria-label="Full commit SHA" value={ref} onChange={event=>setRef(event.target.value.trim())} placeholder="Full 40-character commit SHA"/>:kind&&<Select style={{width:'100%'}} showSearch optionFilterProp="label" aria-label="Revision" value={ref||undefined} onChange={setRef} placeholder={kind==='branch'?'Select a branch':'Select an open pull request'} options={kind==='branch'?inventory?.branches.map(branch=>({value:branch.name,label:`${branch.name} · ${shortSha(branch.sha)}`})):inventory?.prs.map(pr=>({value:String(pr.number),disabled:!pr.available,label:`PR #${pr.number}${pr.draft?' · Draft':''} · ${pr.title} · ${pr.head_branch} → ${pr.base_branch}`}))}/>}
    {kind==='commit'&&ref&&!/^[a-fA-F0-9]{40}$/.test(ref)&&<Alert type="warning" title="Enter a full 40-character commit SHA."/>}
    {selectedPr&&<Typography.Paragraph>Head: <code>{selectedPr.head_repository}:{selectedPr.head_branch}</code> at <code>{selectedPr.head_sha}</code>; base: <code>{inventory?.repository}:{selectedPr.base_branch}</code> at <code>{selectedPr.base_sha}</code>{selectedPr.draft?' · Draft pull request':''}</Typography.Paragraph>}
    <section aria-label="Scanner channel selection">

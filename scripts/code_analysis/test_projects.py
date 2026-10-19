@@ -30,15 +30,16 @@ class ProjectTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate(doc)
 
-    def test_connected_native_identity(self):
+    def test_connected_project_cannot_enable_native_feedback(self):
         doc = config()
         project = doc['projects'][0]
         project.update(id='1', relationship='connected', source_repository=doc['execution_repository'])
         report = {'analyzed_sha': 'b' * 40, 'target': {'repository': 'owner/runner',
                   'source_repository': 'owner/runner', 'head_sha': 'b' * 40}}
-        self.assertTrue(native_feedback_allowed(doc, '1', report))
-        report['target']['head_sha'] = 'c' * 40
         self.assertFalse(native_feedback_allowed(doc, '1', report))
+        project['native_feedback_enabled'] = True
+        with self.assertRaisesRegex(ValueError, 'Native feedback must remain disabled'):
+            validate(doc)
 
     def test_connected_read_only_project_disables_github_feedback(self):
         doc = config()
@@ -52,7 +53,7 @@ class ProjectTests(unittest.TestCase):
     def test_native_feedback_policy_must_be_boolean(self):
         doc = config()
         doc['projects'][0]['native_feedback_enabled'] = 'false'
-        with self.assertRaisesRegex(ValueError, 'native_feedback_enabled'):
+        with self.assertRaisesRegex(ValueError, 'Native feedback must remain disabled'):
             validate(doc)
 
     def test_rename_preserves_project_namespace(self):

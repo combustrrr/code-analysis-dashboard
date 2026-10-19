@@ -14,10 +14,12 @@ When the current scanner cannot produce a report, the system falls back to a
 legacy report. That fallback is bounded by CPU time and report size; large or
 long-running analyses may be truncated or skipped.
 
-## Evaluation mode uses frozen SHA
+## Requests are pinned, not permanently frozen
 
-Evaluation runs operate against a frozen source SHA. They do not pick up new
-commits, so results can drift from the live repository state over time.
+Every explicit request resolves its selected branch, open pull request, or full commit
+SHA to an immutable SHA. The pin applies only to that request; there is no Evaluation
+Mode branch lock, permanent SHA, or one-dispatch budget. A later request resolves its
+selection again, and stale branch or pull-request previews must be refreshed.
 
 ## R2 temp-runs lifecycle depends on bucket configuration
 
@@ -44,10 +46,10 @@ Supported signed GitHub deliveries require the `ANALYSIS_STATE` KV binding. The
 Worker validates the delivery ID, writes a replay marker before dispatch, and
 keeps that marker for 24 hours. A repeated delivery returns `202` without a
 second dispatch. KV has no atomic compare-and-set, so this is not a strict
-concurrent exclusion guarantee. If the marker or dispatch state is unavailable,
-the webhook fails closed; hourly reconciliation remains the recovery path for a
-missed dispatch. The default webhook body limit is 1,000,000 bytes and may be
-overridden with `MAX_WEBHOOK_BYTES`.
+concurrent exclusion guarantee. If the marker or dispatch state is unavailable, the
+webhook fails closed. Webhooks never create analysis work; scheduled reconciliation
+recovers already accepted durable requests only. The default webhook body limit is
+1,000,000 bytes and may be overridden with `MAX_WEBHOOK_BYTES`.
 
 ## Working-tree targets are unsupported
 

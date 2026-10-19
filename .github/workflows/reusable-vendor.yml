@@ -26,13 +26,13 @@ permissions:
   contents: read
 
 jobs:
-  snyk:
-    if: ${{ contains(fromJSON(inputs.target).requested_channels, 'snyk') }}
-    name: Isolated Snyk evidence
+  source-snapshot:
+    if: ${{ contains(fromJSON(inputs.target).requested_channels, 'snyk') || contains(fromJSON(inputs.target).requested_channels, 'sonarqube-cloud') }}
+    name: Prepare credentialless source snapshot
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -40,6 +40,32 @@ jobs:
           ref: ${{ fromJSON(inputs.target).head_sha }}
           path: .source
           persist-credentials: false
+      - name: Package source without checkout metadata
+        run: tar -C .source --exclude=.git -czf source-snapshot.tgz .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: source-snapshot-${{ inputs.request_id }}
+          path: source-snapshot.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+  snyk:
+    if: ${{ contains(fromJSON(inputs.target).requested_channels, 'snyk') }}
+    name: Isolated Snyk evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: source-snapshot
+    permissions:
+      contents: none
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e
+        with:
+          name: source-snapshot-${{ inputs.request_id }}
+          path: .snapshot
+      - name: Materialize pinned source snapshot
+        run: mkdir .source && tar -xzf .snapshot/source-snapshot.tgz -C .source
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         if: env.SNYK_TOKEN != ''
         with:
@@ -78,16 +104,19 @@ jobs:
     name: Isolated SonarQube evidence
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: source-snapshot
+    permissions:
+      contents: none
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e
         with:
-          repository: ${{ fromJSON(inputs.target).source_repository }}
-          ref: ${{ fromJSON(inputs.target).head_sha }}
-          path: .source
-          persist-credentials: false
+          name: source-snapshot-${{ inputs.request_id }}
+          path: .snapshot
+      - name: Materialize pinned source snapshot
+        run: mkdir .source && tar -xzf .snapshot/source-snapshot.tgz -C .source
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ inputs.tooling_sha }}

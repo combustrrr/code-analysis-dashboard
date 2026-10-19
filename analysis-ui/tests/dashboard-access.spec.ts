@@ -327,10 +327,10 @@ test('authorized user follows one repository project from selection through publ
    if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'flow-session',login:'developer'}});
   expect(route.request().headers().authorization).toBe('Bearer flow-session');
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
-    if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false,projects:[
-     {id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false},
+     if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false,projects:[
+      {id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,current_report:{status:'partial'}},
      {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false},
-     {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:true},
+     {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:false},
     ]}});
    if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:project,checked_at:new Date().toISOString(),preferred_branch:'Testing',current_overlay:{schema_version:'analysis-pr-overlay-v1',overlay_key:'overlay-seven',status:'complete',head_sha:sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel,documents:{'pr-overlay.json':overlayAssetName},assets:{[overlayAssetName]:{sha256:createHash('sha256').update(compressedOverlay).digest('hex'),bytes:compressedOverlay.byteLength}}},targets:published?[{id:'published-target',label:'Testing',repository:source,source_repository:source,head_sha:sha,kind:'branch',branch:'Testing',checked_at:new Date().toISOString(),status:'partial',collected_run:43,documents:{'report.json':assetName,'findings.json':assetName},assets}]:[]}});
    if(url.pathname==='/api/public/asset')return route.fulfill({headers,body:url.searchParams.get('overlay')==='current'?compressedOverlay:compressedReport});
@@ -342,24 +342,27 @@ test('authorized user follows one repository project from selection through publ
     launches++;
      expect(route.request().postDataJSON()).toMatchObject({project_id:project,preview_token:'signed-preview',requested_channels:['semgrep'],run_again:false});
      expect(route.request().postDataJSON().idempotency_key).toMatch(/^[a-f0-9-]{36}$/);
-   return route.fulfill({headers,status:202,json:{request_id:'flow-request',run_id:42}});
+   return route.fulfill({headers,status:202,json:{request_id:'flow-request',run_id:42,queue_position:2}});
   }
   if(url.pathname==='/api/project-activity'){
    activityReads++;const isPublished=activityReads>1;published=isPublished;
-   return route.fulfill({headers,json:{phase:isPublished?'published':'scanning',target_id:isPublished?'published-target':undefined,source_sha:sha,analyzed_sha:isPublished?sha:undefined,completeness:isPublished?'partial':undefined,producer:{url:`https://github.com/${execution}/actions/runs/43/attempts/2`,attempt:2,status:isPublished?'completed':'in_progress'}}});
+   return route.fulfill({headers,json:{phase:isPublished?'published':'scanning',queue_position:isPublished?null:2,target_id:isPublished?'published-target':undefined,source_sha:sha,analyzed_sha:isPublished?sha:undefined,completeness:isPublished?'partial':undefined,producer:{url:`https://github.com/${execution}/actions/runs/43/attempts/2`,attempt:2,status:isPublished?'completed':'in_progress'}}});
   }
   throw new Error(`Unexpected request ${url.pathname}`);
- });
-  await page.goto('/');
+  });
+   const pageErrors:string[]=[];page.on('pageerror',error=>pageErrors.push(error.message));
+   await page.goto('/');
    await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
    await expect(page.locator('.landing-actions').getByRole('button',{name:'Open workspace'})).toBeVisible();
    await page.locator('.landing-actions').getByRole('button',{name:'Open workspace'}).click();
-   await expect(page.getByRole('heading',{name:'Choose a codebase'})).toBeVisible();
-   await expect(page.locator('.target-card')).toHaveCount(3);
-   await expect(page.getByText('OBSERVER · READ-ONLY SOURCE')).toHaveCount(2);
-   await expect(page.getByText('CONNECTED · SELF-ANALYSIS')).toHaveCount(1);
-   await page.locator('.target-card').filter({hasText:source}).getByRole('button',{name:'Open report'}).click();
-   await expect(page.getByRole('heading',{name:'Separate PR review overlay · #7'})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Choose a codebase'})).toBeVisible();
+    await expect(page.locator('.target-card')).toHaveCount(3);
+    await expect(page.locator('.target-card').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('analyzed Unavailable');
+    await expect(page.getByText('OBSERVER · READ-ONLY SOURCE')).toHaveCount(2);
+    await expect(page.getByText('CONNECTED · SELF-ANALYSIS')).toHaveCount(1);
+    await page.locator('.target-card').filter({hasText:source}).getByRole('button',{name:'Open report'}).click();
+    await expect(page).toHaveURL(new RegExp(`#repository=${encodeURIComponent(execution)}&project=${project}&tab=overview`));
+    await expect(page.getByRole('heading',{name:'Separate PR review overlay · #7'})).toBeVisible();
    await expect(page.getByText('Review fixture advisory')).toBeVisible();
   await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toBeVisible();
   const selected=new URLSearchParams(new URL(page.url()).hash.slice(1));
@@ -376,6 +379,7 @@ test('authorized user follows one repository project from selection through publ
   await dialog.getByRole('button',{name:'Review exact revision'}).click();
   await page.getByRole('dialog',{name:'Review analysis request'}).getByRole('button',{name:'Confirm and queue analysis'}).click();
  await expect(page.getByText('Analysis is running against the selected revision.')).toBeVisible();
+ await expect(page.getByText(/FIFO queue position:/)).toContainText('2');
  await expect(page.getByText(`Resolved source commit: ${sha}`)).toBeVisible();
  await page.getByRole('button',{name:'Check status now'}).click();
  await expect(page.getByText('New report published for this request.')).toBeVisible();
@@ -384,5 +388,5 @@ test('authorized user follows one repository project from selection through publ
  await page.getByRole('button',{name:'Open published report'}).click();
  await expect(page).toHaveURL(/target=published-target/);
  await expect(page.locator('.identity')).toContainText(sha);
-  expect(activityReads).toBeGreaterThanOrEqual(2);expect(launches).toBe(1);
+   expect(activityReads).toBeGreaterThanOrEqual(2);expect(launches).toBe(1);expect(pageErrors).toEqual([]);
 });

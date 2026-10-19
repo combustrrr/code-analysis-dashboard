@@ -9,8 +9,9 @@ Current as of 2026-10-02. See [handoff](../HANDOFF.md) and
 Cloudflare Worker, trusted scanner adapters, reusable workflows and current reports.
 Agentic SOC runtime and product CI are independent. The product fork and Kavach
 upstream are observer sources; the App is installed only on the service repository.
-A connected project can report to its own exact commit; observer projects never
-upload SARIF/checks to an unrelated fork SHA or write upstream.
+Native feedback is disabled for every configured project, including connected
+self-analysis. Reports remain service-managed and never upload SARIF/checks or write to
+an analyzed source.
 
 ## Request and result path
 
@@ -46,21 +47,23 @@ that policy instead of carrying a second copy. The refactor also removes the obs
 inline/dead implementation. This is a code-organization change, not evidence that
 external repository onboarding is fully verified.
 
-Hourly complete paginated discovery, events and manual requests feed repository-local
-serialized reconciliation. Resolve branch heads at processing; validate full SHA
-and preserve PR source/head/base context. Two analyses run concurrently; pending
-intent stays durable. Exact run/attempt provenance is mandatory. Source-only reuse
-requires matching source, tooling and profile; PR-specific evidence retains context.
-Source scripts execute without publishing/vendor credentials. Trusted vendor and
-publication jobs remain separate.
+Only explicit manual requests enter the bounded global FIFO. Branch and pull-request
+inventory is read-only; events and schedules cannot invent scan work. Reconciliation
+recovers accepted durable requests and processes one source revision globally. All
+selected missing lane groups fan out within that request against the same pinned SHA.
+Exact run/attempt provenance is mandatory. Source-only reuse requires matching source,
+tooling and profile; PR-specific evidence retains context. Portable source scripts
+execute without publishing/vendor credentials. Opt-in vendor jobs consume a snapshot
+created by a separate credentialless checkout and do not execute project-controlled
+commands. Trusted publication remains separate.
 
 ## Current-report lifecycle
 
 GitHub/KV state holds scheduler/request state and R2 holds namespaced current-report
 assets. Storage keys are qualified by the execution repository as
 `repositories/<owner>/<repo>/...`; the public API route shape remains unchanged.
-Each project keeps one report per active branch/open PR and one bounded manual
-selection. Upload replacement assets before changing manifest references; delete
+Each project keeps one current source-only report plus at most one separately keyed
+current PR overlay. Upload replacement assets before changing manifest references; delete
 unreferenced assets only afterward. Only a complete discovery pass removes deleted
 targets. Late/superseded or mixed-revision results cannot overwrite current heads.
 A valid partial report can publish, with the strict publication-gate evidence kept
@@ -80,5 +83,5 @@ See [access](../operations/DASHBOARD-ACCESS.md), [maintenance](../operations/SCA
 
 The Actions-side GitHub CLI wrapper applies a 120-second timeout to each request and
 fails closed on timeout; it does not retry an ambiguous dispatch. Source-executing jobs
-receive read-only repository permissions. `security-events: write` is reserved for
-the explicitly scoped discovery/reconciliation or native-SARIF publication jobs.
+receive read-only repository permissions and no vendor or publication credentials.
+Configured-source producer and reconciliation jobs have no native-feedback authority.
