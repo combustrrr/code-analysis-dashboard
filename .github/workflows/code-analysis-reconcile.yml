@@ -17,9 +17,9 @@ jobs:
     permissions:
       contents: write
       actions: write
-    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-reconcile.yml@2406a4ecea9634b201b44a1c8f1aa0e8fbff4537
+    uses: combustrrr/code-analysis-dashboard/.github/workflows/reusable-reconcile.yml@2c330c45f8f750a496b2bfce63f0ab3f7c9ba9a1
     with:
-      tooling_sha: 2406a4ecea9634b201b44a1c8f1aa0e8fbff4537
+      tooling_sha: 2c330c45f8f750a496b2bfce63f0ab3f7c9ba9a1
       project_id: ''
       selection: ''
       request_id: ''
