@@ -23,6 +23,7 @@ def scanner_jobs():
         'steps':[
             {'uses': CHECKOUT, 'with': {'ref':'${{ inputs.tooling_sha }}','persist-credentials':False}},
             {'uses': CHECKOUT, 'with': {'repository':'${{ fromJSON(inputs.target).source_repository }}','ref':'${{ fromJSON(inputs.target).head_sha }}','path':'.source','persist-credentials':False}},
+            {'name':'Prepare OSV output directory', 'run':'mkdir -p portable-output/osv'},
             {'name':'Run portable OSV-Scanner', 'continue-on-error':True, 'uses': OSV_ACTION,
              'with': {'scan-args':'--recursive --format=sarif --output=portable-output/osv/osv-results.sarif .source'}},
             {'uses': UPLOAD, 'if':'always()', 'with': {'name':'portable-osv-scanner','path':'portable-output/','retention-days':7,'if-no-files-found':'error'}}

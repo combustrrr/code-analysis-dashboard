@@ -1,5 +1,24 @@
 # Current implementation state
 
+## 2026-10-19 production scan verification
+
+The configured-source implementation was deployed and exercised for all three trusted
+projects. Exact producer runs were Kavach `39246779470` at source
+`db8d9357e4300763be9b558d073fb23b3d7702bd`, Agentic-Kibana `39250128961` at source
+`22d4d2c3b3bbac3fe3ddd22e6b78fe6606aa1971`, and dashboard self-analysis
+`39252123413` at source `22266097c8c84ce8540aa7ac5c3ee319b38fe18e`. All used tooling
+`b305d1ec43b3f5221ca83833c9731586633d7b75`. Their exact reconciliation runs
+`39248673557`, `39251831440`, and `39253614443` succeeded and published partial/current
+reports without report errors. Schemathesis failed for the two agentic projects and OSV
+failed for self-analysis; successful sibling evidence remained publishable and was not
+erased.
+
+The production queue needed exact manual retirement of each verified terminal request
+asset because a partial publication could lose the request-owned target row during
+inventory reconciliation. The local follow-up recovers terminal ownership only from a
+matching durable receipt and exact published run/attempt. It also creates the portable
+OSV nested SARIF directory before invoking the pinned action. Queue assets are now empty.
+
 ## Local post-rollout hardening (not deployed)
 
 The current worktree closes configured-source follow-up gaps without changing the

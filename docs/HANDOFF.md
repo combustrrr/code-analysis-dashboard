@@ -1,5 +1,34 @@
 # New-chat handoff: Code Analysis Dashboard
 
+## 2026-10-19 configured-source production verification
+
+The configured-source rollout is live. Pages run `39239386083` deployed commit
+`26e638370b522dc302885ebf06b5745f4bb74a5a`; Worker version
+`40f08c18-238d-43fb-966c-4774bbe14134` is active and anonymous project/report probes
+return `403`. The adopted tooling revision for the production scans was
+`b305d1ec43b3f5221ca83833c9731586633d7b75`.
+
+Three explicit immutable requests were exercised through the global FIFO. Kavach
+request `7d6cfa9e-0aba-46ce-80ca-b9aa2e82294b` analyzed
+`db8d9357e4300763be9b558d073fb23b3d7702bd` in run `39246779470`; Agentic-Kibana
+request `b3d41631-f1bd-4311-a7cd-f68b1e7ba9f0` analyzed
+`22d4d2c3b3bbac3fe3ddd22e6b78fe6606aa1971` in run `39250128961`; service self-analysis
+request `f9fb968e-b2f3-4606-a683-43696c1df860` analyzed
+`22266097c8c84ce8540aa7ac5c3ee319b38fe18e` in run `39252123413`. Reconciliation
+runs `39248673557`, `39251831440`, and `39253614443` published a current report for
+each project with no publication errors. Kavach and Agentic-Kibana explicitly retain a
+failed Schemathesis channel; self-analysis explicitly retains a failed OSV channel.
+Healthy sibling evidence was preserved in every case.
+
+Production exposed two follow-up defects. A terminal partial publication could retain
+its FIFO request asset when inventory no longer contained the request-owned target row;
+the three exact terminal assets were manually removed only after publication was
+verified. The reconciler now recovers terminal ownership from the matching request
+receipt plus exact published run/attempt before advancing. Portable OSV also attempted
+to write its SARIF file before creating the nested output directory; the generated
+workflow now creates that directory first. Do not describe the failed channels as
+completed until a later explicit rerun publishes valid evidence.
+
 Latest verified deployment: 2026-10-16, main commit
 `5fac872f0b30fe1f116185793a8ffe0846b6304a`, Pages run `38889165977`. The active Worker
 version is `35e6c6a4-097c-40a9-8c48-456092987be8`. This is the service handoff; read it

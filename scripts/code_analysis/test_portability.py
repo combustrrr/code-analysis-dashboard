@@ -76,6 +76,12 @@ class PortabilityTests(unittest.TestCase):
         self.assertIn(' --output=semgrep-results.json .', workflow)
         self.assertEqual(jobs['scanner-3-gitleaks']['permissions'], {'contents':'read'})
 
+    def test_portable_osv_prepares_its_nested_output_directory(self):
+        from scripts.code_analysis.portable_workflow import scanner_jobs
+        steps = scanner_jobs()['portable-osv-scanner']['steps']
+        self.assertIn({'name':'Prepare OSV output directory',
+                       'run':'mkdir -p portable-output/osv'}, steps)
+
     def test_current_workflow_is_unchanged(self):
         self.assertEqual(generate(), Path('.github/workflows/11-source-analysis.yml').read_text(encoding='utf-8'))
 
