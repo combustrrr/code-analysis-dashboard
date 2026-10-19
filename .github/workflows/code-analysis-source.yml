@@ -43,7 +43,7 @@ jobs:
           IS_REUSABLE_ANALYSIS: 'true'
         run: python -m scripts.code_analysis.source_identity --validate-only
   analyze:
-    if: ${{ fromJSON(inputs.target).profile_mode == 'portable' }}
+    if: ${{ always() && needs.validate-request.result == 'success' && (needs.isolated-vendor.result == 'success' || needs.isolated-vendor.result == 'skipped') && fromJSON(inputs.target).profile_mode == 'portable' }}
     needs: [validate-request, isolated-vendor]
     permissions:
       contents: read
@@ -54,7 +54,7 @@ jobs:
       target: ${{ inputs.target }}
       request_id: ${{ inputs.request_id }}
   configured-profile:
-    if: ${{ fromJSON(inputs.target).profile_mode == 'agentic-soc' }}
+    if: ${{ always() && needs.validate-request.result == 'success' && (needs.isolated-vendor.result == 'success' || needs.isolated-vendor.result == 'skipped') && fromJSON(inputs.target).profile_mode == 'agentic-soc' }}
     needs: [validate-request, isolated-vendor]
     permissions:
       contents: read

@@ -8,6 +8,14 @@ from scripts.code_analysis.repository_service import report_publication
 from pathlib import Path
 
 class RepositoryExecutionTests(unittest.TestCase):
+    def test_only_exact_fifo_envelope_can_dispatch_retained_target(self):
+        from scripts.code_analysis.repository_service import owns_active_request
+        self.assertTrue(owns_active_request(
+            {'client_request_id': 'current'}, {'request_id': 'current'}))
+        self.assertFalse(owns_active_request(
+            {'client_request_id': 'historical'}, {'request_id': 'current'}))
+        self.assertFalse(owns_active_request({}, {'request_id': 'current'}))
+
     def test_queued_v2_uses_pinned_commit_instead_of_mutable_selection(self):
         from scripts.code_analysis.repository_service import queued_selection
         intent = {

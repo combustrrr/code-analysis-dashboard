@@ -28,6 +28,11 @@ def project_profile_digest(project):
     return hashlib.sha256(json.dumps(profile, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
+def owns_active_request(row, intent):
+    request_id = row.get('client_request_id')
+    return bool(request_id and request_id == intent.get('request_id'))
+
+
 def channel_execution_plan(requested, cached_channels, run_again=False):
     reusable={'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE'}
     cached={value.get('channel'):value for value in cached_channels}
@@ -655,7 +660,10 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             if not selection or str(project['id']) != str(project_id):
                 continue
             request_id=row.get('client_request_id')
-            if not request_id:
+            # A queued envelope may unlock scheduling for this project, but it
+            # must never revive a stale historical client request retained in
+            # another target row. Only the exact FIFO envelope owns the slot.
+            if not owns_active_request(row, intent):
                 continue
             execution_channels=row.get('execution_channels',row.get('requested_channels',project['enabled_scanners']))
             dispatch_id=producer_dispatch_id(request_id,execution_channels)
