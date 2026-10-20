@@ -47,7 +47,7 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
   const filters = useMemo<ReportFilterSnapshot>(() => ({ query, severity, category, guidance }), [query, severity, category, guidance]);
   const filtered = useMemo(() => report ? filterThreatFindings(report.findings, filters) : [], [report, filters]);
   if (error) { const detail = error.toLowerCase(); const expired = detail.includes('expired') || detail.includes('freshness'); const missing = detail.includes('not found') || detail.includes('unavailable'); return <Alert showIcon type="warning" title={expired ? 'Report expired' : missing ? 'Report temporarily unavailable' : 'Threat report could not be retrieved'} description={<>{error} <Space><Button type="link" onClick={() => { refreshRepositoryReports(); setRetry(n => n + 1); }}>Refresh report</Button><Button type="link" onClick={() => { const route=parseAppRoute();if(route.kind==='project')location.hash=routeHash({kind:'project',projectId:route.projectId,view:'overview',target:route.target}); }}>Return to overview</Button></Space></>} />; }
-  if (!report) return <div className="empty" role="status"><Empty description="Loading threat report..." /></div>;
+  if (!report) return <div className="empty" role="status"><Empty description="Loading the threat report…" /></div>;
   const pageSize = 25;
   const visibleFindings = filtered.slice((findingsPage - 1) * pageSize, findingsPage * pageSize);
   const exportPdf = async (scope: ExportScope) => {

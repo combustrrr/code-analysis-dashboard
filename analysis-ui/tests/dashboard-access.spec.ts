@@ -367,7 +367,7 @@ test('authorized user follows one repository project from selection through publ
     await expect(page.locator('.project-record')).toHaveCount(3);
     await expect(page.locator('.project-record').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('Not available');
     await expect(page.getByText('Read-only source')).toHaveCount(2);
-    await expect(page.getByText('Connected self-analysis')).toHaveCount(1);
+    await expect(page.getByText('Connected project')).toHaveCount(1);
     await page.getByRole('link',{name:'Settings'}).click();
     await page.locator('.settings-rail a[href*="section=projects"]').click();
     await expect(page.locator('.settings-project-row').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('24 available');
@@ -385,7 +385,7 @@ test('authorized user follows one repository project from selection through publ
   await page.getByRole('button',{name:/Configure analysis/}).click();
   await page.getByLabel('Full commit SHA').fill(sha);
   await page.getByRole('button',{name:'Choose scanner channels'}).click();
-  await page.getByRole('button',{name:'Select all available'}).click();
+  await page.getByRole('button',{name:'Select all available scanners'}).click();
   await expect(page.getByText('External scanners included')).toBeVisible();
   await expect(page.getByRole('button',{name:'Review exact revision'})).toBeDisabled();
   await page.getByText(/Include snyk/).click();

@@ -49,10 +49,10 @@ test.describe('production shell',()=>{
 
  test('report combines scanner outcomes and immutable coverage context',async({page})=>{
   await page.goto(PROJECT+'/report');
-  await expect(page.getByRole('heading',{name:'Report and scanner coverage'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Published report and scanner coverage'})).toBeVisible();
   await expect(page.getByText('Atheris',{exact:true})).toBeVisible();
   await expect(page.getByText('Schemathesis',{exact:true})).toBeVisible();
-  await expect(page.getByText('Coverage is not a clean bill of health')).toBeVisible();
+  await expect(page.getByText('Coverage does not guarantee that the code is secure')).toBeVisible();
  });
 
  test('legacy activity URLs fall through to Projects and settings remains reachable',async({page})=>{

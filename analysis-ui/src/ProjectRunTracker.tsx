@@ -126,12 +126,12 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const terminal = !!phase && terminalPhases.has(phase);
   const publishedTargetId = phase === 'published' || phase === 'reused' ? activity?.target_id : undefined;
   const type = phase === 'published' || phase === 'reused' ? 'success' : phase === 'failed' ? 'error' : phase === 'superseded' ? 'warning' : 'info';
-  const title = phase ? phaseCopy[phase] || 'Analysis in progress' : error ? 'Could not refresh analysis status' : auth.session ? 'Checking analysis status…' : 'Sign in to resume analysis tracking';
+  const title = phase ? phaseCopy[phase] || 'Analysis in progress' : error ? 'Could not refresh the analysis status' : auth.session ? 'Checking analysis status…' : 'Sign in to resume tracking this analysis';
   const previousReportNote = phase === 'published'
     ? `Results are ready${activity?.analyzed_sha ? ` for commit ${activity.analyzed_sha.slice(0, 12)}` : ''}. Opening the report now.`
     : request.previousReport
     ? `The currently displayed report is for ${request.previousTargetLabel || 'the previously selected target'}${request.previousAnalyzedSha ? ` at commit ${request.previousAnalyzedSha.slice(0, 12)}` : ''}${request.previousGeneratedAt ? `, published ${new Date(request.previousGeneratedAt).toLocaleString()}` : ''}. It will remain visible until this request publishes.`
-    : 'No previous report was captured for this target. Results will appear here after publication.';
+    : 'No previous report is available for this target. Results will appear here after publication.';
   const elapsedMinutes=Math.max(0,Math.floor((now-new Date(request.submittedAt).getTime())/60000));
   const progress=activity?.channel_progress||request.channel_progress||[];
   const finished=progress.filter(channel=>['completed','failed','reused','not_applicable','deferred'].includes(channel.status.toLowerCase())).length;
@@ -149,10 +149,10 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
         {['Choose', 'Analyze', 'Review'].map((label,index)=><div key={label} className={index<journeyStep?'done':index===journeyStep?'current':''}><span>{index+1}</span><b>{label}</b></div>)}
       </div>
       <Progress percent={percent} status={type==='error'?'exception':type==='success'?'success':'active'} showInfo={progress.length>0} />
-      {progress.length>0&&<div className="analysis-progress-summary"><strong>{finished} of {progress.length} checks finished</strong>{activeChannels.length>0&&<span>Analysis is running.</span>}</div>}
+      {progress.length>0&&<div className="analysis-progress-summary"><strong>{finished} of {progress.length} checks complete</strong>{activeChannels.length>0&&<span>Analysis is in progress.</span>}</div>}
       <p>{activity?.error || previousReportNote}</p>
       {!terminal&&<p className="analysis-time-note">You can keep reviewing the current report or leave this page. New results will open automatically when they are ready.</p>}
-      {error && <p>Status refresh is temporarily unavailable. Your analysis was not restarted.</p>}
+      {error && <p>The status could not be refreshed. The analysis was not restarted.</p>}
       <div className="run-tracker-actions">
         {publishedTargetId && <Button size="small" type="primary" onClick={() => onOpenReport(publishedTargetId)}>Open report</Button>}
         {!terminal && auth.session && <Button size="small" loading={checking} onClick={() => setRetry(value => value + 1)}>Refresh</Button>}

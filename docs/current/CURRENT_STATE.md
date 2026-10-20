@@ -1,5 +1,13 @@
 # Current implementation state
 
+## 2026-10-20 interface language review
+
+The primary developer journey now uses consistent, plain-English terminology across
+Projects, analysis configuration, progress, Issues, Report, authentication, and empty or
+failure states. Scanner selection is described as choosing scanners rather than abstract
+coverage, actions use direct verbs, and technical terms remain limited to revision and
+evidence details where they are necessary.
+
 ## 2026-10-20 GitHub sign-in interaction
 
 GitHub authentication now has one stable pending state across redirect preparation,

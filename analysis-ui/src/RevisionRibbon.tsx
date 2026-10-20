@@ -9,7 +9,7 @@ export function RevisionRibbon({repository,target,targets,fresh,statusLabel,cove
   <div className="revision-fact"><SafetyCertificateOutlined/><span>Revision<strong title={target?.head_sha}>{target?.head_sha?.slice(0,12)||'Unavailable'}</strong></span></div>
   <div className="revision-fact"><span className="state-dot state-current"/><span>Coverage<strong>{coverage}</strong></span></div>
   <div className="revision-fact"><ClockCircleOutlined/><span>Published<strong>{published?new Date(published).toLocaleDateString():'Unavailable'}</strong></span></div>
-  <div className="revision-freshness"><Tag>{fresh?'Current revision':'Older revision'}</Tag></div>
+  <div className="revision-freshness"><Tag>{fresh?'Latest revision':'Previous revision'}</Tag></div>
   <div className="revision-fact"><span className={`state-dot state-${target?.lifecycle_status||target?.status}`}/><span>State<strong>{statusLabel}</strong></span></div>
  </section>;
 }
