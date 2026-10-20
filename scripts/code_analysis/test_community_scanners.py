@@ -48,6 +48,20 @@ class CommunityScannerTests(unittest.TestCase):
             manifest, catalog)
         self.assertEqual(current["observations"][0]["channel"], "owasp-iac-secrets")
 
+        javascript = canonicalize([{
+            "source_tool": "nodejsscan", "rule_id": "missing-csp",
+            "message": "Missing security control.", "severity": "MEDIUM",
+            "file": "src/app.ts", "start_line": 1,
+        }], "owner/repo", {"commit_sha": "a" * 40, "workflow_run_id": "1"},
+            manifest, catalog)
+        self.assertEqual(javascript["observations"][0]["channel"], "owasp-js")
+
+    def test_trufflehog_status_filename_is_not_native_scanner_json(self):
+        jobs = scanner_jobs()
+        rendered = str(jobs["community-owasp-iac-secrets"])
+        self.assertIn("owasp-iac-status.json", rendered)
+        self.assertNotIn("trufflehog-status.json", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

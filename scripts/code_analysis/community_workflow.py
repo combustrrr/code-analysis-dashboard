@@ -70,9 +70,9 @@ def scanner_jobs():
              "set -o pipefail\n./trufflehog filesystem .source --json --no-update 2>/dev/null | "
              "python -I scripts/code_analysis/trufflehog_to_sarif.py --output owasp-iac-secrets.sarif"},
             {"name": "Record completed redacted TruffleHog evidence", "run":
-             "printf '%s\\n' '{\"scanner_family\":\"TruffleHog\",\"status\":\"COMPLETED\",\"reason\":\"Redacted SARIF retained for the exact revision.\",\"scanner_version\":\"3.99.3\"}' > trufflehog-status.json"},
+             "printf '%s\\n' '{\"scanner_family\":\"TruffleHog\",\"status\":\"COMPLETED\",\"reason\":\"Redacted SARIF retained for the exact revision.\",\"scanner_version\":\"3.99.3\"}' > owasp-iac-status.json"},
             {"uses": UPLOAD, "if": "always()", "with": {
-                "name": "owasp-iac-secrets", "path": "owasp-iac-secrets.sarif\ntrufflehog-status.json",
+                "name": "owasp-iac-secrets", "path": "owasp-iac-secrets.sarif\nowasp-iac-status.json",
                 "if-no-files-found": "error", "retention-days": 7}},
         ],
     }

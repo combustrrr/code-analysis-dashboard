@@ -207,7 +207,7 @@
     },
     {
       "tool": "njsscan",
-      "evidence_families": ["njsscan"],
+      "evidence_families": ["njsscan", "nodejsscan"],
       "channel": "owasp-js",
       "surface": "javascript-security",
       "activation": "Pinned njsscan analyzes JavaScript and TypeScript from the immutable source checkout and retains SARIF.",

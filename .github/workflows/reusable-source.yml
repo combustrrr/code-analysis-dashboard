@@ -475,14 +475,14 @@ jobs:
         --output owasp-iac-secrets.sarif'
     - name: Record completed redacted TruffleHog evidence
       run: printf '%s\n' '{"scanner_family":"TruffleHog","status":"COMPLETED","reason":"Redacted SARIF retained
-        for the exact revision.","scanner_version":"3.99.3"}' > trufflehog-status.json
+        for the exact revision.","scanner_version":"3.99.3"}' > owasp-iac-status.json
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: owasp-iac-secrets
         path: 'owasp-iac-secrets.sarif
 
-          trufflehog-status.json'
+          owasp-iac-status.json'
         if-no-files-found: error
         retention-days: 7
   portable-python-bandit:
