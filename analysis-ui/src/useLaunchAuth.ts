@@ -42,6 +42,10 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
   const [session, setSession] = useState<{ token: string; login: string }>();
   const [error, setError] = useState('');
   const [verified, setVerified] = useState(false);
+  const [pending, setPending] = useState(() => {
+    const params = new URLSearchParams(location.hash.slice(1));
+    return params.has('analysis_auth') || params.has('analysis_auth_error');
+  });
   const handledCallback = useRef(false);
   const origin = enabled ? (() => { try { const u = new URL(endpoint || pendingAuthEndpoint() || ''); return u.protocol === 'https:' && u.pathname === '/' && !u.search && !u.hash && !u.username && !u.password ? u.origin : undefined; } catch { return undefined; } })() : undefined;
 
@@ -58,6 +62,7 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
     const fail = (message: string) => {
       try { sessionStorage.removeItem(VERIFIER_KEY); } catch {}
       setError(message);
+      setPending(false);
     };
 
     if (callbackError) {
@@ -117,6 +122,7 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
       setSession({ token: result.token, login: result.login });
       setVerified(true);
       setError('');
+      setPending(false);
       restoreAuthDestination();
     }).catch(reason => fail(reason instanceof Error ? reason.message : friendlyAuthError())).finally(() => {
       try { sessionStorage.removeItem(VERIFIER_KEY); } catch {}
@@ -124,7 +130,8 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
   }, [origin]);
 
   const signIn = useCallback(() => {
-    if (!origin) return;
+    if (!origin || pending) return;
+    setPending(true);
     void (async () => {
       try {
         const verifier = randomVerifier();
@@ -136,9 +143,10 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
         location.assign(`${origin}/auth/login?challenge=${encodeURIComponent(challenge)}`);
       } catch {
         setError(friendlyAuthError());
+        setPending(false);
       }
     })();
-  }, [origin]);
+  }, [origin, pending]);
 
   const api = useCallback(async function api<T>(path: string, body?: unknown, extraHeaders: Record<string,string> = {}): Promise<T> {
     if (!origin || !session) throw new Error('Sign in to view dashboard data.');
@@ -160,9 +168,10 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
     const handle = session?.token;
     setSession(undefined);
     setVerified(false);
+    setPending(false);
     setError('');
     try { sessionStorage.removeItem(VERIFIER_KEY); sessionStorage.removeItem(RETURN_KEY); sessionStorage.removeItem(ENDPOINT_KEY); } catch {}
     if (origin && handle) void fetch(`${origin}/api/logout`, { method:'POST', cache:'no-store', credentials:'omit', headers:{Authorization:`Bearer ${handle}`}}).catch(()=>{});
   }, [origin, session]);
-  return useMemo(() => ({ available: !!origin, session, verified, error, signIn, signOut, api }), [origin, session, verified, error, signIn, signOut, api]);
+  return useMemo(() => ({ available: !!origin, session, verified, pending, error, signIn, signOut, api }), [origin, session, verified, pending, error, signIn, signOut, api]);
 }

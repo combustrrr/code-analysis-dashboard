@@ -1,5 +1,13 @@
 # Current implementation state
 
+## 2026-10-20 GitHub sign-in interaction
+
+GitHub authentication now has one stable pending state across redirect preparation,
+callback redemption, and session verification. All sign-in entry points lock while an
+attempt is active, retain their width, show explicit progress, and suppress retry/error
+controls until the attempt completes. This prevents duplicate redirects and the brief
+unsigned landing-page flash previously visible after returning from GitHub.
+
 ## 2026-10-20 analysis journey simplification
 
 The project workspace presents analysis as Choose, Analyze, and Review. Fast analysis is

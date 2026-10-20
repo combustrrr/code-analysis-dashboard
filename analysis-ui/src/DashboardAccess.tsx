@@ -45,7 +45,7 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
    <h1>Code Analysis</h1><p>Sign in with an authorized GitHub account to review configured projects, current reports, and scanner evidence.</p>
   <Space direction="vertical" size="middle"><Segmented aria-label="Color theme" value={dark?'Dark':'Light'} options={['Dark','Light']} onChange={v=>{setDark(v==='Dark');localStorage.setItem('analysis-theme',v.toLowerCase());}}/>
   {(error||auth.error)&&<Alert type="error" title="Dashboard access" description={error||auth.error}/>}
-  <Button type="primary" disabled={required!==true} onClick={auth.signIn}>Sign in with GitHub</Button>
+  <Button type="primary" loading={auth.pending} disabled={required!==true||auth.pending} onClick={auth.signIn}>{auth.pending?'Signing in…':'Sign in with GitHub'}</Button>
   {required===undefined&&!error&&<p>Checking access configuration...</p>}
   </Space></section></main></ConfigProvider>;
 }

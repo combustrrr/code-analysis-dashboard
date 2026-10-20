@@ -1,0 +1,13 @@
+.landing-actions .ant-btn {
+  min-width: 190px;
+}
+
+.landing-nav-cta {
+  min-width: 168px;
+}
+
+@media (max-width: 470px) {
+  .landing-nav-cta {
+    min-width: 148px;
+  }
+}
