@@ -38,7 +38,7 @@ def assemble(artifacts: Path, output: Path, identity: dict, producer_repository:
             channel.update(status='INVALID_EVIDENCE', reason='Malformed scanner output retained in producer artifacts')
     from scripts.code_analysis.hosted import now
     current = canonicalize(raw, repository, {'commit_sha': sha, 'branch': identity['branch'],
-                            'workflow_run_id': run_id, 'generated_at': now()}, manifest)
+                            'workflow_run_id': run_id, 'generated_at': now()}, manifest, catalog)
     proof = provenance.build(artifacts, sha, [run_id])
     snapshot = build_analysis_snapshot(build_snapshot(current, status, proof, allow_partial=True),
                                       catalog, artifacts)

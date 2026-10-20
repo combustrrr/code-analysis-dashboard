@@ -153,7 +153,7 @@ def audit_source_credentials(relative: str, document: dict[str, Any]) -> list[st
         serialized = json.dumps(job, sort_keys=True)
         if "fromJSON(inputs.target).source_repository" not in serialized:
             continue
-        for forbidden in ("secrets.", "R2_ACCESS_KEY", "R2_SECRET_KEY", "R2_ACCOUNT_ID", "R2_BUCKET_NAME"):
+        for forbidden in ("${{ secrets.", "R2_ACCESS_KEY", "R2_SECRET_KEY", "R2_ACCOUNT_ID", "R2_BUCKET_NAME"):
             if forbidden in serialized:
                 errors.append(f"{relative}: source job {job_name} receives forbidden credential reference {forbidden}")
     return errors

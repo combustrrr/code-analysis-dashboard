@@ -206,6 +206,26 @@
       "evidence_source": "DETERMINISTIC"
     },
     {
+      "tool": "njsscan",
+      "evidence_families": ["njsscan"],
+      "channel": "owasp-js",
+      "surface": "javascript-security",
+      "activation": "Pinned njsscan analyzes JavaScript and TypeScript from the immutable source checkout and retains SARIF.",
+      "class": "security",
+      "workflow": "11-source-analysis.yml",
+      "evidence_source": "DETERMINISTIC"
+    },
+    {
+      "tool": "TruffleHog",
+      "evidence_families": ["TruffleHog"],
+      "channel": "owasp-iac-secrets",
+      "surface": "iac-secrets",
+      "activation": "A checksum-verified TruffleHog binary scans the immutable source checkout; secret values are discarded before redacted SARIF is retained.",
+      "class": "security",
+      "workflow": "11-source-analysis.yml",
+      "evidence_source": "DETERMINISTIC"
+    },
+    {
       "tool": "SonarQube Cloud",
       "channel": "sonarqube-cloud",
       "surface": "quality-and-security",

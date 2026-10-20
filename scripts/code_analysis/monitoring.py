@@ -135,11 +135,15 @@ def validate_channel_manifest(manifest: dict[str, Any]) -> None:
 
 
 def canonicalize(raw_findings: list[dict[str, Any]], repository: str, run: dict[str, Any],
-                 channel_manifest: dict[str, Any]) -> dict[str, Any]:
+                 channel_manifest: dict[str, Any], channel_catalog: dict[str, Any] | None = None) -> dict[str, Any]:
     validate_channel_manifest(channel_manifest)
     channel_by_family: dict[str, str] = {}
     for row in channel_manifest["required_static_channels"]:
         channel_by_family.setdefault(str(row["scanner_family"]), str(row["channel"]))
+    for row in (channel_catalog or {}).get("tools", []):
+        for family in [row.get("tool"), *row.get("evidence_families", [])]:
+            if family:
+                channel_by_family.setdefault(str(family), str(row["channel"]))
 
     groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for raw in raw_findings:

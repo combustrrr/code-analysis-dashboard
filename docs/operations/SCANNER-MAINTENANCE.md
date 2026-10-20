@@ -117,6 +117,13 @@ catalog entry. Missing adapters remain setup_required; UI rendering is generic.
 hand. The generator output must remain byte-for-byte equal to the checked-in
 files, enforced by `test_portability.py` and `test_scanner_access.py`.
 
+The built-in credentialless community jobs live in
+`scripts/code_analysis/community_workflow.py`. Their versions are pinned alongside
+their evidence-conversion code. They must remain source-only, carry no secret
+references, and upload a scanner-family status document even when the valid native
+report contains zero findings. Regenerate workflow 11 and both reusable source
+workflows after changing these jobs. Workflow 12 remains vendor-diagnostics-only.
+
 The reusable workflows are generated separately by
 `python -m scripts.code_analysis.generate_reusable_workflows`:
 `reusable-source.yml` (portable) and `reusable-source-full.yml` (full profile).

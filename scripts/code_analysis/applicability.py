@@ -36,7 +36,8 @@ GROUPS = {
     'gitleaks': ['gitleaks'], 'trivy': ['trivy'], 'hadolint': ['hadolint'],
     'checkov': ['checkov'],
     'shipping-image-security': ['shipping-image-cves', 'sbom-license-provenance'],
-    'workflow-security-posture': ['github-secret-protection-posture', 'github-actions-security'],
+    'github-secret-protection-posture': ['github-secret-protection-posture'],
+    'github-actions-security': ['github-actions-security'],
     'openssf-scorecard': ['openssf-scorecard'], 'complexity': ['radon', 'xenon'],
     'dead-code': ['vulture'], 'test-coverage': ['coverage'],
     'schemathesis-fuzz': ['schemathesis'], 'atheris-state-machine': ['atheris'],
@@ -56,7 +57,8 @@ VENDOR_JOBS = {'snyk','sonarqube-cloud'}
 
 PYTHON_JOBS = {'python-ruff', 'python-bandit', 'python-types', 'complexity',
                'dead-code', 'test-coverage', 'schemathesis-fuzz', 'atheris-state-machine'}
-GENERATED_JOBS = PORTABLE_JOBS | VENDOR_JOBS | PYTHON_JOBS | {'codeql','osv-scanner'}
+GENERATED_JOBS = PORTABLE_JOBS | VENDOR_JOBS | PYTHON_JOBS | {
+    'codeql', 'osv-scanner', 'github-actions-security', 'owasp-js', 'owasp-iac-secrets'}
 
 
 def selection(config: dict, source: Path, requested_channels: list[str] | None = None) -> tuple[list[str], dict, list[str]]:
@@ -83,6 +85,12 @@ def selection(config: dict, source: Path, requested_channels: list[str] | None =
         from scripts.code_analysis.portable_profile import readiness
         capabilities = discover_capabilities(source)
         supported = readiness(profile)
+        supported -= {'github-actions-security', 'owasp-js', 'owasp-iac-secrets'}
+        supported.add('owasp-iac-secrets')
+        if profile.get('javascript_root') and present(profile['javascript_root']):
+            supported.add('owasp-js')
+        if present('.github/workflows'):
+            supported.add('github-actions-security')
         if capabilities['dependency_manifests']:
             supported.add('osv')
         languages = (['python'] if profile.get('python_root') and present(profile['python_root']) else []) + (['javascript-typescript'] if profile.get('javascript_root') and present(profile['javascript_root']) else [])
@@ -95,12 +103,13 @@ def selection(config: dict, source: Path, requested_channels: list[str] | None =
         python = present(profile['python_root'])
         javascript = present(profile['javascript_root'])
         languages = (['python'] if python else []) + (['javascript-typescript'] if javascript else [])
-        absent = {'workflow-security-posture':'Repository security-posture access requires a credential unavailable to source scanner jobs.'}
+        absent = {'github-secret-protection-posture':'Repository security-posture access requires a credential unavailable to source scanner jobs.'}
         for job in PYTHON_JOBS:
             if not python:
                 absent[job] = 'Selected source has no configured Python project: ' + profile['python_root']
         if not javascript:
             absent['typescript-quality'] = 'Selected source has no configured JavaScript project: ' + profile['javascript_root']
+            absent['owasp-js'] = 'Selected source has no configured JavaScript project: ' + profile['javascript_root']
         if not languages:
             absent['codeql'] = 'Selected source has neither configured language project'
             absent['sonarqube-cloud'] = 'Selected source has neither configured language project'
@@ -134,7 +143,6 @@ def selection(config: dict, source: Path, requested_channels: list[str] | None =
     if ('github-actions-security' in requested and
             (not present('.github/workflows') or not any(
                 p.is_file() and p.suffix in {'.yml', '.yaml'} for p in workflow_directory.iterdir()))):
-        # This producer also reads repository posture, which remains applicable.
         excluded['github-actions-security'] = {
             'status': 'NOT_APPLICABLE', 'reason': 'Selected source contains no GitHub Actions workflow definitions'}
     from scripts.code_analysis.extensions import registry

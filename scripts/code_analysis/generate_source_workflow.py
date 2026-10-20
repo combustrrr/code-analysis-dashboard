@@ -304,6 +304,8 @@ def generate(config=None):
                          'if': "${{ contains(fromJSON(needs.identity.outputs.jobs), '" + channel + "') }}",
                          'runs-on': 'ubuntu-latest', 'timeout-minutes': extension.get('timeout_minutes', 15) + 5,
                          'permissions': {'contents': 'read'}, 'steps': steps}
+    from scripts.code_analysis.community_workflow import scanner_jobs as community_scanner_jobs
+    jobs.update(community_scanner_jobs())
     if profile.get('mode') == 'portable':
         from scripts.code_analysis.portable_workflow import scanner_jobs
         jobs.update(scanner_jobs())

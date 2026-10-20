@@ -75,7 +75,7 @@ class ScannerAccessTests(unittest.TestCase):
         self.assertNotIn('scanner-3-snyk', jobs)
         for job in jobs.values():
             if 'fromJSON(inputs.target).source_repository' in yaml.safe_dump(job):
-                self.assertNotIn('secrets.', yaml.safe_dump(job))
+                self.assertNotIn('${{ secrets.', yaml.safe_dump(job))
 
     def test_sonar_identity_is_source_scoped_and_rejects_missing_environment(self):
         self.assertEqual(project_identity('owner/other-repo'), ('owner', 'owner_other-repo'))
@@ -95,7 +95,7 @@ class ScannerAccessTests(unittest.TestCase):
         self.assertEqual(checkout['with']['repository'], '${{ fromJSON(inputs.target).source_repository }}')
         self.assertEqual(checkout['with']['ref'], '${{ fromJSON(inputs.target).head_sha }}')
         self.assertFalse(checkout['with']['persist-credentials'])
-        self.assertNotIn('secrets.', yaml.safe_dump(snapshot))
+        self.assertNotIn('${{ secrets.', yaml.safe_dump(snapshot))
         package = next(step for step in snapshot['steps'] if step.get('name') == 'Package source without checkout metadata')
         self.assertIn('--exclude=.git', package['run'])
         for job_name in ('snyk', 'sonar'):

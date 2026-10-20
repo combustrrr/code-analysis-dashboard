@@ -9,7 +9,7 @@ const DIGEST = /^[a-f0-9]{64}$/i;
 
 const stable = value => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value);
 const orderedRequests = assets => (assets||[]).filter(asset=>asset.name?.startsWith('request-')&&asset.name.endsWith('.json')).sort((left,right)=>String(left.created_at||'').localeCompare(String(right.created_at||''))||Number(left.id||0)-Number(right.id||0));
-const CHANNEL_LANES = {'eslint':'typescript-quality','typescript':'typescript-quality','github-secret-protection-posture':'workflow-security-posture','github-actions-security':'workflow-security-posture','radon':'complexity','xenon':'complexity','shipping-image-cves':'shipping-image-security','sbom-license-provenance':'shipping-image-security','bandit':'python-bandit','ruff':'python-ruff','pyright':'python-types','coverage':'test-coverage','vulture':'dead-code','atheris':'atheris-state-machine','schemathesis':'schemathesis-fuzz','osv':'osv-scanner','snyk':'snyk','sonarqube-cloud':'sonar','coderabbit-ai-advisory':'coderabbit'};
+const CHANNEL_LANES = {'eslint':'typescript-quality','typescript':'typescript-quality','github-secret-protection-posture':'github-secret-protection-posture','github-actions-security':'github-actions-security','owasp-js':'owasp-js','owasp-iac-secrets':'owasp-iac-secrets','radon':'complexity','xenon':'complexity','shipping-image-cves':'shipping-image-security','sbom-license-provenance':'shipping-image-security','bandit':'python-bandit','ruff':'python-ruff','pyright':'python-types','coverage':'test-coverage','vulture':'dead-code','atheris':'atheris-state-machine','schemathesis':'schemathesis-fuzz','osv':'osv-scanner','snyk':'snyk','sonarqube-cloud':'sonar','coderabbit-ai-advisory':'coderabbit'};
 export function channelProgress(requested, jobs, runStatus) {
   return (requested||[]).map(channel=>{
     const lane=(CHANNEL_LANES[channel]||channel).toLowerCase();
@@ -26,7 +26,7 @@ function requestIdFromKey(value) {
   return value.toLowerCase();
 }
 function scannerChoices(project) {
-  const portable = new Set(['semgrep','gitleaks','trivy','checkov','osv','snyk','sonarqube-cloud','openssf-scorecard','github-secret-protection-posture','github-actions-security','coderabbit-ai-advisory']);
+  const portable = new Set(['semgrep','gitleaks','trivy','checkov','osv','snyk','sonarqube-cloud','openssf-scorecard','github-secret-protection-posture','github-actions-security','owasp-js','owasp-iac-secrets','coderabbit-ai-advisory']);
   if (project.profile?.python_root) ['bandit','ruff','radon','xenon','vulture','codeql'].forEach(channel=>portable.add(channel));
   if (project.profile?.javascript_root) ['eslint','typescript','codeql'].forEach(channel=>portable.add(channel));
   Object.keys(project.profile?.commands || {}).forEach(channel=>portable.add(channel));

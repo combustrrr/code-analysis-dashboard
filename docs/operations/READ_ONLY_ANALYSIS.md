@@ -100,6 +100,16 @@ Known limitations include vendor access/plan entitlement and GitHub security-pos
 permissions. Scanner counts are evidence from that exact run and revision; absence of
 findings from an unavailable, failed, or deferred channel is not a clean result.
 
+Credentialless community lanes are independent from vendor and repository-posture
+access. `github-actions-security` runs pinned zizmor against workflow definitions,
+`owasp-js` runs pinned njsscan when the selected profile has JavaScript/TypeScript,
+and `owasp-iac-secrets` runs a checksum-verified TruffleHog binary. All three use
+the immutable read-only checkout and retain no credentials. TruffleHog output is
+converted directly to redacted SARIF; detected values are discarded before an
+artifact is written. Repository secret-protection posture remains a separate API
+lane and is unavailable until the GitHub App or a dedicated read-only credential
+has the required repository security permissions.
+
 ## Result and state storage
 
 | Data | Storage | Retention/behavior |

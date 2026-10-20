@@ -24,7 +24,7 @@ class PortabilityTests(unittest.TestCase):
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.touch()
                 jobs, excluded, _ = selection(self.config(), root)
-                self.assertEqual(set(jobs), PORTABLE_JOBS | {'snyk', 'sonarqube-cloud'})
+                self.assertEqual(set(jobs), PORTABLE_JOBS | {'snyk', 'sonarqube-cloud', 'owasp-iac-secrets'})
                 self.assertEqual(excluded['atheris']['status'], 'NOT_AVAILABLE')
                 self.assertNotIn('DEFERRED', {v['status'] for v in excluded.values()})
 

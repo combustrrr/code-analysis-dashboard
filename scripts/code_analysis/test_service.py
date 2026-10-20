@@ -603,7 +603,7 @@ class MonitoringTests(unittest.TestCase):
         required=json.loads(Path("config/code-analysis/required-channels.json").read_text(encoding="utf-8"))
         channels={row["channel"] for row in required["required_static_channels"]}
         self.assertTrue(channels.issubset({row["channel"] for row in tools.values()}))
-        self.assertEqual(len(tools),26)
+        self.assertEqual(len(tools),28)
         for row in tools.values():
             self.assertIn(row["class"],catalog["classes"])
             self.assertNotIn("state",row)
@@ -646,7 +646,7 @@ class MonitoringTests(unittest.TestCase):
             self.assertIn("Total coverage",dashboard)
             self.assertIn("Operational assurance",dashboard)
             self.assertIn("Channel coverage",dashboard)
-            self.assertEqual(len(current["analysis_channels"]),26)
+            self.assertEqual(len(current["analysis_channels"]),28)
             self.assertNotIn("additional_channels",current)
             self.assertNotIn("channel_status",current)
             self.assertIn("Critical and high review queue",dashboard)
@@ -699,7 +699,7 @@ class MonitoringTests(unittest.TestCase):
             channel_status=json.loads((output/"channel-status.json").read_text(encoding="utf-8"))
             snapshot=json.loads((output/"normalized/current-snapshot.json").read_text(encoding="utf-8"))
             self.assertEqual(len(channel_status["channels"]),16)
-            self.assertEqual(len(snapshot["analysis_channels"]),26)
+            self.assertEqual(len(snapshot["analysis_channels"]),28)
             self.assertEqual(len(snapshot["publication_gate"]["channel_ids"]),16)
             self.assertTrue(all(row["status"] == "COMPLETED"
                                 for row in channel_status["channels"]))
@@ -794,14 +794,14 @@ class MonitoringTests(unittest.TestCase):
         result=snapshot([raw("CodeQL"),raw("Semgrep")])
         validate_snapshot(result)
         self.assertEqual(result["schema_version"],"snapshot-v2")
-        self.assertEqual(result["analysis_channel_count"],26)
+        self.assertEqual(result["analysis_channel_count"],28)
         self.assertNotIn("channel_status",result)
         self.assertNotIn("additional_channels",result)
         classes={}
         for row in result["analysis_channels"]:
             classes[row["class"]]=classes.get(row["class"],0)+1
             self.assertNotIn("state",row)
-        self.assertEqual(classes,{"code":7,"security":6,"dependencies":4,"infrastructure":5,"reliability":4})
+        self.assertEqual(classes,{"code":7,"security":8,"dependencies":4,"infrastructure":5,"reliability":4})
         by_name={row["name"]:row for row in result["analysis_channels"]}
         self.assertEqual(by_name["CodeQL"]["findings"],1)
         self.assertIsNone(by_name["Snyk"]["findings"])
@@ -817,11 +817,11 @@ class MonitoringTests(unittest.TestCase):
             findings.append({**raw(family,line=index+1),"evidence_source":row["evidence_source"]})
         result=snapshot(findings)
         validate_snapshot(result)
-        self.assertEqual(len(result["analysis_channels"]),26)
+        self.assertEqual(len(result["analysis_channels"]),28)
         self.assertTrue(all(row["findings"]==1 and row["observation_count"]==1
                             for row in result["analysis_channels"]))
         self.assertEqual(result["ai_advisory_count"],1)
-        self.assertEqual(result["deterministic_finding_count"],25)
+        self.assertEqual(result["deterministic_finding_count"],27)
 
     def test_unified_snapshot_rejects_inventory_or_membership_drift(self):
         for mutation in ("missing", "duplicate", "class", "observation", "gate", "policy", "legacy"):
