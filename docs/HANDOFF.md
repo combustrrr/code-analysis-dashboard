@@ -1,5 +1,36 @@
 # New-chat handoff: Code Analysis Dashboard
 
+## 2026-10-20 project-workspace deployment and production analyses
+
+Commit `518db3a0aa4d74812ca8d24bda73c9ece38fda55` deployed the shared
+project workspace, actionable Overview charts, developer-focused Issues filters,
+web/PDF Report improvements, and the single Run analysis entry point with Fast and
+Configure choices. Worker run `39421893776` deployed version
+`51f9bce3-328e-402f-a043-43ec79eb6aba`; Pages run `39421893774` deployed the matching
+frontend. Scanner compatibility run `39421968141` passed on the exact release commit.
+The live Pages JavaScript asset `assets/index-CD_nHa8W.js` returned HTTP 200 and contains
+the Run analysis, Fast analysis, and Open report journey. Public configuration still
+requires workspace and report login, admission is open with no reset notice, and
+anonymous `/api/projects` access returns 403.
+
+Preferred-branch batch run `39422058327` admitted three real immutable analyses. The
+project/SHA-scoped coordinators ran concurrently and all completed report publication
+and fenced terminal completion successfully:
+
+- Kavach request `5fbebdb3-f255-424f-9baf-0b6280c402c8`, source
+  `ARYDESTROYER/Kavach-AgenticSOC@db8d9357e4300763be9b558d073fb23b3d7702bd`,
+  coordinator run `39422099153`.
+- Agentic-Kibana request `290e1e62-45ac-4adf-a956-4492fdba1688`, source
+  `combustrrr/Agentic-Kibana@22d4d2c3b3bbac3fe3ddd22e6b78fe6606aa1971`,
+  coordinator run `39422103259`.
+- Dashboard request `4983b75e-46f5-418b-8d98-655fd8703876`, source
+  `combustrrr/code-analysis-dashboard@518db3a0aa4d74812ca8d24bda73c9ece38fda55`,
+  coordinator run `39422107024`.
+
+The configured-source scans used tooling revision
+`03bcbff06e3174d75401170ec630b789fbf00a91`; the dashboard used the reviewed portable
+profile at the same tooling revision. No source repository was modified.
+
 ## 2026-10-20 institutional header and Settings deployment
 
 Main commit `01436fda4ac2ee37ff4275b1641ab9e7fecb9e86` replaced the generated
