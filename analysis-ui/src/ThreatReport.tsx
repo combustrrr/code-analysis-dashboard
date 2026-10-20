@@ -6,7 +6,7 @@ import {parseAppRoute,routeHash} from './appRoutes';
 import { safeGithubUrl } from './safeUrls';
 import trustLabLogo from './assets/trustlab-logo.jpg';
 import mphasisLogo from './assets/mphasis-logo.jpg';
-import { filterThreatFindings, hasActiveFilters, PDF_FINDINGS_PER_VOLUME, sourceLocationUrl, type ExportScope, type ReportFilterSnapshot } from './threatReportExportModel';
+import { filterThreatFindings, hasActiveFilters, sourceLocationUrl, type ExportScope, type ReportFilterSnapshot } from './threatReportExportModel';
 import './report-preview.css';
 import type { ThreatReportData } from './threatReportExportModel';
 export type { ThreatFinding, ThreatReportData } from './threatReportExportModel';
@@ -73,9 +73,9 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
       <Button icon={<FilePdfOutlined />} disabled={Boolean(pdfScope) || !hasActiveFilters(filters)} onClick={() => setPreviewScope('filtered')}>Preview filtered PDF</Button>
     </Space>
     <Modal className="pdf-preview-modal" width={820} open={Boolean(previewScope)} title="Preview PDF export" onCancel={() => setPreviewScope(undefined)} footer={<><Button onClick={() => setPreviewScope(undefined)}>Cancel</Button><Button type="primary" icon={<FilePdfOutlined />} loading={Boolean(pdfScope)} onClick={() => previewScope && exportPdf(previewScope)}>Download PDF</Button></>}>
-      {previewScope && (() => { const selected = previewScope === 'complete' ? report.findings : filtered; const volumes = Math.max(1, Math.ceil(selected.length / PDF_FINDINGS_PER_VOLUME)); return <div className="pdf-preview-sheet">
+      {previewScope && (() => { const selected = previewScope === 'complete' ? report.findings : filtered; return <div className="pdf-preview-sheet">
         <div className="pdf-preview-cover"><span>CODE ANALYSIS EVIDENCE</span><h2>Security Analysis Report</h2><p>{report.source_repository || 'Repository unavailable'}</p><code>{report.target_sha}</code></div>
-        <div className="pdf-preview-metrics"><div><strong>{selected.length.toLocaleString()}</strong><span>Findings</span></div><div><strong>{report.coverage.available_channels.length}</strong><span>Complete channels</span></div><div><strong>{report.coverage.incomplete_channels.length}</strong><span>Incomplete channels</span></div><div><strong>{volumes}</strong><span>{volumes === 1 ? 'PDF volume' : 'PDF volumes'}</span></div></div>
+        <div className="pdf-preview-metrics"><div><strong>{selected.length.toLocaleString()}</strong><span>Findings</span></div><div><strong>{report.coverage.available_channels.length}</strong><span>Complete channels</span></div><div><strong>{report.coverage.incomplete_channels.length}</strong><span>Incomplete channels</span></div><div><strong>One</strong><span>PDF document</span></div></div>
         <div className="pdf-preview-body"><div><h3>{previewScope === 'complete' ? 'Complete report' : 'Filtered report'}</h3><p>{previewScope === 'complete' ? 'Every retained finding for this immutable revision will be included.' : `The active filters are frozen into this export. ${selected.length} of ${report.findings.length} findings will be included.`}</p>{previewScope === 'filtered' && <p className="pdf-preview-filters">{Object.entries(filters).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join(' / ')}</p>}</div><div><h3>Included sections</h3><ul><li>Executive summary and distributions</li><li>Scanner coverage and limitations</li><li>Immutable analysis provenance</li><li>Detailed findings with source links</li><li>Explanation, impact, and remediation</li></ul></div></div>
         {report.coverage.incomplete_channels.length > 0 && <Alert showIcon type="warning" title="The PDF will identify incomplete coverage" description="Unavailable scanner evidence remains explicit and is not treated as zero findings." />}
       </div>; })()}

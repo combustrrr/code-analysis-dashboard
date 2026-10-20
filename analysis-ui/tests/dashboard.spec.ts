@@ -28,6 +28,9 @@ test.describe('production shell',()=>{
 
  test('issues support search, grouping, advanced filters, and evidence',async({page})=>{
   await page.goto(PROJECT+'/issues');
+  await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();
+  await expect(page.getByText('How to read this evidence')).toBeVisible();
+  await expect(page.getByText(/scanner.*support.*finding/i).first()).toBeVisible();
   await page.getByLabel('Search issues').fill('CVE-2026-42561');
   await expect(page).toHaveURL(/q=CVE-2026-42561/);
   await expect(page.locator('.ant-table-tbody > tr.ant-table-row').first()).toBeVisible();

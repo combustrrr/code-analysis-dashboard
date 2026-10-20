@@ -3,6 +3,7 @@ import {ArrowRightOutlined,BranchesOutlined,CheckCircleFilled,FileProtectOutline
 import type {useLaunchAuth} from './useLaunchAuth';
 import {AppearanceToggle,useAppearance} from './Appearance';
 import './landing.css';
+import './brand-landing.css';
 import './auth.css';
 import trustLabLogo from './assets/trustlab-logo.jpg';
 import mphasisLogo from './assets/mphasis-logo.jpg';

@@ -290,13 +290,31 @@ check. Deployment changed the Worker and dashboard only; no production scan was 
 
 The authenticated report now previews a complete or filtered PDF export before
 generating a download. The preview freezes and displays the export scope, finding
-count, scanner completion, incomplete coverage, active filters, and deterministic
-volume count. The generated PDF is organized as an evidence report with an executive
+count, scanner completion, incomplete coverage, active filters, and single-document
+output. The generated PDF is organized as an evidence report with an executive
 summary, severity and category distributions, scanner coverage, explicit limitations,
 immutable provenance, and detailed findings containing source links, scanner and rule
-attribution, explanation, impact, remediation, and workflow evidence. Large exports
-retain deterministic volume splitting and incomplete scanner evidence is never
-presented as zero findings.
+attribution, explanation, impact, remediation, and workflow evidence. Complete exports
+include every retained finding in one PDF; filtered exports include the findings selected
+by the active report filters. Incomplete scanner evidence is never presented as zero findings.
+
+## 2026-10-20 Issues investigation workspace
+
+Issues is organized as the primary developer investigation surface. It begins with the
+current filtered scope, critical count, multi-scanner support count, and missing-location
+count, followed by URL-preserved search, evidence filters, grouping, and the finding list.
+Each finding keeps severity, immutable source location, applied rules, and scanner support
+visually separate. Multi-scanner support is highlighted as correlation evidence without
+claiming confidence, impact, a shared defect, or a common root cause. Opening a finding
+retains source context, supporting observations, immutable links, developer copy actions,
+and cautious rule, file, directory, and scanner relationships.
+
+The shared visual tokens use the repository-owned institutional marks as their basis:
+Trust Lab blue structures immutable provenance, Mphasis magenta identifies primary
+actions and multi-scanner correlation, cyan identifies scanner evidence, green marks
+completed evidence, amber marks incomplete coverage, and red remains reserved for
+actionable failures. Dark and light themes use contrast-adjusted variants of the same
+semantic roles rather than changing what each color means.
 
 ## 2026-10-20 Analysis progress placement
 

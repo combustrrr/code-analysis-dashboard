@@ -40,10 +40,10 @@ filters at click time and is unavailable until at least one filter is active.
 
 PDF files identify the exact source SHA, analysis, report, tooling, catalog, generator,
 coverage state, limitations, and a distinct export timestamp. Source locations link to the
-exact GitHub SHA when the repository identity is valid. Large exports are deterministically
-split between findings and delivered only after every volume succeeds as a single ZIP;
-failed exports never offer a partial package. JSON and Markdown remain available as the
-lossless fallbacks for reports above the documented browser-safe PDF volume limit.
+exact GitHub SHA when the repository identity is valid. Every complete or filtered export
+is generated as one PDF document. Generation must finish before the download is offered,
+so a failed export never produces a partial file. JSON and Markdown remain available as
+lossless alternatives for downstream processing.
 
 ## Publication and target boundaries
 

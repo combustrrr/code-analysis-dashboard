@@ -139,7 +139,10 @@ def build(snapshot: dict, identity: dict, output: Path, *, producer_repository: 
         row = {"id": fid, "severity": finding["severity"], "file": name, "line": line,
                "message": "Potential secret detected; value withheld from public report." if secret else finding.get("message", ""),
                "scanners": finding.get("supporting_scanner_families", []),
-               "rules": sorted({str(o["rule"]) for o in origins}), "page": len(details) // 100}
+               "rules": sorted({str(o["rule"]) for o in origins}),
+               "observation_count": len(origins),
+               "scanner_family_count": len(finding.get("supporting_scanner_families", [])),
+               "page": len(details) // 100}
         detail = {**row, "origins": origins, "source": None, "source_start": None, "source_url": None}
         if safe_file(name):
             detail["source_url"] = f"https://github.com/{identity['source_repository']}/blob/{identity['head_sha']}/{quote(name, safe='/')}" + (f"#L{line}" if line else "")

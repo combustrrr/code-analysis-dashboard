@@ -22,11 +22,8 @@ export type ReportFilterSnapshot = { query: string; severity: string; category: 
 export type ExportScope = 'complete' | 'filtered';
 export type PdfExportModel = {
   report: ThreatReportData; findings: ThreatFinding[]; scope: ExportScope; filters: ReportFilterSnapshot;
-  exportedAt: string; sourceUrl?: string; volume: number; volumeCount: number; totalSelected: number;
+  exportedAt: string; sourceUrl?: string; totalSelected: number;
 };
-
-export const PDF_FINDINGS_PER_VOLUME = 250;
-export const MAX_PDF_VOLUMES = 160;
 
 export function hasActiveFilters(filters: ReportFilterSnapshot): boolean {
   return Object.values(filters).some(value => value.trim().length > 0);
@@ -57,13 +54,7 @@ export function safeExportBaseName(report: ThreatReportData, scope: ExportScope)
   return `${clean}-${sha}-${scope}`;
 }
 
-export function buildPdfModels(report: ThreatReportData, scope: ExportScope, filters: ReportFilterSnapshot, exportedAt = new Date().toISOString()): PdfExportModel[] {
+export function buildPdfModel(report: ThreatReportData, scope: ExportScope, filters: ReportFilterSnapshot, exportedAt = new Date().toISOString()): PdfExportModel {
   const selected = scope === 'complete' ? [...report.findings] : filterThreatFindings(report.findings, filters);
-  const volumeCount = Math.max(1, Math.ceil(selected.length / PDF_FINDINGS_PER_VOLUME));
-  if (volumeCount > MAX_PDF_VOLUMES) throw new Error(`This report needs ${volumeCount} PDF volumes, above the browser-safe limit of ${MAX_PDF_VOLUMES}. Download JSON or Markdown instead.`);
-  return Array.from({ length: volumeCount }, (_, index) => ({
-    report, scope, filters: { ...filters }, exportedAt, sourceUrl: undefined,
-    findings: selected.slice(index * PDF_FINDINGS_PER_VOLUME, (index + 1) * PDF_FINDINGS_PER_VOLUME),
-    volume: index + 1, volumeCount, totalSelected: selected.length,
-  }));
+  return { report, scope, filters: { ...filters }, exportedAt, sourceUrl: undefined, findings: selected, totalSelected: selected.length };
 }

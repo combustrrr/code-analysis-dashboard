@@ -87,7 +87,7 @@ shortcuts and target changes clear unrelated filters.
 
 The Threat Report view adds deterministic catalog explanations, potential impact,
 remediation steps, coverage limitations, private links, JSON/Markdown downloads, and
-locally generated PDF/ZIP exports without changing the underlying scanner evidence.
+locally generated single-PDF exports without changing the underlying scanner evidence.
 
 Preferred-branch evidence is refreshed automatically every six hours for the three
 trusted projects, and authorized collaborators can still start Fast or configured

@@ -58,7 +58,7 @@ identifiers.
    and scanner-overlap filters. Selectors are searchable where useful. Clear filters
    resets the selection; overview shortcuts clear unrelated filters. Group by rule,
    scanner, category, file or directory. Filters remain in the project URL. Open an issue for explanation, source line highlighting,
-   immutable GitHub links, reporting scanners, applied rules, supporting observations,
+   immutable GitHub links, reporting scanners, applied rules, scanner-family and retained-observation counts, supporting observations,
    and related evidence. Shared rules/locations mean
    related findings, not proof that one fix resolves the entire group.
 5. Scanners shows usable evidence, unavailable/setup-required channels, execution

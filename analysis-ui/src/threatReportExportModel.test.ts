@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { buildPdfModels, filterThreatFindings, hasActiveFilters, safeExportBaseName, sourceLocationUrl, type ThreatReportData } from './threatReportExportModel';
+import { buildPdfModel, filterThreatFindings, hasActiveFilters, safeExportBaseName, sourceLocationUrl, type ThreatReportData } from './threatReportExportModel';
 
 const report: ThreatReportData = {
   schema_version: '1', report_id: 'report-1', immutable: true, source_repository: 'owner/repo', ref: 'main', target_sha: 'a'.repeat(40), generated_at: '2026-10-20T00:00:00Z', guidance_catalog_version: 'cat-1', generator_version: 'gen-1', status: 'completed', limitations: [],
@@ -11,10 +11,10 @@ const report: ThreatReportData = {
 describe('threat report export model', () => {
   test('complete scope ignores filters while filtered scope freezes the selection', () => {
     const filters = { query: 'does-not-match', severity: 'HIGH', category: '', guidance: '' };
-    expect(buildPdfModels(report, 'complete', filters)[0].totalSelected).toBe(1);
-    expect(buildPdfModels(report, 'filtered', filters)[0].totalSelected).toBe(0);
+    expect(buildPdfModel(report, 'complete', filters).totalSelected).toBe(1);
+    expect(buildPdfModel(report, 'filtered', filters).totalSelected).toBe(0);
     filters.query = '';
-    expect(buildPdfModels(report, 'filtered', { query: 'café', severity: '', category: '', guidance: '' })[0].findings[0].finding_id).toBe('f-1');
+    expect(buildPdfModel(report, 'filtered', { query: 'café', severity: '', category: '', guidance: '' }).findings[0].finding_id).toBe('f-1');
   });
 
   test('detects filters and builds safe exact-SHA links and filenames', () => {
@@ -25,11 +25,10 @@ describe('threat report export model', () => {
     expect(filterThreatFindings(report.findings, { query: '', severity: 'LOW', category: '', guidance: '' })).toHaveLength(0);
   });
 
-  test('splits only between findings and preserves global volume order', () => {
+  test('keeps every selected finding in one PDF model', () => {
     const many = { ...report, findings: Array.from({ length: 251 }, (_, index) => ({ ...report.findings[0], finding_id: `f-${index}` })) };
-    const volumes = buildPdfModels(many, 'complete', { query: '', severity: '', category: '', guidance: '' }, '2026-10-20T01:00:00Z');
-    expect(volumes.map(volume => volume.findings.length)).toEqual([250, 1]);
-    expect(volumes.map(volume => volume.volume)).toEqual([1, 2]);
-    expect(volumes.every(volume => volume.exportedAt === '2026-10-20T01:00:00Z')).toBe(true);
+    const model = buildPdfModel(many, 'complete', { query: '', severity: '', category: '', guidance: '' }, '2026-10-20T01:00:00Z');
+    expect(model.findings).toHaveLength(251);
+    expect(model.exportedAt).toBe('2026-10-20T01:00:00Z');
   });
 });

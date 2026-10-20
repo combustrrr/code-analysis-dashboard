@@ -101,6 +101,9 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(r['status'], 'partial')
         self.assertFalse(r['publication_gate']['satisfied'])
         self.assertIsNone(r['channels'][1]['findings'])
+        finding = json.loads((self.root / 'report/findings.json').read_text(encoding='utf-8'))[0]
+        self.assertEqual(finding['observation_count'], 1)
+        self.assertEqual(finding['scanner_family_count'], 1)
         service.validate_bundle(self.root / 'report', r)
 
     def test_report_generation_timestamp_is_distinct_from_analysis_timestamp(self):

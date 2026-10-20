@@ -1,0 +1,44 @@
+/* Shared Trust Lab x Mphasis palette. */
+.landing-page {
+  --land-blue: #5b7dd1;
+  --land-teal: #28b8d3;
+}
+
+.landing-page .ant-btn-primary {
+  color: #fff;
+  background: #d91668;
+  border-color: #d91668;
+}
+
+.landing-page .ant-btn-primary:hover {
+  color: #fff !important;
+  background: #b80f58 !important;
+  border-color: #b80f58 !important;
+}
+
+.landing-kicker,
+.dossier-coverage,
+.landing-proof strong {
+  color: #74d7e6;
+}
+
+.analysis-dossier::before {
+  background: linear-gradient(90deg, #5b7dd1, #28b8d3, #d91668);
+}
+
+:root[data-theme="light"] .landing-page {
+  --land-blue: #4668be;
+  --land-teal: #087486;
+}
+
+:root[data-theme="light"] .landing-page .ant-btn-primary {
+  color: #fff;
+  background: #b80f58;
+  border-color: #b80f58;
+}
+
+:root[data-theme="light"] .landing-kicker,
+:root[data-theme="light"] .dossier-coverage,
+:root[data-theme="light"] .landing-proof strong {
+  color: #075563;
+}

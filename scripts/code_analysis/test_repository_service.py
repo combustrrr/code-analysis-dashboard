@@ -390,6 +390,7 @@ class PublicationCompletenessTests(unittest.TestCase):
         self.assertEqual({row['observation_id'] for row in snapshot['observations']},{'new-s','old-b'})
         self.assertEqual({row['channel']:row['status'] for row in snapshot['analysis_channels']},{'semgrep':'COMPLETED','bandit':'COMPLETED'})
         self.assertEqual({row['id'] for row in merged['findings.json']},{'new-semgrep','keep-bandit'})
+        self.assertTrue(all(row['observation_count']==1 and row['scanner_family_count']==1 for row in merged['findings.json']))
         self.assertEqual(report['finding_count'],2)
 
     def test_publication_has_one_canonical_target_and_bounded_run_history(self):

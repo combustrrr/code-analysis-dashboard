@@ -275,7 +275,9 @@ def merge_channel_documents(previous, incoming, selected_channels):
         row={'id':identity,'severity':finding.get('severity','UNKNOWN'),'file':finding.get('file',''),
              'line':finding.get('start_line',0),'message':detail.get('message',''),
              'scanners':finding.get('supporting_scanner_families',[]),
-             'rules':sorted({str(origin.get('rule','')) for origin in origins}), 'page':0}
+             'rules':sorted({str(origin.get('rule','')) for origin in origins}),
+             'observation_count':len(origins),
+             'scanner_family_count':len(finding.get('supporting_scanner_families',[])), 'page':0}
         findings.append(row)
         details[identity]={**detail,**row,'origins':[{key:origin.get(key) for key in ('scanner_family','rule','file','start_line','raw_artifact','observation_id')} for origin in origins]}
     findings.sort(key=lambda row:(row.get('severity',''),row.get('file',''),row.get('line',0),row['id']))
