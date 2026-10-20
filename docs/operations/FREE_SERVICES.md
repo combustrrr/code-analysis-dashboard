@@ -44,7 +44,9 @@ No frontend session replay or third-party analytics SDK is installed.
 | Program | Decision for this application |
 |---|---|
 | [Cloudflare Project Alexandria](https://www.cloudflare.com/en-gb/lp/project-alexandria/) | Optional future credits if free quotas become insufficient. Eligibility and acceptance are discretionary; requires a valid payment method. Not activated. |
-| [Sonar OSS plan](https://docs.sonarsource.com/sonarqube-cloud/administering-sonarcloud/managing-subscription/subscription-plans) | Most relevant next entitlement: offers branch/PR analysis for eligible open-source organizations. Could address current branch_entitlement. Existing organization access has not changed; keep scanner partial until real evidence succeeds. |
+| [Sonar OSS plan](https://docs.sonarsource.com/sonarqube-cloud/administering-sonarcloud/managing-subscription/subscription-plans) | Approved for the three public repositories and selected by default. Availability is still established per exact run: invalid organization/project access, quota, or scanner failure remains incomplete evidence. |
+| Snyk Open Source | Approved for the three public repositories and selected by default. The existing token stays inside the isolated vendor job; its plan and quota are never inferred from repository visibility alone. |
+| CodeRabbit OSS review | Approved for exact open-PR evidence. It is not a branch scanner: the app must review the PR, and evidence is accepted only for the resolved head/base context. |
 | [Sentry OSS sponsorship](https://sentry.io/for/open-source/) | Potential future browser error monitoring. Not needed for current Worker diagnostics; no account, SDK, replay or telemetry export added. Sponsorship is not assumed approved. |
 | Cloudflare Turnstile | Free bot checks exist, but adding a challenge to an already collaborator-gated launch flow is not currently necessary. Reconsider for public onboarding. |
 | R2 and KV | Provisioned to store tracking state (KV) and final reports (R2). KV also stores the bounded Kavach evaluation lock. A strict free-tier policy is enforced: (1) all producer artifacts are uploaded under the temp-runs/<run>/<attempt>/ prefix and must be deleted by a 1-day lifecycle rule; (2) per-object size is capped by the Worker (default 100 MB); (3) manifest compressed-bytes are capped by the Worker (default 900 MB). |
@@ -53,7 +55,8 @@ No frontend session replay or third-party analytics SDK is installed.
 
 Provider plan changes and application approvals require verification at activation.
 No credit card, paid upgrade, external message or upstream installation was submitted.
-This change does not remove Sonar/posture blockers or prove independent public onboarding.
+Public OSS eligibility does not prove a particular run completed. The published channel
+status remains authoritative, and repository security-posture access is still separate.
 
 ## R2 free-tier guardrails and required operator setup
 

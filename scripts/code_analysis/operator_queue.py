@@ -8,7 +8,7 @@ from pathlib import Path
 import urllib.request
 import uuid
 
-VENDOR_CHANNELS = {"snyk", "sonarqube-cloud", "coderabbit-ai-advisory"}
+PR_ONLY_CHANNELS = {"coderabbit-ai-advisory"}
 
 
 def stable_digest(value: object) -> str:
@@ -39,7 +39,7 @@ def preferred_intents(document: dict, execution_sha: str) -> list[dict]:
             raise ValueError("configured source identity or visibility changed")
         target_sha = branch_row["commit"]["sha"].lower()
         request_id = str(uuid.uuid4())
-        channels = sorted(channel for channel in project["enabled_scanners"] if channel not in VENDOR_CHANNELS and channel not in project.get("deferred_channels", {}))
+        channels = sorted(channel for channel in project["enabled_scanners"] if channel not in PR_ONLY_CHANNELS and channel not in project.get("deferred_channels", {}))
         profile_digest = stable_digest(project["profile"])
         intent = {
             "schema_version": "analysis-request-v4", "request_id": request_id,

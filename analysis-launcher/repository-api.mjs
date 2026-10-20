@@ -38,7 +38,8 @@ function scannerChoices(project) {
     const group=SCANNER_GROUPS.find(values=>values.includes(channel));
     const status=reason?'DEFERRED':!supported||UNAVAILABLE_SCANNERS.has(channel)?'NOT_AVAILABLE':setupRequired?'SETUP_REQUIRED':'READY';
     const unavailableReason=UNAVAILABLE_SCANNERS.has(channel)?'This lane requires a cross-repository credential and is withheld from source scanner jobs.':!supported?'No registered adapter in this tooling revision.':setupRequired?'Requires a reviewed language or execution profile.':channel==='coderabbit-ai-advisory'?'Available only when analyzing an open pull request.':'';
-    return {id:channel,mode,group:group?.join('+')||channel,status,reason:reason||unavailableReason,default_selected:status==='READY'&&mode==='portable',selectable:status==='READY'};
+    const approvedDefault = mode === 'portable' || channel === 'snyk' || channel === 'sonarqube-cloud';
+    return {id:channel,mode,group:group?.join('+')||channel,status,reason:reason||unavailableReason,default_selected:status==='READY'&&approvedDefault,selectable:status==='READY'};
   });
   for(const group of SCANNER_GROUPS){
     const members=choices.filter(value=>group.includes(value.id));

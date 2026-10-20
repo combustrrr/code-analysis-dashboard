@@ -1,5 +1,16 @@
 # Current implementation state
 
+## 2026-10-20 approved OSS vendor defaults
+
+Snyk and SonarQube Cloud are approved default lanes for all three configured public
+repositories. Fast and operator preferred-branch analyses request them alongside the
+credential-free defaults; vendor credentials remain confined to the isolated vendor
+workflow and never accompany source-executing jobs. CodeRabbit remains PR-only because
+its evidence is a review of an exact pull-request head/base boundary. The collector may
+use the execution workflow's read-only GitHub token for public PR metadata when no
+dedicated collector credential exists. A repository still requires an active CodeRabbit
+installation/review before this channel can produce evidence.
+
 ## 2026-10-20 community scanner production verification
 
 Production source run `39432996302` completed successfully and published immutable
