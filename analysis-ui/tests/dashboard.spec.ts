@@ -77,7 +77,7 @@ test.describe('production shell',()=>{
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   await page.setViewportSize({width:390,height:844});
   await page.getByLabel('Open navigation').click();
-  await expect(page.locator('.ant-drawer').getByRole('link',{name:'Projects'})).toBeVisible();
+  await expect(page.locator('.ant-drawer').getByRole('link',{name:'Project register'})).toBeVisible();
   await expect(page.locator('.ant-drawer').getByRole('link',{name:'Activity'})).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.screenshot({path:testInfo.outputPath('mobile-light.png'),fullPage:true});

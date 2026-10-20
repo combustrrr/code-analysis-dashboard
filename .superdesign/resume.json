@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "/": {
+      "targetKind": "existing-ui",
+      "projectId": "d4b4c0ba-b629-4192-a7e9-85dec8c2bbe6",
+      "activeDraftId": "509ffca3-3e01-469f-8503-ae769a09dd7a",
+      "baselineDraftId": "509ffca3-3e01-469f-8503-ae769a09dd7a",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "analysis-ui/src/LandingPage.tsx",
+        "analysis-ui/src/landing.css",
+        "analysis-ui/src/Appearance.tsx",
+        "analysis-ui/src/brand.ts"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "1c0092e307bfeb6232e6ee0552f3601d6153bfe1a7a11284ab30bfc3e21e4061",
+        "analysis-ui/src/LandingPage.tsx": "3dd07625472f76f997175f62788bfd5e9f3381a375fa14cc91b99a67a89b9caf",
+        "analysis-ui/src/landing.css": "b392e051de5747bf6245a96f39fbb494c3c4f283e8d293987bc1ddad051bd204",
+        "analysis-ui/src/Appearance.tsx": "92cfe3e9e8db709bbd3ff6b4e66355f26606cc626e928f65972c2e48f738c7d0",
+        "analysis-ui/src/brand.ts": "f18febbe403513a029bb6a0e73f6a36509ec5ccb3b26fec8f63e963d5455265b"
+      },
+      "referenceIds": [
+        "analysis-ui-src-assets-trustlab-logo.jpg",
+        "analysis-ui-src-assets-mphasis-logo.jpg"
+      ],
+      "components": [],
+      "drafts": {
+        "509ffca3-3e01-469f-8503-ae769a09dd7a": {
+          "title": "Current Landing — Evidence Register",
+          "visualDirection": "pixel-faithful current landing baseline",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-20T16:20:00+05:30"
+    }
+  }
+}

@@ -29,7 +29,7 @@ Overview, Issues, and Report navigation. The persistent evidence rail keeps repo
 immutable revision, scanner coverage, publication time, and run state visible.
 Operational detail is consolidated in global Settings. The shell is branded **Code Analysis** with the endorsement
 **IIT Bombay Trust Lab × Mphasis**; dark mode is the default and light mode is fully
-supported from the shared token source. Instrument Sans is bundled for interface copy
+supported from the shared token source. Manrope is bundled for interface copy, Sora for product headings,
 and IBM Plex Mono is reserved for SHAs, branches, rules, and run identifiers.
 The dashboard includes a **Threat Report** view for newly published analyses. It
 summarizes severity/category coverage and deterministic catalog guidance, then links

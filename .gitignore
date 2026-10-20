@@ -14,3 +14,4 @@ analysis-ui/test-results/
 analysis-ui/playwright-report/
 
 .verification/
+.superdesign/tmp/
