@@ -50,20 +50,20 @@ class RepositoryExecutionTests(unittest.TestCase):
             {'client_request_id': 'historical'}, {'request_id': 'current'}))
         self.assertFalse(owns_active_request({}, {'request_id': 'current'}))
 
-    def test_queued_v2_uses_pinned_commit_instead_of_mutable_selection(self):
+    def test_queued_v3_uses_pinned_commit_instead_of_mutable_selection(self):
         from scripts.code_analysis.repository_service import queued_selection
         intent = {
-            'schema_version':'analysis-request-v2',
+            'schema_version':'analysis-request-v3',
             'source_repository':'owner/source','source_repository_id':42,
             'selection': {'kind': 'branch', 'ref': 'Testing'},
             'resolved_selection': {'repository':'owner/source','repository_id':42,'kind':'commit','ref':'a'*40},
-            'target_sha':'a'*40,'requested_channels':['semgrep'],
+            'source_sha':'a'*40,'target_sha':'a'*40,'requested_channels':['semgrep'],
         }
         self.assertEqual(json.loads(queued_selection(intent)), intent['resolved_selection'])
 
-    def test_v2_queue_rejects_a_mismatched_pinned_sha(self):
+    def test_v3_queue_rejects_a_mismatched_pinned_sha(self):
         from scripts.code_analysis.repository_service import queued_selection
-        intent={'schema_version':'analysis-request-v2','resolved_selection':{'repository':'owner/source','kind':'commit','ref':'a'*40},'target_sha':'b'*40,'requested_channels':['semgrep']}
+        intent={'schema_version':'analysis-request-v3','source_repository':'owner/source','source_repository_id':42,'resolved_selection':{'repository':'owner/source','repository_id':42,'kind':'commit','ref':'a'*40},'source_sha':'a'*40,'target_sha':'b'*40,'requested_channels':['semgrep']}
         with self.assertRaisesRegex(ValueError,'Pinned request envelope'):
             queued_selection(intent)
 

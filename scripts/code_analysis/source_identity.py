@@ -20,19 +20,19 @@ def validate_durable_request(row: dict) -> dict:
     intent = row.get('queue_intent')
     if not isinstance(intent, dict):
         raise ValueError('Explicit Durable Object request is unavailable')
-    if (intent.get('schema_version') != 'analysis-request-v2' or intent.get('request_id') != request_id
+    if (intent.get('schema_version') != 'analysis-request-v3' or intent.get('request_id') != request_id
             or intent.get('execution_repository_id') != api(f'repos/{host}')['id']
-            or intent.get('target_sha') != row.get('head_sha') or intent.get('tooling_sha') != os.environ['TOOLING_SHA']
+            or intent.get('source_sha') != row.get('head_sha') or intent.get('target_sha') != intent.get('source_sha')
+            or intent.get('tooling_sha') != os.environ['TOOLING_SHA']
             or intent.get('project_id') != row.get('project_id')
             or intent.get('requested_channels') != row.get('requested_channels')
             or intent.get('profile_digest') != row.get('profile_digest')
             or row.get('dispatch_id') != expected_dispatch_id(request_id,row.get('execution_channels') or intent.get('requested_channels',[]))):
         raise ValueError('Producer dispatch does not match the accepted request envelope')
-    if intent.get('schema_version') == 'analysis-request-v2':
-        selection = intent.get('resolved_selection', {})
-        pr_context=intent.get('pr_context') or {}
-        if selection != {'repository':row.get('source_repository'),'repository_id':pr_context.get('head_repository_id',intent.get('source_repository_id')),'kind':'commit','ref':row.get('head_sha')}:
-            raise ValueError('Producer dispatch revision differs from the pinned request')
+    selection = intent.get('resolved_selection', {})
+    pr_context=intent.get('pr_context') or {}
+    if selection != {'repository':row.get('source_repository'),'repository_id':pr_context.get('head_repository_id',intent.get('source_repository_id')),'kind':'commit','ref':row.get('head_sha')}:
+        raise ValueError('Producer dispatch revision differs from the pinned request')
     return intent
 
 

@@ -42,12 +42,12 @@ def preferred_intents(document: dict, execution_sha: str) -> list[dict]:
         channels = sorted(channel for channel in project["enabled_scanners"] if channel not in VENDOR_CHANNELS and channel not in project.get("deferred_channels", {}))
         profile_digest = stable_digest(project["profile"])
         intent = {
-            "schema_version": "analysis-request-v2", "request_id": request_id,
+            "schema_version": "analysis-request-v3", "request_id": request_id,
             "execution_repository_id": document["execution_repository"]["id"], "project_id": str(project["id"]),
             "source_repository": source["full_name"], "source_repository_id": source["id"],
             "selection": {"kind": "branch", "ref": branch},
             "resolved_selection": {"repository": source["full_name"], "repository_id": source["id"], "kind": "commit", "ref": target_sha},
-            "target_sha": target_sha, "pr_context": None, "requested_channels": channels,
+            "source_sha": target_sha, "target_sha": target_sha, "pr_context": None, "requested_channels": channels,
             "tooling_sha": document["tooling_sha"], "profile_digest": profile_digest,
             "profile_mode": "portable" if project["profile"].get("mode") == "portable" else "agentic-soc",
             "analysis_key": {"project_id": str(project["id"]), "source_repository_id": source["id"], "target_sha": target_sha, "tooling_sha": document["tooling_sha"], "profile_digest": profile_digest},

@@ -93,20 +93,20 @@ def producer_dispatch_id(request_id, channels):
 
 def queued_selection(intent):
     """Return the canonical repository-qualified selection from a queued request."""
-    selection = intent.get('resolved_selection') if intent.get('schema_version') == 'analysis-request-v2' else intent.get('selection')
+    if intent.get('schema_version') != 'analysis-request-v3':
+        raise ValueError('Unsupported queued request schema')
+    selection = intent.get('resolved_selection')
     if not isinstance(selection, dict):
         raise ValueError('Queued request selection is invalid')
-    if intent.get('schema_version') == 'analysis-request-v1' and intent.get('target_sha'):
-        selection = {'repository':selection.get('repository'),'kind':'commit','ref':intent['target_sha']}
-    if intent.get('schema_version') == 'analysis-request-v2':
-        pr_context=intent.get('pr_context')
-        expected_repository=pr_context.get('head_repository') if isinstance(pr_context,dict) else intent.get('source_repository')
-        expected_repository_id=pr_context.get('head_repository_id') if isinstance(pr_context,dict) else intent.get('source_repository_id')
-        if (selection.get('kind') != 'commit' or selection.get('ref') != intent.get('target_sha')
-                or selection.get('repository') != expected_repository or selection.get('repository_id') != expected_repository_id
-                or not isinstance(intent.get('requested_channels'), list)
-                or not intent.get('requested_channels')):
-            raise ValueError('Pinned request envelope is invalid')
+    pr_context=intent.get('pr_context')
+    expected_repository=pr_context.get('head_repository') if isinstance(pr_context,dict) else intent.get('source_repository')
+    expected_repository_id=pr_context.get('head_repository_id') if isinstance(pr_context,dict) else intent.get('source_repository_id')
+    if (selection.get('kind') != 'commit' or selection.get('ref') != intent.get('source_sha')
+            or intent.get('target_sha') != intent.get('source_sha')
+            or selection.get('repository') != expected_repository or selection.get('repository_id') != expected_repository_id
+            or not isinstance(intent.get('requested_channels'), list)
+            or not intent.get('requested_channels')):
+        raise ValueError('Pinned request envelope is invalid')
     return json.dumps(selection)
 
 
@@ -618,7 +618,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             accepted = next(r for r in state['targets'] if r['id'] == selected['id'])
             accepted['client_request_id'] = request_id
             accepted['requested_selection'] = intent.get('selection', selected) if queued_asset is not None else selected
-            if queued_asset is not None and intent.get('schema_version') == 'analysis-request-v2':
+            if queued_asset is not None and intent.get('schema_version') == 'analysis-request-v3':
                 accepted.update(requested_channels=intent['requested_channels'],pr_context=intent.get('pr_context'),
                                 tooling_sha=intent['tooling_sha'],profile_digest=intent['profile_digest'],
                                 analysis_key_components=intent['analysis_key'],run_again=intent.get('run_again',False))

@@ -10,6 +10,7 @@ on:
         type: string
 permissions:
   contents: read
+  actions: write
 jobs:
   enqueue:
     runs-on: ubuntu-latest
@@ -33,13 +34,19 @@ jobs:
           WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
           WORKER_URL: ${{ vars.WORKER_URL }}
           INTENTS_PATH: ${{ steps.intents.outputs.path }}
+          GH_TOKEN: ${{ github.token }}
+          EXECUTION_REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
           jq -c '.[]' "$INTENTS_PATH" | while read -r intent; do
-            curl --fail --silent --show-error --request POST \
+            response=$(curl --fail --silent --show-error --request POST \
               --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
               --data "$(jq -cn --argjson request "$intent" '{request:$request}')" \
-              "${WORKER_URL}/api/internal/queue/admit"
-            echo
+              "${WORKER_URL}/api/internal/queue/admit")
+            echo "$response"
+            request_id=$(jq -r '.request_id' <<< "$response")
+            source_sha=$(jq -r '.intent.source_sha' <<< "$response")
+            gh api --method POST "repos/${EXECUTION_REPOSITORY}/actions/workflows/code-analysis-coordinator.yml/dispatches" \
+              -f ref=main -f "inputs[request_id]=${request_id}" -f "inputs[source_sha]=${source_sha}"
           done
