@@ -6,6 +6,7 @@ import './landing.css';
 import trustLabLogo from './assets/trustlab-logo.jpg';
 import mphasisLogo from './assets/mphasis-logo.jpg';
 import {applicationTheme} from './brand';
+import {InstitutionalLockup} from './InstitutionalLockup';
 
 type Auth=ReturnType<typeof useLaunchAuth>;
 const projects=[
@@ -18,8 +19,7 @@ export function LandingPage({auth,onStart,accessError,accessPending=false,worksp
  const {appearance}=useAppearance(),signedIn=Boolean(auth.session)&&!accessError,checking=workspaceRequested&&accessPending,primaryAction=signedIn?onStart:auth.signIn,primaryLabel=checking?'Verifying access…':signedIn?'Open workspace':'Sign in with GitHub';
  return <ConfigProvider theme={applicationTheme(appearance)}><main className="landing-page" id="top"><div className="landing-wrap">
   <nav className="landing-nav" aria-label="Main navigation">
-   <a className="landing-brand" href="#top" aria-label="Code Analysis home"><span className="landing-brand-mark"><ScanOutlined/></span><span className="landing-wordmark"><strong>Code Analysis</strong><small>Traceable security evidence</small></span></a>
-   <div className="landing-institutions" aria-label="Built by IIT Bombay Trust Lab with Mphasis"><span>Built by</span><img src={trustLabLogo} alt="IIT Bombay Trust Lab"/><i>with</i><img src={mphasisLogo} alt="Mphasis"/></div>
+   <InstitutionalLockup className="landing-brand" href="#top"/>
    <div className="landing-nav-right"><AppearanceToggle className="landing-theme-toggle"/>{signedIn&&<span className="landing-user">@{auth.session?.login}</span>}<Button className="landing-nav-cta" icon={signedIn?undefined:<GithubOutlined/>} onClick={primaryAction} disabled={checking||(!signedIn&&!auth.available)}>{primaryLabel}</Button></div>
   </nav>
 

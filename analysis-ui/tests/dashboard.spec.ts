@@ -54,8 +54,13 @@ test.describe('production shell',()=>{
   await expect(page.getByRole('link',{name:'Activity'})).toHaveCount(0);
   await page.getByRole('link',{name:'Settings'}).click();
   await expect(page).toHaveURL(/#\/settings\?section=general/);
-  await expect(page.getByRole('heading',{name:'Appearance'})).toBeVisible();
-  await expect(page.getByRole('tab',{name:'Connections & readiness'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Preferences and access'})).toBeVisible();
+  await expect(page.getByRole('link',{name:/Integrations/})).toBeVisible();
+  await expect(page.getByRole('link',{name:/Security & provenance/})).toBeVisible();
+  await page.goto('/#/settings?section=connections');
+  await expect(page.getByRole('heading',{name:'Integrations'})).toBeVisible();
+  await page.goto('/#/settings?section=provenance');
+  await expect(page.getByRole('heading',{name:'Security & provenance'})).toBeVisible();
  });
 
  test('run route opens confirmation without starting from navigation',async({page})=>{

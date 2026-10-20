@@ -5,18 +5,22 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  await context.route('https://launcher.example/api/public/config',route=>route.fulfill({status:503,contentType:'application/json',body:'{}'}));
  await page.goto('/');
+ await expect(page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'})).toBeVisible();
+ await expect(page.locator('.landing-nav')).not.toContainText('Code Analysis');
+ await expect(page.locator('.landing-nav')).not.toContainText('Evidence workspace');
  await expect(page.getByRole('heading',{name:'Know exactly what was scanned. Prove what the analysis found.'})).toBeVisible();
  await expect(page.locator('.landing-copy > p').first()).toBeVisible();
  await page.getByText('Light',{exact:true}).click();
  await expect(page.locator('.landing-copy > p').first()).toBeVisible();
  await expect(page.getByText('Coverage across current reports')).toBeVisible();
- await expect(page.getByText(/Restricted to approved GitHub collaborators/)).toBeVisible();
+ await expect(page.getByText(/Only approved GitHub collaborators can access this workspace/)).toBeVisible();
  await expect(page.getByRole('button',{name:'Sign in with GitHub'})).toHaveCount(2);
- await page.getByRole('link',{name:'See how evidence works'}).click();
+ await page.getByRole('link',{name:'Learn how evidence is protected'}).click();
  await expect(page).toHaveURL(/#method$/);
- await expect(page.getByRole('heading',{name:/Evidence that answers the questions/})).toBeVisible();
+ await expect(page.getByRole('heading',{name:/Evidence answers questions that a status badge cannot/})).toBeVisible();
  await page.setViewportSize({width:390,height:844});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+ await expect(page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'})).toBeVisible();
 });
 
 test('view access requires login and clears on logout',async({page,context})=>{
@@ -178,7 +182,7 @@ test('repository deep links open the authenticated workspace with a shared theme
  });
  await page.goto('/#/projects');
  await expect(page.getByRole('heading',{name:'Know exactly what was scanned. Prove what the analysis found.'})).toBeVisible();
- await expect(page.getByText(/Restricted to approved GitHub collaborators/)).toBeVisible();
+ await expect(page.getByText(/Only approved GitHub collaborators can access this workspace/)).toBeVisible();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
  await page.getByText('Light',{exact:true}).click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
@@ -192,7 +196,10 @@ test('repository deep links open the authenticated workspace with a shared theme
  await page.setViewportSize({width:390,height:844});
  const mobileLayout=await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,overflowing:[...document.querySelectorAll('body *')].map(element=>({element:element.tagName+'.'+(element as HTMLElement).className?.toString().replaceAll(' ',' .'),right:Math.round(element.getBoundingClientRect().right)})).filter(item=>item.right>innerWidth+1).slice(0,8)}));
  expect(mobileLayout.scrollWidth,JSON.stringify(mobileLayout.overflowing)).toBeLessThanOrEqual(390);
-  await page.getByRole('link',{name:/Code Analysis/}).click();
+  const workspaceLockup=page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'}).first();
+  await expect(workspaceLockup).toBeVisible();
+  await expect(page.locator('.shell-header')).not.toContainText('Evidence workspace');
+  await workspaceLockup.click();
   await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
 });
 
