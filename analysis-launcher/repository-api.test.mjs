@@ -97,6 +97,17 @@ test('read-only collaborators can preview an exact branch revision and trusted c
   assert.ok(h.calls.every(call=>!call.options.method));
 });
 
+test('analysis choices omit deferred scanners that are irrelevant to the project profile',async()=>{
+  const source=CONFIGURED_TARGETS[0];
+  const configured={...config,projects:config.projects.map(project=>project.id===source.id?{...project,
+    deferred_channels:{'owasp-go':'No configured Go project.','owasp-jvm':'No configured JVM project.'}}:project)};
+  const registryPath=`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`;
+  const h=helpers({overrides:{[registryPath]:{content:Buffer.from(JSON.stringify(configured)).toString('base64')},
+    [`repos/${source.repository}/branches/Testing`]:{commit:{sha:'b'.repeat(40)}}}});
+  const result=await (await repositoryApi(post('/api/project-preview',{project_id:source.id,selection:{kind:'branch',ref:'Testing'}}),env,session,h)).json();
+  assert.deepEqual(result.channels.map(channel=>channel.id).sort(),['semgrep','snyk']);
+});
+
 test('CodeRabbit selection is unavailable outside an open PR and launch validation enforces the restriction',async()=>{
   const source=CONFIGURED_TARGETS[0];
   const configured={...config,projects:config.projects.map(project=>project.id===source.id?{...project,enabled_scanners:[...project.enabled_scanners,'coderabbit-ai-advisory']}:project)};

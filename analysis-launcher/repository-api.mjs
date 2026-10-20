@@ -30,7 +30,10 @@ function scannerChoices(project) {
   if (project.profile?.python_root) ['bandit','ruff','radon','xenon','vulture','codeql'].forEach(channel=>portable.add(channel));
   if (project.profile?.javascript_root) ['eslint','typescript','codeql'].forEach(channel=>portable.add(channel));
   Object.keys(project.profile?.commands || {}).forEach(channel=>portable.add(channel));
-  const choices=[...new Set([...project.enabled_scanners,...Object.keys(project.deferred_channels||{})])].map(channel=>{
+  // The launch surface is a project-specific capability list, not the global
+  // scanner catalog. Deferred catalog entries stay available to operators in
+  // registry diagnostics but are intentionally absent from developer choices.
+  const choices=[...new Set(project.enabled_scanners)].map(channel=>{
     const reason=project.deferred_channels?.[channel];
     const supported=SUPPORTED_SCANNERS.includes(channel);
     const mode=VENDOR_SCANNERS.has(channel)?'vendor':project.profile?.mode==='portable'?'portable':'configured';

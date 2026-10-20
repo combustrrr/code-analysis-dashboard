@@ -9,6 +9,11 @@ visible without blocking report review, detailed channel and GitHub Actions info
 is collapsed under Technical details, and newly published results open automatically for
 the project the user is currently viewing.
 
+Configured analysis exposes only channels enabled for the selected project's reviewed
+language and execution profile. Deferred global catalog entries such as Go, JVM, or Ruby
+scanners do not appear for these Python and TypeScript projects; they remain internal
+registry diagnostics and are never presented as runnable or successful evidence.
+
 ## 2026-10-20 approved OSS vendor defaults
 
 Snyk and SonarQube Cloud are approved default lanes for all three configured public
