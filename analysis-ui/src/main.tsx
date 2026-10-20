@@ -171,7 +171,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const openProjectRunReport = (request: ProjectRunRequest, targetId: string) => {
     location.hash = routeHash({kind:'project',projectId:request.project,target:targetId,view:'report'});
   };
-  const projectRunTrackers = projectRuns.map(request => <ProjectRunTracker key={request.request_id} auth={launchAuth} request={request} onPhase={updateProjectRunPhase} onDismiss={() => dismissProjectRun(request.request_id)} onOpenReport={id => openProjectRunReport(request, id)}/>);
+  const projectRunTrackers = projectRuns.filter(request => request.project === r.project).map(request => <ProjectRunTracker key={request.request_id} auth={launchAuth} request={request} onPhase={updateProjectRunPhase} onDismiss={() => dismissProjectRun(request.request_id)} onOpenReport={id => openProjectRunReport(request, id)}/>);
   const activeProjectRun = projectRuns.find(request => request.repository === r.repository && request.project === r.project && (!request.phase || ACTIVE_PROJECT_RUN_PHASES.has(request.phase)));
   useEffect(() => { setReport(undefined); setFindings([]); setDetail(undefined); setSource([]); setPage(0); setError(''); setLoading(false); if (!target?.report) return;
     const c = new AbortController(); setLoading(true); Promise.all([json<Report>(`data/${target.report}/report.json`, c.signal), json<Finding[]>(`data/${target.report}/findings.json`, c.signal)]).then(([a, b]) => { setReport(a); setFindings(b); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort();
@@ -220,11 +220,11 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   useEffect(()=>{if(r.tab!=='issues'||!target)return;const timer=window.setTimeout(()=>{const filters={query,severity,category,scanner,rule,file,directory,location:locationFilter,overlap,group:groupBy==='none'?'':groupBy};const next=routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:r.issue||undefined,filters});if(location.hash!==next)history.replaceState(null,'',next);},50);return()=>window.clearTimeout(timer);},[r.tab,r.project,r.issue,target?.id,query,severity,category,scanner,rule,file,directory,locationFilter,overlap,groupBy]);
    const appTheme=applicationTheme(appearance);
     if (!r.repository) {
-      if(r.tab==='projects')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}><main className="workspace-home"><Repositories auth={launchAuth}/></main></AppShell></ConfigProvider>;
-      if(r.tab==='settings')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}><Settings auth={launchAuth} onRun={projectId=>location.hash=routeHash({kind:'project-run',projectId})}/></AppShell></ConfigProvider>;
+      if(r.tab==='projects')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth}><main className="workspace-home"><Repositories auth={launchAuth}/></main></AppShell></ConfigProvider>;
+      if(r.tab==='settings')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth}><Settings auth={launchAuth} onRun={projectId=>location.hash=routeHash({kind:'project-run',projectId})}/></AppShell></ConfigProvider>;
       return <LandingPage auth={launchAuth} onStart={() => { try { sessionStorage.setItem('analysis-workspace-requested', 'true'); } catch {} location.hash=routeHash({kind:'projects'}); }} />;
     }
-    return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}>
+    return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers.length ? projectRunTrackers : undefined}>
      {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
     <main className="project-workspace">
       <RevisionRibbon repository={index?.source_repository||target?.repository||'Configured project'} target={target} targets={index?.targets||[]} fresh={fresh} statusLabel={states[target?.lifecycle_status||target?.status||'']||target?.status||'Unavailable'} coverage={report?`${completed} of ${report.channels.length}`:'Unavailable'} published={report?.generated_at} onTarget={value=>navigate(value,r.tab==='issues'?'issues':r.tab==='report'?'report':'overview')}/>

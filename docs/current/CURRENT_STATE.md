@@ -297,3 +297,11 @@ immutable provenance, and detailed findings containing source links, scanner and
 attribution, explanation, impact, remediation, and workflow evidence. Large exports
 retain deterministic volume splitting and incomplete scanner evidence is never
 presented as zero findings.
+
+## 2026-10-20 Analysis progress placement
+
+Live analysis progress is scoped to the project being analyzed and is no longer
+rendered globally on Projects or Settings. A successful published or reused result
+opens its report and then removes the temporary progress panel. Durable request and
+revision identifiers are shown with the selected project in Settings, while report
+and workflow provenance remains available from Security & provenance and Report.

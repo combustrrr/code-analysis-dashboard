@@ -68,8 +68,10 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const openedRequest = useRef('');
   const onPhaseRef = useRef(onPhase);
   const onOpenReportRef = useRef(onOpenReport);
+  const onDismissRef = useRef(onDismiss);
   useEffect(() => { onPhaseRef.current = onPhase; }, [onPhase]);
   useEffect(() => { onOpenReportRef.current = onOpenReport; }, [onOpenReport]);
+  useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
   useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),30000);return()=>window.clearInterval(timer);},[]);
 
   const checkStatus = useCallback(async () => {
@@ -84,13 +86,14 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
       setActivity(result);
       setError('');
       onPhaseRef.current(request.request_id, result.phase);
-      if (result.phase === 'published' && publishedRequest.current !== request.request_id) {
+      if ((result.phase === 'published' || result.phase === 'reused') && publishedRequest.current !== request.request_id) {
         publishedRequest.current = request.request_id;
         refreshRepositoryReports();
         window.dispatchEvent(new Event('analysis-report-published'));
         if (result.target_id && window.location.hash.includes(`/projects/${request.project}`) && openedRequest.current !== request.request_id) {
           openedRequest.current = request.request_id;
           window.setTimeout(() => onOpenReportRef.current(result.target_id!), 1500);
+          window.setTimeout(() => onDismissRef.current(), 2200);
         }
       }
       return result;
@@ -100,7 +103,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
     } finally {
       setChecking(false);
     }
-  }, [auth, request.repository, request.project, request.request_id]);
+  }, [auth, request.project, request.request_id]);
 
   useEffect(() => {
     let active = true;
@@ -127,7 +130,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const publishedTargetId = phase === 'published' || phase === 'reused' ? activity?.target_id : undefined;
   const type = phase === 'published' || phase === 'reused' ? 'success' : phase === 'failed' ? 'error' : phase === 'superseded' ? 'warning' : 'info';
   const title = phase ? phaseCopy[phase] || 'Analysis in progress' : error ? 'Could not refresh the analysis status' : auth.session ? 'Checking analysis status…' : 'Sign in to resume tracking this analysis';
-  const previousReportNote = phase === 'published'
+  const previousReportNote = phase === 'published' || phase === 'reused'
     ? `Results are ready${activity?.analyzed_sha ? ` for commit ${activity.analyzed_sha.slice(0, 12)}` : ''}. Opening the report now.`
     : request.previousReport
     ? `The currently displayed report is for ${request.previousTargetLabel || 'the previously selected target'}${request.previousAnalyzedSha ? ` at commit ${request.previousAnalyzedSha.slice(0, 12)}` : ''}${request.previousGeneratedAt ? `, published ${new Date(request.previousGeneratedAt).toLocaleString()}` : ''}. It will remain visible until this request publishes.`

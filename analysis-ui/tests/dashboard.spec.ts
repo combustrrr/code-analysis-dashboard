@@ -58,9 +58,11 @@ test.describe('production shell',()=>{
  test('legacy activity URLs fall through to Projects and settings remains reachable',async({page})=>{
   await page.goto('/#/activity');
   await expect(page.getByRole('heading',{name:'Projects',level:1})).toBeVisible();
+  await expect(page.locator('.project-run-tracker')).toHaveCount(0);
   await expect(page.getByRole('link',{name:'Activity'})).toHaveCount(0);
   await page.getByRole('link',{name:'Settings'}).click();
   await expect(page).toHaveURL(/#\/settings\?section=general/);
+  await expect(page.locator('.project-run-tracker')).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Preferences and access'})).toBeVisible();
   await expect(page.getByRole('link',{name:/Integrations/})).toBeVisible();
   await expect(page.getByRole('link',{name:/Security & provenance/})).toBeVisible();
