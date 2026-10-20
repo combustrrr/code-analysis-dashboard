@@ -7,7 +7,7 @@ component, navigation entry, and `/api/dashboard` endpoint. `GET /api/projects` 
 returns the workspace refresh time, four-state lifecycle aggregates, active-analysis
 identity, current-report freshness/SHA, channel totals, limitations, and sanitized
 attention guidance. The landing, shell, Projects register, and project revision context
-use the locally bundled Instrument Sans and IBM Plex Mono fonts with the calm dark/light
+use the locally bundled Manrope, Sora, and IBM Plex Mono fonts with the calm dark/light
 evidence palette. Project CTAs are Review evidence, Run analysis, or View progress.
 This is repository state only; no production deployment was performed.
 

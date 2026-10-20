@@ -155,4 +155,93 @@ a { color: var(--workspace-accent); }
 
 /* Rich evidence register refresh */
 .application-shell,.workspace-home,.project-workspace,.settings-workspace{font-family:Manrope,sans-serif}.shell-brand strong,.portfolio-heading h1,.project-record h2,.settings-heading h1,.report-workspace-heading h2{font-family:Sora,sans-serif}.shell-header{grid-template-columns:minmax(220px,1fr) auto minmax(390px,1fr);min-height:78px;padding-inline:clamp(18px,3.5vw,52px);background:color-mix(in srgb,var(--workspace-paper) 91%,transparent);box-shadow:0 10px 30px rgba(0,0,0,.12)}.shell-mark{width:40px;height:40px;border:0;border-radius:11px;background:linear-gradient(145deg,var(--workspace-accent),var(--workspace-trust));box-shadow:0 8px 22px color-mix(in srgb,var(--workspace-accent) 18%,transparent);font-size:19px}.shell-brand strong{font-size:15px;font-weight:650}.shell-brand small{margin-top:3px;font-size:10px}.shell-context{justify-self:center;display:grid;padding-left:18px;border-left:2px solid var(--workspace-accent)}.shell-context span{color:var(--workspace-muted);font-size:9px;font-weight:700;letter-spacing:.11em;text-transform:uppercase}.shell-context strong{margin-top:3px;font-size:12px;font-weight:600}.shell-links a{gap:8px;border-radius:7px}.workspace-home{max-width:1320px;padding-top:62px}.portfolio-heading{padding-bottom:34px}.portfolio-heading h1{font-weight:650;letter-spacing:-.05em}.portfolio-heading p{font-size:15px}.portfolio-summary{border-radius:10px;overflow:hidden;box-shadow:0 14px 36px rgba(0,0,0,.08)}.portfolio-summary>div{padding:22px 24px}.portfolio-summary strong{font-family:Sora,sans-serif;font-weight:600}.project-register{gap:20px}.project-record{position:relative;padding:30px 32px;border-left-width:4px;border-radius:10px;background:linear-gradient(135deg,var(--workspace-panel),color-mix(in srgb,var(--workspace-panel-raised) 58%,var(--workspace-panel)));box-shadow:0 16px 40px rgba(0,0,0,.1);overflow:hidden}.project-record:after{position:absolute;right:-90px;top:-120px;width:250px;height:250px;border:1px solid color-mix(in srgb,var(--workspace-accent) 18%,transparent);border-radius:50%;box-shadow:0 0 0 34px color-mix(in srgb,var(--workspace-accent) 4%,transparent),0 0 0 68px color-mix(in srgb,var(--workspace-accent) 3%,transparent);pointer-events:none;content:""}.project-record-main,.evidence-rail,.project-record-detail,.project-record-actions{position:relative;z-index:1}.project-record h2{font-size:25px;font-weight:600}.project-kind{font-weight:700}.project-state{padding:5px 11px;border-radius:999px;font-weight:650}.evidence-rail{border-radius:8px;background:color-mix(in srgb,var(--workspace-panel-raised) 78%,transparent)}.project-record-actions .ant-btn{height:38px;font-weight:650}.project-record-actions .ant-btn-primary{background:linear-gradient(135deg,var(--workspace-trust),color-mix(in srgb,var(--workspace-trust) 70%,var(--workspace-accent)))}
+
+/* One type system for every signed-in surface. */
+:root,
+body,
+button,
+input,
+select,
+textarea {
+  font-family: Manrope, sans-serif;
+}
+
+.application-shell,
+.application-shell button,
+.application-shell input,
+.application-shell select,
+.application-shell textarea,
+.application-shell .ant-typography,
+.application-shell .ant-table,
+.application-shell .ant-modal,
+.application-shell .ant-drawer {
+  font-family: Manrope, sans-serif;
+}
+
+.application-shell h1,
+.application-shell h2,
+.application-shell h3,
+.application-shell .workspace-intro h1,
+.application-shell .target-catalog-heading h2,
+.application-shell .analysis-folder-heading > strong,
+.application-shell .settings-heading h1,
+.application-shell .report-workspace-heading h2,
+.application-shell .report-title.ant-typography,
+.application-shell .findings-heading h2,
+.application-shell .launch-title strong {
+  font-family: Sora, sans-serif !important;
+}
+
+.application-shell code,
+.application-shell pre,
+.application-shell .path,
+.application-shell .metrics .ant-statistic-content,
+.application-shell .distribution > span:last-child,
+.application-shell .launch-section-head > span,
+.application-shell .queue-summary b,
+.application-shell .revision-fact strong,
+.application-shell .report-metric .ant-statistic-content,
+.application-shell .coverage-tag strong,
+.application-shell .findings-count,
+.application-shell .chart-legend strong,
+.application-shell .candidate > span,
+.application-shell .chart-heading > strong,
+.application-shell .finding-bar > strong,
+.application-shell .target-card-index {
+  font-family: "IBM Plex Mono", monospace !important;
+}
+
+.application-shell .target-catalog-heading > span,
+.application-shell .target-card-kicker,
+.application-shell .analysis-folder-heading > span,
+.application-shell .report-kicker,
+.application-shell .findings-count small,
+.application-shell .donut .donut-caption {
+  font-family: Manrope, sans-serif !important;
+}
+
+.application-shell .donut text {
+  font-family: "IBM Plex Mono", monospace !important;
+}
+
+.ant-modal-root .ant-modal,
+.ant-drawer-root .ant-drawer,
+.ant-modal-root .ant-typography,
+.ant-drawer-root .ant-typography {
+  font-family: Manrope, sans-serif;
+}
+
+.ant-modal-root h1,
+.ant-modal-root h2,
+.ant-modal-root h3,
+.ant-modal-root .launch-title strong {
+  font-family: Sora, sans-serif;
+}
+
+.ant-modal-root code,
+.ant-modal-root pre,
+.ant-modal-root .launch-section-head > span,
+.ant-modal-root .queue-summary b {
+  font-family: "IBM Plex Mono", monospace !important;
+}
 @media(max-width:980px){.shell-header{grid-template-columns:1fr auto}.shell-context,.shell-user,.shell-actions>.ant-btn:not(.shell-menu){display:none}}@media(max-width:600px){.project-record{padding:22px 17px}.workspace-home{padding-top:34px}}

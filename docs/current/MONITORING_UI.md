@@ -6,7 +6,7 @@ scan and configuration permissions are checked separately. Both themes are suppo
 The landing page and signed-in shell use a calm evidence palette: Ink and Slate surfaces,
 Trust Blue navigation and actions, Evidence Teal completion, and Attention Amber for
 incomplete coverage. Light mode uses Paper surfaces without changing status meaning.
-Instrument Sans is bundled for interface copy; IBM Plex Mono is reserved for immutable
+Manrope is bundled for interface copy, Sora is used for headings, and IBM Plex Mono is reserved for immutable
 identifiers.
 
 1. Projects is the only signed-in home. Its compact summary shows active analyses,
