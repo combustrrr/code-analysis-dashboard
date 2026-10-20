@@ -2,6 +2,15 @@ name: Code analysis queue coordinator
 run-name: Queue coordinator ${{ github.run_id }}
 on:
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: Durable queue request hint
+        required: true
+        type: string
+      source_sha:
+        description: Full source SHA consistency hint
+        required: true
+        type: string
   schedule:
     - cron: '*/15 * * * *'
 permissions:
@@ -20,6 +29,8 @@ jobs:
       tooling_sha: ${{ steps.contract.outputs.tooling_sha }}
       profile_mode: ${{ steps.contract.outputs.profile_mode }}
       target: ${{ steps.contract.outputs.target }}
+      generation: ${{ steps.contract.outputs.generation }}
+      lease_token: ${{ steps.contract.outputs.lease_token }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -29,11 +40,14 @@ jobs:
         env:
           WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
           WORKER_URL: ${{ vars.WORKER_URL }}
+          WAKE_REQUEST_ID: ${{ inputs.request_id }}
+          WAKE_SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           status=$(curl --silent --show-error --output claim.json --write-out '%{http_code}' \
             --request POST --header "Authorization: Bearer ${WORKER_API_TOKEN}" \
-            --header 'Content-Type: application/json' --data '{}' \
+            --header 'Content-Type: application/json' \
+            --data "{\"request_id\":\"${WAKE_REQUEST_ID}\",\"source_sha\":\"${WAKE_SOURCE_SHA}\"}" \
             "${WORKER_URL}/api/internal/queue/claim")
           if [[ "$status" == 204 || "$status" == 409 ]]; then
             echo 'claimed=false' >> "$GITHUB_OUTPUT"
@@ -45,6 +59,41 @@ jobs:
         if: steps.claim.outputs.claimed == 'true'
         id: contract
         run: python -m scripts.code_analysis.queue_contract claim.json
+      - name: Bind the lease to this exact workflow attempt
+        if: steps.claim.outputs.claimed == 'true'
+        env:
+          WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          REQUEST_ID: ${{ steps.contract.outputs.request_id }}
+          GENERATION: ${{ steps.contract.outputs.generation }}
+          LEASE_TOKEN: ${{ steps.contract.outputs.lease_token }}
+        run: |
+          curl --fail --silent --show-error --request POST \
+            --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
+            --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"workflow_run_id\":${GITHUB_RUN_ID},\"workflow_run_attempt\":${GITHUB_RUN_ATTEMPT}}" \
+            "${WORKER_URL}/api/internal/queue/heartbeat"
+  heartbeat:
+    if: needs.claim.outputs.claimed == 'true'
+    needs: claim
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    environment: production
+    permissions: {}
+    steps:
+      - name: Renew only this fenced lease
+        env:
+          WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          REQUEST_ID: ${{ needs.claim.outputs.request_id }}
+          GENERATION: ${{ needs.claim.outputs.generation }}
+          LEASE_TOKEN: ${{ needs.claim.outputs.lease_token }}
+        run: |
+          while sleep 300; do
+            curl --fail --silent --show-error --request POST \
+              --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
+              --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"workflow_run_id\":${GITHUB_RUN_ID},\"workflow_run_attempt\":${GITHUB_RUN_ATTEMPT}}" \
+              "${WORKER_URL}/api/internal/queue/heartbeat" || exit 0
+          done
   vendor:
     if: needs.claim.outputs.claimed == 'true'
     needs: claim
@@ -62,7 +111,7 @@ jobs:
       CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
   portable:
     if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'portable'
-    needs: [claim, vendor]
+    needs: claim
     permissions:
       contents: read
       actions: read
@@ -73,7 +122,7 @@ jobs:
       request_id: ${{ needs.claim.outputs.request_id }}
   configured:
     if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'agentic-soc'
-    needs: [claim, vendor]
+    needs: claim
     permissions:
       contents: read
       actions: read
@@ -99,6 +148,18 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
+      - name: Verify the publication fence is still active
+        env:
+          WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          REQUEST_ID: ${{ needs.claim.outputs.request_id }}
+          GENERATION: ${{ needs.claim.outputs.generation }}
+          LEASE_TOKEN: ${{ needs.claim.outputs.lease_token }}
+        run: |
+          curl --fail --silent --show-error --request POST \
+            --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
+            --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"workflow_run_id\":${GITHUB_RUN_ID},\"workflow_run_attempt\":${GITHUB_RUN_ATTEMPT}}" \
+            "${WORKER_URL}/api/internal/queue/heartbeat"
       - name: Publish only validated artifacts from this coordinator attempt
         env:
           GH_TOKEN: ${{ github.token }}
@@ -119,6 +180,8 @@ jobs:
           WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
           WORKER_URL: ${{ vars.WORKER_URL }}
           REQUEST_ID: ${{ needs.claim.outputs.request_id }}
+          GENERATION: ${{ needs.claim.outputs.generation }}
+          LEASE_TOKEN: ${{ needs.claim.outputs.lease_token }}
           PORTABLE_RESULT: ${{ needs.portable.result }}
           CONFIGURED_RESULT: ${{ needs.configured.result }}
           VENDOR_RESULT: ${{ needs.vendor.result }}
@@ -129,5 +192,5 @@ jobs:
           if [[ "$VENDOR_RESULT" == failure || "$PORTABLE_RESULT" == failure || "$CONFIGURED_RESULT" == failure || "$PUBLISH_RESULT" != success ]]; then status=failed; fi
           curl --fail --silent --show-error --request POST \
             --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
-            --data "{\"request_id\":\"${REQUEST_ID}\",\"status\":\"${status}\",\"result\":{\"run_id\":${GITHUB_RUN_ID},\"run_attempt\":${GITHUB_RUN_ATTEMPT}}}" \
+            --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"status\":\"${status}\",\"result\":{\"run_id\":${GITHUB_RUN_ID},\"run_attempt\":${GITHUB_RUN_ATTEMPT}}}" \
             "${WORKER_URL}/api/internal/queue/complete"

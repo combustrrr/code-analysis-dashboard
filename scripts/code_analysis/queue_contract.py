@@ -19,17 +19,18 @@ PROJECTS = {
 
 def scanner_target(claim: dict) -> dict:
     intent = claim.get("intent")
-    if not isinstance(intent, dict) or intent.get("schema_version") != "analysis-request-v2":
+    if not isinstance(intent, dict) or intent.get("schema_version") != "analysis-request-v3":
         raise ValueError("invalid queue envelope")
     required = ("request_id", "project_id", "source_repository", "source_repository_id",
-                "target_sha", "tooling_sha", "profile_digest", "profile_mode")
+                "source_sha", "tooling_sha", "profile_digest", "profile_mode")
     if any(not intent.get(key) for key in required):
         raise ValueError("incomplete queue envelope")
     expected = PROJECTS.get(str(intent["project_id"]))
     if (intent.get("execution_repository_id") != EXECUTION_REPOSITORY_ID
             or expected != (intent["source_repository"], intent["source_repository_id"])
             or not isinstance(intent.get("actor_id"), int)
-            or intent.get("idempotency_key") != intent.get("request_id")
+            or not re.fullmatch(r"[0-9a-f-]{36}", intent.get("idempotency_key", ""))
+            or not re.fullmatch(r"[0-9a-f]{40}", intent["source_sha"])
             or not re.fullmatch(r"[0-9a-f]{40}", intent["tooling_sha"])
             or not re.fullmatch(r"[0-9a-f]{64}", intent["profile_digest"])
             or intent["profile_mode"] not in {"portable", "agentic-soc"}
@@ -39,13 +40,13 @@ def scanner_target(claim: dict) -> dict:
     resolved = intent.get("resolved_selection") or {}
     selection = intent.get("selection") or {}
     context = intent.get("pr_context") or {}
-    if resolved.get("kind") != "commit" or resolved.get("ref") != intent["target_sha"]:
+    if resolved.get("kind") != "commit" or resolved.get("ref") != intent["source_sha"] or intent.get("target_sha") != intent["source_sha"]:
         raise ValueError("queue envelope is not pinned to a commit")
     if resolved.get("repository_id") != (context.get("head_repository_id") or intent["source_repository_id"]):
         raise ValueError("resolved repository identity mismatch")
     kind = selection.get("kind")
     branch = context.get("head_branch") or selection.get("ref") or intent["target_sha"]
-    row = target(intent["source_repository"], branch, intent["target_sha"],
+    row = target(intent["source_repository"], branch, intent["source_sha"],
                  pr=context.get("number") if kind == "pr" else None,
                  source_repository=resolved.get("repository"),
                  base_sha=context.get("base_sha") if kind == "pr" else None,
@@ -81,6 +82,8 @@ def main() -> None:
             stream.write("request_id=" + claim["request_id"] + "\n")
             stream.write("tooling_sha=" + claim["intent"]["tooling_sha"] + "\n")
             stream.write("profile_mode=" + claim["intent"]["profile_mode"] + "\n")
+            stream.write("generation=" + str(claim["generation"]) + "\n")
+            stream.write("lease_token=" + claim["lease_token"] + "\n")
             stream.write("target=" + json.dumps(row, separators=(",", ":")) + "\n")
     else:
         print(json.dumps(row, separators=(",", ":")))

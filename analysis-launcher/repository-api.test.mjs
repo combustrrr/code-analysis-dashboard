@@ -10,8 +10,8 @@ const config={schema_version:'analysis-projects-v1',execution_repository:{id:EXE
 const configBlob={content:Buffer.from(JSON.stringify(config)).toString('base64')};
 const host=(permissions={pull:true,push:true,admin:false})=>({id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY,private:false,default_branch:'main',permissions});
 
-function helpers({permissions,overrides={}}={}) {
-  const calls=[],queueCalls=[];
+function helpers({permissions,overrides={},wakeCoordinator}={}) {
+  const calls=[],queueCalls=[],wakeCalls=[];
   const serviceToken=async()=> 'central-app-read-token';
   const github=async(path,token,options={})=>{
     calls.push({path,token,options});
@@ -23,7 +23,7 @@ function helpers({permissions,overrides={}}={}) {
     if(source)return {id:source.repository_id,full_name:source.repository,private:false,default_branch:source.branch,permissions:{pull:true}};
     throw new Error(`Unexpected GitHub request: ${path}`);
   };
-  return {calls,queueCalls,Failure,json,github,serviceToken,pages:async()=>[],queue:async(path,body)=>{queueCalls.push({path,body});if(path==='/queue/status')return json({error:'not_found'},404);if(path==='/queue/recent')return json({requests:[]});return json({...body.request,status:'queued',queue_position:1},201);},seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
+  return {calls,queueCalls,wakeCalls,Failure,json,github,serviceToken,pages:async()=>[],wakeCoordinator:async(...args)=>{wakeCalls.push(args);if(wakeCoordinator)return wakeCoordinator(...args);},queue:async(path,body)=>{queueCalls.push({path,body});if(path==='/queue/status')return json({error:'not_found'},404);if(path==='/queue/recent')return json({requests:[]});return json({...body.request,status:'queued',queue_position:1},201);},seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
 }
 
 const session={token:'user-token'};
@@ -144,7 +144,7 @@ test('confirmation rejects refs that move after the signed preview',async()=>{
   await assert.rejects(()=>repositoryApi(post('/api/project-launch',{project_id:source.id,preview_token:preview.preview_token,requested_channels:['semgrep'],idempotency_key:'11111111-1111-4111-8111-111111111111'}),env,session,h),error=>error.status===409&&error.code==='stale_preview');
 });
 
-test('pull-only collaborator launch persists a pinned v2 envelope and idempotent request identity',async()=>{
+test('pull-only collaborator launch persists a pinned v3 envelope and idempotent request identity',async()=>{
   const source=CONFIGURED_TARGETS[0];
   const h=helpers({permissions:{pull:true,push:false,admin:false},overrides:{[`repos/${source.repository}/pulls/7`]:{number:7,title:'Fix',draft:true,head:{ref:'topic',sha:'d'.repeat(40),repo:{id:999,full_name:'fork/repo'}},base:{ref:'Testing',sha:'e'.repeat(40),repo:{full_name:source.repository}}}}});
   const preview=await (await repositoryApi(post('/api/project-preview',{project_id:source.id,selection:{kind:'pr',ref:'7'}}),env,session,h)).json();
@@ -153,7 +153,8 @@ test('pull-only collaborator launch persists a pinned v2 envelope and idempotent
   const envelope=h.queueCalls[0].body.request;
     assert.equal(response.status,202);
     assert.equal((await response.clone().json()).queue_position,1);
-    assert.equal(envelope.schema_version,'analysis-request-v2');
+    assert.equal(envelope.schema_version,'analysis-request-v3');
+    assert.equal(envelope.source_sha,'d'.repeat(40));
     assert.equal(envelope.selection.kind,'pr');
     assert.equal(envelope.resolved_selection.kind,'commit');
     assert.equal(envelope.resolved_selection.ref,'d'.repeat(40));
@@ -180,7 +181,10 @@ test('Fast Path allows a pull-only collaborator and admits only trusted default 
   assert.equal(intent.selection.ref,source.branch);
   assert.deepEqual(intent.requested_channels,['semgrep']);
   assert.ok(h.queueCalls.some(call=>call.path==='/queue/status'));
+  assert.deepEqual(h.wakeCalls,[[key,'f'.repeat(40)]]);
 });
+
+test('a failed wake does not undo durable queue acceptance',async()=>{const source=CONFIGURED_TARGETS[0],key='45555555-5555-4555-8555-555555555555';const h=helpers({wakeCoordinator:async()=>{throw new Error('dispatch unavailable');},overrides:{[`repos/${source.repository}/branches/${source.branch}`]:{commit:{sha:'f'.repeat(40)}}}});const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,refType:'PREFERRED_BRANCH'},key),env,session,h);assert.equal(response.status,202);assert.equal((await response.json()).wake_status,'scheduled_recovery');assert.ok(h.queueCalls.some(call=>call.path==='/queue/admit'));});
 
 test('Fast Path requires a key, exact intent, and current collaborator access',async()=>{
   const source=CONFIGURED_TARGETS[0],intent={projectId:source.id,refType:'PREFERRED_BRANCH'};

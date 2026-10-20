@@ -1,5 +1,10 @@
 # Read-only analysis workflow
 
+> Replacement contract: the local implementation now uses `analysis-request-v3`, a
+> Durable Object FIFO lease with generation/token fencing and heartbeat renewal, and a
+> best-effort coordinator wake after durable admission. This code is not production
+> state until the big-bang cutover runbook has been executed and commissioned.
+
 The configured-source implementation described below was deployed on 2026-10-16. The
 Worker, workflows, and Pages rollout order and versions are recorded in
 [HANDOFF.md](../HANDOFF.md). No production source-analysis scan was triggered during
@@ -102,7 +107,7 @@ findings from an unavailable, failed, or deferred channel is not a clean result.
 | Current PR overlay manifest entry and compressed overlay shard | Same current-report release and R2 namespace; separately referenced by the v1 manifest | One overlay is retained; its asset is never merged into the source-only report and is fetched only when referenced |
 | Temporary producer handoff artifacts, when R2 handoff is enabled | Cloudflare R2 `temp-runs/<workflow_run_id>/<attempt>/...` | One-day lifecycle; artifacts are validated against source SHA, target, run, attempt, and tooling provenance before publication |
 | Scanner job output | GitHub Actions artifacts | Workflow artifact retention is bounded (currently 7 days); these are producer evidence, not the current report store |
-| Request queue and compatibility/control state | GitHub Release assets and Cloudflare KV | Bounded service state; do not edit or delete manually while requests are active |
+| Request queue and lease/control state | Cloudflare Durable Object | Strict global FIFO, 100 pending maximum, one active fenced lease, heartbeat recovery, and explicit cutover pause/reset |
 | Dashboard application | GitHub Pages | UI bundle only; rebuilding Pages does not rescan or publish reports |
 
 The selected project's report and optional overlay are read from the Worker/API by the

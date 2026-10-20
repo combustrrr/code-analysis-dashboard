@@ -1,21 +1,6 @@
 # Generated scanner diagnostics; never publishes a target report.
 name: Scanner access diagnostics
 run-name: Scanner diagnostics ${{ inputs.dispatch_id }}
-'on':
-  workflow_dispatch:
-    inputs:
-      target:
-        required: true
-        type: string
-      tooling_sha:
-        required: true
-        type: string
-      request_id:
-        required: true
-        type: string
-      dispatch_id:
-        required: true
-        type: string
 permissions:
   contents: read
 concurrency:
@@ -46,3 +31,18 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         REQUEST_ID: ${{ inputs.request_id }}
       run: python -m scripts.code_analysis.source_identity
+'on':
+  workflow_dispatch:
+    inputs:
+      target:
+        required: true
+        type: string
+      tooling_sha:
+        required: true
+        type: string
+      request_id:
+        required: true
+        type: string
+      dispatch_id:
+        required: true
+        type: string

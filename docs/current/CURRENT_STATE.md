@@ -1,5 +1,23 @@
 # Current implementation state
 
+## 2026-10-20 execution-backbone replacement (local, not deployed)
+
+The worktree implements the new queue boundary as `analysis-request-v3`. Durable
+admission now supports explicit pause/resume, a destructive cutover reset that marks
+old queued/running rows `cancelled_cutover`, monotonically advances the fencing
+generation, issues an opaque lease token, renews leases through heartbeats, and rejects
+stale completion. After durable commit the Worker best-effort dispatches the sole
+coordinator with request/SHA hints; dispatch failure leaves scheduled recovery intact.
+Generated workflow 11 is no longer manually dispatchable, workflow 12 remains
+diagnostic-only, source and vendor producers no longer depend on one another, and the
+unused privileged reconciliation workflow has been removed.
+
+This is deliberately not a production-cutover claim. Admissions have not been paused,
+old production state and R2 current pointers have not been cleared, Worker/workflows
+have not been deployed together, and the three post-reset commissioning requests have
+not run. The old production evidence below remains historical until that separate,
+observable cutover succeeds.
+
 ## 2026-10-19 production scan verification
 
 The configured-source implementation was deployed and exercised for all three trusted

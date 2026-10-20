@@ -28,12 +28,12 @@ class ScannerAccessTests(unittest.TestCase):
                 {'target', 'tooling_sha', 'request_id'},
             )
 
-    def test_source_profiles_run_after_vendor_evidence(self):
+    def test_source_profiles_run_independently_from_vendor_evidence(self):
         workflow = yaml.safe_load(Path('.github/workflows/code-analysis-coordinator.yml').read_text(encoding='utf-8'))
         for name in ('portable', 'configured'):
             condition = workflow['jobs'][name]['if']
             self.assertIn('always()', condition)
-            self.assertEqual(workflow['jobs'][name]['needs'], ['claim', 'vendor'])
+            self.assertEqual(workflow['jobs'][name]['needs'], 'claim')
 
     def test_vendor_diagnostics_cannot_publish_a_target_report(self):
         workflow = yaml.safe_load(diagnostics())
@@ -116,8 +116,7 @@ class ScannerAccessTests(unittest.TestCase):
         self.assertNotIn('sonar.projectKey=${{', scan['with']['args'])
 
     def test_reconciliation_cannot_publish_checks_or_security_events_to_sources(self):
-        for path in ('.github/workflows/code-analysis-coordinator.yml',
-                     '.github/workflows/reusable-reconcile.yml'):
+        for path in ('.github/workflows/code-analysis-coordinator.yml',):
             workflow = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
             for job in workflow['jobs'].values():
                 permissions = job.get('permissions', {})

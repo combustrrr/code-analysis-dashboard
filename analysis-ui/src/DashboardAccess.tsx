@@ -7,12 +7,13 @@ import {isWorkspaceRoute,routeHash} from './appRoutes';
 export function DashboardAccess({children,publicFallback}:{children:(auth?:ReturnType<typeof useLaunchAuth>)=>ReactNode;publicFallback?:(auth:ReturnType<typeof useLaunchAuth>,accessError?:string,accessPending?:boolean,workspaceRequested?:boolean)=>ReactNode}) {
  const auth=useLaunchAuth(applicationEndpoint);
  const [required,setRequired]=useState<boolean>();
+ const [resetNotice,setResetNotice]=useState('');
   const [verified,setVerified]=useState<string>();
   const [error,setError]=useState('');
   const [workspaceRequested,setWorkspaceRequested]=useState(()=>isWorkspaceRoute()||Boolean(pendingAuthDestination()?.includes('#/')));
  const [dark,setDark]=useState(()=>localStorage.getItem('analysis-theme')!=='light');
   useEffect(()=>{if(!applicationEndpoint)return;let active=true;
-   fetch(applicationEndpoint+'/api/public/config',{cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error('Access configuration unavailable.');return r.json();}).then(c=>{if(active)setRequired(c.require_login===true||c.require_report_login===true);}).catch(()=>{if(active)setError('Could not verify dashboard access. Reload to retry.');});return()=>{active=false;};
+   fetch(applicationEndpoint+'/api/public/config',{cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error('Access configuration unavailable.');return r.json();}).then(c=>{if(active){setRequired(c.require_login===true||c.require_report_login===true);setResetNotice(c.admission_paused===true&&typeof c.reset_notice==='string'?c.reset_notice:'');}}).catch(()=>{if(active)setError('Could not verify dashboard access. Reload to retry.');});return()=>{active=false;};
   },[]);
   useEffect(()=>{
    const update=()=>setWorkspaceRequested(isWorkspaceRoute());
@@ -39,12 +40,13 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
   },[auth.session?.token,verified]);
    if(!applicationEndpoint)return children(auth.available?auth:undefined);
    if(required===false)return children();
-  if(auth.session&&verified===auth.session.token)return children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}});
-  if(publicFallback)return publicFallback(auth,error,required===true&&!!auth.session&&verified!==auth.session.token&&!error,workspaceRequested);
+  if(auth.session&&verified===auth.session.token)return <>{resetNotice&&<Alert banner type="warning" title="Analysis reset in progress" description={resetNotice}/>} {children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}})}</>;
+  if(publicFallback)return <>{resetNotice&&<Alert banner type="warning" title="Analysis reset in progress" description={resetNotice}/>} {publicFallback(auth,error,required===true&&!!auth.session&&verified!==auth.session.token&&!error,workspaceRequested)}</>;
   return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm}}><main className={`dashboard-access ${dark?'dashboard-access-dark':'dashboard-access-light'}`}><section>
    <h1>Code Analysis</h1><p>Sign in with an authorized GitHub account to browse configured analysis targets, current reports and scanner evidence.</p>
   <Space direction="vertical" size="middle"><Segmented aria-label="Color theme" value={dark?'Dark':'Light'} options={['Dark','Light']} onChange={v=>{setDark(v==='Dark');localStorage.setItem('analysis-theme',v.toLowerCase());}}/>
   {(error||auth.error)&&<Alert type="error" title="Dashboard access" description={error||auth.error}/>}
+  {resetNotice&&<Alert type="warning" title="Analysis reset in progress" description={resetNotice}/>}
   <Button type="primary" disabled={required!==true} onClick={auth.signIn}>Sign in with GitHub</Button>
   {required===undefined&&!error&&<p>Checking access configuration...</p>}
   </Space></section></main></ConfigProvider>;

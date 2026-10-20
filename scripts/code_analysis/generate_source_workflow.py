@@ -20,7 +20,7 @@ def generate(config=None):
     profile = config['profile']
     inputs = {k: {'required': True, 'type': 'string'} for k in ('target', 'tooling_sha', 'request_id', 'dispatch_id')}
     document = {'name': 'Exact Source Analysis', 'run-name': 'Source analysis ${{ inputs.dispatch_id }}',
-                'on': {'workflow_dispatch': {'inputs': inputs}}, 'permissions': {'contents': 'read'},
+                'on': {'workflow_call': {'inputs': inputs}}, 'permissions': {'contents': 'read'},
                  # Every explicit launch gets its own producer artifact.  A
                  # newer request may supersede the dashboard target, but it
                  # must not cancel the earlier run before its evidence/report
@@ -320,6 +320,8 @@ def generate(config=None):
 
 def diagnostics():
     document = yaml.safe_load(generate())
+    trigger = document.pop('on', document.pop(True, None))
+    document['on'] = {'workflow_dispatch': trigger['workflow_call']}
     document['name'] = 'Scanner access diagnostics'
     document['run-name'] = 'Scanner diagnostics ${{ inputs.dispatch_id }}'
     document['concurrency']['group'] = 'source-revision-global'

@@ -1,5 +1,23 @@
 # New-chat handoff: Code Analysis Dashboard
 
+## 2026-10-20 local execution-backbone replacement
+
+The current worktree contains, but has not deployed, the `analysis-request-v3` queue
+contract. It adds Durable Object admission pause/reset, generation plus lease-token
+fencing, heartbeat renewal, stale finalizer rejection, and a best-effort GitHub Actions
+wake after the queue commit. The coordinator validates request/SHA wake hints against
+the FIFO claim. Workflow 11 is generated as non-dispatchable `workflow_call`; workflow
+12 remains manual diagnostics; vendor and source producers begin independently. The
+dormant privileged `reusable-reconcile.yml` was removed after confirming that the
+checked-in coordinator graph had no caller.
+
+Do not deploy only one side of this schema change. Before production cutover reconcile
+the live workflow/tooling SHA, validate the full graph, announce/pause admission, fence
+or cancel old work, clear the intended current R2 pointers/assets, deploy Worker and
+workflow contracts together, resume, then commission one exact-SHA request for each of
+the three projects. Existing public Actions artifacts are intentionally not deleted and
+remain public until their seven-day retention expires.
+
 ## 2026-10-19 production browser-recording follow-up
 
 The authenticated production recording confirmed that GitHub sign-in, project access,

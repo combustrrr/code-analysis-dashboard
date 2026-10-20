@@ -68,11 +68,20 @@ export function cachedChannelsForSnapshot(snapshot, manifest) {
 }
 
 export async function repositoryApi(request, env, session, helpers) {
-  const {github,json,Failure,pages,serviceToken,seal,unseal,queue} = helpers;
+  const {github,json,Failure,pages,serviceToken,seal,unseal,queue,wakeCoordinator} = helpers;
   const url = new URL(request.url);
   const token = session?.token;
   const requestedRepository = url.searchParams.get('repository');
   if (requestedRepository && requestedRepository.toLowerCase() !== EXECUTION_REPOSITORY.toLowerCase()) throw new Failure(400, 'Routes are bound to the configured execution repository.', 'repository_not_configurable');
+  async function admit(intent){
+    const admitted=await queue('/queue/admit',{request:intent}),body=await admitted.json();
+    if(admitted.status===429)throw new Failure(429,'The global analysis queue has 100 pending requests.','queue_full');
+    if(admitted.status===409)throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
+    if(!admitted.ok)throw new Failure(503,body.error==='admission_paused'?(body.reset_notice||'Analysis admission is paused for maintenance.'):'The analysis queue is temporarily unavailable; no request was accepted.',body.error==='admission_paused'?'admission_paused':'queue_unavailable');
+    let wake_status='scheduled_recovery';
+    try{if(wakeCoordinator){await wakeCoordinator(intent.request_id,intent.source_sha);wake_status='signalled';}}catch{}
+    return{...body,wake_status};
+  }
 
   async function executionRepository(permission = 'pull') {
     const repository = await github(`repos/${env.ANALYSIS_REPOSITORY}`, token);
@@ -219,12 +228,9 @@ export async function repositoryApi(request, env, session, helpers) {
     if(!requestedChannels.length)throw new Failure(409,'The trusted project has no usable default scanner channel.','default_channels_unavailable');
     if(SCANNER_GROUPS.some(group=>group.some(channel=>requestedChannels.includes(channel))&&!group.every(channel=>requestedChannels.includes(channel))))throw new Failure(409,'The trusted default scanner policy contains an incomplete shared lane.','default_channels_unavailable');
     const actor=await github('user',token);const targetSha=current.target_sha;
-    const intent={schema_version:'analysis-request-v2',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection:current.selection,resolved_selection:{repository:source.full_name,repository_id:source.id,kind:'commit',ref:targetSha},target_sha:targetSha,pr_context:null,requested_channels:[...requestedChannels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:idempotencyKey.toLowerCase(),run_again:false,preview_id:crypto.randomUUID(),created_at:new Date().toISOString()};
-    const admitted=await queue('/queue/admit',{request:intent});const admittedBody=await admitted.json();
-    if(admitted.status===429)throw new Failure(429,'The global analysis queue has 100 pending requests.','queue_full');
-    if(admitted.status===409)throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
-    if(!admitted.ok)throw new Failure(503,'The analysis queue is temporarily unavailable; no request was accepted.','queue_unavailable');
-    return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,source_repository:source.full_name,target_sha:targetSha,preferred_branch:project.preferred_branch,requested_channels:[...requestedChannels].sort(),queue_position:admittedBody.queue_position??null,duplicate:admittedBody.duplicate===true},202);
+    const intent={schema_version:'analysis-request-v3',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection:current.selection,resolved_selection:{repository:source.full_name,repository_id:source.id,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:null,requested_channels:[...requestedChannels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:idempotencyKey.toLowerCase(),run_again:false,preview_id:crypto.randomUUID(),created_at:new Date().toISOString()};
+    const admittedBody=await admit(intent);
+    return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,source_repository:source.full_name,target_sha:targetSha,preferred_branch:project.preferred_branch,requested_channels:[...requestedChannels].sort(),queue_position:admittedBody.queue_position??null,duplicate:admittedBody.duplicate===true,wake_status:admittedBody.wake_status},202);
   }
 
   if (request.method === 'POST' && url.pathname === '/api/project-preview') {
@@ -289,7 +295,7 @@ export async function repositoryApi(request, env, session, helpers) {
     const id = url.searchParams.get('request_id');
     if (!/^[a-f0-9-]{36}$/.test(id || '')) throw new Failure(400, 'Choose a project and request.', 'invalid_request');
     const queued=await queue('/queue/status',{request_id:id});
-    if(queued.ok){const state=await queued.json();if(['queued','running','failed','superseded'].includes(state.status))return json({phase:state.status,request_id:id,queue_position:state.queue_position,attempts:state.attempts,checked_at:new Date().toISOString(),...(state.result||{})},state.status==='queued'?202:200);}
+    if(queued.ok){const state=await queued.json();if(['queued','running','failed','superseded','cancelled_cutover'].includes(state.status))return json({phase:state.status,request_id:id,queue_position:state.queue_position,attempts:state.attempts,checked_at:new Date().toISOString(),...(state.result||{})},state.status==='queued'?202:200);}
     const reportUrl = new URL('/api/public/manifest', url);
     reportUrl.search = new URLSearchParams({repository:repository.full_name,project_id:project.id});
     const response = await publicReports(new Request(reportUrl), env);
@@ -355,13 +361,9 @@ export async function repositoryApi(request, env, session, helpers) {
     const selection = current.selection;
     const checkoutRepository=current.pr_context?.head_repository||source.full_name;
     const checkoutRepositoryId=current.pr_context?.head_repository_id||source.id;
-    const intent = {schema_version:'analysis-request-v2',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection,resolved_selection:{repository:checkoutRepository,repository_id:checkoutRepositoryId,kind:'commit',ref:targetSha},target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...input.requested_channels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:input.idempotency_key.toLowerCase(),run_again:input.run_again===true,preview_id:preview.preview_id,created_at:new Date().toISOString()};
-    const admitted=await queue('/queue/admit',{request:intent});
-    const admittedBody=await admitted.json();
-    if(admitted.status===429)throw new Failure(429,'The global analysis queue has 100 pending requests.','queue_full');
-    if(admitted.status===409)throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
-    if(!admitted.ok)throw new Failure(503,'The analysis queue is temporarily unavailable; no request was accepted.','queue_unavailable');
-    return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,queue_position:admittedBody.queue_position??null,duplicate:admittedBody.duplicate===true},202);
+    const intent = {schema_version:'analysis-request-v3',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection,resolved_selection:{repository:checkoutRepository,repository_id:checkoutRepositoryId,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...input.requested_channels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:input.idempotency_key.toLowerCase(),run_again:input.run_again===true,preview_id:preview.preview_id,created_at:new Date().toISOString()};
+    const admittedBody=await admit(intent);
+    return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,queue_position:admittedBody.queue_position??null,duplicate:admittedBody.duplicate===true,wake_status:admittedBody.wake_status},202);
   }
 
   return null;

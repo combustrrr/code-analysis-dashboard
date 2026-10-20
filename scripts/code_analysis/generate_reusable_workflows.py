@@ -24,7 +24,7 @@ def reusable_source(portable=True):
     # dispatch_id names the outer source workflow run. The nested reusable
     # producers validate and assemble by durable request_id, so requiring the
     # outer-only input makes an otherwise valid caller fail at workflow startup.
-    reusable_inputs = {name: value for name, value in trigger['workflow_dispatch']['inputs'].items()
+    reusable_inputs = {name: value for name, value in trigger['workflow_call']['inputs'].items()
                        if name != 'dispatch_id'}
     document['on'] = {'workflow_call': {'inputs':reusable_inputs, 'secrets':{name:{'required':False} for name in secret_names}}}
     for job in document['jobs'].values():

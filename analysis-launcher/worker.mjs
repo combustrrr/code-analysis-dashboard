@@ -183,9 +183,20 @@ async function route(request, env) {
     if(request.headers.get('Authorization')!==`Bearer ${env.WORKER_API_TOKEN}`)throw new Failure(401,'Unauthorized queue access.','unauthorized');
     if(request.method!=='POST')throw new Failure(405,'Method not allowed.','method_not_allowed');
     let body={};try{body=await request.json();}catch{}
-    const action=url.pathname.endsWith('/admit')?'/queue/admit':url.pathname.endsWith('/claim')?'/queue/claim':url.pathname.endsWith('/complete')?'/queue/complete':null;
+    const action=['admit','claim','heartbeat','complete','pause','reset','resume'].find(name=>url.pathname.endsWith('/'+name));
     if(!action)throw new Failure(404,'Not found.','not_found');
-    return controlRequest(env,'control-plane',action,body);
+    return controlRequest(env,'control-plane','/queue/'+action,body);
+  }
+  if(url.pathname==='/api/internal/cutover/reset-reports'){
+    if(request.headers.get('Authorization')!==`Bearer ${env.WORKER_API_TOKEN}`)throw new Failure(401,'Unauthorized cutover access.','unauthorized');
+    if(request.method!=='POST')throw new Failure(405,'Method not allowed.','method_not_allowed');
+    const body=await request.json();if(body.confirm!=='RESET_CURRENT_REPORTS')throw new Failure(400,'Explicit reset confirmation is required.','invalid_request');
+    const state=await controlRequest(env,'control-plane','/queue/public-state',{}),queueState=await state.json();
+    if(queueState.admission_paused!==true)throw new Failure(409,'Pause admission before clearing current reports.','pause_required');
+    if(!env.ANALYSIS_REPORTS)throw new Failure(500,'R2 binding not configured.','storage_not_configured');
+    const prefix=`repositories/${env.ANALYSIS_REPOSITORY.toLowerCase()}/`;let cursor,deleted=0;
+    do{const page=await env.ANALYSIS_REPORTS.list({prefix,cursor});const keys=page.objects.map(value=>value.key);if(keys.length){await env.ANALYSIS_REPORTS.delete(keys);deleted+=keys.length;}cursor=page.truncated?page.cursor:undefined;}while(cursor);
+    return json({ok:true,deleted,prefix,generation:queueState.generation,warning:'GitHub Actions artifacts were not deleted and remain public until retention expiry.'});
   }
 
   settings(env);
@@ -231,7 +242,8 @@ async function route(request, env) {
     }
   }
   if (request.method === 'GET' && url.pathname === '/api/public/config') {
-    return json({mode:'repositories', require_login:restricted(env), require_report_login:privateReports(env), execution_repository:{id:Number(env.ANALYSIS_REPOSITORY_ID || EXECUTION_REPOSITORY_ID),full_name:env.ANALYSIS_REPOSITORY}});
+    let queueState={admission_paused:false,reset_notice:null};try{const response=await controlRequest(env,'control-plane','/queue/public-state',{});if(response.ok)queueState=await response.json();}catch{}
+    return json({mode:'repositories', require_login:restricted(env), require_report_login:privateReports(env), execution_repository:{id:Number(env.ANALYSIS_REPOSITORY_ID || EXECUTION_REPOSITORY_ID),full_name:env.ANALYSIS_REPOSITORY},...queueState});
   }
   if (env.REPORT_ACCESS === 'public') {
     const report = await publicReports(request,env);
@@ -277,7 +289,13 @@ async function route(request, env) {
     if(user.id!==session.user_id)throw new Failure(401,'Sign in again; the session identity changed.','session_invalid');
     if (request.method === 'GET' && url.pathname === '/api/session') {const repo=await access(env,session.token,'pull');return json({login:user.login,user_id:user.id,role:repo.permissions?.admin?'admin':repo.permissions?.push?'write':'read',capabilities:{read:true,write:!!repo.permissions?.push,admin:!!repo.permissions?.admin}});}
   }
-  const helpers = {github,json,Failure,seal,unseal,pages,serviceToken:()=>reportToken(env,env.ANALYSIS_REPOSITORY,{contents:'read',actions:'read'}),queue:async(path,body)=>controlRequest(env,'control-plane',path,body)};
+  const wakeCoordinator=async(requestId,sourceSha)=>{
+    const token=await reportToken(env,env.ANALYSIS_REPOSITORY,{actions:'write'});
+    if(!token)throw new Failure(503,'The coordinator wake credential is unavailable.','service_installation_unavailable');
+    const response=await fetch(`https://api.github.com/repos/${env.ANALYSIS_REPOSITORY}/actions/workflows/code-analysis-coordinator.yml/dispatches`,{method:'POST',headers:{Accept:'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'code-analysis-launcher',Authorization:`Bearer ${token}`},body:JSON.stringify({ref:'main',inputs:{request_id:requestId,source_sha:sourceSha}})});
+    if(response.status!==204)throw new Failure(503,'The coordinator wake signal failed; scheduled recovery remains active.','coordinator_wake_failed');
+  };
+  const helpers = {github,json,Failure,seal,unseal,pages,serviceToken:()=>reportToken(env,env.ANALYSIS_REPOSITORY,{contents:'read',actions:'read'}),wakeCoordinator,queue:async(path,body)=>controlRequest(env,'control-plane',path,body)};
     if (reportPath(url.pathname)) {
       await access(env, session.token, 'pull');
       if (privateReports(env) && url.searchParams.has('project_id')) {

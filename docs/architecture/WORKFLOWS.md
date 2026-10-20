@@ -1,5 +1,19 @@
 # Workflow catalog
 
+## Queue coordinator contract (replacement pending deployment)
+
+The dashboard Worker is the only admission surface. It commits an immutable
+`analysis-request-v3` envelope to the Durable Object FIFO and then sends a best-effort
+coordinator wake containing only the request ID and resolved 40-character source SHA.
+The wake is a consistency hint: the coordinator must claim the FIFO head and may not
+invent work. Scheduled recovery uses the same claim path.
+
+Claims carry a queue generation and opaque lease token. A trusted heartbeat job renews
+that exact lease; terminal acknowledgement requires both fence values. A stale or
+cutover-era coordinator therefore cannot complete the request. Vendor and source
+producers start independently after claim, while collection/publication waits for all
+siblings and preserves valid evidence from partial runs.
+
 Every GitHub Actions workflow in `.github/workflows/`, its trigger, permissions, and role in the analysis pipeline.
 
 ## Numbering convention
@@ -46,7 +60,7 @@ All four use read-only repository access (`persist-credentials: false`), accept 
 
 | File | Name | Trigger | Permissions | Purpose |
 |---|---|---|---|---|
-| `11-source-analysis.yml` | Exact Source Analysis | `workflow_dispatch` | contents:read | Isolated exact-source scan; uploads GitHub Actions artifacts without publication/vendor credentials |
+| `11-source-analysis.yml` | Exact Source Analysis | `workflow_call` | contents:read | Generated non-admitting compatibility surface; no direct manual scan dispatch |
 | `12-scanner-diagnostics.yml` | Scanner access diagnostics | `workflow_dispatch` | contents:read | Diagnostic-only run; source scans fail closed as unconfigured until a non-source credential split exists |
 | `reusable-source.yml` | Reusable source analysis | `workflow_call` | contents:read | Portable-profile reusable producer |
 | `reusable-source-full.yml` | Reusable source analysis (full) | `workflow_call` | contents:read | agentic-soc-profile reusable producer |
@@ -79,8 +93,7 @@ These are manual-dispatch scanners. They are not dispatched by `08-full-code-ana
 
 | File | Name | Trigger | Permissions | Purpose |
 |---|---|---|---|---|
-| `code-analysis-coordinator.yml` | Queue coordinator | `schedule` (every 15 minutes) | contents:read | Claims one Durable Object request, invokes approved reusable scanners locally, publishes validated evidence, and records terminal queue status |
-| `reusable-reconcile.yml` | Reusable repository reconciliation | `workflow_call` | workflow: contents:read; reconcile job: contents/actions:write | Recovers accepted requests, validates exact-source evidence, and publishes service-managed reports without native feedback |
+| `code-analysis-coordinator.yml` | Queue coordinator | queue wake, `schedule` (every 15 minutes) | contents:read; secrets only in trusted claim/heartbeat/publisher jobs | Verifies the wake hint against the FIFO claim, invokes approved reusable scanners, publishes validated evidence, and acknowledges with the active fence |
 | `pages.yml` | Deploy code analysis application | `workflow_dispatch`, `push` to main | contents:read | Builds and deploys the React dashboard to GitHub Pages |
 
 ## Safety contract
@@ -92,3 +105,4 @@ These are manual-dispatch scanners. They are not dispatched by `08-full-code-ana
 - Repository-content write permission appears only in reconciliation/publication jobs that operate on the service repository itself.
 - Generated workflows carry no SARIF publication privileges, R2 credentials, or vendor credentials in source-executing jobs.
 - Source producer evidence uses GitHub Actions artifacts; R2 is reserved for reconciliation/publication and current-report storage.
+- `reusable-reconcile.yml` was removed because no checked-in caller used it and its dormant contents/actions write permission violated least privilege.

@@ -2,7 +2,7 @@
 name: Exact Source Analysis
 run-name: Source analysis ${{ inputs.dispatch_id }}
 'on':
-  workflow_dispatch:
+  workflow_call:
     inputs:
       target:
         required: true

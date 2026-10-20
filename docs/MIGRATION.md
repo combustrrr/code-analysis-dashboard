@@ -16,12 +16,13 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
 - Preferred-branch analysis launches require one explicit Fast Path action. The Worker
   applies the operator-configured default scanner policy and resolves the immutable
   revision before admission. Non-default revisions or channels use the separate
-  revision -> scanners -> exact-SHA review custom wizard. The `analysis-request-v2` envelope pins the
+  revision -> scanners -> exact-SHA review custom wizard. The `analysis-request-v3` envelope pins the
   configured project, selected SHA, tooling/profile digests, requested channels, actor,
   and idempotency key; 202 is accepted/queued, not complete.
 - Accepted requests drain FIFO from a bounded queue with one active source revision
-  globally. Scheduled reconciliation recovers accepted work only and never creates a
-  request from branch/PR discovery.
+  globally. Each claim has a generation and opaque lease token, heartbeat renewal, and
+  stale-finalizer rejection. A best-effort wake follows durable admission; scheduled
+  recovery still claims accepted work only and never creates a request from discovery.
 - Each configured repository keeps one current source-only report and at most one
   separately keyed current PR overlay (project, PR, head repository/SHA, base SHA,
   tooling, profile). Same-SHA runs replace only successfully validated selected
