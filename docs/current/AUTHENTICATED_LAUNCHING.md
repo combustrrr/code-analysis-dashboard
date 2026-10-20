@@ -53,6 +53,9 @@ validated selected channels; other statuses remain distinct, including `NOT_SELE
 configured project and one separately keyed PR overlay (project, PR, head repository/SHA,
 base SHA, tooling, profile). Source-only report replacement waits for the first valid
 new-SHA channel result; failures preserve the previous report.
+The coordinator heartbeat renews the fenced lease once per minute and exits when terminal
+completion invalidates that lease, so a published Actions run should not remain visibly active
+for more than one renewal interval solely because of its heartbeat job.
 
 ## Dashboard sign-in and report visibility
 

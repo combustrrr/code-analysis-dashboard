@@ -86,7 +86,10 @@ jobs:
           GENERATION: ${{ needs.claim.outputs.generation }}
           LEASE_TOKEN: ${{ needs.claim.outputs.lease_token }}
         run: |
-          while sleep 300; do
+          # The terminal completion call invalidates this lease. Check once per minute so
+          # the heartbeat job stops promptly instead of leaving a published run looking
+          # active for up to five additional minutes.
+          while sleep 60; do
             curl --fail --silent --show-error --request POST \
               --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
               --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"workflow_run_id\":${GITHUB_RUN_ID},\"workflow_run_attempt\":${GITHUB_RUN_ATTEMPT}}" \
