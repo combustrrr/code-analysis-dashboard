@@ -7,11 +7,14 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:fixtures": "tsc --noEmit && vite build --mode fixtures",
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:unit": "vitest run --dir src"
   },
   "dependencies": {
     "@ant-design/icons": "6.3.4",
     "antd": "6.6.3",
+    "jspdf": "^4.2.1",
+    "jszip": "^3.10.2",
     "react": "19.1.1",
     "react-dom": "19.1.1"
   },
@@ -20,6 +23,7 @@
     "@types/react": "19.1.10",
     "@types/react-dom": "19.1.9",
     "typescript": "5.9.2",
-    "vite": "7.3.6"
+    "vite": "7.3.6",
+    "vitest": "^5.0.5"
   }
 }

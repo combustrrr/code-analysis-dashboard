@@ -1,27 +1,23 @@
 import { Alert, Button, Card, Col, Empty, Input, List, Pagination, Row, Select, Space, Statistic, Table, Tag, Typography } from 'antd';
-import { CopyOutlined, DownloadOutlined, PrinterOutlined } from '@ant-design/icons';
+import { CopyOutlined, DownloadOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { useEffect, useMemo, useState } from 'react';
 import { refreshRepositoryReports, repositoryJson } from './repositoryReports';
 import { safeGithubUrl } from './safeUrls';
-
-export type ThreatFinding = {
-  finding_id: string; category: string; severity: string; evidence_sources: string[]; guidance_source: string;
-  guidance_match: string; title: string; explanation: string; impact: string; remediation_steps: string[];
-  references: string[]; message: string; file: string; line: number; rule: string; scanners: string[];
-  observation_ids?: string[]; evidence_provenance?: Array<{ observation_id: string; scanner?: string; workflow_run_id?: string | number; attempt?: number; source_sha?: string; artifact?: string }>;
-  uncertainty_notice?: boolean;
-};
-export type ThreatReportData = {
-  schema_version: string; report_id: string; analysis_id?: string; immutable: boolean; source_repository?: string; ref?: string; pr?: number; target_sha: string; analysis_timestamp?: string; report_generation_timestamp?: string; tooling_sha?: string; generated_at: string;
-  guidance_catalog_version: string; generator_version: string; status: string; limitations: string[];
-  coverage: { status: string; expected_channels: string[]; available_channels: string[]; incomplete_channels: string[]; positioning_statement?: string; summary?: Record<string, number>; channel_matrix?: Array<{ channel: string; name: string; raw_status: string; normalized_status: string; reason: string; finding_count: number | null }> };
-  metrics: { findings_total: number; findings_by_category: Record<string, number>; findings_by_severity: Record<string, number>; advisories_total: number; guidance_matched: number; guidance_fallback: number };
-  findings: ThreatFinding[];
-};
+import trustLabLogo from './assets/trustlab-logo.jpg';
+import mphasisLogo from './assets/mphasis-logo.jpg';
+import { filterThreatFindings, hasActiveFilters, sourceLocationUrl, type ExportScope, type ReportFilterSnapshot } from './threatReportExportModel';
+import type { ThreatReportData } from './threatReportExportModel';
+export type { ThreatFinding, ThreatReportData } from './threatReportExportModel';
 
 function download(name: string, value: string, type: string) {
   const url = URL.createObjectURL(new Blob([value], { type }));
   const link = document.createElement('a'); link.href = url; link.download = name; link.click(); URL.revokeObjectURL(url);
+}
+
+function downloadBlob(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a'); link.href = url; link.download = name; document.body.appendChild(link); link.click(); link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function ThreatReport({ reportPath, targetSha }: { reportPath: string; targetSha?: string }) {
@@ -34,6 +30,8 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
   const [guidance, setGuidance] = useState('');
   const [findingsPage, setFindingsPage] = useState(1);
   const [retry, setRetry] = useState(0);
+  const [pdfScope, setPdfScope] = useState<ExportScope>();
+  const [exportError, setExportError] = useState('');
   useEffect(() => {
     const controller = new AbortController(); setReport(undefined); setMarkdown(''); setError('');
     repositoryJson<ThreatReportData>(`data/${reportPath}/threat-report.json`, controller.signal)
@@ -45,21 +43,36 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
     return () => controller.abort();
   }, [reportPath, retry]);
   useEffect(() => setFindingsPage(1), [query, severity, category, guidance, reportPath]);
-  const filtered = useMemo(() => report?.findings.filter(f => (!severity || f.severity === severity) && (!category || f.category === category) && (!guidance || f.guidance_source === guidance) && `${f.title} ${f.message} ${f.file} ${f.rule} ${f.scanners.join(' ')}`.toLowerCase().includes(query.toLowerCase())) || [], [report, query, severity, category, guidance]);
+  const filters = useMemo<ReportFilterSnapshot>(() => ({ query, severity, category, guidance }), [query, severity, category, guidance]);
+  const filtered = useMemo(() => report ? filterThreatFindings(report.findings, filters) : [], [report, filters]);
   if (error) { const detail = error.toLowerCase(); const expired = detail.includes('expired') || detail.includes('freshness'); const missing = detail.includes('not found') || detail.includes('unavailable'); return <Alert showIcon type="warning" title={expired ? 'Report expired' : missing ? 'Report temporarily unavailable' : 'Threat report could not be retrieved'} description={<>{error} <Space><Button type="link" onClick={() => { refreshRepositoryReports(); setRetry(n => n + 1); }}>Refresh report</Button><Button type="link" onClick={() => { const params = new URLSearchParams(location.hash.slice(1)); params.set('tab', 'overview'); location.hash = params.toString(); }}>Rerun analysis</Button></Space></>} />; }
   if (!report) return <div className="empty" role="status"><Empty description="Loading threat report..." /></div>;
   const legacy = !report.immutable;
   const pageSize = 25;
   const visibleFindings = filtered.slice((findingsPage - 1) * pageSize, findingsPage * pageSize);
+  const exportPdf = async (scope: ExportScope) => {
+    const frozenFilters = { ...filters };
+    setPdfScope(scope); setExportError('');
+    try {
+      const { createThreatReportDownload } = await import('./ThreatReportPdf');
+      const result = await createThreatReportDownload(report, scope, frozenFilters);
+      downloadBlob(result.filename, result.blob);
+    } catch (cause) {
+      setExportError(cause instanceof Error ? cause.message : 'The PDF could not be generated. No partial download was created.');
+    } finally { setPdfScope(undefined); }
+  };
   return <section className="threat-report" aria-label="Threat report">
     {legacy && <Alert showIcon type="warning" title="Legacy runtime report" description="This report was generated from an older stored analysis and is not an immutable publication artifact. Rerun analysis for a provenance-bound report." />}
     <Space className="report-actions" wrap>
       <Button icon={<CopyOutlined />} onClick={() => navigator.clipboard?.writeText(location.href)}>Copy private report link</Button>
       <Button icon={<DownloadOutlined />} onClick={() => download('threat-report.json', JSON.stringify(report, null, 2), 'application/json')}>Download JSON</Button>
       <Button icon={<DownloadOutlined />} disabled={!markdown} loading={!markdown} onClick={() => download('threat-report.md', markdown, 'text/markdown')}>Download Markdown</Button>
-      <Button icon={<PrinterOutlined />} onClick={() => window.print()}>Print / Save as PDF</Button>
+      <Button type="primary" icon={<FilePdfOutlined />} loading={pdfScope === 'complete'} disabled={Boolean(pdfScope)} onClick={() => exportPdf('complete')}>Download PDF</Button>
+      <Button icon={<FilePdfOutlined />} loading={pdfScope === 'filtered'} disabled={Boolean(pdfScope) || !hasActiveFilters(filters)} onClick={() => exportPdf('filtered')}>Download filtered PDF</Button>
     </Space>
+    {exportError && <Alert showIcon type="error" title="PDF export failed" description={`${exportError} JSON and Markdown downloads remain available.`} />}
      <Card className="threat-identity report-hero">
+       <div className="report-brand-masthead"><div><img src={trustLabLogo} alt="TrustLab" /><span>Prepared by TrustLab</span></div><div><img src={mphasisLogo} alt="Mphasis" /><span>Prepared for Mphasis</span></div></div>
        <div className="report-kicker">SECURITY EVIDENCE BRIEF</div>
        <div className="report-hero-line"><div><Typography.Title level={1} className="report-title">Threat Report</Typography.Title><Typography.Text className="report-subtitle">Immutable findings for a single analyzed revision</Typography.Text></div><Tag className={`report-status report-status-${report.status.toLowerCase().replaceAll(' ', '-')}`}>{report.status}</Tag></div>
        <Typography.Paragraph>{report.coverage.positioning_statement}</Typography.Paragraph>
@@ -82,7 +95,7 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
     <section className="threat-findings report-section"><div className="findings-heading"><div><div className="report-kicker">EVIDENCE REGISTER</div><h2>Highest-severity findings</h2><p>Ordered by retained scanner severity and deterministic source identity. No subjective risk score is applied.</p></div><div className="findings-count">{filtered.length.toLocaleString()}<small>shown</small></div></div>
       <Space wrap className="threat-filters"><Input aria-label="Search threat findings" placeholder="Search title, message, file, rule, or scanner" allowClear value={query} onChange={e => setQuery(e.target.value)} /><Select aria-label="Threat severity" value={severity} onChange={setSeverity} options={[{value:'',label:'All severities'}, ...[...new Set(report.findings.map(f => f.severity))].map(value => ({value,label:value}))]} /><Select aria-label="Threat category" value={category} onChange={setCategory} options={[{value:'',label:'All categories'}, ...[...new Set(report.findings.map(f => f.category))].map(value => ({value,label:value}))]} /><Select aria-label="Guidance source" value={guidance} onChange={setGuidance} options={[{value:'',label:'All guidance'}, {value:'catalog',label:'Catalog guidance'}, {value:'fallback',label:'Fallback guidance'}]} /><Typography.Text>{filtered.length.toLocaleString()} findings</Typography.Text></Space>
        {visibleFindings.map(finding => <Card key={finding.finding_id} className={`threat-finding finding-${finding.severity.toLowerCase()}`} title={<Space><Tag className={`severity-tag severity-${finding.severity.toLowerCase()}`}>{finding.severity}</Tag><span>{finding.title}</span></Space>}>
-        <Typography.Paragraph><strong>Category:</strong> {finding.category} · <strong>Location:</strong> <code>{finding.file}:{finding.line}</code> · <strong>Evidence:</strong> {finding.evidence_sources.join(', ')}</Typography.Paragraph>
+        <Typography.Paragraph><strong>Category:</strong> {finding.category} · <strong>Location:</strong> {sourceLocationUrl(report, finding) ? <a href={sourceLocationUrl(report, finding)} target="_blank" rel="noreferrer"><code>{finding.file}:{finding.line}</code></a> : <code>{finding.file}:{finding.line}</code>} · <strong>Evidence:</strong> {finding.evidence_sources.join(', ')}</Typography.Paragraph>
          <Typography.Paragraph><strong>Scanner message:</strong> {finding.message}</Typography.Paragraph>
          {finding.evidence_provenance?.length ? <Typography.Paragraph><strong>Evidence provenance:</strong> {finding.evidence_provenance.map(source => `${source.scanner || 'scanner'}${source.workflow_run_id ? ` run ${source.workflow_run_id}` : ''}${source.attempt ? ` attempt ${source.attempt}` : ''}`).join('; ')}</Typography.Paragraph> : null}
         <Typography.Paragraph><strong>Explanation:</strong> {finding.explanation}</Typography.Paragraph>

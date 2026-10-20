@@ -464,6 +464,7 @@ test('unsafe source URLs are omitted from report links', async ({ page }) => {
 });
 
 test('large threat reports render one findings page without blocking the report', async ({ page }) => {
+  test.setTimeout(90_000);
   const findings = Array.from({ length: 100 }, (_, index) => ({
     finding_id: `finding-${index}`, category: 'code-quality', severity: 'MEDIUM', evidence_sources: ['semgrep'], guidance_source: 'catalog',
     guidance_match: 'test', title: `Finding ${index}`, explanation: 'Explanation', impact: 'Impact', remediation_steps: ['Fix it'], references: [],
@@ -479,8 +480,21 @@ test('large threat reports render one findings page without blocking the report'
   await page.goto('/');
   await page.getByRole('tab', { name: 'Threat Report' }).click();
   await expect(page.getByRole('heading', { name: 'Threat Report' })).toBeVisible();
+  await expect(page.getByAltText('TrustLab')).toBeVisible();
+  await expect(page.getByAltText('Mphasis')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download filtered PDF' })).toBeDisabled();
+  await expect(page.getByRole('link', { name: 'src/file-0.ts:1' })).toHaveAttribute('href', `https://github.com/combustrrr/Agentic-Kibana/blob/${'a'.repeat(40)}/src/file-0.ts#L1`);
   await expect(page.locator('.threat-finding')).toHaveCount(25);
   await expect(page.getByText('100 findings', { exact: true }).first()).toBeVisible();
+  await page.getByLabel('Search threat findings').fill('Finding 0');
+  await expect(page.getByRole('button', { name: 'Download filtered PDF' })).toBeEnabled();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download filtered PDF' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(`Agentic-Kibana-${'a'.repeat(12)}-filtered.pdf`);
+  const path = await download.path();
+  expect(path && readFileSync(path).subarray(0, 5).toString()).toBe('%PDF-');
+  await page.getByLabel('Search threat findings').clear();
   await page.getByTitle('Next Page').click();
   await expect(page.getByText('Finding 25', { exact: true })).toBeVisible();
 });

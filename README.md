@@ -84,7 +84,7 @@ shortcuts and target changes clear unrelated filters.
 
 The Threat Report view adds deterministic catalog explanations, potential impact,
 remediation steps, coverage limitations, private links, JSON/Markdown downloads, and
-print-to-PDF output without changing the underlying scanner evidence.
+locally generated PDF/ZIP exports without changing the underlying scanner evidence.
 
 Analysis launches are manual only. Scheduled reconciliation recovers already accepted
 durable requests; it never discovers a branch/PR and creates work. Each immutable

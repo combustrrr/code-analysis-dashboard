@@ -26,15 +26,24 @@ of remaining indefinitely in collection.
 
 Stored reports are immutable for the analyzed target SHA, report schema version,
 guidance catalog version, and generator version. The dashboard supports authenticated
-private links, JSON download, Markdown download, and browser print/save-to-PDF.
+private links, JSON download, Markdown download, and generated PDF download.
 
 Reports preserve secret redaction and treat scanner-controlled values as untrusted
 text. Incomplete channels remain visible and are not interpreted as zero findings.
 
-The screen is optimized for review and print: severity colors, coverage status tokens,
-responsive tables, high-contrast light/dark themes, and print-specific pagination are
-provided by the Threat Report view. PDF output is browser print/save-to-PDF from the
-report view; controls and navigation are hidden in print media.
+The screen is optimized for review and export: severity colors, coverage status tokens,
+responsive tables, and high-contrast light/dark themes are provided by the Threat Report
+view. PDF output is generated locally from the already fetched, authenticated report JSON;
+it does not call a PDF service or refetch evidence. Complete export always contains every
+retained finding. Filtered export freezes the active query, severity, category, and guidance
+filters at click time and is unavailable until at least one filter is active.
+
+PDF files identify the exact source SHA, analysis, report, tooling, catalog, generator,
+coverage state, limitations, and a distinct export timestamp. Source locations link to the
+exact GitHub SHA when the repository identity is valid. Large exports are deterministically
+split between findings and delivered only after every volume succeeds as a single ZIP;
+failed exports never offer a partial package. JSON and Markdown remain available as the
+lossless fallbacks for reports above the documented browser-safe PDF volume limit.
 
 ## Publication and target boundaries
 

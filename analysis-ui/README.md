@@ -21,7 +21,9 @@ repository picker, per-user App installation, or setup-commit workflow.
 The dashboard includes a **Threat Report** view for newly published analyses. It
 summarizes severity/category coverage and deterministic catalog guidance, then links
 back to Issues for scanner evidence. Reports can be copied as authenticated private
-links, downloaded as JSON or Markdown, or printed to PDF. Older reports may show an
+links, downloaded as JSON or Markdown, or exported as a generated PDF. Complete PDF
+export ignores review filters; filtered PDF export freezes the active filters. Large PDF
+exports are packaged as deterministic volumes in one ZIP. Older reports may show an
 explicit non-immutable legacy-runtime warning.
 
 ## Local browser fixtures
