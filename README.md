@@ -89,8 +89,13 @@ The Threat Report view adds deterministic catalog explanations, potential impact
 remediation steps, coverage limitations, private links, JSON/Markdown downloads, and
 locally generated PDF/ZIP exports without changing the underlying scanner evidence.
 
-Analysis launches are manual only. Scheduled reconciliation recovers already accepted
-durable requests; it never discovers a branch/PR and creates work. Each immutable
+Preferred-branch evidence is refreshed automatically every six hours for the three
+trusted projects, and authorized collaborators can still start Fast or configured
+analysis explicitly. The proactive refresh resolves each preferred branch to an
+immutable SHA and requests every configured, applicable branch scanner; PR-only and
+language-inapplicable channels remain excluded. Scheduled coordinator reconciliation
+separately recovers already accepted durable requests and never discovers a branch or
+pull request. Each immutable
 `analysis-request-v4` envelope pins the configured project, selected revision SHA,
 tooling/profile digests, selected channels, actor, and idempotency key. Matching channel
 evidence is reused unless **Run again** is selected. Same-SHA publication replaces only

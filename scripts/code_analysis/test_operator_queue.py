@@ -1,11 +1,18 @@
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from scripts.code_analysis.operator_queue import preferred_intents
 
 
 class OperatorQueueTests(unittest.TestCase):
+    def test_preferred_branch_refresh_runs_four_times_daily(self):
+        workflow = Path('.github/workflows/preferred-branch-analysis.yml').read_text(encoding='utf-8')
+        self.assertIn("cron: '17 */6 * * *'", workflow)
+        self.assertIn('group: preferred-branch-analysis', workflow)
+        self.assertIn('cancel-in-progress: false', workflow)
+
     def test_public_preferred_analysis_includes_approved_vendor_lanes(self):
         document = {
             "tooling_sha": "a" * 40,

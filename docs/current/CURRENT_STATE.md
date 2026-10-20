@@ -305,3 +305,13 @@ rendered globally on Projects or Settings. A successful published or reused resu
 opens its report and then removes the temporary progress panel. Durable request and
 revision identifiers are shown with the selected project in Settings, while report
 and workflow provenance remains available from Security & provenance and Report.
+
+## 2026-10-20 Proactive preferred-branch evidence
+
+`preferred-branch-analysis.yml` now runs at minute 17 every six hours as well as on
+manual dispatch. Each invocation resolves the configured preferred branch of all three
+trusted public projects to an immutable SHA, requests every enabled non-deferred branch
+channel, and immediately dispatches project-scoped coordinators. PR-only CodeRabbit
+evidence and language-inapplicable channels remain excluded. Workflow-level concurrency
+prevents overlapping batch admissions without serializing the three project analyses.
+The coordinator's 15-minute schedule remains recovery-only and does not create work.

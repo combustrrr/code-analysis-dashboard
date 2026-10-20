@@ -1,6 +1,9 @@
 name: Analyze all preferred branches
 run-name: Analyze all configured preferred branches
 on:
+  schedule:
+    # Keep preferred-branch evidence warm without continuously consuming public runners.
+    - cron: '17 */6 * * *'
   workflow_dispatch:
     inputs:
       project_id:
@@ -11,6 +14,9 @@ on:
 permissions:
   contents: read
   actions: write
+concurrency:
+  group: preferred-branch-analysis
+  cancel-in-progress: false
 jobs:
   enqueue:
     runs-on: ubuntu-latest

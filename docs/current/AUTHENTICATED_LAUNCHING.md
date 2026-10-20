@@ -41,7 +41,9 @@ The Durable Object starts accepted project/SHA analyses immediately. Different p
 revisions may run concurrently; active duplicates merge only missing channels. Selected channel
 producers run concurrently and independently fenced claims remain active until their lanes are
 terminal. The Worker signals the coordinator after admission or channel expansion. The 15-minute
-schedule is recovery-only. `code-analysis-coordinator.yml` claims exact unclaimed channels,
+schedule is recovery-only. Separately, `preferred-branch-analysis.yml` proactively
+refreshes all three trusted preferred branches every six hours and requests all configured,
+applicable branch channels. `code-analysis-coordinator.yml` claims exact unclaimed channels,
 invokes reusable jobs, and serializes publication per project. GitHub Releases are not used for
 admission. A missing optional normalized-findings directory does
 not fail an otherwise completed scanner lane, while required raw evidence and assembled

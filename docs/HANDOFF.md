@@ -1,5 +1,14 @@
 # New-chat handoff: Code Analysis Dashboard
 
+## 2026-10-20 proactive preferred-branch refresh
+
+The preferred-branch operator workflow now runs every six hours and requests all
+configured, applicable branch-analysis channels for the three trusted public projects.
+It excludes deferred, language-inapplicable, and PR-only CodeRabbit evidence. The three
+project/SHA analyses remain concurrent; only overlapping batch admission workflows are
+serialized. This proactive schedule is distinct from the coordinator's recovery-only
+15-minute schedule.
+
 ## 2026-10-20 project-workspace deployment and production analyses
 
 Commit `518db3a0aa4d74812ca8d24bda73c9ece38fda55` deployed the shared
