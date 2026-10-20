@@ -1,0 +1,38 @@
+name: Analyze all preferred branches
+run-name: Analyze all configured preferred branches
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  enqueue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.11'
+      - name: Resolve every preferred branch to an immutable SHA
+        id: intents
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "path=$(python -m scripts.code_analysis.operator_queue)" >> "$GITHUB_OUTPUT"
+      - name: Admit trusted requests to the production FIFO
+        env:
+          WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          INTENTS_PATH: ${{ steps.intents.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -c '.[]' "$INTENTS_PATH" | while read -r intent; do
+            curl --fail --silent --show-error --request POST \
+              --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
+              --data "$(jq -cn --argjson request "$intent" '{request:$request}')" \
+              "${WORKER_URL}/api/internal/queue/admit"
+            echo
+          done

@@ -183,7 +183,7 @@ async function route(request, env) {
     if(request.headers.get('Authorization')!==`Bearer ${env.WORKER_API_TOKEN}`)throw new Failure(401,'Unauthorized queue access.','unauthorized');
     if(request.method!=='POST')throw new Failure(405,'Method not allowed.','method_not_allowed');
     let body={};try{body=await request.json();}catch{}
-    const action=url.pathname.endsWith('/claim')?'/queue/claim':url.pathname.endsWith('/complete')?'/queue/complete':null;
+    const action=url.pathname.endsWith('/admit')?'/queue/admit':url.pathname.endsWith('/claim')?'/queue/claim':url.pathname.endsWith('/complete')?'/queue/complete':null;
     if(!action)throw new Failure(404,'Not found.','not_found');
     return controlRequest(env,'control-plane',action,body);
   }

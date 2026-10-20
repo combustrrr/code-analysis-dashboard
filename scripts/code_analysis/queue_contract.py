@@ -71,6 +71,10 @@ def main() -> None:
     args = parser.parse_args()
     claim = json.loads(args.claim.read_text(encoding="utf-8"))
     row = scanner_target(claim)
+    execution_sha = os.environ.get("GITHUB_SHA", "").lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", execution_sha):
+        raise ValueError("coordinator execution revision is unavailable")
+    row["execution_sha"] = execution_sha
     output = os.environ.get("GITHUB_OUTPUT")
     if output:
         with open(output, "a", encoding="utf-8") as stream:

@@ -38,6 +38,12 @@ Fixtures cover branch, open-PR, and full-SHA variants; do not spend production q
 running every combination. A pull-only collaborator path must not be called live-verified
 until a pull-only collaborator performs it successfully.
 
+For an explicitly approved refresh of every configured project, maintainers may dispatch
+`Analyze all preferred branches`. It resolves each registry `preferred_branch` to an
+immutable SHA and admits three ordinary FIFO requests through the authenticated internal
+queue boundary. The schedule-only coordinator continues to claim one request per cadence;
+the workflow does not bypass concurrency, scanner isolation, or publication validation.
+
 ## Known boundaries
 
 Workflow reachability and profile declaration do not prove vendor credentials or scanner
