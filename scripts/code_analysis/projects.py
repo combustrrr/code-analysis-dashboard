@@ -1,4 +1,4 @@
-﻿"""Versioned, repository-owned application projects and publication boundaries."""
+"""Versioned, repository-owned application projects and publication boundaries."""
 from __future__ import annotations
 
 import copy

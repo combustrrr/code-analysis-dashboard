@@ -1,4 +1,4 @@
-﻿import copy
+import copy
 import unittest
 from scripts.code_analysis.projects import validate, service_config, native_feedback_allowed
 from scripts.code_analysis.report_assets import shard, verify_asset

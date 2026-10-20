@@ -1,5 +1,17 @@
 # Current implementation state
 
+## 2026-10-20 community scanner production verification
+
+Production source run `39432996302` completed successfully and published immutable
+dashboard evidence using tooling `7cc795e9554e225fd688dfb78319e41f19e5c016`.
+Credentialless zizmor, njsscan, and TruffleHog lanes completed with read-only source
+access; their retained observations were reconciled without exposing detected secret
+values. The follow-up tooling change enables the already reviewed TypeScript adapters
+for portable profiles and removes UTF-8 byte-order marks from three Python modules that
+caused Radon parse failures. Repository security-posture evidence remains unavailable
+until a dedicated read-only security API credential or equivalent GitHub App permission
+is configured; it is not passed to source-executing jobs.
+
 ## 2026-10-20 Settings control-center deployment
 
 Pages run `39415699309` deployed commit

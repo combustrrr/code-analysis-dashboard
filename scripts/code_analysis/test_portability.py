@@ -67,6 +67,21 @@ class PortabilityTests(unittest.TestCase):
             self.assertNotIn('snyk', excluded)
             self.assertNotIn('sonarqube-cloud', excluded)
 
+    def test_portable_javascript_selection_runs_typescript_quality(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'analysis-ui').mkdir()
+            config = self.config()
+            config['profile'].update(javascript_root='analysis-ui', commands={
+                'eslint': {'cwd': 'analysis-ui', 'argv': ['eslint', '.']},
+                'typescript': {'cwd': 'analysis-ui', 'argv': ['tsc', '--noEmit']},
+            })
+            jobs, excluded, languages = selection(config, root)
+            self.assertIn('typescript-quality', jobs)
+            self.assertNotIn('eslint', excluded)
+            self.assertNotIn('typescript', excluded)
+            self.assertIn('javascript-typescript', languages)
+
     def test_portable_workflow_contains_no_original_project_harness(self):
         workflow = generate(self.config())
         jobs = yaml.safe_load(workflow)['jobs']

@@ -1,4 +1,4 @@
-﻿"""Run a trusted service module without importing packages from the source tree."""
+"""Run a trusted service module without importing packages from the source tree."""
 import re
 import runpy
 import sys

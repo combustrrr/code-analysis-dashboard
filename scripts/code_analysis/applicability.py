@@ -58,7 +58,8 @@ VENDOR_JOBS = {'snyk','sonarqube-cloud'}
 PYTHON_JOBS = {'python-ruff', 'python-bandit', 'python-types', 'complexity',
                'dead-code', 'test-coverage', 'schemathesis-fuzz', 'atheris-state-machine'}
 GENERATED_JOBS = PORTABLE_JOBS | VENDOR_JOBS | PYTHON_JOBS | {
-    'codeql', 'osv-scanner', 'github-actions-security', 'owasp-js', 'owasp-iac-secrets'}
+    'codeql', 'osv-scanner', 'typescript-quality', 'github-actions-security',
+    'owasp-js', 'owasp-iac-secrets'}
 
 
 def selection(config: dict, source: Path, requested_channels: list[str] | None = None) -> tuple[list[str], dict, list[str]]:
