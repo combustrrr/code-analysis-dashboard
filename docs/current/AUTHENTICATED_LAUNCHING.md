@@ -9,6 +9,10 @@ project-registry entries. Users do not choose or install an execution repository
 Users sign in to **Projects**. **Activity** contains aggregate health, alerts,
 recent-request metadata, global search, and project summaries. Opening Projects,
 Activity, or a project remains read-only.
+Developers see product-level progress only: Preparing, Analyzing, Preparing results,
+Ready, or Needs attention. Queue positions, coordinator runs, lease state, scanner job
+links, and individual channel scheduling remain operational details. The exact selected
+revision remains visible throughout.
 On a project, **Run analysis** is the Fast Path: one action asks the Worker to resolve the
 configured preferred branch, apply trusted default channels, verify current collaborator access,
 and queue the exact SHA. The retained report stays visible while the request is active.
@@ -32,10 +36,13 @@ access includes `can_configure`.
 
 The bounded Durable Object queue is FIFO (maximum 100) with one active source-revision request globally.
 Selected channel producers for that revision may run concurrently; a request remains
-active until every selected lane is terminal. The 15-minute scheduled
-`code-analysis-coordinator.yml` claims only durable accepted requests and invokes
-reusable jobs inside that same run; the Worker never dispatches workflows or uses
-GitHub Releases as a queue. Each lane
+active until every selected lane is terminal. The Worker signals the coordinator when a
+request is admitted and immediately signals the next FIFO request when the active request
+finishes. The 15-minute schedule is recovery-only. `code-analysis-coordinator.yml` claims
+only durable accepted requests and invokes reusable jobs inside that same run; GitHub
+Releases are not used as a queue. A missing optional normalized-findings directory does
+not fail an otherwise completed scanner lane, while required raw evidence and assembled
+reports still fail closed when absent. Each lane
 checks out the same immutable SHA. Matching channel evidence is reused automatically.
 Same-SHA publication replaces only successfully
 validated selected channels; other statuses remain distinct, including `NOT_SELECTED`,

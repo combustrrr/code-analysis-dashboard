@@ -167,17 +167,19 @@ export async function repositoryApi(request, env, session, helpers) {
   if (request.method === 'GET' && url.pathname === '/api/projects') {
     const {repository, configuration} = await context();
     const verified = await Promise.all(configuration.projects.map(project => projectFor(configuration, project.id)));
+    let activeByProject=new Map();
+    try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();for(const row of payload.requests||[]){if(!['queued','running'].includes(row.status))continue;const key=String(row.intent?.project_id||'');activeByProject.set(key,(activeByProject.get(key)||0)+1);}}}catch{}
     return json({
       execution_repository: {id:repository.id, full_name:repository.full_name},
       can_launch: repository.permissions.pull === true,
       can_configure: repository.permissions.admin === true,
       projects: await Promise.all(verified.map(async ({project}) => {
-        let current_report=null,current_overlay=null,queued_requests=0;
+        let current_report=null,current_overlay=null;
        const reportUrl=new URL('/api/public/manifest',url);
        reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
        try {
         const response=await publicReports(new Request(reportUrl),env);
-        if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);const overlay=manifest.current_overlay;queued_requests=(manifest.requests||[]).filter(value=>!['published','reused','failed','superseded'].includes(value.status)).length;if(target)current_report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null,status:target.report_status||target.status};if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
+        if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);const overlay=manifest.current_overlay;if(target)current_report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null,status:target.report_status||target.status};if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
        } catch {}
        return {
         id: String(project.id),
@@ -187,19 +189,21 @@ export async function repositoryApi(request, env, session, helpers) {
         preferred_branch: project.preferred_branch,
         native_feedback_enabled: false,
         readiness_summary:{configured_channels:project.enabled_scanners.length,vendor_channels:project.enabled_scanners.filter(channel=>VENDOR_SCANNERS.has(channel)).length},
-         current_report,current_overlay,queued_requests,
+         current_report,current_overlay,queued_requests:activeByProject.get(String(project.id))||0,
        };
       })),
     });
   }
   if(request.method==='GET'&&url.pathname==='/api/dashboard'){
     const {repository,configuration}=await context();const checkedAt=new Date().toISOString();const alerts=[];
-    const projects=await Promise.all(configuration.projects.map(async project=>{let current_report=null,queued_requests=0;
+    let recent=[];try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();recent=payload.requests||[];}}catch{alerts.push({id:'recent-requests',severity:'warning',title:'Recent analysis unavailable',message:'Current project reports remain available.'});}
+    const activeByProject=new Map();for(const row of recent){if(!['queued','running'].includes(row.status))continue;const key=String(row.intent?.project_id||'');activeByProject.set(key,(activeByProject.get(key)||0)+1);}
+    const projects=await Promise.all(configuration.projects.map(async project=>{let current_report=null;
       const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
-      try{const response=await publicReports(new Request(reportUrl),env);if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);queued_requests=(manifest.requests||[]).filter(value=>!['published','reused','failed','superseded'].includes(value.status)).length;if(target)current_report={status:target.report_status||target.status,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null};if(manifest.publication_error)alerts.push({id:`publication-${project.id}`,project_id:String(project.id),severity:'error',title:'Report publication needs attention',message:String(manifest.publication_error)});}}
+      try{const response=await publicReports(new Request(reportUrl),env);if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);if(target)current_report={status:target.report_status||target.status,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null};if(manifest.publication_error)alerts.push({id:`publication-${project.id}`,project_id:String(project.id),severity:'error',title:'Report publication needs attention',message:String(manifest.publication_error)});}}
       catch{alerts.push({id:`report-${project.id}`,project_id:String(project.id),severity:'warning',title:'Project summary unavailable',message:'The current report summary could not be read.'});}
-      return{id:String(project.id),source_repository:project.source_repository.full_name,preferred_branch:project.preferred_branch,current_report,queued_requests};}));
-    let recent=[];try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();const allowed=new Map(projects.map(project=>[project.id,project.source_repository]));recent=(payload.requests||[]).filter(row=>allowed.has(String(row.intent?.project_id))).map(row=>({request_id:row.request_id,project_id:String(row.intent.project_id),source_repository:allowed.get(String(row.intent.project_id)),ref_type:row.intent.selection?.kind||'revision',ref:row.intent.selection?.ref||row.intent.target_sha,target_sha:row.intent.target_sha,status:row.status,created_at:row.created_at,updated_at:row.completed_at||row.created_at,run_url:row.result?.run_id?`https://github.com/${repository.full_name}/actions/runs/${row.result.run_id}`:undefined}));}}catch{alerts.push({id:'recent-requests',severity:'warning',title:'Recent request metadata unavailable',message:'Current project reports remain available.'});}
+      return{id:String(project.id),source_repository:project.source_repository.full_name,preferred_branch:project.preferred_branch,current_report,queued_requests:activeByProject.get(String(project.id))||0};}));
+    const allowed=new Map(projects.map(project=>[project.id,project.source_repository]));recent=recent.filter(row=>allowed.has(String(row.intent?.project_id))).map(row=>({request_id:row.request_id,project_id:String(row.intent.project_id),source_repository:allowed.get(String(row.intent.project_id)),ref_type:row.intent.selection?.kind||'revision',ref:row.intent.selection?.ref||row.intent.target_sha,target_sha:row.intent.target_sha,status:row.status,created_at:row.created_at,updated_at:row.completed_at||row.created_at}));
     return json({checked_at:checkedAt,freshness:'fresh',health:{status:alerts.some(alert=>alert.severity==='error')?'degraded':alerts.length?'unknown':'healthy',message:alerts.length?'Some aggregate evidence is unavailable.':'Control plane and project summaries responded.'},alerts,projects,recent_requests:recent,execution_repository:{id:repository.id,full_name:repository.full_name},can_launch:repository.permissions.pull===true,can_configure:repository.permissions.admin===true});
   }
   if (request.method === 'GET' && url.pathname === '/api/project-identity') {

@@ -1,7 +1,7 @@
 """Generate the isolated exact-source workflow from existing scanner definitions.
 
-Legacy push/PR workflows remain compatible. This generated workflow has no SARIF
-publication privileges, persisted checkout credentials, or source-inherited tooling.
+The generated workflow has no SARIF publication privileges, persisted checkout
+credentials, or source-inherited tooling.
 """
 from pathlib import Path
 import copy
@@ -92,7 +92,11 @@ def generate(config=None):
                         raise ValueError('Cannot safely convert R2 upload in ' + str(step.get('name', 'unnamed')))
                     paths = '\n'.join(line.strip().rstrip('\\\\') for line in command.group(1).splitlines() if line.strip())
                     artifact_name = step.get('name', 'scanner-output').replace('Upload ', '').replace(' to R2', '').strip()
-                    step = {'name': 'Upload ' + artifact_name + ' as artifact', 'if': step.get('if', 'always()'), 'uses': UPLOAD, 'with': {'name': artifact_name, 'path': paths, 'if-no-files-found': 'error', 'retention-days': 7}}
+                    # A normalized findings directory is legitimately absent when a
+                    # scanner reports zero findings. The primary scanner report is
+                    # still required, so only this derived artifact may be empty.
+                    missing = 'ignore' if artifact_name == 'fuzzing-findings' else 'error'
+                    step = {'name': 'Upload ' + artifact_name + ' as artifact', 'if': step.get('if', 'always()'), 'uses': UPLOAD, 'with': {'name': artifact_name, 'path': paths, 'if-no-files-found': missing, 'retention-days': 7}}
                     uses = UPLOAD
                 if 'upload-sarif@' in uses or step.get('name') in {'Parse Results for Aggregation', 'Upload Normalized Findings'}:
                     continue

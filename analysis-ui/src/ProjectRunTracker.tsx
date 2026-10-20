@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Space } from 'antd';
+import { Alert, Button } from 'antd';
 import type { useLaunchAuth } from './useLaunchAuth';
 import { refreshRepositoryReports } from './repositoryReports';
 
@@ -41,15 +41,15 @@ type Activity = {
 
 const terminalPhases = new Set(['published', 'reused', 'failed', 'superseded']);
 const phaseCopy: Record<string, string> = {
-  queued: 'Analysis queued — the previous report is still being shown.',
-  scanning: 'Analysis is running against the selected revision.',
-  running: 'Analysis is running against the selected revision.',
-  collecting: 'Collecting scanner results.',
-  publishing: 'Analysis finished; validating and publishing the report.',
-  published: 'New report published for this request.',
-  reused: 'Matching retained channel evidence was reused; no new scan was launched.',
-  failed: 'Analysis failed. The previous published report is unchanged.',
-  superseded: 'This request was superseded by a newer analysis request.',
+  queued: 'Preparing analysis',
+  scanning: 'Analyzing the selected revision',
+  running: 'Analyzing the selected revision',
+  collecting: 'Preparing your results',
+  publishing: 'Preparing your results',
+  published: 'Analysis ready',
+  reused: 'Analysis ready',
+  failed: 'Analysis needs attention',
+  superseded: 'A newer analysis is available',
 };
 
 export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPhase }: {
@@ -117,7 +117,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const terminal = !!phase && terminalPhases.has(phase);
   const publishedTargetId = phase === 'published' || phase === 'reused' ? activity?.target_id : undefined;
   const type = phase === 'published' || phase === 'reused' ? 'success' : phase === 'failed' ? 'error' : phase === 'superseded' ? 'warning' : 'info';
-  const title = phase ? phaseCopy[phase] || `Analysis status: ${phase}` : error ? 'Could not refresh analysis status' : auth.session ? 'Checking analysis status…' : 'Sign in to resume analysis tracking';
+  const title = phase ? phaseCopy[phase] || 'Analysis in progress' : error ? 'Could not refresh analysis status' : auth.session ? 'Checking analysis status…' : 'Sign in to resume analysis tracking';
   const previousReportNote = phase === 'published'
     ? `This request published its report${activity?.analyzed_sha ? ` for commit ${activity.analyzed_sha.slice(0, 12)}` : ''}. Refreshing the selected report inventory now.`
     : request.previousReport
@@ -130,23 +130,14 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
     showIcon
     title={title}
     description={<>
-      <p><strong>{request.source_repository||request.repository}</strong> · {request.kind} <code>{request.ref}</code>{request.target_sha&&<> · pinned <code>{request.target_sha}</code></>} · execution <code>{request.repository}</code> · submitted {new Date(request.submittedAt).toLocaleString()} · request <code>{request.request_id}</code></p>
-      {request.pr_context&&<p>PR head {request.pr_context.head_repository}:{request.pr_context.head_branch} at <code>{request.pr_context.head_sha}</code>; base {request.pr_context.base_repository}:{request.pr_context.base_branch} at <code>{request.pr_context.base_sha}</code>.</p>}
-      {request.requested_channels&&<p>Requested channels: {request.requested_channels.join(', ')}</p>}
-      {(activity?.queue_position||request.queue_position)&&<p>FIFO queue position: <strong>{activity?.queue_position||request.queue_position}</strong>. One source-revision request is active globally.</p>}
-      <p>{activity?.message || activity?.error || previousReportNote}</p>
-      {activity?.source_sha && <p>Resolved source commit: <code>{activity.source_sha}</code></p>}
-      {activity?.producer && <p>Scanner workflow, attempt {activity.producer.attempt}: {activity.producer.status}</p>}
-      {!!activity?.channel_progress?.length&&<div className="channel-progress"><strong>Channel progress</strong>{activity.channel_progress.map(channel=><span key={channel.channel} className={`channel-progress-item channel-${channel.status}`}>{channel.channel}: {channel.status.replaceAll('_',' ')}{channel.evidence_reused?' · retained evidence reused':''}{channel.last_attempt_status?` · latest attempt ${channel.last_attempt_status.toLowerCase()}`:''}{channel.reason?` · ${channel.reason}`:''}</span>)}</div>}
-      {activity?.completeness && <p>Published report completeness: {activity.completeness}</p>}
-      {error && <p>{error}. The request remains recorded; retrying the status check will not launch another scan.</p>}
-      <Space wrap>
-        {request.run_id && <a href={`https://github.com/${request.repository}/actions/runs/${request.run_id}`} target="_blank" rel="noreferrer">Request workflow #{request.run_id}</a>}
-        {activity?.producer?.url && <a href={activity.producer.url} target="_blank" rel="noreferrer">Scanner workflow attempt {activity.producer.attempt}</a>}
-        {publishedTargetId && <Button size="small" type="primary" onClick={() => onOpenReport(publishedTargetId)}>Open published report</Button>}
-        {!terminal && auth.session && <Button size="small" loading={checking} onClick={() => setRetry(value => value + 1)}>Check status now</Button>}
+      <p><strong>{request.source_repository||request.repository}</strong> · {request.kind} <code>{request.ref}</code>{request.target_sha&&<> · <code>{request.target_sha.slice(0,12)}</code></>} · started {new Date(request.submittedAt).toLocaleString()}</p>
+      <p>{activity?.error || previousReportNote}</p>
+      {error && <p>Status refresh is temporarily unavailable. Your analysis was not restarted.</p>}
+      <div className="run-tracker-actions">
+        {publishedTargetId && <Button size="small" type="primary" onClick={() => onOpenReport(publishedTargetId)}>Review issues</Button>}
+        {!terminal && auth.session && <Button size="small" loading={checking} onClick={() => setRetry(value => value + 1)}>Refresh</Button>}
         {terminal && <Button size="small" onClick={onDismiss}>Dismiss</Button>}
-      </Space>
+      </div>
     </>}
   />;
 }

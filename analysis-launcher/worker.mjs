@@ -95,6 +95,12 @@ async function controlRequest(env, key, path, body) {
   const stub = env.AUTH_EXCHANGES.get(env.AUTH_EXCHANGES.idFromName(key));
   return stub.fetch(new Request(`https://control${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
 }
+async function wakeCoordinator(env,requestId,sourceSha){
+  const token=await reportToken(env,env.ANALYSIS_REPOSITORY,{actions:'write'});
+  if(!token)throw new Failure(503,'The analysis service could not start processing yet.','service_installation_unavailable');
+  const response=await fetch(`https://api.github.com/repos/${env.ANALYSIS_REPOSITORY}/actions/workflows/code-analysis-coordinator.yml/dispatches`,{method:'POST',headers:{Accept:'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'code-analysis-launcher',Authorization:`Bearer ${token}`},body:JSON.stringify({ref:'main',inputs:{request_id:requestId,source_sha:sourceSha}})});
+  if(response.status!==204)throw new Failure(503,'The analysis service could not start processing yet.','coordinator_wake_failed');
+}
 async function route(request, env) {
   const url = new URL(request.url);
   
@@ -185,7 +191,12 @@ async function route(request, env) {
     let body={};try{body=await request.json();}catch{}
     const action=['admit','claim','heartbeat','complete','pause','reset','resume'].find(name=>url.pathname.endsWith('/'+name));
     if(!action)throw new Failure(404,'Not found.','not_found');
-    return controlRequest(env,'control-plane','/queue/'+action,body);
+    const response=await controlRequest(env,'control-plane','/queue/'+action,body);
+    if(action!=='complete'||!response.ok)return response;
+    const completed=await response.json();
+    let next_started=false;
+    if(completed.next_request){try{await wakeCoordinator(env,completed.next_request.request_id,completed.next_request.source_sha);next_started=true;}catch{}}
+    return json({...completed,next_started});
   }
   if(url.pathname==='/api/internal/cutover/reset-reports'){
     if(request.headers.get('Authorization')!==`Bearer ${env.WORKER_API_TOKEN}`)throw new Failure(401,'Unauthorized cutover access.','unauthorized');
@@ -289,13 +300,7 @@ async function route(request, env) {
     if(user.id!==session.user_id)throw new Failure(401,'Sign in again; the session identity changed.','session_invalid');
     if (request.method === 'GET' && url.pathname === '/api/session') {const repo=await access(env,session.token,'pull');return json({login:user.login,user_id:user.id,role:repo.permissions?.admin?'admin':repo.permissions?.push?'write':'read',capabilities:{read:true,write:!!repo.permissions?.push,admin:!!repo.permissions?.admin}});}
   }
-  const wakeCoordinator=async(requestId,sourceSha)=>{
-    const token=await reportToken(env,env.ANALYSIS_REPOSITORY,{actions:'write'});
-    if(!token)throw new Failure(503,'The coordinator wake credential is unavailable.','service_installation_unavailable');
-    const response=await fetch(`https://api.github.com/repos/${env.ANALYSIS_REPOSITORY}/actions/workflows/code-analysis-coordinator.yml/dispatches`,{method:'POST',headers:{Accept:'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'code-analysis-launcher',Authorization:`Bearer ${token}`},body:JSON.stringify({ref:'main',inputs:{request_id:requestId,source_sha:sourceSha}})});
-    if(response.status!==204)throw new Failure(503,'The coordinator wake signal failed; scheduled recovery remains active.','coordinator_wake_failed');
-  };
-  const helpers = {github,json,Failure,seal,unseal,pages,serviceToken:()=>reportToken(env,env.ANALYSIS_REPOSITORY,{contents:'read',actions:'read'}),wakeCoordinator,queue:async(path,body)=>controlRequest(env,'control-plane',path,body)};
+  const helpers = {github,json,Failure,seal,unseal,pages,serviceToken:()=>reportToken(env,env.ANALYSIS_REPOSITORY,{contents:'read',actions:'read'}),wakeCoordinator:(requestId,sourceSha)=>wakeCoordinator(env,requestId,sourceSha),queue:async(path,body)=>controlRequest(env,'control-plane',path,body)};
     if (reportPath(url.pathname)) {
       await access(env, session.token, 'pull');
       if (privateReports(env) && url.searchParams.has('project_id')) {

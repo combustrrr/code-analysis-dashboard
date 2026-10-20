@@ -92,7 +92,10 @@ export class AuthExchangeStore {
       const meta=(await s.get('queue:meta'))||{};
       if(row.status!=='running'||meta.active?.request_id!==row.request_id||body.generation!==meta.active?.generation||body.lease_token!==meta.active?.lease_token)return json({error:'stale_lease'},409);
       row.status=body.status;row.completed_at=new Date().toISOString();row.result=body.result||null;
-      await s.put(key,row);await s.delete(`queue:seq:${String(row.sequence).padStart(12,'0')}`);meta.pending=Math.max(0,(meta.pending||1)-1);if(meta.active?.request_id===row.request_id)meta.active=null;await s.put('queue:meta',meta);return json(row);
+      await s.put(key,row);await s.delete(`queue:seq:${String(row.sequence).padStart(12,'0')}`);meta.pending=Math.max(0,(meta.pending||1)-1);if(meta.active?.request_id===row.request_id)meta.active=null;
+      const entries=await s.list({prefix:'queue:seq:'}),nextEntry=[...entries.entries()].sort(([a],[b])=>a.localeCompare(b))[0];
+      const next=nextEntry?await s.get(`queue:id:${nextEntry[1]}`):null;
+      await s.put('queue:meta',meta);return json({...row,next_request:next?{request_id:next.request_id,source_sha:next.intent.source_sha}:null});
     });
     if(path==='/queue/pause')return this.transact(async s=>{const meta=(await s.get('queue:meta'))||emptyMeta();meta.paused=true;meta.reset_notice=String(body.reason||'Analysis is temporarily unavailable for a planned execution-backbone reset.').slice(0,500);await s.put('queue:meta',meta);return json(meta);});
     if(path==='/queue/resume')return this.transact(async s=>{const meta=(await s.get('queue:meta'))||emptyMeta();meta.paused=false;await s.put('queue:meta',meta);return json(meta);});

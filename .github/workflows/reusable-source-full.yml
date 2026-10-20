@@ -1092,7 +1092,7 @@ jobs:
       with:
         name: fuzzing-findings
         path: fuzzing-normalized/
-        if-no-files-found: error
+        if-no-files-found: ignore
         retention-days: 7
     env:
       SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
