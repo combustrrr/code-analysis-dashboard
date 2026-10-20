@@ -16,6 +16,7 @@ test.describe('production shell',()=>{
   await page.goto(PROJECT);
   await expect(page.getByLabel('Selected analysis revision')).toContainText('Agentic-Kibana');
   await expect(page.getByLabel('Selected analysis revision')).toContainText(/Revision/);
+  await expect(page.getByLabel('Target revision')).toHaveCount(0);
   await expect(page.getByRole('link',{name:'Run analysis'})).toHaveCount(1);
   await expect(page.getByRole('tab',{name:/Overview/})).toHaveAttribute('aria-selected','true');
   await expect(page.getByText('Reported issues',{exact:true})).toBeVisible();
