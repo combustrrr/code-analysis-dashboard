@@ -412,3 +412,10 @@ page's light-theme contrast and deployed through Pages run `39410791048`. Produc
 browser verification confirmed the persisted light theme, dark readable hero copy,
 darker teal emphasis, and white proof surfaces. The production build, UI unit tests,
 and Playwright suite passed before deployment.
+
+Commit `8272994e195ede6deff0842030b2799169e378ce` completed an interface
+copywriting pass and deployed through Pages run `39411557310`. The public landing
+page, access guidance, preferred-branch action, and Settings introduction now use
+plain, grammatical, action-oriented language. The production bundle was checked for
+the revised headline and workflow copy after the build, unit tests, and Playwright
+suite passed.
