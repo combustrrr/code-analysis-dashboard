@@ -1,8 +1,25 @@
 # New-chat handoff: Code Analysis Dashboard
 
-## 2026-10-20 local execution-backbone replacement
+## 2026-10-20 production execution-backbone reset
 
-The current worktree contains, but has not deployed, the `analysis-request-v3` queue
+The v3 queue/workflow contract is live. Worker version
+`d14b8468-5bc7-4c9c-b08d-eae0f9881378` is active. Protected cutover runs paused
+admission (`39373080533`), advanced the queue to generation 2 and reset reports
+(`39373121443`), then resumed admission (`39373556150`). Two retained requests were
+marked cancelled and 201 current-report objects under the execution repository's exact
+R2 prefix were deleted. GitHub Actions artifacts were not deleted and remain public
+until their existing retention expires.
+
+Promotion PR #77 pinned tooling
+`07d757c6a3c7d08a90130a5b93434269e02af314`. Commissioning enqueue run
+`39373589327` admitted all three configured preferred branches. First coordinator run
+`39373608117` successfully claimed and fenced sequence 1; at this handoff its scanner
+lanes were still running and sequences 2-3 remained durable. Verify their eventual
+publication before describing all three new reports as commissioned.
+
+## 2026-10-20 execution-backbone replacement implementation
+
+The deployed source contains the `analysis-request-v3` queue
 contract. It adds Durable Object admission pause/reset, generation plus lease-token
 fencing, heartbeat renewal, stale finalizer rejection, and a best-effort GitHub Actions
 wake after the queue commit. The coordinator validates request/SHA wake hints against
@@ -11,12 +28,9 @@ the FIFO claim. Workflow 11 is generated as non-dispatchable `workflow_call`; wo
 dormant privileged `reusable-reconcile.yml` was removed after confirming that the
 checked-in coordinator graph had no caller.
 
-Do not deploy only one side of this schema change. Before production cutover reconcile
-the live workflow/tooling SHA, validate the full graph, announce/pause admission, fence
-or cancel old work, clear the intended current R2 pointers/assets, deploy Worker and
-workflow contracts together, resume, then commission one exact-SHA request for each of
-the three projects. Existing public Actions artifacts are intentionally not deleted and
-remain public until their seven-day retention expires.
+Future schema changes must still deploy both sides together. Existing public Actions
+artifacts were intentionally not deleted and remain public until their seven-day
+retention expires.
 
 ## 2026-10-19 production browser-recording follow-up
 

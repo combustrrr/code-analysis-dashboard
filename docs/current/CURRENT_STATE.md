@@ -1,6 +1,25 @@
 # Current implementation state
 
-## 2026-10-20 execution-backbone replacement (local, not deployed)
+## 2026-10-20 production execution-backbone cutover
+
+The v3 execution backbone is deployed. Worker version
+`d14b8468-5bc7-4c9c-b08d-eae0f9881378` was deployed before the protected reset.
+Cutover runs `39373080533`, `39373121443`, and `39373556150` paused, reset, and
+resumed production admission. Reset generation 2 cancelled two retained requests and
+deleted 201 objects only from
+`repositories/combustrrr/code-analysis-dashboard/`. Public GitHub Actions artifacts
+were intentionally retained under their existing seven-day policy.
+
+Tooling promotion PR #77 merged as `a67b581f507a2e74b69525b8847615af681b8d4a`
+and pins tooling `07d757c6a3c7d08a90130a5b93434269e02af314`, which contains all
+v3 queue/source/publication consumers. Pages run `39372919684` deployed the reset
+notice UI from `a089ef6ff7c082a854bae92f7b411a9d60d49b63`. Commissioning enqueue run
+`39373589327` admitted one immutable preferred-branch request for each configured
+project. Coordinator run `39373608117` claimed FIFO sequence 1 with generation 2 and
+successfully entered independent scanner execution; remaining requests stay durable
+for subsequent coordinator claims.
+
+## 2026-10-20 execution-backbone replacement implementation
 
 The worktree implements the new queue boundary as `analysis-request-v3`. Durable
 admission now supports explicit pause/resume, a destructive cutover reset that marks
@@ -12,11 +31,8 @@ Generated workflow 11 is no longer manually dispatchable, workflow 12 remains
 diagnostic-only, source and vendor producers no longer depend on one another, and the
 unused privileged reconciliation workflow has been removed.
 
-This is deliberately not a production-cutover claim. Admissions have not been paused,
-old production state and R2 current pointers have not been cleared, Worker/workflows
-have not been deployed together, and the three post-reset commissioning requests have
-not run. The old production evidence below remains historical until that separate,
-observable cutover succeeds.
+The production cutover evidence and commissioning status are recorded above. Older
+production evidence below remains historical context rather than current state.
 
 ## 2026-10-19 production scan verification
 
