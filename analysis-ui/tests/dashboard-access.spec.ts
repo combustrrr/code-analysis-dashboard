@@ -5,11 +5,11 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  await context.route('https://launcher.example/api/public/config',route=>route.fulfill({status:503,contentType:'application/json',body:'{}'}));
  await page.goto('/');
- await expect(page.getByRole('heading',{name:'Know what was scanned. Prove what was found.'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Know exactly what was scanned. Prove what the analysis found.'})).toBeVisible();
  await expect(page.locator('.landing-copy > p').first()).toBeVisible();
  await page.getByText('Light',{exact:true}).click();
  await expect(page.locator('.landing-copy > p').first()).toBeVisible();
- await expect(page.getByText('Current project coverage')).toBeVisible();
+ await expect(page.getByText('Coverage across current reports')).toBeVisible();
  await expect(page.getByText(/Restricted to approved GitHub collaborators/)).toBeVisible();
  await expect(page.getByRole('button',{name:'Sign in with GitHub'})).toHaveCount(2);
  await page.getByRole('link',{name:'See how evidence works'}).click();
@@ -177,7 +177,7 @@ test('repository deep links open the authenticated workspace with a shared theme
   throw new Error(`Unexpected request ${url.pathname}`);
  });
  await page.goto('/#/projects');
- await expect(page.getByRole('heading',{name:'Know what was scanned. Prove what was found.'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Know exactly what was scanned. Prove what the analysis found.'})).toBeVisible();
  await expect(page.getByText(/Restricted to approved GitHub collaborators/)).toBeVisible();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
  await page.getByText('Light',{exact:true}).click();

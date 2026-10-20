@@ -42,7 +42,7 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
   if(auth.session&&verified===auth.session.token)return <>{children({...auth,signOut:()=>{setReportSession(undefined);setVerified(undefined);auth.signOut();}})}</>;
   if(publicFallback)return <>{publicFallback(auth,error,required===true&&!!auth.session&&verified!==auth.session.token&&!error,workspaceRequested)}</>;
   return <ConfigProvider theme={{algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm}}><main className={`dashboard-access ${dark?'dashboard-access-dark':'dashboard-access-light'}`}><section>
-   <h1>Code Analysis</h1><p>Sign in with an authorized GitHub account to browse configured analysis targets, current reports and scanner evidence.</p>
+   <h1>Code Analysis</h1><p>Sign in with an authorized GitHub account to review configured projects, current reports, and scanner evidence.</p>
   <Space direction="vertical" size="middle"><Segmented aria-label="Color theme" value={dark?'Dark':'Light'} options={['Dark','Light']} onChange={v=>{setDark(v==='Dark');localStorage.setItem('analysis-theme',v.toLowerCase());}}/>
   {(error||auth.error)&&<Alert type="error" title="Dashboard access" description={error||auth.error}/>}
   <Button type="primary" disabled={required!==true} onClick={auth.signIn}>Sign in with GitHub</Button>

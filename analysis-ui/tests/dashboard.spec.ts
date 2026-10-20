@@ -60,7 +60,7 @@ test.describe('production shell',()=>{
 
  test('run route opens confirmation without starting from navigation',async({page})=>{
   await page.goto(PROJECT);
-  await page.getByRole('link',{name:'Choose revision and scanners'}).click();
+  await page.getByRole('link',{name:'Choose a revision and scanners'}).click();
   await expect(page).toHaveURL(/#\/projects\/1278177697\/run$/);
   await expect(page.getByRole('dialog',{name:'Run analysis'})).toBeVisible();
   await page.keyboard.press('Escape');
