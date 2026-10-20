@@ -306,3 +306,35 @@ passed 24 tests (5 access tests are excluded in the default fixture build); the 
 access-enabled suite passed all 5, including a mocked login-to-published-report path.
 No authenticated production launch or scanner dispatch was performed, so this is not
 live end-to-end scan/publication evidence.
+
+## 2026-10-20 PDF export deployment and production scan batch
+
+Main commit `6872a24b0a27bd70da9a07ac6118b9e6d08fe40a` was deployed to GitHub
+Pages by workflow run `39380331836`. The public site and its fingerprinted JavaScript
+asset returned HTTP 200, and the deployed bundle contains the generated PDF export
+action (`Download filtered PDF`) rather than the retired print/save action. This was a
+frontend-only release, so no Worker deployment was required; the live Worker remained
+in repository mode with login and report-login enforcement enabled and queue admission
+open.
+
+Preferred-branch batch run `39380456086` admitted three immutable requests. Existing
+FIFO requests were allowed to finish first; no queue state was reset or bypassed.
+Production coordinator evidence for the fresh requests is:
+
+- Kavach request `bce75485-ade9-4a97-a7c8-6ddaa15b3cd1`, source
+  `ARYDESTROYER/Kavach-AgenticSOC@db8d9357e4300763be9b558d073fb23b3d7702bd`,
+  coordinator run `39382345704`: report publication and terminal queue completion
+  succeeded; Schemathesis was the only failed scanner channel.
+- Agentic-Kibana request `eb58a322-5fe6-48ad-a277-479c0780374e`, source
+  `combustrrr/Agentic-Kibana@22d4d2c3b3bbac3fe3ddd22e6b78fe6606aa1971`,
+  coordinator run `39384177466`: report publication and terminal queue completion
+  succeeded; Schemathesis was the only failed scanner channel.
+- Dashboard request `0e262070-7a8b-419a-a01c-926db67dcd9e`, source
+  `combustrrr/code-analysis-dashboard@6872a24b0a27bd70da9a07ac6118b9e6d08fe40a`,
+  coordinator run `39385331702`: all applicable portable scanner channels, report
+  publication, and terminal queue completion succeeded.
+
+All three requests retained their exact source revision, request ID, coordinator run,
+attempt, and configured tooling provenance. A red coordinator conclusion for either
+configured-source run reflects the explicit Schemathesis failure; it does not invalidate
+or erase the successfully published sibling scanner evidence.
