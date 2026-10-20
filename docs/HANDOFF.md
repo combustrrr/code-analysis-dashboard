@@ -406,3 +406,9 @@ scanned`, `Current project coverage`, and the revised sign-in recovery copy. It 
 longer contains the old evidence-chain heading, generic GitHub sign-in error, or
 `Analysis reset in progress`. The Worker public config reports generation 3 with
 admission open and `reset_notice: null`; anonymous `/api/projects` access remains 403.
+
+Commit `140e451cc9c0910605189e9110b2421f2226e8c2` corrected the public landing
+page's light-theme contrast and deployed through Pages run `39410791048`. Production
+browser verification confirmed the persisted light theme, dark readable hero copy,
+darker teal emphasis, and white proof surfaces. The production build, UI unit tests,
+and Playwright suite passed before deployment.
