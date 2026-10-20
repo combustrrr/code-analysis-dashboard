@@ -25,7 +25,7 @@ def generate(config=None):
                  # newer request may supersede the dashboard target, but it
                  # must not cancel the earlier run before its evidence/report
                  # artifact is assembled.
-                  'concurrency': {'group': 'source-revision-global', 'cancel-in-progress': False}, 'jobs': {}}
+                  'concurrency': {'group': 'source-analysis-${{ inputs.dispatch_id }}', 'cancel-in-progress': False}, 'jobs': {}}
     jobs = document['jobs']
     jobs['identity'] = {'runs-on': 'ubuntu-latest', 'timeout-minutes': 5,
         'outputs': {'jobs': '${{ steps.identity.outputs.jobs }}', 'languages': '${{ steps.identity.outputs.languages }}'},
@@ -328,7 +328,7 @@ def diagnostics():
     document['on'] = {'workflow_dispatch': trigger['workflow_call']}
     document['name'] = 'Scanner access diagnostics'
     document['run-name'] = 'Scanner diagnostics ${{ inputs.dispatch_id }}'
-    document['concurrency']['group'] = 'source-revision-global'
+    document['concurrency']['group'] = 'scanner-diagnostics-${{ inputs.dispatch_id }}'
     document['jobs'] = {key: value for key, value in document['jobs'].items()
                         if key in {'identity', 'scanner-3-snyk', 'scanner-1-sonarqube-cloud'}}
     return '# Generated scanner diagnostics; never publishes a target report.\n' + yaml.safe_dump(document, sort_keys=False, width=110)

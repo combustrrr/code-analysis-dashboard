@@ -1,5 +1,13 @@
 # Current implementation state
 
+## 2026-10-20 concurrent analysis implementation
+
+The worktree implements `analysis-request-v4`: immediate dispatch, concurrent project and
+revision execution, active project/SHA channel merging, independently fenced channel claims,
+and per-project publication serialization with newest-accepted-wins protection. Queue positions
+and the global FIFO are removed from the public contract. Production remains on the deployment
+recorded below until the paused-admission cutover is completed.
+
 ## 2026-10-20 production execution-backbone cutover
 
 The v3 execution backbone is deployed. Worker version
@@ -56,9 +64,9 @@ OSV nested SARIF directory before invoking the pinned action. Queue assets are n
 ## Local post-rollout hardening (not deployed)
 
 The current worktree closes configured-source follow-up gaps without changing the
-same-tab sign-in boundary: all missing scanner lane groups for one accepted revision
-fan out in one producer workflow, launch/activity responses expose FIFO queue position,
-and Python registry validation now rejects native feedback for every target. Opt-in
+same-tab sign-in boundary: all missing scanner lane groups for accepted project/SHA
+analyses fan out concurrently, public responses use the four-state lifecycle without
+queue position, and Python registry validation rejects native feedback for every target. Opt-in
 vendor jobs consume a one-day source snapshot made by a separate credentialless
 checkout job; credential-bearing jobs cannot check out source or run project-controlled
 setup/test commands. These changes are locally validated only until a later authorized

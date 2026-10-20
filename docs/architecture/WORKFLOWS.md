@@ -3,15 +3,15 @@
 ## Queue coordinator contract (replacement pending deployment)
 
 The dashboard Worker is the only admission surface. It commits an immutable
-`analysis-request-v3` envelope to the Durable Object FIFO and then sends a best-effort
+`analysis-request-v4` envelope to the Durable Object control plane and then sends a best-effort
 coordinator wake containing only the request ID and resolved 40-character source SHA.
-The wake is a consistency hint: the coordinator must claim the FIFO head and may not
-invent work. Scheduled recovery uses the same claim path.
+The wake is a consistency hint: the coordinator must claim the exact project/SHA analysis
+and only its unclaimed channels. Scheduled recovery uses the same claim path.
 
-Claims carry a queue generation and opaque lease token. A trusted heartbeat job renews
+Claims carry a control-plane generation and opaque lease token. A trusted heartbeat job renews
 that exact lease; terminal acknowledgement requires both fence values. A stale or
 cutover-era coordinator therefore cannot complete the request. Vendor and source
-producers start independently after claim, while collection/publication waits for all
+producers start independently after claim, while collection/publication waits for that claim's
 siblings and preserves valid evidence from partial runs.
 
 Every GitHub Actions workflow in `.github/workflows/`, its trigger, permissions, and role in the analysis pipeline.
@@ -93,7 +93,7 @@ These are manual-dispatch scanners. They are not dispatched by `08-full-code-ana
 
 | File | Name | Trigger | Permissions | Purpose |
 |---|---|---|---|---|
-| `code-analysis-coordinator.yml` | Queue coordinator | queue wake, `schedule` (every 15 minutes) | contents:read; secrets only in trusted claim/heartbeat/publisher jobs | Verifies the wake hint against the FIFO claim, invokes approved reusable scanners, publishes validated evidence, and acknowledges with the active fence |
+| `code-analysis-coordinator.yml` | Analysis coordinator | immediate wake, `schedule` (every 15 minutes) | contents:read; secrets only in trusted claim/heartbeat/publisher jobs | Claims exact unclaimed channel work, invokes approved reusable scanners, serializes publication per project, and acknowledges with the active fence |
 | `pages.yml` | Deploy code analysis application | `workflow_dispatch`, `push` to main | contents:read | Builds and deploys the React dashboard to GitHub Pages |
 
 ## Safety contract

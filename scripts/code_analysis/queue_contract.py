@@ -19,7 +19,7 @@ PROJECTS = {
 
 def scanner_target(claim: dict) -> dict:
     intent = claim.get("intent")
-    if not isinstance(intent, dict) or intent.get("schema_version") != "analysis-request-v3":
+    if not isinstance(intent, dict) or intent.get("schema_version") != "analysis-request-v4":
         raise ValueError("invalid queue envelope")
     required = ("request_id", "project_id", "source_repository", "source_repository_id",
                 "source_sha", "tooling_sha", "profile_digest", "profile_mode")
@@ -80,6 +80,7 @@ def main() -> None:
     if output:
         with open(output, "a", encoding="utf-8") as stream:
             stream.write("request_id=" + claim["request_id"] + "\n")
+            stream.write("project_id=" + str(claim["intent"]["project_id"]) + "\n")
             stream.write("tooling_sha=" + claim["intent"]["tooling_sha"] + "\n")
             stream.write("profile_mode=" + claim["intent"]["profile_mode"] + "\n")
             stream.write("generation=" + str(claim["generation"]) + "\n")

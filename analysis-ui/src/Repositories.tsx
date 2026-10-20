@@ -1,69 +1,49 @@
 import {useEffect,useState} from 'react';
-import {Alert,Button,Empty,Select,Space,Tag} from 'antd';
+import {Alert,Button,Empty,Progress,Select,Tag} from 'antd';
+import {ArrowRightOutlined,BranchesOutlined,ClockCircleOutlined,FileProtectOutlined,PlayCircleOutlined,SafetyCertificateOutlined} from '@ant-design/icons';
 import type {useLaunchAuth} from './useLaunchAuth';
 import {routeHash} from './appRoutes';
 
-export type ConfiguredProject={id:string;source_repository:string;source_repository_id:number;relationship:'observer'|'connected';preferred_branch:string;native_feedback_enabled:boolean;readiness_summary?:{configured_channels:number;vendor_channels:number};current_report?:{source_sha?:string;analyzed_sha?:string;generated_at?:string|null;status:string}|null;current_overlay?:{overlay_key:string;status:string;head_sha?:string;checked_at?:string;pr_context:{number:number;title?:string;head_repository:string;head_branch:string;base_repository:string;base_branch:string;base_sha:string};channel:{status:string;reason?:string}}|null;queued_requests?:number};
-type Registry={execution_repository:{id:number;full_name:string};can_launch:boolean;can_configure:boolean;projects:ConfiguredProject[]};
+type Lifecycle='Preparing'|'Analyzing'|'Ready'|'Needs attention';
+type Limitation={channel:string;status:string;reason:string};
+export type ConfiguredProject={id:string;source_repository:string;source_repository_id:number;relationship:'observer'|'connected';preferred_branch:string;native_feedback_enabled:boolean;lifecycle?:Lifecycle;attention_reason?:string|null;active_analysis?:{request_id:string;status:string;target_sha?:string|null;created_at:string}|null;readiness_summary?:{configured_channels:number;vendor_channels:number};current_report?:{source_sha?:string;analyzed_sha?:string;generated_at?:string|null;status:string;scanner_summary?:{completed:number;total:number;incomplete:number};limitations?:Limitation[]}|null;current_overlay?:{overlay_key:string;status:string;head_sha?:string;checked_at?:string;pr_context:{number:number;title?:string;head_repository:string;head_branch:string;base_repository:string;base_branch:string;base_sha:string};channel:{status:string;reason?:string}}|null};
+type Registry={checked_at?:string;summary?:{projects:number;preparing:number;analyzing:number;needs_attention:number};execution_repository:{id:number;full_name:string};can_launch:boolean;can_configure:boolean;projects:ConfiguredProject[]};
 type Auth=ReturnType<typeof useLaunchAuth>;
 
-let registryToken='';
-let registryValue:Registry|undefined;
-let registryRequest:Promise<Registry>|undefined;
-
-function shortSha(value:unknown){return typeof value==='string'&&value?value.slice(0,12):'Unavailable';}
+let registryToken='',registryValue:Registry|undefined,registryRequest:Promise<Registry>|undefined;
+const shortSha=(value?:string|null)=>value?value.slice(0,12):'Not available';
+const date=(value?:string|null)=>value?new Date(value).toLocaleString():'Not published';
+const lifecycle=(project:ConfiguredProject):Lifecycle=>project.lifecycle||(project.active_analysis?.status==='analyzing'?'Analyzing':project.active_analysis?'Preparing':project.current_report?'Ready':'Needs attention');
+const stateColor=(state:Lifecycle)=>state==='Ready'?'green':state==='Needs attention'?'orange':'blue';
 
 function useRegistry(auth:Auth){
- const token=auth.session?.token||'';
- const [registry,setRegistry]=useState<Registry|undefined>(()=>token===registryToken?registryValue:undefined);
- const [loading,setLoading]=useState(false);
- const [error,setError]=useState('');
- useEffect(()=>{
-  let active=true;
-  setError('');
-  if(!auth.session){setLoading(false);return;}
-  if(token!==registryToken){registryToken=token;registryValue=undefined;registryRequest=undefined;setRegistry(undefined);}
-  if(registryValue){setRegistry(registryValue);setLoading(false);return;}
-  setLoading(true);
-  registryRequest ||= auth.api<Registry>('projects');
-  registryRequest.then(value=>{
-   registryValue=value;
-   if(active){setRegistry(value);setError('');}
-  }).catch(reason=>{
-   registryRequest=undefined;
-   if(active)setError(reason instanceof Error?reason.message:'Configured projects are unavailable.');
-  }).finally(()=>{if(active)setLoading(false);});
-  return()=>{active=false;};
- },[token]);
- return {registry,loading,error};
+ const token=auth.session?.token||'';const [registry,setRegistry]=useState<Registry|undefined>(()=>token===registryToken?registryValue:undefined);const [loading,setLoading]=useState(false);const [error,setError]=useState('');
+ useEffect(()=>{let active=true;setError('');if(!auth.session){setLoading(false);return;}if(token!==registryToken){registryToken=token;registryValue=undefined;registryRequest=undefined;setRegistry(undefined);}if(registryValue){setRegistry(registryValue);setLoading(false);return;}setLoading(true);registryRequest||=auth.api<Registry>('projects');registryRequest.then(value=>{registryValue=value;if(active){setRegistry(value);setError('');}}).catch(reason=>{registryRequest=undefined;if(active)setError(reason instanceof Error?reason.message:'Configured projects are unavailable.');}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[token]);
+ return{registry,loading,error};
 }
 
-function openProject(registry:Registry,project:ConfiguredProject){
- location.hash=routeHash({kind:'project',projectId:project.id,view:'overview'});
-}
+const openProject=(project:ConfiguredProject)=>{location.hash=routeHash({kind:'project',projectId:project.id,view:'overview'});};
 
 export function Repositories({auth}:{auth:Auth}){
- const {registry,loading,error}=useRegistry(auth);
- return <section className="connections-panel target-catalog" aria-label="Configured analysis targets">
-  <div className="target-catalog-heading"><span>TRUSTED PROJECT REGISTRY</span><h2>Choose a codebase</h2><p>These projects are configured on the analysis service. Opening a project only reads its current report; it does not start a scan.</p></div>
-  {error&&<Alert type="error" showIcon title="Project registry unavailable" description={error}/>}
-  {!error&&loading&&<p role="status">Loading configured projects…</p>}
-  {!error&&!loading&&registry?.projects.length===0&&<Empty description="No configured projects are available."/>}
-  {registry&&<div className="target-cards">{registry.projects.map((project,index)=><article className="target-card" key={project.id}>
-   <div className="target-card-index" aria-hidden="true">{String(index+1).padStart(2,'0')}</div>
-     <div className="target-card-content"><div className="target-card-kicker">{project.relationship==='connected'?'CONNECTED · SELF-ANALYSIS':'OBSERVER · READ-ONLY SOURCE'}</div><h3>{project.source_repository}</h3><Space wrap><Tag>{project.relationship}</Tag><span>Preferred branch <code>{project.preferred_branch}</code></span>{project.queued_requests? <Tag color="blue">Analysis in progress</Tag>:null}</Space><p className="target-report-summary">{project.current_report?<>Last completed source report: <Tag>{project.current_report.status}</Tag> analyzed <code>{shortSha(project.current_report.analyzed_sha)}</code> {project.current_report.source_sha&&project.current_report.analyzed_sha&&project.current_report.source_sha!==project.current_report.analyzed_sha&&<>· selected head <code>{shortSha(project.current_report.source_sha)}</code></>} · {project.current_report.generated_at?new Date(project.current_report.generated_at).toLocaleString():'time unavailable'}</>:'No completed source report is retained yet.'}</p>{project.current_overlay&&<p className="target-report-summary"><Tag color="purple">Separate PR overlay · #{project.current_overlay.pr_context.number}</Tag> <code>{project.current_overlay.pr_context.head_repository}@{shortSha(project.current_overlay.head_sha)}</code> → <code>{project.current_overlay.pr_context.base_repository}:{project.current_overlay.pr_context.base_branch}</code> · {project.current_overlay.channel.status.replaceAll('_',' ')}</p>}</div>
-   <Button type="primary" onClick={()=>openProject(registry,project)}>Open report</Button>
-  </article>)}</div>}
-  {registry&&<p className="target-catalog-footer">Execution and reports: <code>{registry.execution_repository.full_name}</code>. {registry.can_launch?'Your collaborator access can submit an analysis request explicitly.':'Your account is not an authorized collaborator, so launch is unavailable.'} {registry.can_configure?'Your account can manage the trusted project registry.':'Admin permission is required to change the project registry.'}</p>}
+ const {registry,loading,error}=useRegistry(auth),summary=registry?.summary||{projects:registry?.projects.length||0,preparing:registry?.projects.filter(value=>lifecycle(value)==='Preparing').length||0,analyzing:registry?.projects.filter(value=>lifecycle(value)==='Analyzing').length||0,needs_attention:registry?.projects.filter(value=>lifecycle(value)==='Needs attention').length||0};
+ return <section className="portfolio" aria-label="Configured analysis projects">
+  <header className="portfolio-heading"><div><span className="section-label">Evidence workspace</span><h1>Projects</h1><p>Review the latest published evidence for each configured codebase. Analysis starts only when you ask for it.</p></div><div className="portfolio-updated"><ClockCircleOutlined/><span>Workspace checked<strong>{registry?date(registry.checked_at):'Checking…'}</strong></span></div></header>
+  {error&&<Alert type="error" showIcon title="Project evidence is unavailable" description={`${error} Refresh the page to try again.`}/>} {!error&&loading&&<div className="portfolio-loading" role="status">Loading project evidence…</div>}
+  {registry&&<><section className="portfolio-summary" aria-label="Workspace summary"><div><span>Configured projects</span><strong>{summary.projects}</strong></div><div><span>Preparing</span><strong>{summary.preparing}</strong></div><div><span>Analyzing</span><strong>{summary.analyzing}</strong></div><div className={summary.needs_attention?'summary-attention':''}><span>Needs attention</span><strong>{summary.needs_attention}</strong></div></section>
+   {registry.projects.length===0?<Empty description="No configured projects are available."/>:<div className="project-register">{registry.projects.map(project=>{
+    const report=project.current_report,coverage=report?.scanner_summary,total=coverage?.total||project.readiness_summary?.configured_channels||0,completed=coverage?.completed||0,percent=total?Math.round(completed/total*100):0,state=lifecycle(project),active=state==='Preparing'||state==='Analyzing';
+    return <article className={`project-record state-${state.toLowerCase().replace(' ','-')}`} key={project.id}>
+     <div className="project-record-main"><div className="project-record-title"><span className="project-kind">{project.relationship==='connected'?'Connected self-analysis':'Read-only source'}</span><h2>{project.source_repository}</h2><div className="project-meta"><span><BranchesOutlined/> {project.preferred_branch}</span><span><SafetyCertificateOutlined/> {project.relationship}</span></div></div><Tag color={stateColor(state)} className="project-state">{state}</Tag></div>
+     <div className="evidence-rail" aria-label={`Evidence provenance for ${project.source_repository}`}><div><span>Source</span><strong>{project.source_repository}</strong></div><i/><div><span>Revision</span><code>{shortSha(report?.analyzed_sha||project.active_analysis?.target_sha)}</code></div><i/><div><span>Coverage</span><strong>{total?`${completed} of ${total}`:'Not available'}</strong></div><i/><div><span>Published</span><strong>{date(report?.generated_at)}</strong></div></div>
+     <div className="project-record-detail"><div className="coverage-line"><div><span>Scanner evidence</span><small>{coverage?.incomplete?`${coverage.incomplete} incomplete channel${coverage.incomplete===1?'':'s'}`:report?'No incomplete channels reported':'Awaiting first report'}</small></div><Progress percent={percent} showInfo={false} strokeColor="#31A89A" trailColor="var(--workspace-line)"/></div><div className="project-guidance">{project.attention_reason||(active?`${state} the selected immutable revision.`:'Current evidence is ready for review.')}{report?.limitations?.[0]&&<small>{report.limitations[0].channel}: {report.limitations[0].reason}</small>}</div></div>
+     <footer className="project-record-actions"><Button type="primary" icon={<FileProtectOutlined/>} onClick={()=>openProject(project)}>Review evidence</Button>{registry.can_launch&&(active?<Button icon={<ArrowRightOutlined/>} onClick={()=>openProject(project)}>View progress</Button>:<Button icon={<PlayCircleOutlined/>} href={routeHash({kind:'project-run',projectId:project.id})}>Run analysis</Button>)}</footer>
+    </article>;
+   })}</div>}
+   <footer className="portfolio-footnote"><span>Execution and publication host</span><code>{registry.execution_repository.full_name}</code>{registry.can_configure&&<a href={routeHash({kind:'settings',section:'projects'})}>Manage registry settings</a>}</footer></>}
  </section>;
 }
 
 export function ProjectPicker({auth,project}:{auth:Auth;project:string}){
- const {registry,loading,error}=useRegistry(auth);
- if(!registry)return <span role="status">{loading?'Loading configured projects…':error||'Configured project list unavailable.'}</span>;
- const selected=registry.projects.find(value=>value.id===project);
- return <Select aria-label="Configured project" showSearch optionFilterProp="label" value={selected?.id} placeholder="Choose a configured project" options={registry.projects.map(value=>({value:value.id,label:value.source_repository}))} onChange={id=>{
-  const target=registry.projects.find(value=>value.id===id);
-  if(target)openProject(registry,target);
- }}/>
+ const {registry,loading,error}=useRegistry(auth);if(!registry)return <span role="status">{loading?'Loading configured projects…':error||'Configured project list unavailable.'}</span>;const selected=registry.projects.find(value=>value.id===project);
+ return <Select aria-label="Configured project" showSearch optionFilterProp="label" value={selected?.id} placeholder="Choose a configured project" options={registry.projects.map(value=>({value:value.id,label:value.source_repository}))} onChange={id=>{const target=registry.projects.find(value=>value.id===id);if(target)openProject(target);}}/>;
 }

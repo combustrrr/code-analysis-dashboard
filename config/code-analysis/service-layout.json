@@ -46,7 +46,6 @@
       "analysis-ui/src/ThreatReport.tsx",
       "analysis-ui/src/repositoryReports.ts",
       "analysis-ui/src/style.css",
-      "analysis-ui/src/ActivityView.tsx",
       "analysis-ui/src/ProjectLauncher.tsx",
       "analysis-ui/src/ProjectRunTracker.tsx",
       "analysis-ui/src/useLaunchAuth.ts"

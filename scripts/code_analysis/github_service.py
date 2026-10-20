@@ -304,8 +304,6 @@ def scan(config: dict, refresh_target: str | None = None) -> None:
             row.update(scan_run_id=reusable['scan_run_id'], run_attempt=reusable['run_attempt'],
                        tooling_sha=reusable['tooling_sha'], status='collected')
             continue
-        if running >= config['max_parallel_analyses']:
-            continue
         request_id = uuid.uuid4().hex
         row.update(request_id=request_id, status='dispatching', tooling_sha=tooling)
         row.pop('manual_refresh', None)

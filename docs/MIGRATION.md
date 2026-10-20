@@ -16,13 +16,14 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
 - Preferred-branch analysis launches require one explicit Fast Path action. The Worker
   applies the operator-configured default scanner policy and resolves the immutable
   revision before admission. Non-default revisions or channels use the separate
-  revision -> scanners -> exact-SHA review custom wizard. The `analysis-request-v3` envelope pins the
+  revision -> scanners -> exact-SHA review custom wizard. The `analysis-request-v4` envelope pins the
   configured project, selected SHA, tooling/profile digests, requested channels, actor,
-  and idempotency key; 202 is accepted/queued, not complete.
-- Accepted requests drain FIFO from a bounded queue with one active source revision
-  globally. Each claim has a generation and opaque lease token, heartbeat renewal, and
-  stale-finalizer rejection. A best-effort wake follows durable admission; scheduled
-  recovery still claims accepted work only and never creates a request from discovery.
+  and idempotency key; 202 is accepted/preparing, not complete.
+- Accepted project/SHA analyses are dispatched immediately and may run concurrently.
+  Active duplicates atomically merge missing channels. Each channel claim has a generation
+  and opaque lease token, heartbeat renewal, and stale-finalizer rejection. Publication is
+  serialized per project and an older analysis cannot replace a newer accepted revision.
+  A best-effort wake follows durable admission; scheduled recovery claims accepted work only.
 - Each configured repository keeps one current source-only report and at most one
   separately keyed current PR overlay (project, PR, head repository/SHA, base SHA,
   tooling, profile). Same-SHA runs replace only successfully validated selected
@@ -43,8 +44,8 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
 - The `temp-runs/` prefix has a one-day lifecycle rule; the Worker enforces 100 MB asset
   and 900 MB compressed-manifest limits.
 - Cloudflare KV stores report service state. The SQLite-backed Durable Object stores
-  OAuth exchanges, encrypted grants/session metadata, and the bounded FIFO request
-  queue. GitHub Releases are no longer used for request admission or execution.
+  OAuth exchanges, encrypted grants/session metadata, concurrent analysis records,
+  channel leases, and duplicate-suppression state. GitHub Releases are not used for admission.
 
 ## Change Rules
 
@@ -63,10 +64,10 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
 
 ## Frontend route cutover
 
-The authenticated information architecture uses `#/projects`, `#/activity`,
-`#/projects/:projectId`, the project `issues`, `report`, and `run` routes, and the global
+The authenticated information architecture uses `#/projects`, `#/projects/:projectId`,
+the project `issues`, `report`, and `run` routes, and the global
 `#/settings?section=<section>&project=<optional-id>` workspace. Legacy query hashes,
-`#/dashboard`, project-scoped settings, and the old custom-run route are removed rather
+`#/activity`, `#/dashboard`, project-scoped settings, and the old custom-run route are removed rather
 than normalized. Opening projects, changing navigation, filtering, refreshing, and
 downloading evidence never enqueue analysis. Only the explicit **Run analysis** action
 can create a request.

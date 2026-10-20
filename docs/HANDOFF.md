@@ -1,5 +1,27 @@
 # New-chat handoff: Code Analysis Dashboard
 
+## 2026-10-20 Projects and evidence workspace redesign
+
+The worktree makes Projects the only signed-in home and removes the Activity route,
+component, navigation entry, and `/api/dashboard` endpoint. `GET /api/projects` now
+returns the workspace refresh time, four-state lifecycle aggregates, active-analysis
+identity, current-report freshness/SHA, channel totals, limitations, and sanitized
+attention guidance. The landing, shell, Projects register, and project revision context
+use the locally bundled Instrument Sans and IBM Plex Mono fonts with the calm dark/light
+evidence palette. Project CTAs are Review evidence, Run analysis, or View progress.
+This is repository state only; no production deployment was performed.
+
+## 2026-10-20 concurrent analysis implementation
+
+The worktree replaces the global FIFO with `analysis-request-v4` project/SHA records.
+Accepted analyses wake immediately, unrelated projects and revisions can run in parallel,
+active duplicates merge missing channels, and Run again is rejected while matching work is
+active. Channel claims retain generation/token fencing and heartbeat recovery. Publication
+is serialized per project and rechecks newest-accepted status before writing. The public
+lifecycle is Preparing, Analyzing, Ready, or Needs attention. This is repository state only;
+production cutover still requires paused admission, v3 reset verification, deployment, and
+live concurrent checks.
+
 ## 2026-10-20 production execution-backbone reset
 
 The v3 queue/workflow contract is live. Worker version

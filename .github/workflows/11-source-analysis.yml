@@ -19,7 +19,7 @@ run-name: Source analysis ${{ inputs.dispatch_id }}
 permissions:
   contents: read
 concurrency:
-  group: source-revision-global
+  group: source-analysis-${{ inputs.dispatch_id }}
   cancel-in-progress: false
 jobs:
   identity:

@@ -20,7 +20,7 @@ def validate_durable_request(row: dict) -> dict:
     intent = row.get('queue_intent')
     if not isinstance(intent, dict):
         raise ValueError('Explicit Durable Object request is unavailable')
-    if (intent.get('schema_version') != 'analysis-request-v3' or intent.get('request_id') != request_id
+    if (intent.get('schema_version') != 'analysis-request-v4' or intent.get('request_id') != request_id
             or intent.get('execution_repository_id') != api(f'repos/{host}')['id']
             or intent.get('source_sha') != row.get('head_sha') or intent.get('target_sha') != intent.get('source_sha')
             or intent.get('tooling_sha') != os.environ['TOOLING_SHA']

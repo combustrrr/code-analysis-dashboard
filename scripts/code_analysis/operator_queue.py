@@ -42,7 +42,7 @@ def preferred_intents(document: dict, execution_sha: str) -> list[dict]:
         channels = sorted(channel for channel in project["enabled_scanners"] if channel not in VENDOR_CHANNELS and channel not in project.get("deferred_channels", {}))
         profile_digest = stable_digest(project["profile"])
         intent = {
-            "schema_version": "analysis-request-v3", "request_id": request_id,
+            "schema_version": "analysis-request-v4", "request_id": request_id,
             "execution_repository_id": document["execution_repository"]["id"], "project_id": str(project["id"]),
             "source_repository": source["full_name"], "source_repository_id": source["id"],
             "selection": {"kind": "branch", "ref": branch},

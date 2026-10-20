@@ -195,7 +195,7 @@ async function route(request, env) {
     if(action!=='complete'||!response.ok)return response;
     const completed=await response.json();
     let next_started=false;
-    if(completed.next_request){try{await wakeCoordinator(env,completed.next_request.request_id,completed.next_request.source_sha);next_started=true;}catch{}}
+    if(completed.needs_wake){try{await wakeCoordinator(env,completed.request_id,completed.intent.source_sha);next_started=true;}catch{}}
     return json({...completed,next_started});
   }
   if(url.pathname==='/api/internal/cutover/reset-reports'){

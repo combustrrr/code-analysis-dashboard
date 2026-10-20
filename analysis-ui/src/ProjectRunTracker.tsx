@@ -16,7 +16,6 @@ export type ProjectRunRequest = {
   channel_progress?: {channel:string;status:string;reason?:string;evidence_reused?:boolean;last_attempt_status?:string}[];
   request_id: string;
   run_id: number | null;
-  queue_position?: number | null;
   submittedAt: string;
   previousReport?: string;
   previousTargetLabel?: string;
@@ -33,7 +32,6 @@ type Activity = {
   completeness?: string;
   error?: string;
   message?: string;
-  queue_position?: number | null;
   channel_progress?: {channel:string;status:string;reason?:string;evidence_reused?:boolean;last_attempt_status?:string}[];
   producer?: { url: string; attempt: number; status: string };
   checked_at?: string;
@@ -41,15 +39,17 @@ type Activity = {
 
 const terminalPhases = new Set(['published', 'reused', 'failed', 'superseded']);
 const phaseCopy: Record<string, string> = {
-  queued: 'Preparing analysis',
-  scanning: 'Analyzing the selected revision',
-  running: 'Analyzing the selected revision',
-  collecting: 'Preparing your results',
-  publishing: 'Preparing your results',
-  published: 'Analysis ready',
-  reused: 'Analysis ready',
-  failed: 'Analysis needs attention',
-  superseded: 'A newer analysis is available',
+  preparing: 'Preparing',
+  scanning: 'Analyzing',
+  running: 'Analyzing',
+  analyzing: 'Analyzing',
+  collecting: 'Preparing',
+  publishing: 'Preparing',
+  published: 'Ready',
+  reused: 'Ready',
+  failed: 'Needs attention',
+  superseded: 'Ready',
+  cancelled_cutover: 'Needs attention',
 };
 
 export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPhase }: {

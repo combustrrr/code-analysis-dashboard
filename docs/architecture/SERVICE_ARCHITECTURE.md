@@ -47,7 +47,8 @@ that policy instead of carrying a second copy. The refactor also removes the obs
 inline/dead implementation. This is a code-organization change, not evidence that
 external repository onboarding is fully verified.
 
-Only explicit manual requests enter the bounded global FIFO. Branch and pull-request
+Only explicit manual requests create analysis records. Different projects and revisions
+run concurrently; active requests for the same project/SHA merge missing channels. Branch and pull-request
 inventory is read-only; events and schedules cannot invent scan work. Reconciliation
 recovers accepted durable requests and processes one source revision globally. All
 selected missing lane groups fan out within that request against the same pinned SHA.

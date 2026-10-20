@@ -6,9 +6,9 @@ test.describe('production shell',()=>{
  test('serves the configured favicon and modern routes only',async({page})=>{
   const favicon=await page.request.get('/favicon.svg');expect(favicon.ok()).toBe(true);
   await page.goto('/#/projects');
-  await expect(page.getByRole('heading',{name:'Choose a codebase',level:1})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Projects',level:1})).toBeVisible();
   await page.goto('/#/not-a-route');
-  await expect(page.getByRole('heading',{name:'Choose a codebase',level:1})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Projects',level:1})).toBeVisible();
   await expect(page).toHaveURL(/#\/not-a-route$/);
  });
 
@@ -48,9 +48,10 @@ test.describe('production shell',()=>{
   await expect(page.getByText('Coverage is not a clean bill of health')).toBeVisible();
  });
 
- test('activity and global settings are reachable from the common shell',async({page})=>{
+ test('legacy activity URLs fall through to Projects and settings remains reachable',async({page})=>{
   await page.goto('/#/activity');
-  await expect(page.getByRole('heading',{name:'Analysis progress'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Projects',level:1})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Activity'})).toHaveCount(0);
   await page.getByRole('link',{name:'Settings'}).click();
   await expect(page).toHaveURL(/#\/settings\?section=general/);
   await expect(page.getByRole('heading',{name:'Appearance'})).toBeVisible();
@@ -68,14 +69,20 @@ test.describe('production shell',()=>{
 
  test('theme persists and mobile navigation remains bounded',async({page},testInfo)=>{
   await page.goto(PROJECT);
+  await page.screenshot({path:testInfo.outputPath('desktop-dark.png'),fullPage:true});
   await page.locator('.shell-actions').getByText('Light',{exact:true}).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+  await page.screenshot({path:testInfo.outputPath('desktop-light.png'),fullPage:true});
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   await page.setViewportSize({width:390,height:844});
   await page.getByLabel('Open navigation').click();
-  await expect(page.locator('.ant-drawer').getByRole('link',{name:'Activity'})).toBeVisible();
+  await expect(page.locator('.ant-drawer').getByRole('link',{name:'Projects'})).toBeVisible();
+  await expect(page.locator('.ant-drawer').getByRole('link',{name:'Activity'})).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-  await page.screenshot({path:testInfo.outputPath('mobile-shell.png'),fullPage:true});
+  await page.screenshot({path:testInfo.outputPath('mobile-light.png'),fullPage:true});
+  await page.locator('.ant-drawer').getByText('Dark',{exact:true}).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  await page.screenshot({path:testInfo.outputPath('mobile-dark.png'),fullPage:true});
  });
 });

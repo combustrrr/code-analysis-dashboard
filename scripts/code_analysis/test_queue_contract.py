@@ -7,7 +7,7 @@ class QueueContractTests(unittest.TestCase):
     def intent(self):
         request_id = "11111111-1111-4111-8111-111111111111"
         return {"request_id": request_id, "generation": 4, "lease_token": "lease-token", "intent": {
-            "schema_version": "analysis-request-v3", "request_id": request_id,
+            "schema_version": "analysis-request-v4", "request_id": request_id,
             "idempotency_key": request_id, "actor_id": 73,
             "execution_repository_id": 1360051890,
             "project_id": "1278177697", "source_repository": "combustrrr/Agentic-Kibana",

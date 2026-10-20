@@ -15,9 +15,6 @@ on:
     - cron: '*/15 * * * *'
 permissions:
   contents: read
-concurrency:
-  group: source-revision-global
-  cancel-in-progress: false
 jobs:
   claim:
     runs-on: ubuntu-latest
@@ -26,6 +23,7 @@ jobs:
     outputs:
       claimed: ${{ steps.claim.outputs.claimed }}
       request_id: ${{ steps.contract.outputs.request_id }}
+      project_id: ${{ steps.contract.outputs.project_id }}
       tooling_sha: ${{ steps.contract.outputs.tooling_sha }}
       profile_mode: ${{ steps.contract.outputs.profile_mode }}
       target: ${{ steps.contract.outputs.target }}
@@ -35,7 +33,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
-      - name: Claim the FIFO head
+      - name: Claim exact unclaimed analysis channels
         id: claim
         env:
           WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
@@ -135,6 +133,9 @@ jobs:
     if: always() && needs.claim.outputs.claimed == 'true'
     needs: [claim, vendor, portable, configured]
     runs-on: ubuntu-latest
+    concurrency:
+      group: analysis-publication-${{ needs.claim.outputs.project_id }}
+      cancel-in-progress: false
     timeout-minutes: 30
     environment: production
     permissions:
@@ -158,7 +159,7 @@ jobs:
         run: |
           curl --fail --silent --show-error --request POST \
             --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
-            --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"workflow_run_id\":${GITHUB_RUN_ID},\"workflow_run_attempt\":${GITHUB_RUN_ATTEMPT}}" \
+            --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"workflow_run_id\":${GITHUB_RUN_ID},\"workflow_run_attempt\":${GITHUB_RUN_ATTEMPT},\"publication\":true}" \
             "${WORKER_URL}/api/internal/queue/heartbeat"
       - name: Publish only validated artifacts from this coordinator attempt
         env:

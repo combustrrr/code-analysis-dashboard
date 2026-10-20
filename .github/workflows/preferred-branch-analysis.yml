@@ -29,7 +29,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PROJECT_ID: ${{ inputs.project_id }}
         run: echo "path=$(python -m scripts.code_analysis.operator_queue)" >> "$GITHUB_OUTPUT"
-      - name: Admit trusted requests to the production FIFO
+      - name: Admit trusted concurrent analyses
         env:
           WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
           WORKER_URL: ${{ vars.WORKER_URL }}

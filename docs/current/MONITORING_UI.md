@@ -3,14 +3,20 @@
 Open the [dashboard](https://combustrrr.github.io/code-analysis-dashboard/) and sign
 in with GitHub. Accepted collaborators of the service repository may view it;
 scan and configuration permissions are checked separately. Both themes are supported.
-The landing page and signed-in shell share the same brand tokens: Midnight and Slate
-surfaces, Trust Blue navigation, Evidence Cyan data emphasis, Mphasis Magenta primary
-actions, and Signal Amber coverage warnings. Light mode uses the corresponding neutral
-paper surfaces without changing status meaning.
+The landing page and signed-in shell use a calm evidence palette: Ink and Slate surfaces,
+Trust Blue navigation and actions, Evidence Teal completion, and Attention Amber for
+incomplete coverage. Light mode uses Paper surfaces without changing status meaning.
+Instrument Sans is bundled for interface copy; IBM Plex Mono is reserved for immutable
+identifiers.
 
-1. Select one of the three configured source projects. The project overview distinguishes
+1. Projects is the only signed-in home. Its compact summary shows active analyses,
+   projects needing attention, and the last refresh; each of the three cards shows
+   repository relationship, preferred branch, one of the four public lifecycle states,
+   current SHA, evidence age, channel coverage, limitations, and Review evidence plus
+   Run analysis or View progress actions. There is no Activity route or API.
+2. Select one of the three configured source projects. The project overview distinguishes
    the current source-only report from an optional separately retained PR overlay and
-   shows compact readiness, queued work, source/analyzed SHA, and timestamps. Opening a
+   shows compact readiness, active work, source/analyzed SHA, and timestamps. Opening a
    project or browsing revisions is read-only.
 2. Authorized collaborators choose a revision kind (branch, open PR including drafts,
    or full 40-character commit SHA), select the exact ref, and choose scanner channels.
@@ -21,17 +27,18 @@ paper surfaces without changing status meaning.
 3. **Review exact revision** resolves the branch/PR/SHA server-side and displays the full
    immutable SHA, fork head and base provenance where applicable, selected channels,
    readiness, matching cached evidence, and the GitHub Actions/vendor usage caveat. No
-   work is queued until **Confirm and queue analysis**. A moved branch or PR invalidates
+   work starts until **Confirm and start analysis**. A moved branch or PR invalidates
    the preview; refresh it rather than silently retargeting. **Run again** explicitly
    forces selected channels instead of reusing matching evidence.
-4. Follow request, producer, and per-channel progress. The bounded queue is FIFO with one
-   active source revision globally. A 202 means accepted/queued, never completed; selected
-   lanes for the active SHA may execute concurrently. `NOT_SELECTED`, `NOT_APPLICABLE`,
+4. Follow request, producer, and per-channel progress through **Preparing**, **Analyzing**,
+   **Ready**, or **Needs attention**. A 202 means accepted/preparing, never completed.
+   Different projects, revisions, and selected scanner lanes may execute concurrently;
+   active project/SHA duplicates merge missing channels. `NOT_SELECTED`, `NOT_APPLICABLE`,
    `DEFERRED`, failures, and validated completion are separate states. Same-SHA results
    replace only successfully validated selected-channel evidence; failed attempts do not
    erase the previous valid evidence.
 5. The source-only report remains one current report per configured repository. A new SHA
-   replaces it only after the first valid channel result; queued/running work and failures
+   replaces it only after the first valid channel result; preparing/analyzing work and failures
    preserve the prior report and its SHA. PR review evidence is stored in a separate
    current overlay keyed by project, PR, head repository/SHA, base SHA, tooling, and
    profile; it is never merged into source-only findings. Readers can inspect reports;

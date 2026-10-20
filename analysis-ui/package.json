@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@ant-design/icons": "6.3.4",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/instrument-sans": "^5.2.8",
     "antd": "6.6.3",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.2",

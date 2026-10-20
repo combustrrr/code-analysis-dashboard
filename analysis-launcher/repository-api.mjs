@@ -75,11 +75,10 @@ export async function repositoryApi(request, env, session, helpers) {
   if (requestedRepository && requestedRepository.toLowerCase() !== EXECUTION_REPOSITORY.toLowerCase()) throw new Failure(400, 'Routes are bound to the configured execution repository.', 'repository_not_configurable');
   async function admit(intent){
     const admitted=await queue('/queue/admit',{request:intent}),body=await admitted.json();
-    if(admitted.status===429)throw new Failure(429,'The global analysis queue has 100 pending requests.','queue_full');
-    if(admitted.status===409)throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
-    if(!admitted.ok)throw new Failure(503,body.error==='admission_paused'?(body.reset_notice||'Analysis admission is paused for maintenance.'):'The analysis queue is temporarily unavailable; no request was accepted.',body.error==='admission_paused'?'admission_paused':'queue_unavailable');
+    if(admitted.status===409)throw new Failure(409,body.error==='analysis_active'?'Wait for the active analysis of this project and revision to finish before running it again.':body.error==='active_context_conflict'?'This revision is already being analyzed with a different immutable tooling profile.':'This idempotency key already identifies a different analysis request.',body.error||'idempotency_conflict');
+    if(!admitted.ok)throw new Failure(503,body.error==='admission_paused'?(body.reset_notice||'Analysis admission is paused for maintenance.'):'The analysis control plane is temporarily unavailable; no request was accepted.',body.error==='admission_paused'?'admission_paused':'analysis_unavailable');
     let wake_status='scheduled_recovery';
-    try{if(wakeCoordinator){await wakeCoordinator(intent.request_id,intent.source_sha);wake_status='signalled';}}catch{}
+    try{if(wakeCoordinator){await wakeCoordinator(body.request_id||intent.request_id,intent.source_sha);wake_status='signalled';}}catch{}
     return{...body,wake_status};
   }
 
@@ -167,44 +166,32 @@ export async function repositoryApi(request, env, session, helpers) {
   if (request.method === 'GET' && url.pathname === '/api/projects') {
     const {repository, configuration} = await context();
     const verified = await Promise.all(configuration.projects.map(project => projectFor(configuration, project.id)));
-    let activeByProject=new Map();
-    try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();for(const row of payload.requests||[]){if(!['queued','running'].includes(row.status))continue;const key=String(row.intent?.project_id||'');activeByProject.set(key,(activeByProject.get(key)||0)+1);}}}catch{}
+    const checkedAt=new Date().toISOString(),activeByProject=new Map();
+    try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();for(const row of payload.requests||[]){if(!['preparing','analyzing'].includes(row.status))continue;const key=String(row.intent?.project_id||''),existing=activeByProject.get(key);if(!existing||row.status==='analyzing')activeByProject.set(key,row);}}}catch{}
+    const completedStatuses=new Set(['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE']);
+    const projects=await Promise.all(verified.map(async ({project}) => {
+      let current_report=null,current_overlay=null,publicationError=false;
+      const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
+      try {
+        const response=await publicReports(new Request(reportUrl),env);
+        if(response.ok){const manifest=await response.json(),target=canonicalReportTarget(manifest),overlay=manifest.current_overlay;publicationError=Boolean(manifest.publication_error);if(target){const channels=Array.isArray(target.channel_statuses)?target.channel_statuses:[],completed=channels.filter(value=>completedStatuses.has(value.status)).length,incomplete=channels.filter(value=>!completedStatuses.has(value.status)&&!['NOT_SELECTED','DEFERRED'].includes(value.status));current_report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null,status:target.report_status||target.status,scanner_summary:{completed,total:channels.length,incomplete:incomplete.length},limitations:incomplete.slice(0,3).map(value=>({channel:value.channel||value.name||'Scanner',status:value.status||'Unavailable',reason:String(value.reason||'Evidence is incomplete.').slice(0,180)}))};}if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
+      } catch {}
+      const active=activeByProject.get(String(project.id));let lifecycle='Ready',attention_reason=null;
+      if(active)lifecycle=active.status==='analyzing'?'Analyzing':'Preparing';
+      else if(publicationError){lifecycle='Needs attention';attention_reason='The latest report could not be published. Review the project evidence before relying on it.';}
+      else if(!current_report){lifecycle='Needs attention';attention_reason='No current report is available. Run analysis to create the first evidence set.';}
+      else if(current_report.status==='partial'||current_report.scanner_summary.incomplete>0){lifecycle='Needs attention';attention_reason='The current report contains incomplete scanner evidence.';}
+      return {id:String(project.id),source_repository:project.source_repository.full_name,source_repository_id:project.source_repository.id,relationship:project.relationship,preferred_branch:project.preferred_branch,native_feedback_enabled:false,readiness_summary:{configured_channels:project.enabled_scanners.length,vendor_channels:project.enabled_scanners.filter(channel=>VENDOR_SCANNERS.has(channel)).length},lifecycle,attention_reason,active_analysis:active?{request_id:active.request_id,status:active.status,target_sha:active.intent?.target_sha||active.intent?.source_sha||null,created_at:active.created_at}:null,current_report,current_overlay};
+    }));
+    const summary={projects:projects.length,preparing:projects.filter(value=>value.lifecycle==='Preparing').length,analyzing:projects.filter(value=>value.lifecycle==='Analyzing').length,needs_attention:projects.filter(value=>value.lifecycle==='Needs attention').length};
     return json({
+      checked_at:checkedAt,
+      summary,
       execution_repository: {id:repository.id, full_name:repository.full_name},
       can_launch: repository.permissions.pull === true,
       can_configure: repository.permissions.admin === true,
-      projects: await Promise.all(verified.map(async ({project}) => {
-        let current_report=null,current_overlay=null;
-       const reportUrl=new URL('/api/public/manifest',url);
-       reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
-       try {
-        const response=await publicReports(new Request(reportUrl),env);
-        if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);const overlay=manifest.current_overlay;if(target)current_report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null,status:target.report_status||target.status};if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
-       } catch {}
-       return {
-        id: String(project.id),
-        source_repository: project.source_repository.full_name,
-        source_repository_id: project.source_repository.id,
-        relationship: project.relationship,
-        preferred_branch: project.preferred_branch,
-        native_feedback_enabled: false,
-        readiness_summary:{configured_channels:project.enabled_scanners.length,vendor_channels:project.enabled_scanners.filter(channel=>VENDOR_SCANNERS.has(channel)).length},
-         current_report,current_overlay,queued_requests:activeByProject.get(String(project.id))||0,
-       };
-      })),
+      projects,
     });
-  }
-  if(request.method==='GET'&&url.pathname==='/api/dashboard'){
-    const {repository,configuration}=await context();const checkedAt=new Date().toISOString();const alerts=[];
-    let recent=[];try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();recent=payload.requests||[];}}catch{alerts.push({id:'recent-requests',severity:'warning',title:'Recent analysis unavailable',message:'Current project reports remain available.'});}
-    const activeByProject=new Map();for(const row of recent){if(!['queued','running'].includes(row.status))continue;const key=String(row.intent?.project_id||'');activeByProject.set(key,(activeByProject.get(key)||0)+1);}
-    const projects=await Promise.all(configuration.projects.map(async project=>{let current_report=null;
-      const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
-      try{const response=await publicReports(new Request(reportUrl),env);if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);if(target)current_report={status:target.report_status||target.status,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null};if(manifest.publication_error)alerts.push({id:`publication-${project.id}`,project_id:String(project.id),severity:'error',title:'Report publication needs attention',message:String(manifest.publication_error)});}}
-      catch{alerts.push({id:`report-${project.id}`,project_id:String(project.id),severity:'warning',title:'Project summary unavailable',message:'The current report summary could not be read.'});}
-      return{id:String(project.id),source_repository:project.source_repository.full_name,preferred_branch:project.preferred_branch,current_report,queued_requests:activeByProject.get(String(project.id))||0};}));
-    const allowed=new Map(projects.map(project=>[project.id,project.source_repository]));recent=recent.filter(row=>allowed.has(String(row.intent?.project_id))).map(row=>({request_id:row.request_id,project_id:String(row.intent.project_id),source_repository:allowed.get(String(row.intent.project_id)),ref_type:row.intent.selection?.kind||'revision',ref:row.intent.selection?.ref||row.intent.target_sha,target_sha:row.intent.target_sha,status:row.status,created_at:row.created_at,updated_at:row.completed_at||row.created_at}));
-    return json({checked_at:checkedAt,freshness:'fresh',health:{status:alerts.some(alert=>alert.severity==='error')?'degraded':alerts.length?'unknown':'healthy',message:alerts.length?'Some aggregate evidence is unavailable.':'Control plane and project summaries responded.'},alerts,projects,recent_requests:recent,execution_repository:{id:repository.id,full_name:repository.full_name},can_launch:repository.permissions.pull===true,can_configure:repository.permissions.admin===true});
   }
   if (request.method === 'GET' && url.pathname === '/api/project-identity') {
     const {configuration} = await context();
@@ -225,16 +212,16 @@ export async function repositoryApi(request, env, session, helpers) {
     if(prior.ok){
       const row=await prior.json();
       if(String(row.intent?.project_id)!==String(project.id)||row.intent?.selection?.kind!=='branch'||row.intent?.selection?.ref!==project.preferred_branch)throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
-      return json({status:row.status,request_id:requestId,run_id:row.result?.run_id||null,repository:repository.full_name,source_repository:source.full_name,target_sha:row.intent.target_sha,preferred_branch:project.preferred_branch,requested_channels:row.intent.requested_channels,queue_position:row.queue_position??null,duplicate:true},202);
+      return json({status:row.status,request_id:row.request_id,run_id:row.result?.run_id||null,repository:repository.full_name,source_repository:source.full_name,target_sha:row.intent.target_sha,preferred_branch:project.preferred_branch,requested_channels:row.intent.requested_channels,duplicate:true},202);
     }
     const current=await revisionSnapshot(configuration,project,source,{kind:'branch',ref:project.preferred_branch});
     const requestedChannels=current.channels.filter(channel=>channel.default_selected&&channel.selectable).map(channel=>channel.id);
     if(!requestedChannels.length)throw new Failure(409,'The trusted project has no usable default scanner channel.','default_channels_unavailable');
     if(SCANNER_GROUPS.some(group=>group.some(channel=>requestedChannels.includes(channel))&&!group.every(channel=>requestedChannels.includes(channel))))throw new Failure(409,'The trusted default scanner policy contains an incomplete shared lane.','default_channels_unavailable');
     const actor=await github('user',token);const targetSha=current.target_sha;
-    const intent={schema_version:'analysis-request-v3',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection:current.selection,resolved_selection:{repository:source.full_name,repository_id:source.id,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:null,requested_channels:[...requestedChannels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:idempotencyKey.toLowerCase(),run_again:false,preview_id:crypto.randomUUID(),created_at:new Date().toISOString()};
+    const intent={schema_version:'analysis-request-v4',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection:current.selection,resolved_selection:{repository:source.full_name,repository_id:source.id,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:null,requested_channels:[...requestedChannels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:idempotencyKey.toLowerCase(),run_again:false,preview_id:crypto.randomUUID(),created_at:new Date().toISOString()};
     const admittedBody=await admit(intent);
-    return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,source_repository:source.full_name,target_sha:targetSha,preferred_branch:project.preferred_branch,requested_channels:[...requestedChannels].sort(),queue_position:admittedBody.queue_position??null,duplicate:admittedBody.duplicate===true,wake_status:admittedBody.wake_status},202);
+    return json({status:'preparing',request_id:admittedBody.request_id||requestId,run_id:null,repository:repository.full_name,source_repository:source.full_name,target_sha:targetSha,preferred_branch:project.preferred_branch,requested_channels:admittedBody.intent?.requested_channels||[...requestedChannels].sort(),duplicate:admittedBody.duplicate===true,wake_status:admittedBody.wake_status},202);
   }
 
   if (request.method === 'POST' && url.pathname === '/api/project-preview') {
@@ -299,11 +286,11 @@ export async function repositoryApi(request, env, session, helpers) {
     const id = url.searchParams.get('request_id');
     if (!/^[a-f0-9-]{36}$/.test(id || '')) throw new Failure(400, 'Choose a project and request.', 'invalid_request');
     const queued=await queue('/queue/status',{request_id:id});
-    if(queued.ok){const state=await queued.json();if(['queued','running','failed','superseded','cancelled_cutover'].includes(state.status))return json({phase:state.status,request_id:id,queue_position:state.queue_position,attempts:state.attempts,checked_at:new Date().toISOString(),...(state.result||{})},state.status==='queued'?202:200);}
+    if(queued.ok){const state=await queued.json();if(['preparing','analyzing','failed','published','superseded','cancelled_cutover'].includes(state.status))return json({phase:state.status,request_id:id,attempts:state.attempts,checked_at:new Date().toISOString(),...(state.result||{})},state.status==='preparing'?202:200);}
     const reportUrl = new URL('/api/public/manifest', url);
     reportUrl.search = new URLSearchParams({repository:repository.full_name,project_id:project.id});
     const response = await publicReports(new Request(reportUrl), env);
-    if (!response.ok) return json({phase:'queued',request_id:id,queue_position:null,checked_at:new Date().toISOString(),publication_status:'unavailable'},202);
+    if (!response.ok) return json({phase:'preparing',request_id:id,checked_at:new Date().toISOString(),publication_status:'unavailable'},202);
     const manifest = await response.json();
     const receipt = manifest.requests?.find(row => row.request_id === id);
     const canonical = canonicalReportTarget(manifest);
@@ -315,8 +302,8 @@ export async function repositoryApi(request, env, session, helpers) {
       if (recent && canonical && recent.analyzed_sha === canonical.analyzed_sha && recent.original_target_id === canonical.original_target_id) row = {...canonical,...recent};
       else if (recent) return json({phase:'superseded',source_sha:recent.head_sha,request_id:id,checked_at:new Date().toISOString()});
     }
-    if (!row) return json({phase:'queued',request_id:id,queue_position:null,checked_at:new Date().toISOString()});
-    const result = {request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'queued',queue_position:null,checked_at:new Date().toISOString()};
+    if (!row) return json({phase:'preparing',request_id:id,checked_at:new Date().toISOString()});
+    const result = {request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'preparing',checked_at:new Date().toISOString()};
     if (row.scan_run_id) {
       const run = await github(`repos/${repository.full_name}/actions/runs/${row.scan_run_id}/attempts/${row.run_attempt}`, appToken);
       if (run.head_sha !== row.execution_sha) throw new Failure(409, 'Producer revision does not match the request.', 'producer_mismatch');
@@ -324,7 +311,7 @@ export async function repositoryApi(request, env, session, helpers) {
       const producerJobs=await pages(`repos/${repository.full_name}/actions/runs/${row.scan_run_id}/jobs?filter=latest`,'jobs',appToken);
       const progress=new Map((row.channel_statuses||[]).map(value=>[value.channel,{...value,status:String(value.status||'unknown').toLowerCase()}]));
       for(const value of channelProgress(row.execution_channels||row.requested_channels,producerJobs,run.status))progress.set(value.channel,value);
-      for(const channel of row.requested_channels||[])if(!progress.has(channel))progress.set(channel,{channel,status:'queued'});
+      for(const channel of row.requested_channels||[])if(!progress.has(channel))progress.set(channel,{channel,status:'preparing'});
       result.channel_progress=[...progress.values()];
       result.phase = run.status === 'completed' ? 'publishing' : 'scanning';
       if (row.collected_run === `${row.scan_run_id}-${row.run_attempt}` && row.analyzed_sha === row.head_sha) {result.phase='published';result.completeness=row.report_status;}
@@ -365,9 +352,9 @@ export async function repositoryApi(request, env, session, helpers) {
     const selection = current.selection;
     const checkoutRepository=current.pr_context?.head_repository||source.full_name;
     const checkoutRepositoryId=current.pr_context?.head_repository_id||source.id;
-    const intent = {schema_version:'analysis-request-v3',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection,resolved_selection:{repository:checkoutRepository,repository_id:checkoutRepositoryId,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...input.requested_channels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:input.idempotency_key.toLowerCase(),run_again:input.run_again===true,preview_id:preview.preview_id,created_at:new Date().toISOString()};
+    const intent = {schema_version:'analysis-request-v4',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection,resolved_selection:{repository:checkoutRepository,repository_id:checkoutRepositoryId,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...input.requested_channels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:input.idempotency_key.toLowerCase(),run_again:input.run_again===true,preview_id:preview.preview_id,created_at:new Date().toISOString()};
     const admittedBody=await admit(intent);
-    return json({status:'queued',request_id:requestId,run_id:null,repository:repository.full_name,queue_position:admittedBody.queue_position??null,duplicate:admittedBody.duplicate===true,wake_status:admittedBody.wake_status},202);
+    return json({status:'preparing',request_id:admittedBody.request_id||requestId,run_id:null,repository:repository.full_name,duplicate:admittedBody.duplicate===true,wake_status:admittedBody.wake_status},202);
   }
 
   return null;

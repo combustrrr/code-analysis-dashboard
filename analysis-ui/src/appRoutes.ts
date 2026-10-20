@@ -3,7 +3,6 @@ export type SettingsSection='general'|'projects'|'connections'|'provenance';
 export type AppRoute=
  |{kind:'landing'}
  |{kind:'projects'}
- |{kind:'activity'}
  |{kind:'project';projectId:string;view:ProjectView;target?:string;issue?:string}
  |{kind:'project-run';projectId:string}
  |{kind:'settings';section:SettingsSection;projectId?:string};
@@ -18,7 +17,6 @@ export function parseAppRoute(hash=location.hash):AppRoute{
  if(!raw.startsWith('/'))return{kind:'projects'};
  const [pathname,query='']=raw.split('?',2);const parts=pathname.split('/').filter(Boolean).map(decodeURIComponent);const params=new URLSearchParams(query);
  if(parts[0]==='projects'&&parts.length===1)return{kind:'projects'};
- if(parts[0]==='activity'&&parts.length===1)return{kind:'activity'};
  if(parts[0]==='settings'&&parts.length===1){const candidate=clean(params.get('section')) as SettingsSection|undefined;return{kind:'settings',section:candidate&&settingsSections.has(candidate)?candidate:'general',projectId:safeProject(clean(params.get('project')))};}
  const projectId=parts[0]==='projects'?safeProject(parts[1]):undefined;
  if(projectId){
@@ -30,7 +28,7 @@ export function parseAppRoute(hash=location.hash):AppRoute{
 }
 
 export function routeHash(route:AppRoute){
- if(route.kind==='landing')return'#';if(route.kind==='projects')return'#/projects';if(route.kind==='activity')return'#/activity';
+ if(route.kind==='landing')return'#';if(route.kind==='projects')return'#/projects';
  if(route.kind==='settings'){const params=new URLSearchParams({section:route.section});if(route.projectId)params.set('project',route.projectId);return`#/settings?${params}`;}
  if(route.kind==='project-run')return`#/projects/${encodeURIComponent(route.projectId)}/run`;
  const suffix=route.view==='overview'?'':`/${route.view}`;const params=new URLSearchParams();if(route.target)params.set('target',route.target);if(route.issue)params.set('issue',route.issue);

@@ -1,7 +1,7 @@
 # Read-only analysis workflow
 
-> Replacement contract: the local implementation now uses `analysis-request-v3`, a
-> Durable Object FIFO lease with generation/token fencing and heartbeat renewal, and a
+> Replacement contract: the local implementation now uses `analysis-request-v4`, concurrent
+> Durable Object channel leases with generation/token fencing and heartbeat renewal, and a
 > best-effort coordinator wake after durable admission. This code is not production
 > state until the big-bang cutover runbook has been executed and commissioned.
 
@@ -38,10 +38,11 @@ repository write was performed as part of this implementation.
    and vendor lanes are opt-in. CodeRabbit review is available only for an open PR.
 5. Review the resolved full SHA, original selection, PR fork/head/base provenance, exact
    selected channels, cache/reuse state, readiness, and usage caveat. Confirm explicitly
-   to create work. A 202/queued response means only accepted/queued. If a branch or PR
+   to create work. A 202 response means accepted/preparing only. If a branch or PR
    changes after preview, refresh the preview; accepted work remains pinned to its SHA.
-6. Follow FIFO queue position and per-channel progress. Only one source-revision request
-   is active globally; selected lanes for that SHA may run concurrently. Scheduled
+6. Follow Preparing, Analyzing, Ready, or Needs attention and detailed per-channel progress.
+   Different projects and revisions and selected lanes may run concurrently. Active requests
+   for the same project/SHA merge missing channels. Scheduled
    reconciliation recovers durable accepted requests only and never starts scans from
    discovered refs. Refreshing the UI is read-only.
 7. Inspect the current source-only report and any separate current PR overlay. Source-only
@@ -107,7 +108,7 @@ findings from an unavailable, failed, or deferred channel is not a clean result.
 | Current PR overlay manifest entry and compressed overlay shard | Same current-report release and R2 namespace; separately referenced by the v1 manifest | One overlay is retained; its asset is never merged into the source-only report and is fetched only when referenced |
 | Temporary producer handoff artifacts, when R2 handoff is enabled | Cloudflare R2 `temp-runs/<workflow_run_id>/<attempt>/...` | One-day lifecycle; artifacts are validated against source SHA, target, run, attempt, and tooling provenance before publication |
 | Scanner job output | GitHub Actions artifacts | Workflow artifact retention is bounded (currently 7 days); these are producer evidence, not the current report store |
-| Request queue and lease/control state | Cloudflare Durable Object | Strict global FIFO, 100 pending maximum, one active fenced lease, heartbeat recovery, and explicit cutover pause/reset |
+| Analysis and lease/control state | Cloudflare Durable Object | Project/SHA deduplication, independently fenced channel claims, heartbeat recovery, newest-accepted publication fencing, and explicit cutover pause/reset |
 | Dashboard application | GitHub Pages | UI bundle only; rebuilding Pages does not rescan or publish reports |
 
 The selected project's report and optional overlay are read from the Worker/API by the

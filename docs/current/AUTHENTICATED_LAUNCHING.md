@@ -6,41 +6,42 @@ viewer authorization, fixed-host APIs, explicit launch requests and report deliv
 `combustrrr/code-analysis-dashboard` is the only execution host for the three trusted
 project-registry entries. Users do not choose or install an execution repository.
 
-Users sign in to **Projects**. **Activity** contains aggregate health, alerts,
-recent-request metadata, global search, and project summaries. Opening Projects,
-Activity, or a project remains read-only.
-Developers see product-level progress only: Preparing, Analyzing, Preparing results,
-Ready, or Needs attention. Queue positions, coordinator runs, lease state, scanner job
+Users sign in to **Projects**, the only workspace home. It contains the three fixed
+projects, aggregate Preparing/Analyzing/Needs-attention counts, last refresh time, and
+each project's current evidence state. Opening Projects or a project remains read-only.
+Developers see product-level progress only: Preparing, Analyzing, Ready, or Needs attention.
+Coordinator runs, lease state, scanner job
 links, and individual channel scheduling remain operational details. The exact selected
 revision remains visible throughout.
 On a project, **Run analysis** is the Fast Path: one action asks the Worker to resolve the
 configured preferred branch, apply trusted default channels, verify current collaborator access,
-and queue the exact SHA. The retained report stays visible while the request is active.
+and start the exact SHA. The retained report stays visible while the request is active.
 **Choose revision and scanners** opens the three-step Run analysis flow for branch,
 open-PR, or full-SHA selection, explicit channel selection, immutable-SHA review, and final
 confirmation. The Worker
-checks collaborator access and transactionally persists an immutable `analysis-request-v3` envelope in the SQLite-backed Durable Object with source
+checks collaborator access and transactionally persists an immutable `analysis-request-v4` envelope in the SQLite-backed Durable Object with source
 and fork identities, original/resolved selection, pinned SHA, optional PR context,
 requested channels, tooling/profile digests, actor, and idempotency key. A 202 means
-accepted/queued, never scanner completion. Retries with the same idempotency key return
+accepted/preparing, never scanner completion. Retries with the same idempotency key return
 the existing durable request.
 
-The canonical client routes are `#/projects`, `#/activity`,
-`#/projects/:projectId`, `#/projects/:projectId/issues`,
+The canonical client routes are `#/projects`, `#/projects/:projectId`,
+`#/projects/:projectId/issues`,
 `#/projects/:projectId/report`, `#/projects/:projectId/run`, and global
 `#/settings?section=<section>&project=<optional-id>`. No retired query-hash, dashboard,
-custom-run, or project-settings route implementation remains. Settings owns
+custom-run, Activity, or project-settings route implementation remains. Unsupported
+hashes, including legacy `#/activity`, fall through to Projects. Settings owns
 General, Projects, Connections & readiness, and Evidence provenance; read-only values
 remain informational. The GitHub configuration history link is visible only when current
 access includes `can_configure`.
 
-The bounded Durable Object queue is FIFO (maximum 100) with one active source-revision request globally.
-Selected channel producers for that revision may run concurrently; a request remains
-active until every selected lane is terminal. The Worker signals the coordinator when a
-request is admitted and immediately signals the next FIFO request when the active request
-finishes. The 15-minute schedule is recovery-only. `code-analysis-coordinator.yml` claims
-only durable accepted requests and invokes reusable jobs inside that same run; GitHub
-Releases are not used as a queue. A missing optional normalized-findings directory does
+The Durable Object starts accepted project/SHA analyses immediately. Different projects and
+revisions may run concurrently; active duplicates merge only missing channels. Selected channel
+producers run concurrently and independently fenced claims remain active until their lanes are
+terminal. The Worker signals the coordinator after admission or channel expansion. The 15-minute
+schedule is recovery-only. `code-analysis-coordinator.yml` claims exact unclaimed channels,
+invokes reusable jobs, and serializes publication per project. GitHub Releases are not used for
+admission. A missing optional normalized-findings directory does
 not fail an otherwise completed scanner lane, while required raw evidence and assembled
 reports still fail closed when absent. Each lane
 checks out the same immutable SHA. Matching channel evidence is reused automatically.

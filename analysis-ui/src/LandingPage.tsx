@@ -1,85 +1,22 @@
-import { Alert, Button, ConfigProvider, Space, Typography } from 'antd';
-import { ArrowDownOutlined, ArrowRightOutlined, BranchesOutlined, CodeOutlined, FileSearchOutlined, GithubOutlined, RadarChartOutlined, SafetyCertificateOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import type { useLaunchAuth } from './useLaunchAuth';
-import { AppearanceToggle, useAppearance } from './Appearance';
+import {Alert,Button,ConfigProvider} from 'antd';
+import {ArrowRightOutlined,BranchesOutlined,CheckCircleOutlined,FileProtectOutlined,GithubOutlined,LockOutlined,RadarChartOutlined,SafetyCertificateOutlined} from '@ant-design/icons';
+import type {useLaunchAuth} from './useLaunchAuth';
+import {AppearanceToggle,useAppearance} from './Appearance';
 import './landing.css';
 import trustLabLogo from './assets/trustlab-logo.jpg';
 import mphasisLogo from './assets/mphasis-logo.jpg';
-import { applicationTheme } from './brand';
+import {applicationTheme} from './brand';
 
-type Auth = ReturnType<typeof useLaunchAuth>;
-
-export function LandingPage({ auth, onStart, accessError, accessPending = false, workspaceRequested = false }: { auth: Auth; onStart: () => void; accessError?: string; accessPending?: boolean; workspaceRequested?: boolean }) {
-  const { appearance } = useAppearance();
-  const signedIn = Boolean(auth.session) && !accessError;
-  const checkingAccess = workspaceRequested && accessPending;
-  const primaryAction = signedIn ? onStart : auth.signIn;
-  const primaryLabel = checkingAccess ? 'Checking GitHub access…' : signedIn ? 'Open workspace' : 'Sign in with GitHub';
-
-  return <ConfigProvider theme={applicationTheme(appearance)}>
-    <main className="landing-page landing-v2">
-      <div className="landing-wrap">
-        <nav className="landing-nav" aria-label="Main navigation">
-          <a className="landing-brand landing-cobrand" href="#top" aria-label="Code Analysis home"><span className="landing-brand-mark"><RadarChartOutlined /></span><span><strong>Code Analysis</strong><small>IIT Bombay Trust Lab × Mphasis</small></span></a>
-          <div className="landing-nav-right">
-            <span className="landing-nav-note">READ-ONLY ANALYSIS</span>
-            <AppearanceToggle className="landing-theme-toggle" />
-            {signedIn && auth.session && <span className="landing-user">{auth.session.login}</span>}
-              <Button className="landing-nav-cta" icon={signedIn ? undefined : <GithubOutlined />} onClick={primaryAction} disabled={checkingAccess || (!signedIn && !auth.available)}>{primaryLabel}</Button>
-          </div>
-        </nav>
-
-        <section className="landing-hero" id="top" aria-labelledby="landing-title">
-          <div className="landing-copy">
-            <div className="landing-kicker"><span className="landing-kicker-dot" /> SECURITY FINDINGS, WITH THEIR RECEIPTS</div>
-            <Typography.Title id="landing-title">Know what your code is carrying.</Typography.Title>
-            <Typography.Paragraph>Browse current reports from the analysis service's trusted project registry. Authorized collaborators can start a separate, explicit analysis request against a branch, pull request, or exact commit.</Typography.Paragraph>
-            <Space wrap className="landing-actions">
-              <Button type="primary" size="large" icon={signedIn ? <ArrowRightOutlined /> : <GithubOutlined />} onClick={primaryAction} disabled={checkingAccess || (!signedIn && !auth.available)}>{primaryLabel}</Button>
-              <a className="landing-secondary-action" href="#workflow">See how it works <ArrowDownOutlined /></a>
-            </Space>
-            {!signedIn && <p className="landing-auth-hint">First time here? Sign in with GitHub—no separate app account is needed. A dashboard admin must invite your account to combustrrr/code-analysis-dashboard; accept the invitation, then sign in.</p>}
-            {workspaceRequested && !accessError && <p className="landing-auth-hint">{accessPending ? 'Checking your GitHub access. This workspace request will be kept while access is verified.' : 'Sign in with an approved GitHub account to open the repository workspace. Your sign-in stays active in this tab.'}</p>}
-            {!auth.available && !auth.error && <p className="landing-auth-hint">GitHub sign-in is temporarily unavailable.</p>}
-            {(accessError || auth.error) && <Alert className="landing-error" type="error" showIcon title={accessError ? 'Dashboard access' : 'GitHub sign-in'} description={accessError || auth.error} />}
-          </div>
-
-          <aside className="landing-visual" aria-label="Illustrative finding report preview">
-            <div className="landing-visual-topline"><span>REPORT ANATOMY</span><span>ILLUSTRATIVE · NOT LIVE DATA</span></div>
-            <article className="evidence-card">
-              <header className="evidence-card-header"><div><span className="evidence-label">SOURCE REVISION</span><strong><BranchesOutlined /> sample/service-api <i>main</i></strong></div><span className="evidence-sha">8d41b72</span></header>
-              <div className="evidence-path"><CodeOutlined /><span>src/auth/session.ts</span><b>42</b></div>
-              <div className="evidence-code"><span>40</span><code>export function createSession() {'{'}</code><span>41</span><code>  const token = generateToken();</code><span className="evidence-line-current">42</span><code className="evidence-code-current">  return sign(payload, token);</code><span>43</span><code>{'}'}</code></div>
-              <div className="evidence-finding"><div className="evidence-severity">HIGH <span>REVIEW</span></div><div><strong>Review token generation</strong><p>Finding linked to its source location and retained scanner observation.</p></div><FileSearchOutlined /></div>
-              <footer className="evidence-provenance"><span><SafetyCertificateOutlined /> EXACT COMMIT</span><span><ThunderboltOutlined /> ISOLATED RUN</span><span><RadarChartOutlined /> PUBLISHED REPORT</span></footer>
-            </article>
-            <div className="landing-visual-caption"><span /> Every result should answer: what ran, where, and against which revision.</div>
-          </aside>
-        </section>
-
-        <div className="landing-proof" aria-label="Analysis safeguards">
-          <span><SafetyCertificateOutlined /> Findings keep source and run provenance</span>
-          <span><ThunderboltOutlined /> Source executes in isolated scanner jobs</span>
-          <span><RadarChartOutlined /> Missing evidence stays visible</span>
-        </div>
-
-        <section className="landing-workflow" id="workflow" aria-labelledby="workflow-title">
-          <div className="landing-section-heading"><div><span className="landing-kicker">FROM SOURCE TO EVIDENCE</span><Typography.Title id="workflow-title" level={2}>A clear path from code to context.</Typography.Title></div><p>No automatic scans on page load. You choose the target; the dashboard follows the run and shows the published result.</p></div>
-          <div className="landing-steps">
-            <article className="landing-step"><span className="landing-step-index">01</span><div className="landing-step-icon"><GithubOutlined /></div><h3>Sign in to the dashboard</h3><p>An authorized collaborator can browse configured projects and request analysis. Only administrators can change trusted configuration.</p></article>
-            <article className="landing-step"><span className="landing-step-index">02</span><div className="landing-step-icon"><BranchesOutlined /></div><h3>Choose a configured project</h3><p>The execution host and source identities come from the trusted service registry. Opening a project only reads its current report.</p></article>
-            <article className="landing-step"><span className="landing-step-index">03</span><div className="landing-step-icon"><FileSearchOutlined /></div><h3>Follow or launch explicitly</h3><p>Inspect scanner evidence and provenance. Authorized collaborators can use the separate launch action.</p></article>
-          </div>
-        </section>
-
-        <section className="landing-boundary" aria-label="Security and access boundaries">
-          <div className="landing-boundary-mark"><SafetyCertificateOutlined /></div>
-          <div><span className="landing-kicker">BUILT AROUND TRUST BOUNDARIES</span><h2>Your source stays read-only.</h2><p>Scans use an immutable checkout. Scanner execution does not receive report-publication or vendor credentials. Incomplete coverage is shown as incomplete—not quietly counted as clean.</p></div>
-          <Button type="primary" onClick={primaryAction} disabled={checkingAccess || (!signedIn && !auth.available)}>{checkingAccess ? 'Checking access…' : signedIn ? 'Open workspace' : 'Get started'} <ArrowRightOutlined /></Button>
-        </section>
-
-        <footer className="landing-footer"><div className="landing-partner-lockup"><img src={trustLabLogo} alt="IIT Bombay Trust Lab"/><span>×</span><img src={mphasisLogo} alt="Mphasis"/></div><span>Read-only analysis. Evidence you can trace.</span><span>Dashboard access is limited to approved GitHub collaborators.</span></footer>
-      </div>
-    </main>
-  </ConfigProvider>;
+type Auth=ReturnType<typeof useLaunchAuth>;
+export function LandingPage({auth,onStart,accessError,accessPending=false,workspaceRequested=false}:{auth:Auth;onStart:()=>void;accessError?:string;accessPending?:boolean;workspaceRequested?:boolean}){
+ const {appearance}=useAppearance(),signedIn=Boolean(auth.session)&&!accessError,checking=workspaceRequested&&accessPending,primaryAction=signedIn?onStart:auth.signIn,primaryLabel=checking?'Checking GitHub access…':signedIn?'Open workspace':'Sign in with GitHub';
+ return <ConfigProvider theme={applicationTheme(appearance)}><main className="landing-page" id="top"><div className="landing-wrap">
+  <nav className="landing-nav" aria-label="Main navigation"><a className="landing-brand" href="#top"><span className="landing-brand-mark"><RadarChartOutlined/></span><span><strong>Code Analysis</strong><small>IIT Bombay Trust Lab × Mphasis</small></span></a><div className="landing-nav-right"><span className="landing-nav-note">Traceable evidence</span><AppearanceToggle className="landing-theme-toggle"/>{signedIn&&<span className="landing-user">{auth.session?.login}</span>}<Button className="landing-nav-cta" icon={signedIn?undefined:<GithubOutlined/>} onClick={primaryAction} disabled={checking||(!signedIn&&!auth.available)}>{primaryLabel}</Button></div></nav>
+  <section className="landing-hero" aria-labelledby="landing-title"><div className="landing-copy"><span className="landing-kicker">Read-only code analysis</span><h1 id="landing-title">Security evidence you can trace back to the code.</h1><p>Review findings, scanner coverage, and exact revision provenance across three trusted projects. Authorized collaborators can start an isolated analysis when new evidence is needed.</p><div className="landing-actions"><Button type="primary" size="large" icon={signedIn?<ArrowRightOutlined/>:<GithubOutlined/>} onClick={primaryAction} disabled={checking||(!signedIn&&!auth.available)}>{primaryLabel}</Button><a className="landing-secondary-action" href="#trust">How evidence is protected <ArrowRightOutlined/></a></div>{!signedIn&&<p className="landing-auth-hint">Use an approved GitHub collaborator account. No separate dashboard account is required.</p>}{workspaceRequested&&!accessError&&<p className="landing-auth-hint">{accessPending?'Checking your GitHub access…':'Sign in to continue to the requested workspace.'}</p>}{!auth.available&&!auth.error&&<p className="landing-auth-hint">GitHub sign-in is temporarily unavailable.</p>}{(accessError||auth.error)&&<Alert className="landing-error" type="error" showIcon title={accessError?'Workspace access':'GitHub sign-in'} description={accessError||auth.error}/>}</div>
+   <aside className="evidence-chain" aria-label="Evidence chain illustration"><header><span>Evidence chain</span><small>Illustrative structure</small></header><div className="chain-node"><BranchesOutlined/><span>Source repository<strong>project / preferred branch</strong></span></div><i/><div className="chain-node"><SafetyCertificateOutlined/><span>Immutable revision<code>8d41b72c5f09</code></span></div><i/><div className="chain-node"><RadarChartOutlined/><span>Isolated scanner run<strong>Coverage remains explicit</strong></span></div><i/><div className="chain-node chain-result"><FileProtectOutlined/><span>Published evidence<strong>Findings with provenance</strong></span><CheckCircleOutlined/></div></aside>
+  </section>
+  <section className="trust-section" id="trust"><div className="trust-heading"><span className="landing-kicker">Built around evidence boundaries</span><h2>Understand what the report proves—and what it does not.</h2></div><div className="trust-grid"><article><SafetyCertificateOutlined/><h3>Exact provenance</h3><p>Every report retains its source repository, immutable SHA, tooling revision, workflow run, and attempt.</p></article><article><LockOutlined/><h3>Isolated execution</h3><p>Source code runs in scanner jobs without publication credentials or authority to modify the analyzed repository.</p></article><article><RadarChartOutlined/><h3>Honest coverage</h3><p>Failed, unavailable, deferred, and unselected scanners stay visible instead of being reported as zero findings.</p></article></div></section>
+  <section className="landing-entry"><div><span className="landing-kicker">Three configured projects</span><h2>Move from portfolio status to exact evidence.</h2><p>The workspace opens on the trusted project register. Review current results first; run analysis only when you need fresh evidence.</p></div><Button type="primary" size="large" onClick={primaryAction} disabled={checking||(!signedIn&&!auth.available)}>{signedIn?'Open workspace':'Sign in to continue'} <ArrowRightOutlined/></Button></section>
+  <footer className="landing-footer"><div className="landing-partner-lockup"><img src={trustLabLogo} alt="IIT Bombay Trust Lab"/><span>×</span><img src={mphasisLogo} alt="Mphasis"/></div><span>Read-only analysis · Evidence with receipts</span><span>Access is limited to approved GitHub collaborators.</span></footer>
+ </div></main></ConfigProvider>;
 }

@@ -34,14 +34,15 @@ npm run build
 
 ## Browse configured projects
 
-For the already configured analysis instance, sign in to the aggregate dashboard or open
-**Projects** to browse the service's three trusted targets. Search, project selection,
+For the already configured analysis instance, sign in and open **Projects**, the only
+workspace home, to browse the service's three trusted targets. Project selection,
 settings, and report viewing do not trigger a scan. On a project, **Run analysis** queues
 the configured preferred branch with trusted default channels in one Fast Path action.
 Use **Choose revision and scanners** for the three-step custom flow and exact-SHA review.
-The service verifies the resolved immutable SHA before queueing the request. A 202 means
-queued, not completed. Requests run FIFO with one active source revision globally;
-selected scanner lanes for that revision may run concurrently. Repository administration
+The service verifies the resolved immutable SHA before starting the request. A 202 means
+accepted and preparing, not completed. Different projects and revisions run concurrently;
+matching active project/SHA requests merge missing scanner channels instead of duplicating
+work, and selected scanner lanes run concurrently. Repository administration
 is required to change the versioned target registry. There is no per-user
 execution-repository selection or App installation flow. See the
 [read-only analysis runbook](docs/operations/READ_ONLY_ANALYSIS.md) for the end-to-end
@@ -53,7 +54,7 @@ checks/SARIF to either analyzed source. Service request state and reports are st
 separately by the control plane, as documented in the runbook.
 
 The fixed execution repository runs the Actions workflows. A SQLite-backed Durable Object
-retains the bounded manual request queue; current source-only reports, the single
+retains concurrent analysis leases and duplicate-suppression state; current source-only reports, the single
 current PR overlay, and temporary producer artifacts are stored in Cloudflare R2. Small wrappers reference immutable shared
 workflows in this service repository. Scanner credentials are supplied by that
 repository's owner; configuration alone does not prove usable scanner evidence.
@@ -88,7 +89,7 @@ locally generated PDF/ZIP exports without changing the underlying scanner eviden
 
 Analysis launches are manual only. Scheduled reconciliation recovers already accepted
 durable requests; it never discovers a branch/PR and creates work. Each immutable
-`analysis-request-v2` envelope pins the configured project, selected revision SHA,
+`analysis-request-v4` envelope pins the configured project, selected revision SHA,
 tooling/profile digests, selected channels, actor, and idempotency key. Matching channel
 evidence is reused unless **Run again** is selected. Same-SHA publication replaces only
 validated selected channels; unselected channels are `NOT_SELECTED`, distinct from

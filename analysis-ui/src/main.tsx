@@ -7,6 +7,10 @@ import { createRoot } from 'react-dom/client';
 import { Alert, Button, Collapse, ConfigProvider, Drawer, Empty, Grid, Input, Progress, Select, Space, Statistic, Table, Tabs, Tag, message } from 'antd';
 import { GithubOutlined, SearchOutlined } from '@ant-design/icons';
 import 'antd/dist/reset.css';
+import '@fontsource/instrument-sans/400.css';
+import '@fontsource/instrument-sans/500.css';
+import '@fontsource/instrument-sans/600.css';
+import '@fontsource/ibm-plex-mono/400.css';
 import './style.css';
 import './workspace.css';
 import { useLaunchAuth } from './useLaunchAuth';
@@ -18,7 +22,6 @@ import { LandingPage } from './LandingPage';
 import { AppearanceProvider, useAppearance } from './Appearance';
 import { ProjectRunTracker, type ProjectRunRequest } from './ProjectRunTracker';
 import {parseAppRoute,routeHash,type ProjectView} from './appRoutes';
-import {ActivityPage} from './ActivityView';
 import {FastPathRunAction} from './FastPathRunAction';
 import {AppShell} from './AppShell';
 import {RevisionRibbon} from './RevisionRibbon';
@@ -209,15 +212,14 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const completed = report?.channels.filter(c => ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(c.status)).length || 0;
    const appTheme=applicationTheme(appearance);
     if (!r.repository) {
-      if(r.tab==='projects')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}><main className="workspace-home"><div className="workspace-intro"><div className="eyebrow">PROJECTS</div><h1>Choose a codebase</h1><p>Open current evidence or follow work already in progress. Nothing runs until you choose Run analysis.</p></div><Repositories auth={launchAuth}/></main></AppShell></ConfigProvider>;
-      if(r.tab==='activity')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}><ActivityPage auth={launchAuth}/></AppShell></ConfigProvider>;
+      if(r.tab==='projects')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}><main className="workspace-home"><Repositories auth={launchAuth}/></main></AppShell></ConfigProvider>;
       if(r.tab==='settings')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}><Settings auth={launchAuth} onRun={projectId=>location.hash=routeHash({kind:'project-run',projectId})}/></AppShell></ConfigProvider>;
       return <LandingPage auth={launchAuth} onStart={() => { try { sessionStorage.setItem('analysis-workspace-requested', 'true'); } catch {} location.hash=routeHash({kind:'projects'}); }} />;
     }
     return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}>
      {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={index?.preferred_branch} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
     <main className="project-workspace">
-      <RevisionRibbon repository={index?.source_repository||target?.repository||'Configured project'} target={target} targets={index?.targets||[]} fresh={fresh} statusLabel={states[target?.lifecycle_status||target?.status||'']||target?.status||'Unavailable'} onTarget={value=>navigate(value,r.tab==='issues'?'issues':r.tab==='report'?'report':'overview')}/>
+      <RevisionRibbon repository={index?.source_repository||target?.repository||'Configured project'} target={target} targets={index?.targets||[]} fresh={fresh} statusLabel={states[target?.lifecycle_status||target?.status||'']||target?.status||'Unavailable'} coverage={report?`${completed} of ${report.channels.length}`:'Unavailable'} published={report?.generated_at} onTarget={value=>navigate(value,r.tab==='issues'?'issues':r.tab==='report'?'report':'overview')}/>
       <div className="project-context-actions"><span>Reports checked {date(lastRefresh)}</span><Button size="small" loading={refreshing} onClick={() => { refreshRepositoryReports(); setRefreshing(true); setRefreshTick(t => t + 1); message.loading({ content: 'Checking for a new report…', key: 'refresh', duration: 1.2 }); }}>{refreshing ? 'Refreshing…' : 'Refresh results'}</Button><a href={routeHash({kind:'settings',section:'provenance',projectId:r.project})}>Full provenance</a></div>
        {r.tab!=='run'&&<FastPathRunAction auth={launchAuth} projectId={r.project} repository={r.repository} preferredBranch={index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} warning={report?.status==='partial'?'The current report has incomplete scanner evidence. A new request may still be queued with the trusted default policy.':undefined} onAccepted={handleProjectSubmitted}/>}
        {index?.current_overlay&&<section className="panel pr-overlay" aria-label="Current pull request review overlay">

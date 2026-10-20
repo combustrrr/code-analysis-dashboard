@@ -10,10 +10,9 @@ import type {useLaunchAuth} from './useLaunchAuth';
 type Auth=ReturnType<typeof useLaunchAuth>;
 export function AppShell({auth,children,status}:{auth?:Auth;children:ReactNode;status?:ReactNode}){
  const [open,setOpen]=useState(false);const route=parseAppRoute();
- const active=route.kind==='activity'?'activity':route.kind==='settings'?'settings':'projects';
+ const active=route.kind==='settings'?'settings':'projects';
  const primaryLinks=<nav className="shell-links" aria-label="Workspace navigation">
   <a className={active==='projects'?'active':''} aria-current={active==='projects'?'page':undefined} href={routeHash({kind:'projects'})}>Projects</a>
-  <a className={active==='activity'?'active':''} aria-current={active==='activity'?'page':undefined} href={routeHash({kind:'activity'})}>Activity</a>
  </nav>;
  const settingsLink=<a className={`shell-settings ${active==='settings'?'active':''}`} aria-current={active==='settings'?'page':undefined} href={routeHash({kind:'settings',section:'general'})}><SettingOutlined/> Settings</a>;
  return <div className="application-shell">

@@ -23,7 +23,7 @@ function helpers({permissions,overrides={},wakeCoordinator}={}) {
     if(source)return {id:source.repository_id,full_name:source.repository,private:false,default_branch:source.branch,permissions:{pull:true}};
     throw new Error(`Unexpected GitHub request: ${path}`);
   };
-  return {calls,queueCalls,wakeCalls,Failure,json,github,serviceToken,pages:async()=>[],wakeCoordinator:async(...args)=>{wakeCalls.push(args);if(wakeCoordinator)return wakeCoordinator(...args);},queue:async(path,body)=>{queueCalls.push({path,body});if(path==='/queue/status')return json({error:'not_found'},404);if(path==='/queue/recent')return json({requests:[]});return json({...body.request,status:'queued',queue_position:1},201);},seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
+  return {calls,queueCalls,wakeCalls,Failure,json,github,serviceToken,pages:async()=>[],wakeCoordinator:async(...args)=>{wakeCalls.push(args);if(wakeCoordinator)return wakeCoordinator(...args);},queue:async(path,body)=>{queueCalls.push({path,body});if(path==='/queue/status')return json({error:'not_found'},404);if(path==='/queue/recent')return json({requests:[]});return json({...body.request,intent:body.request,status:'preparing'},201);},seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
 }
 
 const session={token:'user-token'};
@@ -144,7 +144,7 @@ test('confirmation rejects refs that move after the signed preview',async()=>{
   await assert.rejects(()=>repositoryApi(post('/api/project-launch',{project_id:source.id,preview_token:preview.preview_token,requested_channels:['semgrep'],idempotency_key:'11111111-1111-4111-8111-111111111111'}),env,session,h),error=>error.status===409&&error.code==='stale_preview');
 });
 
-test('pull-only collaborator launch persists a pinned v3 envelope and idempotent request identity',async()=>{
+test('pull-only collaborator launch persists a pinned v4 envelope and idempotent request identity',async()=>{
   const source=CONFIGURED_TARGETS[0];
   const h=helpers({permissions:{pull:true,push:false,admin:false},overrides:{[`repos/${source.repository}/pulls/7`]:{number:7,title:'Fix',draft:true,head:{ref:'topic',sha:'d'.repeat(40),repo:{id:999,full_name:'fork/repo'}},base:{ref:'Testing',sha:'e'.repeat(40),repo:{full_name:source.repository}}}}});
   const preview=await (await repositoryApi(post('/api/project-preview',{project_id:source.id,selection:{kind:'pr',ref:'7'}}),env,session,h)).json();
@@ -152,8 +152,8 @@ test('pull-only collaborator launch persists a pinned v3 envelope and idempotent
   const response=await repositoryApi(post('/api/project-launch',input),env,session,h);
   const envelope=h.queueCalls[0].body.request;
     assert.equal(response.status,202);
-    assert.equal((await response.clone().json()).queue_position,1);
-    assert.equal(envelope.schema_version,'analysis-request-v3');
+    assert.equal((await response.clone().json()).status,'preparing');
+    assert.equal(envelope.schema_version,'analysis-request-v4');
     assert.equal(envelope.source_sha,'d'.repeat(40));
     assert.equal(envelope.selection.kind,'pr');
     assert.equal(envelope.resolved_selection.kind,'commit');
@@ -197,13 +197,18 @@ test('Fast Path retries return the original accepted request',async()=>{
   const source=CONFIGURED_TARGETS[0],key='66666666-6666-4666-8666-666666666666';
   const h=helpers();h.queue=async(path,body)=>{h.queueCalls.push({path,body});if(path==='/queue/status')return json({request_id:key,status:'queued',queue_position:3,intent:{project_id:source.id,selection:{kind:'branch',ref:source.branch},target_sha:'d'.repeat(40),requested_channels:['semgrep']}},200);throw new Error('must not admit duplicate');};
   const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,refType:'PREFERRED_BRANCH'},key),env,session,h);
-  assert.equal(response.status,202);assert.deepEqual(await response.json(),{status:'queued',request_id:key,run_id:null,repository:EXECUTION_REPOSITORY,source_repository:source.repository,target_sha:'d'.repeat(40),preferred_branch:source.branch,requested_channels:['semgrep'],queue_position:3,duplicate:true});
+  assert.equal(response.status,202);assert.deepEqual(await response.json(),{status:'queued',request_id:key,run_id:null,repository:EXECUTION_REPOSITORY,source_repository:source.repository,target_sha:'d'.repeat(40),preferred_branch:source.branch,requested_channels:['semgrep'],duplicate:true});
 });
 
-test('dashboard aggregate exposes bounded request metadata without credentials',async()=>{
-  const h=helpers();h.queue=async path=>path==='/queue/recent'?json({requests:[{request_id:'77777777-7777-4777-8777-777777777777',status:'queued',created_at:'2026-10-19T00:00:00Z',intent:{project_id:CONFIGURED_TARGETS[0].id,selection:{kind:'branch',ref:CONFIGURED_TARGETS[0].branch},target_sha:'e'.repeat(40)}}]}):json({error:'not_found'},404);
-  const response=await repositoryApi(get('/api/dashboard'),env,session,h),result=await response.json();
-  assert.equal(response.status,200);assert.equal(result.projects.length,CONFIGURED_TARGETS.length);assert.equal(result.recent_requests.length,1);assert.ok(!JSON.stringify(result).includes('user-token'));
+test('projects is the workspace home contract and dashboard is retired',async()=>{
+  const h=helpers();h.queue=async path=>path==='/queue/recent'?json({requests:[{request_id:'77777777-7777-4777-8777-777777777777',status:'preparing',created_at:'2026-10-19T00:00:00Z',intent:{project_id:CONFIGURED_TARGETS[0].id,selection:{kind:'branch',ref:CONFIGURED_TARGETS[0].branch},target_sha:'e'.repeat(40)}}]}):json({error:'not_found'},404);
+  const response=await repositoryApi(get('/api/projects'),env,session,h),result=await response.json();
+  assert.equal(response.status,200);assert.equal(result.projects.length,CONFIGURED_TARGETS.length);
+  assert.equal(result.summary.projects,CONFIGURED_TARGETS.length);assert.equal(result.summary.preparing,1);
+  assert.equal(result.projects[0].lifecycle,'Preparing');assert.equal(result.projects[0].active_analysis.request_id,'77777777-7777-4777-8777-777777777777');
+  assert.ok(['Preparing','Analyzing','Ready','Needs attention'].includes(result.projects[1].lifecycle));
+  assert.ok(!JSON.stringify(result).includes('user-token'));
+  assert.equal(await repositoryApi(get('/api/dashboard'),env,session,h),null);
 });
 
 test('non-collaborators cannot launch and no user source repository can override the registry',async()=>{

@@ -42,7 +42,7 @@ class RepositoryExecutionTests(unittest.TestCase):
         self.assertIsNone(terminal_queue_request({'targets':[], 'requests':[receipt]},
                                                 {'recent_runs':[recent]}, 'request-1'))
 
-    def test_only_exact_fifo_envelope_can_dispatch_retained_target(self):
+    def test_only_exact_accepted_envelope_can_dispatch_retained_target(self):
         from scripts.code_analysis.repository_service import owns_active_request
         self.assertTrue(owns_active_request(
             {'client_request_id': 'current'}, {'request_id': 'current'}))
@@ -53,7 +53,7 @@ class RepositoryExecutionTests(unittest.TestCase):
     def test_queued_v3_uses_pinned_commit_instead_of_mutable_selection(self):
         from scripts.code_analysis.repository_service import queued_selection
         intent = {
-            'schema_version':'analysis-request-v3',
+            'schema_version':'analysis-request-v4',
             'source_repository':'owner/source','source_repository_id':42,
             'selection': {'kind': 'branch', 'ref': 'Testing'},
             'resolved_selection': {'repository':'owner/source','repository_id':42,'kind':'commit','ref':'a'*40},
@@ -63,7 +63,7 @@ class RepositoryExecutionTests(unittest.TestCase):
 
     def test_v3_queue_rejects_a_mismatched_pinned_sha(self):
         from scripts.code_analysis.repository_service import queued_selection
-        intent={'schema_version':'analysis-request-v3','source_repository':'owner/source','source_repository_id':42,'resolved_selection':{'repository':'owner/source','repository_id':42,'kind':'commit','ref':'a'*40},'source_sha':'a'*40,'target_sha':'b'*40,'requested_channels':['semgrep']}
+        intent={'schema_version':'analysis-request-v4','source_repository':'owner/source','source_repository_id':42,'resolved_selection':{'repository':'owner/source','repository_id':42,'kind':'commit','ref':'a'*40},'source_sha':'a'*40,'target_sha':'b'*40,'requested_channels':['semgrep']}
         with self.assertRaisesRegex(ValueError,'Pinned request envelope'):
             queued_selection(intent)
 

@@ -93,7 +93,7 @@ def producer_dispatch_id(request_id, channels):
 
 def queued_selection(intent):
     """Return the canonical repository-qualified selection from a queued request."""
-    if intent.get('schema_version') != 'analysis-request-v3':
+    if intent.get('schema_version') != 'analysis-request-v4':
         raise ValueError('Unsupported queued request schema')
     selection = intent.get('resolved_selection')
     if not isinstance(selection, dict):
@@ -618,7 +618,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             accepted = next(r for r in state['targets'] if r['id'] == selected['id'])
             accepted['client_request_id'] = request_id
             accepted['requested_selection'] = intent.get('selection', selected) if queued_asset is not None else selected
-            if queued_asset is not None and intent.get('schema_version') == 'analysis-request-v3':
+            if queued_asset is not None and intent.get('schema_version') == 'analysis-request-v4':
                 accepted.update(requested_channels=intent['requested_channels'],pr_context=intent.get('pr_context'),
                                 tooling_sha=intent['tooling_sha'],profile_digest=intent['profile_digest'],
                                 analysis_key_components=intent['analysis_key'],run_again=intent.get('run_again',False))
@@ -666,7 +666,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             request_id=row.get('client_request_id')
             # A queued envelope may unlock scheduling for this project, but it
             # must never revive a stale historical client request retained in
-            # another target row. Only the exact FIFO envelope owns the slot.
+            # another target row. Only the exact accepted envelope owns the analysis.
             if not owns_active_request(row, intent):
                 continue
             execution_channels=row.get('execution_channels',row.get('requested_channels',project['enabled_scanners']))
@@ -700,7 +700,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                 receipt.update({k:selected_row[k] for k in ('scan_run_id','run_attempt','execution_sha','status','error','execution_channels','remaining_channels','dispatch_id') if k in selected_row})
         published = report_publication(config,state,current,document)
         summaries.append(published['metrics'])
-        # Keep the FIFO head durable until every selected lane reaches a terminal state.
+        # Keep the analysis durable until every selected lane reaches a terminal state.
         if queued_asset is not None and str(project['id'])==str(project_id):
             active_request=terminal_queue_request(state,published,request_id)
             if request_id and not active_request:
