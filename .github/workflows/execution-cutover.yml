@@ -1,0 +1,52 @@
+name: Execution backbone cutover
+run-name: Execution cutover ${{ inputs.operation }}
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Exact cutover operation
+        required: true
+        type: choice
+        options:
+          - pause
+          - reset
+          - resume
+permissions: {}
+concurrency:
+  group: execution-backbone-cutover
+  cancel-in-progress: false
+jobs:
+  operate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Apply exact cutover operation
+        env:
+          OPERATION: ${{ inputs.operation }}
+          WORKER_API_TOKEN: ${{ secrets.WORKER_API_TOKEN }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
+        run: |
+          set -euo pipefail
+          case "$OPERATION" in
+            pause)
+              body='{"reason":"Production analysis state is being reset for the execution-backbone cutover. Existing public Actions artifacts remain available until retention expiry."}'
+              curl --fail --silent --show-error --request POST \
+                --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
+                --data "$body" "${WORKER_URL}/api/internal/queue/pause" | tee operation-result.json
+              ;;
+            reset)
+              curl --fail --silent --show-error --request POST \
+                --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
+                --data '{}' "${WORKER_URL}/api/internal/queue/reset" | tee queue-reset.json
+              curl --fail --silent --show-error --request POST \
+                --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
+                --data '{"confirm":"RESET_CURRENT_REPORTS"}' "${WORKER_URL}/api/internal/cutover/reset-reports" | tee report-reset.json
+              ;;
+            resume)
+              curl --fail --silent --show-error --request POST \
+                --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
+                --data '{}' "${WORKER_URL}/api/internal/queue/resume" | tee operation-result.json
+              ;;
+            *) exit 2 ;;
+          esac
