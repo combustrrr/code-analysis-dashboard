@@ -1,5 +1,14 @@
 # Current implementation state
 
+## 2026-10-20 analysis journey simplification
+
+The project workspace presents analysis as Choose, Analyze, and Review. Fast analysis is
+the recommended one-click path; configured analysis keeps revision and coverage choices
+available without exposing scanner implementation details by default. Progress remains
+visible without blocking report review, detailed channel and GitHub Actions information
+is collapsed under Technical details, and newly published results open automatically for
+the project the user is currently viewing.
+
 ## 2026-10-20 approved OSS vendor defaults
 
 Snyk and SonarQube Cloud are approved default lanes for all three configured public

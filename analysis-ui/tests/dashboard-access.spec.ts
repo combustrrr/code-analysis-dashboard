@@ -158,7 +158,7 @@ test('visible tabs recheck collaborator access and clear the session when revoke
    await page.getByRole('button',{name:'Review evidence'}).click();
    await expect(page.getByLabel('Selected analysis revision')).toBeVisible();
    await expect(page.getByText('No report available yet. Run analysis to publish the first report.')).toBeVisible();
-   await expect(page.getByRole('link',{name:/Run analysis/})).toHaveAttribute('aria-disabled','true');
+   await expect(page.locator('.analysis-entry .ant-btn-disabled')).toHaveText('Run analysis');
    expect(sessionChecks).toBe(1);
   await page.clock.fastForward(15_000);
   await expect(page.getByText(/Ask a dashboard maintainer to invite your account/)).toBeVisible();
@@ -386,9 +386,9 @@ test('authorized user follows one repository project from selection through publ
   await page.getByLabel('Full commit SHA').fill(sha);
   await page.getByRole('button',{name:'Choose scanner channels'}).click();
   await page.getByRole('button',{name:'Select all available'}).click();
-  await expect(page.getByText('Vendor usage requires confirmation')).toBeVisible();
+  await expect(page.getByText('External scanners included')).toBeVisible();
   await expect(page.getByRole('button',{name:'Review exact revision'})).toBeDisabled();
-  await page.getByText(/Run snyk\. These integrations/).click();
+  await page.getByText(/Include snyk/).click();
   await expect(page.getByRole('button',{name:'Review exact revision'})).toBeEnabled();
   await page.keyboard.press('Escape');
    expect(new URL(page.url()).hash).toContain(`#/projects/${project}`);
@@ -398,12 +398,12 @@ test('authorized user follows one repository project from selection through publ
   await page.getByRole('button',{name:/Fast analysis/}).click();
   await page.getByRole('button',{name:'Start fast analysis'}).click();
  await expect(page.getByText('Analyzing',{exact:true})).toBeVisible();
+ await page.locator('.project-run-tracker').getByText('Technical details').click();
  await expect(page.locator('.project-run-tracker')).toContainText(sha.slice(0,12));
  await expect(page.locator('.project-run-tracker').getByRole('link',{name:'Open GitHub Actions'})).toHaveAttribute('href',`https://github.com/${execution}/actions/runs/43/attempts/2`);
  await page.locator('.project-run-tracker').getByRole('button',{name:'Refresh'}).click();
  await expect(page.getByText('Ready',{exact:true})).toBeVisible();
- await expect(page.locator('.project-run-tracker')).toContainText('This request published its report');
- await page.getByRole('button',{name:'Open report',exact:true}).click();
+ await expect(page.locator('.project-run-tracker')).toContainText('Results are ready');
  await expect(page).toHaveURL(/\/report\?target=published-target/);
  await expect(page.getByLabel('Selected analysis revision')).toContainText(sha.slice(0,12));
    expect(activityReads).toBeGreaterThanOrEqual(2);expect(launches).toBe(1);expect(pageErrors).toEqual([]);

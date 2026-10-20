@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button } from 'antd';
+import { Alert, Button, Collapse, Progress } from 'antd';
 import type { useLaunchAuth } from './useLaunchAuth';
 import { refreshRepositoryReports } from './repositoryReports';
 
@@ -65,8 +65,11 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const [retry, setRetry] = useState(0);
   const [now,setNow]=useState(Date.now());
   const publishedRequest = useRef('');
+  const openedRequest = useRef('');
   const onPhaseRef = useRef(onPhase);
+  const onOpenReportRef = useRef(onOpenReport);
   useEffect(() => { onPhaseRef.current = onPhase; }, [onPhase]);
+  useEffect(() => { onOpenReportRef.current = onOpenReport; }, [onOpenReport]);
   useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),30000);return()=>window.clearInterval(timer);},[]);
 
   const checkStatus = useCallback(async () => {
@@ -85,6 +88,10 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
         publishedRequest.current = request.request_id;
         refreshRepositoryReports();
         window.dispatchEvent(new Event('analysis-report-published'));
+        if (result.target_id && window.location.hash.includes(`/projects/${request.project}`) && openedRequest.current !== request.request_id) {
+          openedRequest.current = request.request_id;
+          window.setTimeout(() => onOpenReportRef.current(result.target_id!), 1500);
+        }
       }
       return result;
     } catch (reason) {
@@ -121,7 +128,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const type = phase === 'published' || phase === 'reused' ? 'success' : phase === 'failed' ? 'error' : phase === 'superseded' ? 'warning' : 'info';
   const title = phase ? phaseCopy[phase] || 'Analysis in progress' : error ? 'Could not refresh analysis status' : auth.session ? 'Checking analysis status…' : 'Sign in to resume analysis tracking';
   const previousReportNote = phase === 'published'
-    ? `This request published its report${activity?.analyzed_sha ? ` for commit ${activity.analyzed_sha.slice(0, 12)}` : ''}. Refreshing the selected report inventory now.`
+    ? `Results are ready${activity?.analyzed_sha ? ` for commit ${activity.analyzed_sha.slice(0, 12)}` : ''}. Opening the report now.`
     : request.previousReport
     ? `The currently displayed report is for ${request.previousTargetLabel || 'the previously selected target'}${request.previousAnalyzedSha ? ` at commit ${request.previousAnalyzedSha.slice(0, 12)}` : ''}${request.previousGeneratedAt ? `, published ${new Date(request.previousGeneratedAt).toLocaleString()}` : ''}. It will remain visible until this request publishes.`
     : 'No previous report was captured for this target. Results will appear here after publication.';
@@ -129,6 +136,8 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const progress=activity?.channel_progress||request.channel_progress||[];
   const finished=progress.filter(channel=>['completed','failed','reused','not_applicable','deferred'].includes(channel.status.toLowerCase())).length;
   const activeChannels=progress.filter(channel=>['active','running','analyzing','claimed'].includes(channel.status.toLowerCase()));
+  const percent=progress.length>0?Math.round((finished/progress.length)*100):(terminal?100:8);
+  const journeyStep=phase==='published'||phase==='reused'||phase==='superseded'?2:1;
 
   return <Alert
     className="project-run-tracker"
@@ -136,17 +145,25 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
     showIcon
     title={title}
     description={<>
-      <p><strong>{request.source_repository||request.repository}</strong> · {request.kind} <code>{request.ref}</code>{request.target_sha&&<> · <code>{request.target_sha.slice(0,12)}</code></>} · started {new Date(request.submittedAt).toLocaleString()} · elapsed {elapsedMinutes<1?'less than a minute':`${elapsedMinutes} minute${elapsedMinutes===1?'':'s'}`}</p>
-      {progress.length>0&&<div className="analysis-progress-summary" aria-label="Scanner channel progress"><strong>{finished} of {progress.length} channels finished</strong>{activeChannels.length>0&&<span>Running now: {activeChannels.map(channel=>channel.channel).join(', ')}</span>}</div>}
+      <div className="analysis-journey" aria-label="Analysis journey">
+        {['Choose', 'Analyze', 'Review'].map((label,index)=><div key={label} className={index<journeyStep?'done':index===journeyStep?'current':''}><span>{index+1}</span><b>{label}</b></div>)}
+      </div>
+      <Progress percent={percent} status={type==='error'?'exception':type==='success'?'success':'active'} showInfo={progress.length>0} />
+      {progress.length>0&&<div className="analysis-progress-summary"><strong>{finished} of {progress.length} checks finished</strong>{activeChannels.length>0&&<span>Analysis is running.</span>}</div>}
       <p>{activity?.error || previousReportNote}</p>
-      {!terminal&&<p className="analysis-time-note">Completion time depends on repository size and GitHub runner availability. The Actions run shows each scanner as it progresses.</p>}
+      {!terminal&&<p className="analysis-time-note">You can keep reviewing the current report or leave this page. New results will open automatically when they are ready.</p>}
       {error && <p>Status refresh is temporarily unavailable. Your analysis was not restarted.</p>}
       <div className="run-tracker-actions">
-        {activity?.producer?.url&&<Button size="small" href={activity.producer.url} target="_blank" rel="noreferrer">Open GitHub Actions</Button>}
         {publishedTargetId && <Button size="small" type="primary" onClick={() => onOpenReport(publishedTargetId)}>Open report</Button>}
         {!terminal && auth.session && <Button size="small" loading={checking} onClick={() => setRetry(value => value + 1)}>Refresh</Button>}
         {terminal && <Button size="small" onClick={onDismiss}>Dismiss</Button>}
       </div>
+      <Collapse ghost size="small" className="run-technical-details" items={[{key:'details',label:'Technical details',children:<>
+        <p><strong>{request.source_repository||request.repository}</strong> · {request.kind} <code>{request.ref}</code>{request.target_sha&&<> · <code>{request.target_sha.slice(0,12)}</code></>}</p>
+        <p>Started {new Date(request.submittedAt).toLocaleString()} · elapsed {elapsedMinutes<1?'less than a minute':`${elapsedMinutes} minute${elapsedMinutes===1?'':'s'}`}</p>
+        {progress.length>0&&<p>{finished} of {progress.length} channels finished{activeChannels.length>0?` · active: ${activeChannels.map(channel=>channel.channel).join(', ')}`:''}</p>}
+        {activity?.producer?.url&&<Button size="small" href={activity.producer.url} target="_blank" rel="noreferrer">Open GitHub Actions</Button>}
+      </>}]} />
     </>}
   />;
 }
