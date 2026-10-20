@@ -20,11 +20,14 @@ requested channels, tooling/profile digests, actor, and idempotency key. A 202 m
 accepted/queued, never scanner completion. Retries with the same idempotency key return
 the existing durable request.
 
-The canonical client routes are `#/dashboard`, `#/projects`,
-`#/projects/:projectId`, `#/projects/:projectId/custom-run`, and
-`#/projects/:projectId/settings`. Older query-hash links are mapped to these routes; new
-links must use the canonical path form. Settings is read-only, and the GitHub configuration
-history link is visible only when current access includes `can_configure`.
+The canonical client routes are `#/projects`, `#/activity`,
+`#/projects/:projectId`, `#/projects/:projectId/issues`,
+`#/projects/:projectId/report`, `#/projects/:projectId/run`, and global
+`#/settings?section=<section>&project=<optional-id>`. Older query hashes and superseded
+dashboard, custom-run, and project-settings routes are not aliases. Settings owns
+General, Projects, Connections & readiness, and Evidence provenance; read-only values
+remain informational. The GitHub configuration history link is visible only when current
+access includes `can_configure`.
 
 The bounded Durable Object queue is FIFO (maximum 100) with one active source-revision request globally.
 Selected channel producers for that revision may run concurrently; a request remains

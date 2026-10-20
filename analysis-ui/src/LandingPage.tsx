@@ -3,6 +3,8 @@ import { ArrowDownOutlined, ArrowRightOutlined, BranchesOutlined, CodeOutlined, 
 import type { useLaunchAuth } from './useLaunchAuth';
 import { AppearanceToggle, useAppearance } from './Appearance';
 import './landing.css';
+import trustLabLogo from './assets/trustlab-logo.jpg';
+import mphasisLogo from './assets/mphasis-logo.jpg';
 
 type Auth = ReturnType<typeof useLaunchAuth>;
 
@@ -17,7 +19,7 @@ export function LandingPage({ auth, onStart, accessError, accessPending = false,
     <main className="landing-page landing-v2">
       <div className="landing-wrap">
         <nav className="landing-nav" aria-label="Main navigation">
-          <a className="landing-brand" href="#top" aria-label="Code Analysis home"><span className="landing-brand-mark"><RadarChartOutlined /></span><span>Code Analysis</span></a>
+          <a className="landing-brand landing-cobrand" href="#top" aria-label="Code Analysis home"><span className="landing-brand-mark"><RadarChartOutlined /></span><span><strong>Code Analysis</strong><small>IIT Bombay Trust Lab × Mphasis</small></span></a>
           <div className="landing-nav-right">
             <span className="landing-nav-note">READ-ONLY ANALYSIS</span>
             <AppearanceToggle className="landing-theme-toggle" />
@@ -75,7 +77,7 @@ export function LandingPage({ auth, onStart, accessError, accessPending = false,
           <Button type="primary" onClick={primaryAction} disabled={checkingAccess || (!signedIn && !auth.available)}>{checkingAccess ? 'Checking access…' : signedIn ? 'Open workspace' : 'Get started'} <ArrowRightOutlined /></Button>
         </section>
 
-        <footer className="landing-footer"><a className="landing-brand" href="#top"><span className="landing-brand-mark"><RadarChartOutlined /></span><span>Code Analysis</span></a><span>Read-only analysis. Evidence you can trace.</span><span>Dashboard access is limited to approved GitHub collaborators.</span></footer>
+        <footer className="landing-footer"><div className="landing-partner-lockup"><img src={trustLabLogo} alt="IIT Bombay Trust Lab"/><span>×</span><img src={mphasisLogo} alt="Mphasis"/></div><span>Read-only analysis. Evidence you can trace.</span><span>Dashboard access is limited to approved GitHub collaborators.</span></footer>
       </div>
     </main>
   </ConfigProvider>;

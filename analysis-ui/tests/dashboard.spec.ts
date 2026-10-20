@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const scannerChoices=(ids=['semgrep'])=>ids.map(id=>({id,channel:id,mode:['snyk','sonarqube-cloud','coderabbit-ai-advisory'].includes(id)?'vendor':'portable',group:id,status:'configured',reason:'',default_selected:!['snyk','sonarqube-cloud','coderabbit-ai-advisory'].includes(id),selectable:true}));
 const revisionPreview=(project,source,kind,ref,sha,channels=scannerChoices())=>({preview_id:'preview-1',preview_token:'signed-preview',previewed_at:new Date().toISOString(),project_id:project,source_repository:source,source_repository_id:Number(project),selection:{kind,ref},target_sha:sha,pr_context:null,tooling_sha:'a'.repeat(40),profile_digest:'b'.repeat(64),channels,cached_channels:[]});
+const PROJECT='/#/projects/1278177697';
 
 // This suite intentionally runs against the explicit Vite fixtures build.
 test.describe('local fixture build', () => {
@@ -16,17 +17,20 @@ test('favicon is served from the configured base path', async ({ page }) => {
   expect(response.headers()['content-type']).toContain('image/svg+xml');
 });
 
-test('selected repositories are not silently rewritten', async ({ page }) => {
+test('modern project routes are canonical and legacy hashes are retired', async ({ page }) => {
+  await page.goto(PROJECT);
+  await expect(page).toHaveURL(/#\/projects\/1278177697$/);
+  await expect(page.getByLabel('Selected analysis revision')).toContainText('Agentic-Kibana');
   await page.goto('/#repository=combustrrr%2Fcode-analysis-dashboard&project=1278177697');
-  expect(new URL(page.url()).hash).toContain('repository=combustrrr%2Fcode-analysis-dashboard');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Agentic-Kibana');
+  await expect(page).toHaveURL(/#repository=/);
+  await expect(page.getByRole('heading', { name: 'Choose a codebase', level: 1 })).toBeVisible();
 });
 
 test('retained dataset preserves source identity, filters and issue provenance', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Agentic-Kibana');
-  await expect(page.getByText('ANALYZED COMMIT')).toBeVisible();
+  await page.goto(PROJECT);
+  await expect(page.getByLabel('Selected analysis revision')).toContainText('Agentic-Kibana');
+  await expect(page.getByLabel('Selected analysis revision')).toContainText('Revision');
   await page.getByRole('tab', { name: /^Issues/ }).click();
   await expect(page.getByLabel('Search issues')).toBeVisible();
   await page.getByLabel('Search issues').fill('assert');
@@ -48,7 +52,7 @@ test('retained dataset preserves source identity, filters and issue provenance',
 });
 
 test('developers can group findings by rule and inspect a relationship', async ({page}) => {
-  await page.goto('/');
+  await page.goto(PROJECT);
   await page.getByRole('tab', {name:/^Issues/}).click();
   await page.getByLabel('Group issues').click();
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'Group by rule'}).click();
@@ -60,7 +64,7 @@ test('developers can group findings by rule and inspect a relationship', async (
   await expect(group.locator('.related-finding').first()).toBeVisible();
 });
 test('overview visualizes issue composition and offers cautious investigation priorities', async ({page}) => {
-  await page.goto('/');
+  await page.goto(PROJECT);
   await expect(page.getByRole('img', {name:'Finding distribution by severity'})).toBeVisible();
   await expect(page.getByRole('img', {name:'Finding distribution by scanner overlap'})).toBeVisible();
   await expect(page.getByRole('heading', {name:'Investigation priorities'})).toBeVisible();
@@ -74,8 +78,8 @@ test('overview visualizes issue composition and offers cautious investigation pr
 
 test('scanner failures remain separate from findings and navigation works on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/#tab=scanners');
-  await expect(page.getByText('Scanner execution and evidence')).toBeVisible();
+  await page.goto(PROJECT+'/report');
+  await expect(page.getByRole('heading',{name:'Report and scanner coverage'})).toBeVisible();
   await page.getByLabel('Execution status').click();
   await expect(page.locator('.ant-select-dropdown:visible')).not.toHaveClass(/(?:enter|appear)-active/);
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'NOT AVAILABLE'}).click();
@@ -84,7 +88,7 @@ test('scanner failures remain separate from findings and navigation works on mob
   await expect(rows.first()).toContainText('Unavailable');
   await expect(page.getByText('Atheris', { exact: true })).toBeVisible();
   await expect(page.getByText('Schemathesis', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Target revision')).toBeVisible();
+  await expect(page.getByLabel('Target revision', { exact: true })).toBeVisible();
 });
 
 test('untrusted messages render as text', async ({ page }) => {
@@ -93,7 +97,7 @@ test('untrusted messages render as text', async ({ page }) => {
     rows[0].message = '<img src=x onerror="window.injected=true">';
     await route.fulfill({ status: response.status(), headers: response.headers(), json: rows });
   });
-  await page.goto('/'); await page.getByRole('tab', { name: /^Issues/ }).click();
+  await page.goto(PROJECT); await page.getByRole('tab', { name: /^Issues/ }).click();
   await page.getByLabel('Search issues').fill('window.injected');
   await expect(page.locator('.issue-link').first()).toContainText('<img');
   expect(await page.evaluate(() => (window as any).injected)).toBeUndefined();
@@ -101,7 +105,7 @@ test('untrusted messages render as text', async ({ page }) => {
 });
 
 test('Ant Design filters, pagination and responsive layout remain usable', async ({ page }, testInfo) => {
-  await page.goto('/');
+  await page.goto(PROJECT);
   await expect(page.getByRole('button', { name: 'Browse issues', exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('overview.png'), fullPage: true });
   await page.getByRole('tab', { name: /^Issues/ }).click();
@@ -122,37 +126,35 @@ test('Ant Design filters, pagination and responsive layout remain usable', async
   await expect(page.getByRole('dialog')).not.toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('mobile.png'), fullPage: true });
-  await page.getByLabel('Target revision').click();
+  await page.getByLabel('Target revision', { exact: true }).click();
   await expect(page.getByRole('listbox')).toBeAttached();
   await page.keyboard.press('Escape');
 });
 
 
 test('overview drilldown, scanner filters and provenance use retained evidence', async ({ page }) => {
-  await page.goto('/');
+  await page.goto(PROJECT);
   await expect(page.getByRole('heading', { name: 'Directories with most findings' })).toBeVisible({timeout:30000});
   const directory = page.locator('.directory-row .ant-btn').first();
   const path = await directory.innerText();
   await directory.click();
   await expect(page.getByText(`Directory: ${path}`, {exact:true})).toBeVisible();
   await expect(page.locator('.ant-table-tbody > tr.ant-table-row').first()).toContainText(path);
-  await page.getByRole('tab', {name:'Scanners',exact:true}).click();
+  await page.getByRole('tab', {name:'Report',exact:true}).click();
   await page.getByLabel('Execution status').click();
   await expect(page.locator('.ant-select-dropdown:visible')).not.toHaveClass(/(?:enter|appear)-active/);
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'NOT AVAILABLE'}).click();
   const rows=page.locator('.ant-table-tbody > tr.ant-table-row');
   await expect(rows.first()).toContainText('Unavailable');
   for (const row of await rows.all()) await expect(row).toContainText('Unavailable');
-  await page.getByRole('tab', {name:'Readiness',exact:true}).click();
-  await page.getByRole('tab', {name:'Provenance',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Analysis identity'})).toBeVisible();
-  await expect(page.getByRole('heading',{name:'Producing workflows'})).toBeVisible();
-  await expect(page.locator('.panel').filter({hasText:'Producing workflows'}).getByRole('link').first()).toHaveAttribute('href', /github.com.*actions\/runs\/\d+/);
+  await page.goto('/#/settings?section=provenance&project=1278177697');
+  await expect(page.getByRole('heading',{name:'Evidence and execution boundary'})).toBeVisible();
+  await expect(page.getByText('Detailed report provenance')).toBeVisible();
 });
 
 test('mobile issue evidence opens accessibly and closes with Escape', async ({page}) => {
   await page.setViewportSize({width:390,height:844});
-  await page.goto('/');
+  await page.goto(PROJECT);
   await page.getByRole('tab',{name:/^Issues/}).click();
   await page.locator('.issue-link').first().click();
   await expect(page.getByRole('dialog',{name:'Issue detail'})).toBeVisible();
@@ -164,20 +166,20 @@ test('mobile issue evidence opens accessibly and closes with Escape', async ({pa
 
 test('theme persists and direct analysis accepts an exact commit', async ({page}) => {
   await page.route('**/index.json', async route => { const data = JSON.parse(readFileSync('public/data/index.json','utf8')); data.analysis_default_branch = 'Testing'; await route.fulfill({json:data}); });
-  await page.goto('/');
+  await page.goto(PROJECT);
   await page.getByText('Light', {exact:true}).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   await page.getByRole('link',{name:'Choose revision and scanners'}).click();
-  await expect(page).toHaveURL(/#\/projects\/1360051890\/custom-run/);
+  await expect(page).toHaveURL(/#\/projects\/1278177697\/run/);
   const dialog=page.getByRole('dialog',{name:'Custom run'});
   await dialog.getByRole('radio',{name:'Commit SHA'}).click();
   await dialog.getByLabel('Full commit SHA').fill('a'.repeat(40));
   await expect(dialog.getByLabel('Full commit SHA')).toHaveValue('a'.repeat(40));
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'Refresh results',exact:true}).click();
-  await expect(page.getByText(/Reports checked:/)).toBeVisible();
+  await expect(page.locator('.project-context-actions').getByText(/Reports checked/)).toBeVisible();
 });
 
 
@@ -379,9 +381,10 @@ test.skip('superseded dialog tracking fixture',async({page,context})=>{
 
 
 test('issue filters compose, clear and remain usable on mobile',async({page})=>{
- await page.goto('/#tab=issues');
+ await page.goto(PROJECT+'/issues');
  const rows=page.locator('.ant-table-tbody > tr.ant-table-row');
  await expect(rows.first()).toBeVisible();
+ await page.getByRole('button',{name:'More filters'}).click();
  await page.getByLabel('Rule',{exact:true}).click();
  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(1).click();
  await expect(rows.first()).toBeVisible();
@@ -455,7 +458,7 @@ test('unsafe source URLs are omitted from report links', async ({ page }) => {
     detail.source_url = 'javascript:alert(document.domain)';
     await route.fulfill({ status: response.status(), headers: response.headers(), json: rows });
   });
-  await page.goto('/');
+  await page.goto(PROJECT);
   await page.getByRole('tab', { name: /^Issues/ }).click();
   await page.getByLabel('Search issues').fill(target.file);
   await page.locator('.issue-link').first().click();
@@ -477,8 +480,7 @@ test('large threat reports render one findings page without blocking the report'
     metrics: { findings_total: findings.length, findings_by_category: { 'code-quality': findings.length }, findings_by_severity: { MEDIUM: findings.length }, advisories_total: 0, guidance_matched: findings.length, guidance_fallback: 0 }, findings
   }}));
   await page.route('**/data/reports/retained/threat-report.md', route => route.fulfill({ body: '# Threat report', contentType: 'text/markdown' }));
-  await page.goto('/');
-  await page.getByRole('tab', { name: 'Threat Report' }).click();
+  await page.goto(PROJECT+'/report');
   await expect(page.getByRole('heading', { name: 'Threat Report' })).toBeVisible();
   await expect(page.getByAltText('TrustLab')).toBeVisible();
   await expect(page.getByAltText('Mphasis')).toBeVisible();

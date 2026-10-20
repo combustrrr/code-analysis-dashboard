@@ -33,7 +33,7 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
      const restored=restoreAuthDestination();
      if(sessionStorage.getItem('analysis-workspace-requested')==='true') {
       sessionStorage.removeItem('analysis-workspace-requested');
-      if(!isWorkspaceRoute())location.hash=routeHash({kind:'dashboard'});
+      if(!isWorkspaceRoute())location.hash=routeHash({kind:'projects'});
       setWorkspaceRequested(true);
      } else if(restored) setWorkspaceRequested(isWorkspaceRoute());
    } catch {}

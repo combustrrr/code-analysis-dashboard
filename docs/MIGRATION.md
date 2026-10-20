@@ -63,11 +63,13 @@ instructions. Current deployment evidence is maintained in [HANDOFF.md](HANDOFF.
 
 ## Frontend route cutover
 
-The authenticated information architecture uses `#/dashboard`, `#/projects`, and
-project-scoped report, custom-run, and settings routes. Legacy query hashes are accepted
-only as inbound aliases and immediately normalized; generated navigation uses the path
-routes. Project listing, report opening, dashboard search, and settings do not enqueue
-analysis. Only Fast Path or the final custom-wizard confirmation can create a request.
+The authenticated information architecture uses `#/projects`, `#/activity`,
+`#/projects/:projectId`, the project `issues`, `report`, and `run` routes, and the global
+`#/settings?section=<section>&project=<optional-id>` workspace. Legacy query hashes,
+`#/dashboard`, project-scoped settings, and the old custom-run route are removed rather
+than normalized. Opening projects, changing navigation, filtering, refreshing, and
+downloading evidence never enqueue analysis. Only the explicit **Run analysis** action
+can create a request.
 
 ## Storage Key Compatibility
 

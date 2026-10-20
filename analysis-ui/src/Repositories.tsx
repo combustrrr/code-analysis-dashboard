@@ -39,7 +39,7 @@ function useRegistry(auth:Auth){
 }
 
 function openProject(registry:Registry,project:ConfiguredProject){
- location.hash=routeHash({kind:'project',repository:registry.execution_repository.full_name,projectId:project.id,view:'overview'});
+ location.hash=routeHash({kind:'project',projectId:project.id,view:'overview'});
 }
 
 export function Repositories({auth}:{auth:Auth}){

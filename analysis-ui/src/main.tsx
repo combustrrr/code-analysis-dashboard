@@ -4,8 +4,8 @@ import { ProjectLauncher } from './ProjectLauncher';
 import { applicationEndpoint, repositoryJson } from './repositoryReports';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Alert, Button, Collapse, ConfigProvider, Descriptions, Drawer, Empty, Grid, Input, Progress, Select, Space, Statistic, Table, Tabs, Tag, Typography, theme, message } from 'antd';
-import { CodeOutlined, GithubOutlined, SearchOutlined } from '@ant-design/icons';
+import { Alert, Button, Collapse, ConfigProvider, Drawer, Empty, Grid, Input, Progress, Select, Space, Statistic, Table, Tabs, Tag, message } from 'antd';
+import { GithubOutlined, SearchOutlined } from '@ant-design/icons';
 import 'antd/dist/reset.css';
 import './style.css';
 import './workspace.css';
@@ -15,13 +15,16 @@ import { AnalysisLauncher, type LaunchRequest } from './AnalysisLauncher';
 import { ThreatReport } from './ThreatReport';
 import { Settings } from './Settings';
 import { safeGithubUrl } from './safeUrls';
-import { ProjectPicker, Repositories } from './Repositories';
+import { Repositories } from './Repositories';
 import { LandingPage } from './LandingPage';
-import { AppearanceProvider, AppearanceToggle, useAppearance } from './Appearance';
+import { AppearanceProvider, useAppearance } from './Appearance';
 import { ProjectRunTracker, type ProjectRunRequest } from './ProjectRunTracker';
-import {normalizeLegacyHash,parseAppRoute,routeHash,type ReportView} from './appRoutes';
-import {DashboardHome} from './DashboardHome';
+import {parseAppRoute,routeHash,type ProjectView} from './appRoutes';
+import {ActivityPage} from './DashboardHome';
 import {FastPathRunAction} from './FastPathRunAction';
+import {AppShell} from './AppShell';
+import {RevisionRibbon} from './RevisionRibbon';
+import {applicationTheme} from './brand';
 
 type Target = { scan_run_id?: number; run_attempt?: number; tooling_sha?: string; lifecycle_status?: string; id: string; label: string; repository: string; source_repository: string; head_sha: string; kind: string; branch: string; pr?: number; base_branch?: string; base_sha?: string; checked_at: string; status: string; report?: string; error?: string };
 type Index = { report_storage?: {compressed_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; current_overlay?: {overlay_key:string;status:string;head_sha:string;checked_at?:string;pr_context:{number:number;title?:string;draft?:boolean;head_repository:string;head_branch:string;base_repository:string;base_branch:string;base_sha:string};channel:{status:string;reason?:string}}; discovery_error?: string; publication_error?: string };
@@ -36,12 +39,12 @@ async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
   return repositoryJson<T>(path, signal);
 }
 const DEFAULT_EXECUTION_REPOSITORY=import.meta.env.VITE_DEFAULT_EXECUTION_REPOSITORY||'combustrrr/code-analysis-dashboard';
-function route() {const value=parseAppRoute();if(value.kind==='project')return{repository:value.repository||DEFAULT_EXECUTION_REPOSITORY,project:value.projectId,target:value.target||'',tab:value.view,section:'',issue:value.issue||''};if(value.kind==='custom-run')return{repository:value.repository||DEFAULT_EXECUTION_REPOSITORY,project:value.projectId,target:'',tab:'custom-run',section:'',issue:''};if(value.kind==='settings')return{repository:value.repository||DEFAULT_EXECUTION_REPOSITORY,project:value.projectId,target:'',tab:'settings',section:value.section||'connections',issue:''};return{repository:'',project:'',target:'',tab:value.kind==='projects'?'repositories':value.kind,section:'',issue:''};}
+function route() {const value=parseAppRoute();if(value.kind==='project')return{repository:DEFAULT_EXECUTION_REPOSITORY,project:value.projectId,target:value.target||'',tab:value.view,section:'',issue:value.issue||''};if(value.kind==='project-run')return{repository:DEFAULT_EXECUTION_REPOSITORY,project:value.projectId,target:'',tab:'run',section:'',issue:''};if(value.kind==='settings')return{repository:'',project:value.projectId||'',target:'',tab:'settings',section:value.section,issue:''};return{repository:'',project:'',target:'',tab:value.kind,section:'',issue:''};}
 function isRepositoryAvailabilityError(value: string) { return /retired|unsupported|not supported|project is unavailable|private reports are not supported/i.test(value); }
 const PROJECT_RUNS_STORAGE_KEY = 'analysis-project-runs';
 const ACTIVE_PROJECT_RUN_PHASES = new Set(['queued', 'running', 'scanning', 'collecting', 'publishing']);
 function readProjectRuns(): ProjectRunRequest[] { try { const value = JSON.parse(sessionStorage.getItem(PROJECT_RUNS_STORAGE_KEY) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } }
-function navigate(target: string, tab: string, issue = '') { const current = route(); if(!current.project)return;location.hash=routeHash({kind:'project',repository:current.repository,projectId:current.project,target:target||undefined,view:tab as ReportView,issue:issue||undefined}); }
+function navigate(target: string, tab: ProjectView, issue = '') { const current = route(); if(!current.project)return;location.hash=routeHash({kind:'project',projectId:current.project,target:target||undefined,view:tab,issue:issue||undefined}); }
 function date(s?: string) { return s ? new Date(s).toLocaleString() : 'Unavailable'; }
 const colors: Record<string, string> = { CRITICAL: 'red', HIGH: 'volcano', MEDIUM: 'gold', LOW: 'blue', INFO: 'default', current: 'green', partial: 'orange', failed: 'red', scanning: 'blue', COMPLETED: 'green', CONFIGURED_COMPLETE: 'green', POLICY_FINDINGS: 'orange', NOT_AVAILABLE: 'orange', FAILED: 'red' };
 function Badge({ value }: { value: string }) { return <Tag className={`status-tag status-${value}`} color={colors[value]}>{states[value] || value.replaceAll('_', ' ')}</Tag>; }
@@ -51,6 +54,12 @@ const chartColors = ['#ff4d4f', '#ff7a45', '#fadb14', '#1677ff', '#8c8c8c', '#92
 function DonutChart({ values, label, center }: { values: { label: string; value: number; color?: string }[]; label: string; center: string }) {
   const total = values.reduce((sum, item) => sum + item.value, 0); let offset = 0;
   return <div className="donut-layout"><svg className="donut" viewBox="0 0 42 42" role="img" aria-label={label}><circle className="donut-track" cx="21" cy="21" r="15.9155" fill="none" strokeWidth="6"/>{total > 0 && values.map((item, index) => { const share = item.value / total * 100; const start = offset; offset += share; return <circle key={item.label} cx="21" cy="21" r="15.9155" fill="none" stroke={item.color || chartColors[index]} strokeWidth="6" strokeDasharray={`${share} ${100 - share}`} strokeDashoffset={25 - start}/>; })}<text x="21" y="20" textAnchor="middle">{center}</text><text className="donut-caption" x="21" y="25" textAnchor="middle">findings</text></svg><div className="chart-legend">{values.filter(v => v.value).map((item, i) => <div key={item.label}><i style={{ background: item.color || chartColors[i] }}/><span>{item.label}</span><strong>{item.value.toLocaleString()}</strong></div>)}</div></div>;
+}
+
+function ReportWorkspace({report,target}:{report:Report;target:Target}){
+ const [status,setStatus]=useState('');
+ const rows=report.channels.filter(channel=>!status||channel.status===status);
+ return <section className="report-workspace"><header className="report-workspace-heading"><div><span className="eyebrow">IMMUTABLE EVIDENCE</span><h2>Report and scanner coverage</h2><p>Review the published document and the execution state of every expected channel.</p></div><Select aria-label="Execution status" value={status} onChange={setStatus} options={[{value:'',label:'All statuses'},...[...new Set(report.channels.map(channel=>channel.status))].sort().map(value=>({value,label:value.replaceAll('_',' ')}))]}/></header><Alert showIcon type="info" title="Coverage is not a clean bill of health" description="Failed, deferred, or unavailable channels remain incomplete; healthy sibling findings are still retained."/><Table<Channel> rowKey="channel" size="middle" dataSource={rows} pagination={false} scroll={{x:760}} columns={[{title:'Scanner',key:'scanner',render:(_,channel)=><><strong>{channel.name}</strong><small>{channel.class}</small></>},{title:'Status',key:'status',render:(_,channel)=><Badge value={channel.status}/>},{title:'Findings',key:'findings',render:(_,channel)=>channel.findings===null?'Unavailable':channel.findings.toLocaleString()},{title:'Evidence limitation',key:'reason',render:(_,channel)=>channel.reason||'Retained evidence available'}]}/>{target.report?<ThreatReport reportPath={target.report} targetSha={target.head_sha}/>:<Empty description="The immutable report document is unavailable for this revision."/>}</section>;
 }
 
 function Evidence({ detail, source, error, findings, openFinding }: { detail?: Detail; source: string[]; error: string; findings: Finding[]; openFinding: (id: string) => void }) {
@@ -86,15 +95,13 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const [refreshing, setRefreshing] = useState(false);
   const [hostAccess,setHostAccess]=useState<{can_launch:boolean;can_configure:boolean}>({can_launch:false,can_configure:false});
   useEffect(()=>{const refresh=()=>setRefreshTick(t=>t+1);window.addEventListener('analysis-report-published',refresh);return()=>window.removeEventListener('analysis-report-published',refresh);},[]);
-  const [category, setCategory] = useState('');
-  const [channelStatus, setChannelStatus] = useState('');
   const [directory, setDirectory] = useState('');
   const [rule,setRule]=useState(''); const [file,setFile]=useState(''); const [locationFilter,setLocationFilter]=useState(''); const [overlap,setOverlap]=useState('');
    const [index, setIndex] = useState<Index>(); const [error, setError] = useState(''); const [r, setRoute] = useState(route());
    const [currentOverlay,setCurrentOverlay]=useState<PrOverlay>(); const [overlayError,setOverlayError]=useState('');
    const refreshSequence = useRef(0);
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
-  const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [moreFilters,setMoreFilters]=useState(false); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
     useEffect(() => {
       const sequence = ++refreshSequence.current;
       const c = new AbortController();
@@ -162,7 +169,7 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   };
   const dismissProjectRun = (requestId: string) => persistProjectRuns(projectRunsRef.current.filter(item => item.request_id !== requestId));
   const openProjectRunReport = (request: ProjectRunRequest, targetId: string) => {
-    location.hash = routeHash({kind:'project',projectId:request.project,repository:request.repository,target:targetId,view:'overview'});
+    location.hash = routeHash({kind:'project',projectId:request.project,target:targetId,view:'overview'});
   };
   const projectRunTrackers = projectRuns.map(request => <ProjectRunTracker key={request.request_id} auth={launchAuth} request={request} onPhase={updateProjectRunPhase} onDismiss={() => dismissProjectRun(request.request_id)} onOpenReport={id => openProjectRunReport(request, id)}/>);
   const activeProjectRun = projectRuns.find(request => request.repository === r.repository && request.project === r.project && (!request.phase || ACTIVE_PROJECT_RUN_PHASES.has(request.phase)));
@@ -205,32 +212,16 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   }, [r.issue, screens.lg, target?.id]);
   const fresh = !!report && report.analyzed_sha === target?.head_sha;
   const completed = report?.channels.filter(c => ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(c.status)).length || 0;
-  const humanBytes=(n?:number)=>typeof n==='number'? (n>950_000_000? (n/1_000_000_000).toFixed(2)+' GB' : (n/1_000_000).toFixed(1)+' MB') : 'Unavailable';
-   const appTheme = { algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: {
-     colorPrimary: appearance === 'dark' ? '#75c7b1' : '#08767a',
-     colorLink: appearance === 'dark' ? '#a6d8c8' : '#075b60',
-     colorLinkHover: appearance === 'dark' ? '#d0eadc' : '#06484c',
-     colorBgBase: appearance === 'dark' ? '#102b34' : '#eef1eb',
-     colorBgContainer: appearance === 'dark' ? '#183640' : '#fbfcf8',
-     colorText: appearance === 'dark' ? '#f0f5ef' : '#122c33',
-     colorTextSecondary: appearance === 'dark' ? '#a2beb6' : '#4d666a',
-     colorBorder: appearance === 'dark' ? '#34535a' : '#cbd6d0',
-     borderRadius: 6, fontFamily: 'Segoe UI, sans-serif'
-   }, components: { Button: { primaryColor: appearance === 'dark' ? '#102b34' : '#ffffff' } } };
+   const appTheme=applicationTheme(appearance);
     if (!r.repository) {
-      if(r.tab==='dashboard')return <ConfigProvider theme={appTheme}><header className="topbar workspace-topbar"><a className="brand" href={routeHash({kind:'dashboard'})}><CodeOutlined/> Code Analysis</a><Space wrap><a href={routeHash({kind:'dashboard'})}>Dashboard</a><a href={routeHash({kind:'projects'})}>Projects</a>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}<AppearanceToggle/></Space></header><div className="workspace-run-status">{projectRunTrackers}</div><DashboardHome auth={launchAuth}/></ConfigProvider>;
-      if (r.tab === 'repositories') return <ConfigProvider theme={appTheme}>
-        <header className="topbar workspace-topbar"><a className="brand" href={routeHash({kind:'dashboard'})}><CodeOutlined/> Code Analysis</a><Space wrap><a href={routeHash({kind:'dashboard'})}>Dashboard</a><a href={routeHash({kind:'projects'})}>Projects</a>{viewerAuth?.session&&<><span>Signed in as {viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}<AppearanceToggle className="appearance-toggle"/></Space></header>
-        <div className="workspace-run-status">{projectRunTrackers}</div>
-        <main className="workspace-home"><div className="workspace-intro"><div className="eyebrow">CODEBASE WORKSPACE</div><h1>Choose a configured codebase</h1><p>Browse the current reports for the trusted analysis targets. Project selection is read-only; launching analysis is a separate action.</p></div><Repositories auth={launchAuth}/></main>
-      </ConfigProvider>;
-      return <LandingPage auth={launchAuth} onStart={() => { try { sessionStorage.setItem('analysis-workspace-requested', 'true'); } catch {} location.hash = '#tab=repositories'; }} />;
+      if(r.tab==='projects')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}><main className="workspace-home"><div className="workspace-intro"><div className="eyebrow">PROJECTS</div><h1>Choose a codebase</h1><p>Open current evidence or follow work already in progress. Nothing runs until you choose Run analysis.</p></div><Repositories auth={launchAuth}/></main></AppShell></ConfigProvider>;
+      if(r.tab==='activity')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}><ActivityPage auth={launchAuth}/></AppShell></ConfigProvider>;
+      if(r.tab==='settings')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}><Settings auth={launchAuth} onRun={projectId=>location.hash=routeHash({kind:'project-run',projectId})}/></AppShell></ConfigProvider>;
+      return <LandingPage auth={launchAuth} onStart={() => { try { sessionStorage.setItem('analysis-workspace-requested', 'true'); } catch {} location.hash=routeHash({kind:'projects'}); }} />;
     }
-    return <ConfigProvider theme={appTheme}>
-      <header className="topbar"><a className="brand" href={routeHash({kind:'dashboard'})}><CodeOutlined/> Code Analysis</a><Space wrap><a href={routeHash({kind:'dashboard'})}>Dashboard</a><a href={routeHash({kind:'projects'})}>Projects</a>{viewerAuth?.session&&<><span>{viewerAuth.session.login}</span><Button onClick={viewerAuth.signOut}>Sign out</Button></>}{r.repository&&<ProjectPicker auth={launchAuth} project={r.project}/>}<AppearanceToggle/>{r.project&&<a href={routeHash({kind:'settings',projectId:r.project,repository:r.repository})}>Settings</a>}{index?.analysis_repository&&<a href={`https://github.com/${index.analysis_repository}/actions`} target="_blank" rel="noreferrer"><GithubOutlined/> Workflows</a>}</Space></header>
-     <div className="project-run-status">{projectRunTrackers}</div>
+    return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}>
      {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={index?.preferred_branch} close={() => setRunOpen(false)} onSubmitted={handleProjectSubmitted}/>}
-     {r.tab==='custom-run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={index?.preferred_branch} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,repository:r.repository,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
+     {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={index?.preferred_branch} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
     {runOpen && !(r.repository && r.project) && <AnalysisLauncher
       onSubmitted={request => {
         const previous = index?.targets.find(t => t.kind === request.kind && (t.kind === 'pr' ? String(t.pr) === request.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === request.ref : t.branch === request.ref));
@@ -243,32 +234,11 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
       channelCount={report?.channels.length} completedChannels={completed}
       queued={index ? index.targets.filter(t => t.status === 'queued').length : undefined} scanning={index ? index.targets.filter(t => t.status === 'scanning').length : undefined}
     />}
-    <main>
+    <main className="project-workspace">
        {pendingLaunch && <Alert className="launch-tracking" type={newOutput ? 'success' : 'info'} showIcon closable onClose={() => { setPendingLaunch(undefined); try { sessionStorage.removeItem('analysis-pending-launch'); } catch {} }} title={launchStatus} description={<><p>{pendingLaunch.kind}: <code>{pendingLaunch.ref}</code>. Submitted {date(pendingLaunch.submittedAt)}. {newOutput ? 'Open the report to inspect its analyzed SHA, producing run, and scanner completeness.' : 'Previous output may remain visible until a new report is published. Status is based on the latest published inventory.'}</p><RequestStatus auth={launchAuth} runId={pendingLaunch.runId}/><Space wrap><a href={pendingLaunch.url} target="_blank" rel="noreferrer">Track analysis request</a>{launched && <Button onClick={() => navigate(launched.id, 'overview')}>{newOutput ? 'Open new report' : 'View selected target'}</Button>}<Button onClick={() => { refreshRepositoryReports(); setRefreshTick(t => t + 1); }}>Check for results</Button></Space></>}/>}
-      <section className="project">
-        <div className="eyebrow">SOURCE REPOSITORY</div><h1>{target?.repository || 'Code quality dashboard'}</h1>
-        <div className="target-row"><label htmlFor="target">What do you want to analyze?</label>
-          <Select id="target" aria-label="Target revision" showSearch optionFilterProp="label" value={target?.id} placeholder="Choose branch, pull request, or commit" onChange={value => navigate(value, r.tab)} options={['branch', 'pr', 'commit'].map(kind => ({ label: kind === 'branch' ? 'Branches' : kind === 'pr' ? 'Pull requests' : 'Selected commit', options: index?.targets.filter(t => t.kind === kind).map(t => ({ value: t.id, label: t.label })) || [] }))}/>
-           {target && <span title={target.lifecycle_status ? 'Lifecycle status reflects the latest persisted analysis stage.' : target.status === 'queued' ? 'This target is recorded in the published inventory but has not been confirmed as running.' : target.status === 'scanning' ? 'A GitHub analysis run is currently associated with this target.' : 'Status reflects the latest published inventory.'}><Badge value={target.lifecycle_status || target.status || 'queued'}/></span>}
-        </div>
-        <p className="helper-text">Select a target revision to analyze. Branch/PR uses the latest head at run time; Commit analyzes the exact 40‑character SHA you paste. Analysis is read‑only and never writes to the source repository.</p>
-        {target?.pr && <p>Source {target.source_repository}:{target.branch} to {target.base_branch} | head analysis, not merge validation</p>}
-        <Descriptions className="identity" size="small" column={{ xs: 1, sm: 1, md: 2 }} items={[
-          { key: 'head', label: 'DISCOVERED HEAD', children: <code>{target?.head_sha || 'Unavailable'}</code> },
-          { key: 'analyzed', label: 'ANALYZED COMMIT', children: <code>{report?.analyzed_sha || 'Not analyzed'}</code> },
-          { key: 'checked', label: 'HEAD LAST CHECKED', children: date(target?.checked_at || index?.checked_at) },
-          { key: 'time', label: 'ANALYSIS COMPLETED', children: date(report?.generated_at) }
-        ]}/>
-        <Space wrap className="runs">
-           <span>Reports checked: {date(lastRefresh)}</span><Button size="small" loading={refreshing} onClick={() => { refreshRepositoryReports(); setRefreshing(true); setRefreshTick(t => t + 1); message.loading({ content: 'Checking for a new report…', key: 'refresh', duration: 1.2 }); }}>{refreshing ? 'Refreshing…' : 'Refresh results'}</Button>
-          {target?.scan_run_id && !report?.producer_runs.some(run => run.id === String(target.scan_run_id)) && <a href={`https://github.com/${index!.analysis_repository}/actions/runs/${target.scan_run_id}`} target="_blank" rel="noreferrer">Current scan #{target.scan_run_id}</a>}
-           {index && <span title="Counts are across all configured branch, pull-request, and commit targets in this repository inventory.">{index.targets.length} configured targets | {index.targets.filter(t => (t.lifecycle_status || t.status) === 'queued').length} queued | {index.targets.filter(t => ['scanning', 'running', 'collecting', 'publishing'].includes(t.lifecycle_status || t.status)).length} active</span>}
-          {index?.report_storage && <span>Report storage: {humanBytes(index.report_storage.compressed_bytes)}</span>}
-          {report?.tooling_sha && <span>Tooling <code title={report.tooling_sha}>{report.tooling_sha.slice(0, 12)}</code> | attempt {report.producer_run_attempt ?? 'Unavailable'}</span>}
-           {report?.producer_runs.map(run => { const url = safeGithubUrl(run.url); return url ? <a key={run.id} href={url} target="_blank" rel="noreferrer">Published report · Run #{run.id}</a> : null; })}
-        </Space>
-       </section>
-       {r.tab!=='custom-run'&&<FastPathRunAction auth={launchAuth} projectId={r.project} repository={r.repository} preferredBranch={index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} warning={report?.status==='partial'?'The current report has incomplete scanner evidence. A new request may still be queued with the trusted default policy.':undefined} onAccepted={handleProjectSubmitted}/>}
+      <RevisionRibbon repository={index?.source_repository||target?.repository||'Configured project'} target={target} targets={index?.targets||[]} fresh={fresh} statusLabel={states[target?.lifecycle_status||target?.status||'']||target?.status||'Unavailable'} onTarget={value=>navigate(value,r.tab==='issues'?'issues':r.tab==='report'?'report':'overview')}/>
+      <div className="project-context-actions"><span>Reports checked {date(lastRefresh)}</span><Button size="small" loading={refreshing} onClick={() => { refreshRepositoryReports(); setRefreshing(true); setRefreshTick(t => t + 1); message.loading({ content: 'Checking for a new report…', key: 'refresh', duration: 1.2 }); }}>{refreshing ? 'Refreshing…' : 'Refresh results'}</Button><a href={routeHash({kind:'settings',section:'provenance',projectId:r.project})}>Full provenance</a></div>
+       {r.tab!=='run'&&<FastPathRunAction auth={launchAuth} projectId={r.project} repository={r.repository} preferredBranch={index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} warning={report?.status==='partial'?'The current report has incomplete scanner evidence. A new request may still be queued with the trusted default policy.':undefined} onAccepted={handleProjectSubmitted}/>}
        {index?.current_overlay&&<section className="panel pr-overlay" aria-label="Current pull request review overlay">
          <div className="pr-overlay-heading"><div><h2>Separate PR review overlay · #{index.current_overlay.pr_context.number}</h2><p>This CodeRabbit evidence is stored separately and is not part of the canonical source-only report.</p></div><Tag color="purple">{index.current_overlay.channel.status.replaceAll('_',' ')}</Tag></div>
          <p><strong>{index.current_overlay.pr_context.head_repository}:{index.current_overlay.pr_context.head_branch}</strong> at <code>{index.current_overlay.head_sha}</code> against <strong>{index.current_overlay.pr_context.base_repository}:{index.current_overlay.pr_context.base_branch}</strong> at <code>{index.current_overlay.pr_context.base_sha}</code>{index.current_overlay.pr_context.draft?' · draft PR':''}</p>
@@ -280,13 +250,13 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
         const isRepositoryUnavailable = !!applicationEndpoint && isRepositoryAvailabilityError(desc);
          return <Alert showIcon type={isNoCurrent ? 'info' : 'error'} title={isRepositoryUnavailable ? 'Repository unavailable' : isNoCurrent ? 'No current report yet' : 'Report service error'} description={isRepositoryUnavailable ? (r.repository || 'This repository') + ' is retired or unsupported by the live analysis service. No other repository was selected.' : isNoCurrent ? 'Run analysis to generate the first report for this target.' : desc}/>;
       })()}
-       {report && (target?.status === 'failed' || !fresh || report.status === 'partial') && <Alert showIcon type="warning" title={target?.status === 'failed' ? 'Showing last successful report' : !fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={target?.status === 'failed' ? `The newer analysis failed. These findings belong to commit ${report.analyzed_sha} and are retained as the last successful report; inspect the failure above before treating them as current.` : !fresh ? 'These findings belong to the older analyzed commit shown above.' : `Available findings are shown. Incomplete scanners: ${report.channels.filter(c=>!['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE','DEFERRED'].includes(c.status)).map(c=>c.name).join(', ') || 'see Scanners for evidence details'}. Open Scanners for the failure reason.`}/>}
-        <Tabs activeKey={r.tab} onChange={tab => tab==='settings'?location.hash=routeHash({kind:'settings',projectId:r.project,repository:r.repository}):navigate(target?.id || '', tab)} items={['overview', 'threat-report', 'issues', 'scanners', 'settings'].map(tab => ({ key: tab, label: tab === 'threat-report' ? 'Threat Report' : tab === 'settings' ? 'Readiness' : tab[0].toUpperCase() + tab.slice(1) + (tab === 'issues' && report ? ` (${report.finding_count.toLocaleString()})` : '') }))}/>
-        {r.tab === 'settings' ? <Settings auth={launchAuth} repository={r.repository} project={r.project} source={index?.source_repository || index?.targets[0]?.repository} host={index?.analysis_repository} publisher={index?.publishing_repository} endpoint={applicationEndpoint || index?.launch_endpoint} start={() => setRunOpen(true)} canLaunch={mayLaunch} canConfigure={hostAccess.can_configure} report={report} target={target} index={index}/> : r.tab === 'threat-report' && target?.report ? <ThreatReport reportPath={target.report} targetSha={target.head_sha}/> : !report ? <div className="empty" role="status"><Empty description={loading ? 'Loading the selected report...' : r.target && !target ? 'Target no longer active' : 'No report available yet'}/></div> : <>
+       {report && (target?.status === 'failed' || !fresh || report.status === 'partial') && <Alert showIcon type="warning" title={target?.status === 'failed' ? 'Showing last successful report' : !fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={target?.status === 'failed' ? `The newer analysis failed. These findings belong to commit ${report.analyzed_sha} and are retained as the last successful report; inspect the failure above before treating them as current.` : !fresh ? 'These findings belong to the older analyzed commit shown above.' : `Available findings are shown. Incomplete scanners: ${report.channels.filter(c=>!['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE','DEFERRED'].includes(c.status)).map(c=>c.name).join(', ') || 'see Report for evidence details'}. Open Report for the failure reason.`}/>}
+        <Tabs className="project-navigation" activeKey={r.tab==='run'?'overview':r.tab} onChange={tab=>navigate(target?.id||'',tab as ProjectView)} items={[{key:'overview',label:'Overview'},{key:'issues',label:`Issues${report?` (${report.finding_count.toLocaleString()})`:''}`},{key:'report',label:'Report'}]}/>
+        {r.tab==='report'&&report&&target?<ReportWorkspace report={report} target={target}/>:!report?<div className="empty" role="status"><Empty description={loading?'Loading the selected report...':r.target&&!target?'Target no longer active':'No report available yet. Run analysis to publish the first report.'}/></div>:<>
         {r.tab === 'overview' && <>
           <section className="metrics">{['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(s => <div key={s}><Statistic title={<Badge value={s}/>} value={report.severities[s] || 0}/><Button type="link" onClick={() => { resetFilters();setSeverity(s); navigate(target!.id, 'issues'); }}>View findings</Button></div>)}</section>
           <section className="summary"><div><h2>Reported issues</h2><p>{report.finding_count.toLocaleString()} findings from {report.observation_count.toLocaleString()} scanner observations.</p><p>Inspect the rule, exact source location, and evidence behind each finding.</p><Button type="primary" onClick={() => { resetFilters(); navigate(target!.id, 'issues'); }}>Browse issues</Button></div>
-            <div><h2>Scanner execution</h2><p>{completed} of {report.channels.length} channels completed.</p><Progress strokeColor="#7bd0ff" percent={Math.round(completed / Math.max(1, report.channels.length) * 100)} showInfo={false} aria-label={`${completed} of ${report.channels.length} channels completed`}/><p>Strict evidence gate: <strong>{report.publication_gate.satisfied ? 'Passed' : 'Not satisfied'}</strong></p><Button onClick={() => navigate(target!.id, 'scanners')}>Inspect every scanner</Button></div></section>
+            <div><h2>Scanner execution</h2><p>{completed} of {report.channels.length} channels completed.</p><Progress strokeColor="#42BFD0" percent={Math.round(completed / Math.max(1, report.channels.length) * 100)} showInfo={false} aria-label={`${completed} of ${report.channels.length} channels completed`}/><p>Strict evidence gate: <strong>{report.publication_gate.satisfied ? 'Passed' : 'Not satisfied'}</strong></p><Button onClick={() => navigate(target!.id, 'report')}>Open report and coverage</Button></div></section>
         </>}
         {r.tab === 'overview' && <section className="insights-grid">
           <article className="panel"><h2>Severity distribution</h2><p>Composition of available findings at this revision.</p><DonutChart label="Finding distribution by severity" center={report.finding_count.toLocaleString()} values={Object.keys(ranks).map((level, i) => ({ label: level, value: report.severities[level] || 0, color: chartColors[i] }))}/></article>
@@ -295,35 +265,17 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
           <article className="panel"><h2>Highest severity findings</h2><p>Open the original location and scanner observations.</p>{[...findings].sort((a,b) => (ranks[a.severity] ?? 9) - (ranks[b.severity] ?? 9)).slice(0, 4).map(f => <div className="priority-row" key={f.id}><Badge value={f.severity}/><Button type="link" onClick={() => navigate(target!.id, 'issues', f.id)}>{f.message}</Button><small>{f.file}:{f.line}</small></div>)}</article>
           <article className="panel investigation-panel"><h2>Investigation priorities</h2><p>Clusters with repeated high-severity findings from the same rule and source area. Inspect shared code, configuration, or data flow first; one change is not assumed to resolve the cluster.</p><Alert type="warning" showIcon title="Heuristic guidance" description="Static scanners can correlate symptoms without proving a common cause. Validate control flow, runtime behavior, and tests before changing logic."/>{investigationCandidates.map((candidate, i) => <div className="candidate" key={`${candidate.rule}:${candidate.directory}`}><span>{i + 1}</span><div><strong>{candidate.rule}</strong><small>{candidate.directory} · {candidate.rows.length.toLocaleString()} findings · {new Set(candidate.rows.map(f => f.file)).size} files</small></div><Button onClick={() => { resetFilters();setRule(candidate.rule); setDirectory(candidate.directory); setGroupBy('rule'); navigate(target!.id, 'issues'); }}>Investigate cluster</Button></div>)}</article>
         </section>}
-        {r.tab === 'provenance' && <section className="insights-grid">
-          <article className="panel"><h2>Analysis identity</h2><Descriptions column={1} items={[
-            {key:'source',label:'Source repository',children:target!.source_repository},
-            {key:'sha',label:'Analyzed revision',children:<code>{report.analyzed_sha}</code>},
-            {key:'tool',label:'Trusted tooling revision',children:<code>{report.tooling_sha || 'Unavailable'}</code>},
-            {key:'base',label:'PR base revision',children:<code>{target!.base_sha || 'Not applicable'}</code>},
-            {key:'attempt',label:'Producer attempt',children:report.producer_run_attempt ?? 'Unavailable'},
-            {key:'schema',label:'Collection schema',children:index?.schema_version}
-          ]}/></article>
-          <article className="panel"><h2>Producing workflows</h2><p>These exact runs produced the displayed report.</p>{report.producer_runs.map(run => { const url = safeGithubUrl(run.url); return url ? <div className="origin" key={run.id}><GithubOutlined/> <a href={url} target="_blank" rel="noreferrer">Run #{run.id}</a></div> : null; })}<h3>Evidence gate</h3><Tag color={report.publication_gate.satisfied ? 'green' : 'orange'}>{report.publication_gate.satisfied ? 'Passed' : 'Not satisfied'}</Tag><p>The evidence gate and scanner completeness are separate. {completed} of {report.channels.length} channels completed.</p><p>Individual finding details identify their source observations and retained artifact paths.</p></article>
-        </section>}
-        {r.tab === 'scanners' && <><Alert showIcon type="info" title="Scanner execution and evidence" description="Execution failures are separate from code findings. Unavailable counts are unknown; completed policy findings can still require attention."/>
-          <div className="filters"><Select aria-label="Scanner category" value={category} onChange={setCategory} options={[{value:'',label:'All categories'}, ...[...new Set(report.channels.map(c => c.class))].sort().map(c => ({value:c,label:c}))]}/><Select aria-label="Execution status" value={channelStatus} onChange={setChannelStatus} options={[{value:'',label:'All statuses'}, ...[...new Set(report.channels.map(c => c.status))].sort().map(c => ({value:c,label:c.replaceAll('_',' ')}))]}/><span>{report.channels.filter(c => (!category || c.class === category) && (!channelStatus || c.status === channelStatus)).length} channels</span></div>
-          <Table<Channel> rowKey="channel" size="middle" dataSource={report.channels.filter(c => (!category || c.class === category) && (!channelStatus || c.status === channelStatus))} pagination={false} scroll={{ x: 850 }} columns={[
-            { title: 'Scanner', key: 'scanner', width: 210, render: (_, c) => <><strong>{c.name}</strong><small>{c.class}</small></> },
-            { title: 'Status', key: 'status', width: 200, render: (_, c) => <Badge value={c.status}/> },
-            { title: 'Findings', key: 'findings', width: 110, render: (_, c) => c.findings === null ? 'Unavailable' : c.findings.toLocaleString() },
-            { title: 'Workflow / evidence limitations', key: 'reason', render: (_, c) => <>{c.reason || 'Retained evidence available'}<small>Scanner definition: {c.workflow}</small></> }
-          ]}/></>}
         {r.tab === 'issues' && <>
           {directory && <Tag closable onClose={() => setDirectory('')}>Directory: {directory}</Tag>}
           <div className="filters"><Input aria-label="Search issues" prefix={<SearchOutlined/>} placeholder="Search message, file, rule, or scanner" allowClear value={query} onChange={e => setQuery(e.target.value)}/>
             <Select aria-label="Severity" value={severity} onChange={setSeverity} options={[{ value: '', label: 'All severities' }, ...Object.keys(ranks).map(s => ({ value: s, label: s }))]}/>
             <Select aria-label="Scanner" showSearch optionFilterProp="label" value={scanner} onChange={setScanner} options={[{ value: '', label: 'All scanners' }, ...[...new Set(findings.flatMap(f => f.scanners))].sort().map(s => ({ value: s, label: s }))]}/>
-            <Select aria-label="Rule" showSearch optionFilterProp="label" value={rule} onChange={setRule} options={[{value:'',label:'All rules'},...issueOptions.rules.map(value=>({value,label:value}))]}/>
+            <Button aria-expanded={moreFilters} onClick={()=>setMoreFilters(value=>!value)}>{moreFilters?'Fewer filters':'More filters'}</Button>
+            {moreFilters&&<><Select aria-label="Rule" showSearch optionFilterProp="label" value={rule} onChange={setRule} options={[{value:'',label:'All rules'},...issueOptions.rules.map(value=>({value,label:value}))]}/>
             <Select aria-label="File" showSearch optionFilterProp="label" value={file} onChange={setFile} options={[{value:'',label:'All files'},...issueOptions.files.map(value=>({value,label:value}))]}/>
             <Select aria-label="Directory" showSearch optionFilterProp="label" value={directory} onChange={setDirectory} options={[{value:'',label:'All directories'},...issueOptions.directories.map(value=>({value,label:value}))]}/>
             <Select aria-label="Source location" value={locationFilter} onChange={setLocationFilter} options={[{value:'',label:'Any source location'},{value:'located',label:'File and line available'},{value:'unlocated',label:'Missing file or line'}]}/>
-            <Select aria-label="Scanner overlap" value={overlap} onChange={setOverlap} options={[{value:'',label:'Any scanner support'},{value:'multiple',label:'Multiple scanners'},{value:'single',label:'Single scanner'}]}/>
+            <Select aria-label="Scanner overlap" value={overlap} onChange={setOverlap} options={[{value:'',label:'Any scanner support'},{value:'multiple',label:'Multiple scanners'},{value:'single',label:'Single scanner'}]}/></>}
             <Button onClick={resetFilters}>Clear filters</Button>
             <Select aria-label="Group issues" value={groupBy} onChange={setGroupBy} options={[{ value: 'none', label: 'No grouping' }, { value: 'rule', label: 'Group by rule' }, { value: 'file', label: 'Group by file' }, { value: 'directory', label: 'Group by directory' }, { value: 'scanner', label: 'Group by scanner' }]}/>
             <span>{filtered.length.toLocaleString()} results</span>
@@ -342,11 +294,6 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
       </Drawer>
       <footer>Findings are scanner observations, not confirmed defects.</footer>
     </main>
-  </ConfigProvider>;
+  </AppShell></ConfigProvider>;
 }
-if(import.meta.env.VITE_APPLICATION_MODE!=='repositories'){
-  const legacy=new URLSearchParams(location.hash.replace(/^#/,'')),legacyTab=legacy.get('tab') as ReportView|null;
-  if(!location.hash||(legacyTab&&['overview','issues','scanners','provenance','threat-report'].includes(legacyTab)&&!legacy.get('project')))history.replaceState(null,'',routeHash({kind:'project',projectId:import.meta.env.VITE_DEFAULT_PROJECT_ID||'1360051890',view:legacyTab||'overview'}));
-}
-if(!location.hash.includes('analysis_auth=')&&!location.hash.includes('analysis_auth_error='))normalizeLegacyHash();
-createRoot(document.getElementById('root')!).render(<AppearanceProvider><DashboardAccess publicFallback={(auth,accessError,accessPending,workspaceRequested)=><LandingPage auth={auth} accessError={accessError} accessPending={accessPending} workspaceRequested={workspaceRequested} onStart={() => { try { sessionStorage.setItem('analysis-workspace-requested', 'true'); } catch {} location.hash = routeHash({kind:'dashboard'}); }} />}>{auth=><App viewerAuth={auth}/>}</DashboardAccess></AppearanceProvider>);
+createRoot(document.getElementById('root')!).render(<AppearanceProvider><DashboardAccess publicFallback={(auth,accessError,accessPending,workspaceRequested)=><LandingPage auth={auth} accessError={accessError} accessPending={accessPending} workspaceRequested={workspaceRequested} onStart={() => { try { sessionStorage.setItem('analysis-workspace-requested', 'true'); } catch {} location.hash=routeHash({kind:'projects'}); }} />}>{auth=><App viewerAuth={auth}/>}</DashboardAccess></AppearanceProvider>);

@@ -37,7 +37,7 @@ test('view access requires login and clears on logout',async({page,context})=>{
   if(u.pathname==='/api/public/manifest'){reports++;return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:'1278177697',targets:[]}});}
   throw new Error(`Unexpected request ${u.pathname}`);
  });
-  await page.goto(`/#/projects/1278177697?repository=${encodeURIComponent(execution)}`);
+  await page.goto('/#/projects/1278177697');
  await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();expect(reports).toBe(0);
  await expect(page.getByRole('button',{name:/Run analysis/})).toHaveCount(0);
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
@@ -64,7 +64,7 @@ test('cancellation and exchange failures stay on the public shell',async({page,c
   reportRequests++;
   return route.fulfill({status:200,headers,json:{targets:[],projects:[]}});
  });
-  await page.goto('/#tab=repositories');
+  await page.goto('/#/projects');
   const signIn=page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/});
   await signIn.click();
   await expect(page.getByText(/Ask a dashboard maintainer to invite your account/)).toBeVisible();
@@ -95,7 +95,7 @@ test('a revoked workspace API request clears the session immediately',async({pag
     reportRequests++;
     return route.fulfill({headers,status:200,json:{targets:[],projects:[]}});
    });
-   await page.goto('/#tab=repositories');
+   await page.goto('/#/projects');
   revoked=true;
    await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
    await expect(page.getByText('Access expired or was revoked. Sign in with an authorized GitHub account.')).toBeVisible();
@@ -119,7 +119,7 @@ test('a mismatched target registry is shown as an error, not an empty project li
   writes++;
   throw new Error(`Unexpected write or endpoint ${url.pathname}`);
  });
- await page.goto('/#tab=repositories');
+ await page.goto('/#/projects');
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
  await expect(page.getByRole('heading',{name:'Choose a codebase'})).toBeVisible();
  await expect(page.getByRole('alert')).toContainText('Project registry unavailable');
@@ -148,7 +148,7 @@ test('visible tabs recheck collaborator access and clear the session when revoke
    if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:'combustrrr/code-analysis-dashboard',project_id:'1278177697',preferred_branch:'Testing',targets:[]}});
   throw new Error(`Unexpected request ${url.pathname}`);
  });
-  await page.goto('/#tab=repositories');
+  await page.goto('/#/projects');
    await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
     await expect(page.getByRole('heading',{name:'Choose a codebase'})).toBeVisible();
    await page.getByRole('button',{name:'Open report'}).click();
@@ -176,7 +176,7 @@ test('repository deep links open the authenticated workspace with a shared theme
     if(url.pathname==='/api/dashboard')return route.fulfill({headers,json:{checked_at:new Date().toISOString(),freshness:'fresh',health:{status:'healthy',message:'Control plane responded.'},alerts:[],projects:[],recent_requests:[],execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false}});
   throw new Error(`Unexpected request ${url.pathname}`);
  });
- await page.goto('/#tab=repositories');
+ await page.goto('/#/projects');
  await expect(page.getByRole('heading',{name:'Know what your code is carrying.'})).toBeVisible();
  await expect(page.getByText(/Sign in with an approved GitHub account to open the repository workspace/)).toBeVisible();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
@@ -218,7 +218,7 @@ test('workspace intent survives a transient hash reset while GitHub access is ch
    if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
    throw new Error(`Unexpected request ${url.pathname}`);
   });
-  await page.goto('/#tab=repositories');
+  await page.goto('/#/projects');
   await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
   await sessionCheckStarted;
   await page.evaluate(()=>{location.hash='';});
@@ -230,7 +230,7 @@ test('workspace intent survives a transient hash reset while GitHub access is ch
 test('authorization restores the exact requested repository route',async({page,context})=>{
   test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
   const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
-   const destination='#/projects/1278177697?repository=combustrrr%2Fcode-analysis-dashboard&view=issues&target=target-1&issue=F-1';
+   const destination='#/projects/1278177697/issues?target=target-1&issue=F-1';
   const requestOrder:string[]=[];
   let projectsVerified=false;
   await context.route('https://launcher.example/**',async route=>{
@@ -252,7 +252,7 @@ test('authorization restores the exact requested repository route',async({page,c
  });
  await page.goto('/'+destination);
   await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
-  await expect(page.getByRole('heading',{name:'Code quality dashboard'})).toBeVisible();
+  await expect(page.getByLabel('Selected analysis revision')).toBeVisible();
   await expect.poll(()=>new URL(page.url()).hash).toBe(destination);
   expect(requestOrder.indexOf('session')).toBeLessThan(requestOrder.indexOf('projects'));
   expect(requestOrder.indexOf('projects')).toBeLessThan(requestOrder.indexOf('manifest'));
@@ -273,7 +273,7 @@ test('a removed requested project is not restored or fetched after sign-in',asyn
   if(url.pathname==='/api/public/manifest'){reportRequests++;return route.fulfill({headers,json:{targets:[]}});}
   throw new Error(`Unexpected request ${url.pathname}`);
  });
- await page.goto('/#/projects/1278177697?repository=combustrrr%2Fcode-analysis-dashboard&view=issues');
+ await page.goto('/#/projects/1278177697/issues');
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
  await expect(page.getByText(/The requested project is no longer configured/)).toBeVisible();
  expect(new URL(page.url()).hash).toBe('');
@@ -298,7 +298,7 @@ test('reloads and new tabs require a fresh in-memory sign-in',async({page,contex
    if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
   throw new Error(`Unexpected request ${url.pathname}`);
  });
-  await page.goto('/#tab=repositories');
+  await page.goto('/#/projects');
   await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
    await expect(page.getByRole('heading',{name:'Choose a codebase'})).toBeVisible();
  await expect(page).toHaveURL(/#\/projects$/);
@@ -309,7 +309,7 @@ test('reloads and new tabs require a fresh in-memory sign-in',async({page,contex
  await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
  expect(sessionChecks).toBe(1);
  const anotherTab=await context.newPage();
- await anotherTab.goto('/#tab=repositories');
+ await anotherTab.goto('/#/projects');
  await expect(anotherTab.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
  expect(sessionChecks).toBe(1);
 });

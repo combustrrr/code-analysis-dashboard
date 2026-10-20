@@ -5,6 +5,9 @@ Static React/Ant Design application deployed to GitHub Pages.
 | Area | Location |
 |---|---|
 | Application entrypoint | `src/main.tsx` |
+| Application shell | `src/AppShell.tsx` |
+| Modern route contract | `src/appRoutes.ts` |
+| Brand and theme tokens | `src/brand.ts` |
 | Fixed target selection | `src/Repositories.tsx` |
 | Explicit launch flow | `src/ProjectLauncher.tsx` |
 | Integration checks | `src/Integration.tsx` |
@@ -18,6 +21,14 @@ The authenticated project list comes from the fixed execution-host registry. Sel
 a configured target only opens its report; the separate launch action is shown only
 when the signed-in user is an authorized execution-host collaborator. The dashboard has no arbitrary
 repository picker, per-user App installation, or setup-commit workflow.
+
+Signed-in users land on Projects and follow one workflow: choose a project, run analysis,
+follow Activity, review Issues, and download from Report. Each project has only Overview,
+Issues, and Report navigation. The persistent revision ribbon keeps repository, selected
+ref, short SHA, freshness, and run state visible. Operational detail is consolidated in
+global Settings. The shell is branded **Code Analysis** with the endorsement
+**IIT Bombay Trust Lab × Mphasis**; dark mode is the default and light mode is fully
+supported from the shared token source.
 The dashboard includes a **Threat Report** view for newly published analyses. It
 summarizes severity/category coverage and deterministic catalog guidance, then links
 back to Issues for scanner evidence. Reports can be copied as authenticated private
