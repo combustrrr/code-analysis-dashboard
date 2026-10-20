@@ -33,7 +33,7 @@ function scannerChoices(project) {
   const choices=[...new Set([...project.enabled_scanners,...Object.keys(project.deferred_channels||{})])].map(channel=>{
     const reason=project.deferred_channels?.[channel];
     const supported=SUPPORTED_SCANNERS.includes(channel);
-    const mode=VENDOR_SCANNERS.has(channel)?'vendor':'portable';
+    const mode=VENDOR_SCANNERS.has(channel)?'vendor':project.profile?.mode==='portable'?'portable':'configured';
     const setupRequired=project.profile?.mode==='portable'&&!portable.has(channel);
     const group=SCANNER_GROUPS.find(values=>values.includes(channel));
     const status=reason?'DEFERRED':!supported||UNAVAILABLE_SCANNERS.has(channel)?'NOT_AVAILABLE':setupRequired?'SETUP_REQUIRED':'READY';
@@ -181,7 +181,8 @@ export async function repositoryApi(request, env, session, helpers) {
       else if(publicationError){lifecycle='Needs attention';attention_reason='The latest report could not be published. Review the project evidence before relying on it.';}
       else if(!current_report){lifecycle='Needs attention';attention_reason='No current report is available. Run analysis to create the first evidence set.';}
       else if(current_report.status==='partial'||current_report.scanner_summary.incomplete>0){lifecycle='Needs attention';attention_reason='The current report contains incomplete scanner evidence.';}
-      return {id:String(project.id),source_repository:project.source_repository.full_name,source_repository_id:project.source_repository.id,relationship:project.relationship,preferred_branch:project.preferred_branch,native_feedback_enabled:false,readiness_summary:{configured_channels:project.enabled_scanners.length,vendor_channels:project.enabled_scanners.filter(channel=>VENDOR_SCANNERS.has(channel)).length},lifecycle,attention_reason,active_analysis:active?{request_id:active.request_id,status:active.status,target_sha:active.intent?.target_sha||active.intent?.source_sha||null,created_at:active.created_at}:null,current_report,current_overlay};
+      const choices=scannerChoices(project),selectable=choices.filter(channel=>channel.selectable);
+      return {id:String(project.id),source_repository:project.source_repository.full_name,source_repository_id:project.source_repository.id,relationship:project.relationship,preferred_branch:project.preferred_branch,native_feedback_enabled:false,readiness_summary:{profile_mode:project.profile.mode,configured_channels:project.enabled_scanners.length,selectable_channels:selectable.length,vendor_channels:selectable.filter(channel=>channel.mode==='vendor').length,deferred_channels:choices.filter(channel=>channel.status==='DEFERRED').length,unavailable_channels:choices.filter(channel=>['NOT_AVAILABLE','SETUP_REQUIRED'].includes(channel.status)).length},lifecycle,attention_reason,active_analysis:active?{request_id:active.request_id,status:active.status,target_sha:active.intent?.target_sha||active.intent?.source_sha||null,created_at:active.created_at}:null,current_report,current_overlay};
     }));
     const summary={projects:projects.length,preparing:projects.filter(value=>value.lifecycle==='Preparing').length,analyzing:projects.filter(value=>value.lifecycle==='Analyzing').length,needs_attention:projects.filter(value=>value.lifecycle==='Needs attention').length};
     return json({
@@ -257,8 +258,9 @@ export async function repositoryApi(request, env, session, helpers) {
         const response=await publicReports(new Request(reportUrl),env);
         if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);observed=new Map((target?.channel_statuses||[]).map(value=>[value.channel,value]));observedAt=target?.generated_at||target?.checked_at||null;}
       } catch {}
-      const channels = scannerChoices(project).map(value=>{const last=observed.get(value.id);return {...value,channel:value.id,status:value.status==='READY'?'profile_declared':value.status.toLowerCase(),reason:value.reason||'Declared in the trusted profile; completed evidence is still required.',last_observed:last?{status:String(last.status||'unknown').toLowerCase(),reason:last.reason||null,findings:Number.isFinite(last.findings)?last.findings:null,checked_at:observedAt}:null};});
-      return json({project_id:project.id,preferred_branch:project.preferred_branch,tooling_sha:configuration.tooling_sha,channels,checked_at:new Date().toISOString()});
+      const completeStatuses=new Set(['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE']);
+      const channels = scannerChoices(project).map(value=>{const last=observed.get(value.id),observedStatus=String(last?.status||'unknown').toUpperCase();return {...value,channel:value.id,status:value.status==='READY'?'profile_declared':value.status.toLowerCase(),reason:value.reason||'Declared in the trusted profile; completed evidence is still required.',last_observed:last?{status:observedStatus.toLowerCase(),complete:completeStatuses.has(observedStatus),reason:last.reason||null,findings:Number.isFinite(last.findings)?last.findings:null,checked_at:observedAt}:null};});
+      return json({project_id:project.id,preferred_branch:project.preferred_branch,profile_mode:project.profile.mode,tooling_sha:configuration.tooling_sha,summary:{selectable:channels.filter(channel=>channel.selectable).length,vendor:channels.filter(channel=>channel.selectable&&channel.mode==='vendor').length,deferred:channels.filter(channel=>channel.status==='deferred').length,unavailable:channels.filter(channel=>['setup_required','not_available'].includes(channel.status)).length,completed:channels.filter(channel=>channel.last_observed?.complete).length,needs_attention:channels.filter(channel=>channel.last_observed&&!channel.last_observed.complete).length},channels,checked_at:new Date().toISOString()});
     }
 
     if (url.pathname === '/api/project-integration') {

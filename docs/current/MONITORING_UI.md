@@ -65,7 +65,11 @@ identifiers.
    failures and deferrals separately from source findings. Unknown counts are not zero.
 6. Connections verifies the selected project through the live project-integration
    API, including App access and both workflows. An unavailable check disables its
-   launch shortcut. Successful routing does not prove all scanners completed.
+   launch shortcut. Settings identifies the selected project's configured or portable
+   source profile, reports how many channels can be submitted together, separates vendor
+   lanes, and groups terminal evidence using every valid completion status rather than
+   treating only literal `COMPLETED` as healthy. Successful routing does not prove all
+   scanners completed.
 7. Repositories lists only the fixed trusted projects. Authorized collaborators can inspect
    reports, preview revisions, and explicitly submit; administrators alone
    manage the central registry. The connected self-analysis target does not publish native

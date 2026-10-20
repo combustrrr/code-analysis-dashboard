@@ -6,7 +6,6 @@
     "private": false
   },
   "tooling_sha": "03bcbff06e3174d75401170ec630b789fbf00a91",
-  "max_parallel_analyses": 1,
   "projects": [
     {
       "id": "1267340546",

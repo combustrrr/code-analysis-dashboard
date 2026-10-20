@@ -60,6 +60,10 @@ test('reviewed agentic scanner profiles remain listable while portable profiles 
   const response=await repositoryApi(get('/api/projects'),env,session,agenticHelpers);
   assert.equal(response.status,200);
   assert.equal((await response.json()).projects.length,CONFIGURED_TARGETS.length);
+  const readiness=await (await repositoryApi(get(`/api/project-readiness?project_id=${CONFIGURED_TARGETS[0].id}`),env,session,agenticHelpers)).json();
+  assert.equal(readiness.profile_mode,'agentic-soc');
+  assert.equal(readiness.channels.find(channel=>channel.channel==='semgrep').mode,'configured');
+  assert.equal(readiness.summary.selectable,2);
 
   const invalidConfig={...config,projects:config.projects.map((project,index)=>index===0?{...project,profile:{mode:'portable',commands:{eslint:{cwd:'../outside',argv:['eslint','.']}}}}:project)};
   const invalidHelpers=helpers({overrides:{[`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`]:{content:Buffer.from(JSON.stringify(invalidConfig)).toString('base64')}}});
@@ -72,6 +76,8 @@ test('read-only collaborators can inspect configured project readiness',async()=
   assert.equal(response.status,200);
   assert.equal(result.project_id,'1278177697');
   assert.equal(result.preferred_branch,'Testing');
+  assert.equal(result.profile_mode,'portable');
+  assert.equal(result.summary.selectable,2);
   assert.ok(result.channels.some(channel=>channel.channel==='semgrep'&&channel.status==='profile_declared'&&channel.last_observed===null));
   assert.ok(result.channels.every(channel=>channel.status!=='completed'));
 });

@@ -336,15 +336,15 @@ test('authorized user follows one repository project from selection through publ
   expect(route.request().headers().authorization).toBe('Bearer flow-session');
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
      if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false,projects:[
-      {id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Needs attention',readiness_summary:{configured_channels:26,vendor_channels:4},current_report:{status:'partial'}},
+      {id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Needs attention',readiness_summary:{profile_mode:'agentic-soc',configured_channels:26,selectable_channels:24,vendor_channels:3,deferred_channels:9,unavailable_channels:2},current_report:{status:'partial'}},
      {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Preparing'},
      {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:false,lifecycle:'Ready'},
     ]}});
    if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:project,checked_at:new Date().toISOString(),preferred_branch:'Testing',current_overlay:{schema_version:'analysis-pr-overlay-v1',overlay_key:'overlay-seven',status:'complete',head_sha:sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel,documents:{'pr-overlay.json':overlayAssetName},assets:{[overlayAssetName]:{sha256:createHash('sha256').update(compressedOverlay).digest('hex'),bytes:compressedOverlay.byteLength}}},targets:published?[{id:'published-target',label:'Testing',repository:source,source_repository:source,head_sha:sha,kind:'branch',branch:'Testing',checked_at:new Date().toISOString(),status:'partial',collected_run:43,documents:{'report.json':assetName,'findings.json':assetName},assets}]:[]}});
    if(url.pathname==='/api/public/asset')return route.fulfill({headers,body:url.searchParams.get('overlay')==='current'?compressedOverlay:compressedReport});
   if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:source,branches:[{name:'Testing',sha}],prs:[]}});
-   const channels=[{id:'semgrep',channel:'semgrep',mode:'portable',group:'semgrep',status:'configured',reason:'',default_selected:true,selectable:true},{id:'snyk',channel:'snyk',mode:'vendor',group:'snyk',status:'configured',reason:'May use vendor quota.',default_selected:false,selectable:true}];
-   if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{tooling_sha:'e'.repeat(40),channels}});
+   const channels=[{id:'semgrep',channel:'semgrep',mode:'configured',group:'semgrep',status:'profile_declared',reason:'',default_selected:true,selectable:true,last_observed:{status:'completed',complete:true,reason:null,findings:3,checked_at:new Date().toISOString()}},{id:'snyk',channel:'snyk',mode:'vendor',group:'snyk',status:'profile_declared',reason:'May use vendor quota.',default_selected:false,selectable:true,last_observed:{status:'configured_complete',complete:true,reason:null,findings:0,checked_at:new Date().toISOString()}}];
+   if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{profile_mode:'agentic-soc',tooling_sha:'e'.repeat(40),summary:{selectable:2,vendor:1,deferred:0,unavailable:0,completed:2,needs_attention:0},channels,checked_at:new Date().toISOString()}});
    if(url.pathname==='/api/project-preview')return route.fulfill({headers,json:{preview_id:'preview-access',preview_token:'signed-preview',previewed_at:new Date().toISOString(),project_id:project,source_repository:source,source_repository_id:1278177697,selection:{kind:'branch',ref:'Testing'},target_sha:sha,pr_context:null,tooling_sha:'e'.repeat(40),profile_digest:'f'.repeat(64),channels,cached_channels:[]}});
     if(url.pathname==='/api/project-launch-fast'){
     launches++;
@@ -370,7 +370,7 @@ test('authorized user follows one repository project from selection through publ
     await expect(page.getByText('Connected self-analysis')).toHaveCount(1);
     await page.getByRole('link',{name:'Settings'}).click();
     await page.locator('.settings-rail a[href*="section=projects"]').click();
-    await expect(page.locator('.settings-project-row').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('26 configured · evidence pending');
+    await expect(page.locator('.settings-project-row').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('24 available');
     await expect(page.locator('.settings-project-list')).not.toContainText('0 of 0');
     await page.locator('.settings-rail a[href*="section=provenance"]').click();
     await expect(page.locator('.provenance-boundary')).toContainText('Needs attention');
@@ -403,7 +403,7 @@ test('authorized user follows one repository project from selection through publ
  await page.locator('.project-run-tracker').getByRole('button',{name:'Refresh'}).click();
  await expect(page.getByText('Ready',{exact:true})).toBeVisible();
  await expect(page.locator('.project-run-tracker')).toContainText('This request published its report');
- await page.getByRole('button',{name:'Open report'}).click();
+ await page.getByRole('button',{name:'Open report',exact:true}).click();
  await expect(page).toHaveURL(/\/report\?target=published-target/);
  await expect(page.getByLabel('Selected analysis revision')).toContainText(sha.slice(0,12));
    expect(activityReads).toBeGreaterThanOrEqual(2);expect(launches).toBe(1);expect(pageErrors).toEqual([]);

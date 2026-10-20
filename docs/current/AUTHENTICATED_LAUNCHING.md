@@ -53,6 +53,11 @@ validated selected channels; other statuses remain distinct, including `NOT_SELE
 configured project and one separately keyed PR overlay (project, PR, head repository/SHA,
 base SHA, tooling, profile). Source-only report replacement waits for the first valid
 new-SHA channel result; failures preserve the previous report.
+Each project has one reviewed source-execution profile: `agentic-soc` channels are labelled
+**configured**, while the self-analysis profile is labelled **portable**. Those source
+channels fan out together with separately isolated vendor lanes when the user selects all
+available channels. Deferred, setup-required, revision-inapplicable, and credential-withheld
+channels remain visible but are not counted as selectable or silently submitted.
 The coordinator heartbeat renews the fenced lease once per minute and exits when terminal
 completion invalidates that lease, so a published Actions run should not remain visibly active
 for more than one renewal interval solely because of its heartbeat job.

@@ -7,7 +7,7 @@ import {FastPathRunAction} from './FastPathRunAction';
 
 type Auth=ReturnType<typeof useLaunchAuth>;
 type Selection={kind:'branch'|'pr'|'commit';ref:string};
-type Channel={id:string;mode:'portable'|'vendor';group:string;status:string;reason:string;default_selected:boolean;selectable:boolean};
+type Channel={id:string;mode:'configured'|'portable'|'vendor';group:string;status:string;reason:string;default_selected:boolean;selectable:boolean};
 type Inventory={repository:string;inventory_warning?:string|null;branches:{name:string;sha?:string}[];prs:{number:number;title:string;draft:boolean;available:boolean;head_branch:string;head_sha:string;head_repository:string|null;base_sha:string;base_branch:string}[]};
 type Preview={preview_token:string;source_repository:string;selection:Selection;target_sha:string;pr_context:{head_repository:string;head_branch:string;head_sha:string;base_repository:string;base_branch:string;base_sha:string}|null;tooling_sha:string;channels:Channel[];cached_channels:string[]};
 const short=(value?:string)=>value?value.slice(0,12):'Unavailable';
