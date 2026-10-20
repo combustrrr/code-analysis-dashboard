@@ -419,3 +419,10 @@ page, access guidance, preferred-branch action, and Settings introduction now us
 plain, grammatical, action-oriented language. The production bundle was checked for
 the revised headline and workflow copy after the build, unit tests, and Playwright
 suite passed.
+
+Commit `e236d047729ba8a12f528f53176f9478736c3efb` unified typography across
+the signed-in workspace and deployed through Pages run `39412248440`. Manrope now
+covers interface copy and controls, Sora covers headings, and IBM Plex Mono is limited
+to technical identifiers and numeric evidence. Computed fonts were verified in the
+fixture-backed project workspace, and the production stylesheet was confirmed to
+contain all three locally bundled families.
