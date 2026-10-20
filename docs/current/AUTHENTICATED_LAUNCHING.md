@@ -13,12 +13,14 @@ Developers see product-level progress only: Preparing, Analyzing, Ready, or Need
 Coordinator runs, lease state, scanner job
 links, and individual channel scheduling remain operational details. The exact selected
 revision remains visible throughout.
-On a project, **Run analysis** is the Fast Path: one action asks the Worker to resolve the
+On a project, **Fast analysis** is the one-click path: one action asks the Worker to resolve the
 configured preferred branch, apply trusted default channels, verify current collaborator access,
 and start the exact SHA. The retained report stays visible while the request is active.
-**Choose revision and scanners** opens the three-step Run analysis flow for branch,
-open-PR, or full-SHA selection, explicit channel selection, immutable-SHA review, and final
-confirmation. The Worker
+**Configure analysis** opens a three-step flow that asks for a full commit SHA first and
+offers branch or pull-request selection as a fallback. It supports safe defaults, individual
+producer groups, or all currently available channels. Selecting vendor channels requires
+an explicit usage confirmation before preview and submission. The immutable-SHA review is
+the final confirmation boundary. The Worker
 checks collaborator access and transactionally persists an immutable `analysis-request-v4` envelope in the SQLite-backed Durable Object with source
 and fork identities, original/resolved selection, pinned SHA, optional PR context,
 requested channels, tooling/profile digests, actor, and idempotency key. A 202 means

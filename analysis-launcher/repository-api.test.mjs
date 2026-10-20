@@ -153,6 +153,7 @@ test('pull-only collaborator launch persists a pinned v4 envelope and idempotent
   const envelope=h.queueCalls[0].body.request;
     assert.equal(response.status,202);
     assert.equal((await response.clone().json()).status,'preparing');
+    assert.equal((await response.clone().json()).lifecycle,'Preparing');
     assert.equal(envelope.schema_version,'analysis-request-v4');
     assert.equal(envelope.source_sha,'d'.repeat(40));
     assert.equal(envelope.selection.kind,'pr');
@@ -177,6 +178,7 @@ test('Fast Path allows a pull-only collaborator and admits only trusted default 
   const result=await response.json(),intent=h.queueCalls.find(call=>call.path==='/queue/admit').body.request;
   assert.equal(response.status,202);
   assert.equal(result.request_id,key);
+  assert.equal(result.lifecycle,'Preparing');
   assert.equal(intent.target_sha,'f'.repeat(40));
   assert.equal(intent.selection.ref,source.branch);
   assert.deepEqual(intent.requested_channels,['semgrep']);
@@ -197,7 +199,7 @@ test('Fast Path retries return the original accepted request',async()=>{
   const source=CONFIGURED_TARGETS[0],key='66666666-6666-4666-8666-666666666666';
   const h=helpers();h.queue=async(path,body)=>{h.queueCalls.push({path,body});if(path==='/queue/status')return json({request_id:key,status:'queued',queue_position:3,intent:{project_id:source.id,selection:{kind:'branch',ref:source.branch},target_sha:'d'.repeat(40),requested_channels:['semgrep']}},200);throw new Error('must not admit duplicate');};
   const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,refType:'PREFERRED_BRANCH'},key),env,session,h);
-  assert.equal(response.status,202);assert.deepEqual(await response.json(),{status:'queued',request_id:key,run_id:null,repository:EXECUTION_REPOSITORY,source_repository:source.repository,target_sha:'d'.repeat(40),preferred_branch:source.branch,requested_channels:['semgrep'],duplicate:true});
+  assert.equal(response.status,202);assert.deepEqual(await response.json(),{status:'queued',lifecycle:'Preparing',request_id:key,run_id:null,repository:EXECUTION_REPOSITORY,source_repository:source.repository,target_sha:'d'.repeat(40),preferred_branch:source.branch,requested_channels:['semgrep'],duplicate:true});
 });
 
 test('projects is the workspace home contract and dashboard is retired',async()=>{

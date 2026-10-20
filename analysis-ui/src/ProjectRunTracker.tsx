@@ -134,7 +134,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
       <p>{activity?.error || previousReportNote}</p>
       {error && <p>Status refresh is temporarily unavailable. Your analysis was not restarted.</p>}
       <div className="run-tracker-actions">
-        {publishedTargetId && <Button size="small" type="primary" onClick={() => onOpenReport(publishedTargetId)}>Review issues</Button>}
+        {publishedTargetId && <Button size="small" type="primary" onClick={() => onOpenReport(publishedTargetId)}>Open report</Button>}
         {!terminal && auth.session && <Button size="small" loading={checking} onClick={() => setRetry(value => value + 1)}>Refresh</Button>}
         {terminal && <Button size="small" onClick={onDismiss}>Dismiss</Button>}
       </div>

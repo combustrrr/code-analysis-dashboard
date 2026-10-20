@@ -16,20 +16,21 @@ test.describe('production shell',()=>{
   await page.goto(PROJECT);
   await expect(page.getByLabel('Selected analysis revision')).toContainText('Agentic-Kibana');
   await expect(page.getByLabel('Selected analysis revision')).toContainText(/Revision/);
-  await expect(page.getByRole('button',{name:/Run analysis/})).toHaveCount(1);
+  await expect(page.getByRole('link',{name:'Run analysis'})).toHaveCount(1);
   await expect(page.getByRole('tab',{name:/Overview/})).toHaveAttribute('aria-selected','true');
   await expect(page.getByText('Reported issues',{exact:true})).toBeVisible();
-  await expect(page.locator('.overview-chart')).toHaveCount(2);
-  await expect(page.locator('.finding-bar')).toHaveCount(6);
-  await expect(page.getByRole('img',{name:'Finding counts by severity'})).toBeVisible();
+  await expect(page.locator('.overview-chart')).toHaveCount(3);
+  await expect(page.getByLabel('Finding counts by severity')).toBeVisible();
  });
 
  test('issues support search, grouping, advanced filters, and evidence',async({page})=>{
   await page.goto(PROJECT+'/issues');
   await page.getByLabel('Search issues').fill('CVE-2026-42561');
+  await expect(page).toHaveURL(/q=CVE-2026-42561/);
   await expect(page.locator('.ant-table-tbody > tr.ant-table-row').first()).toBeVisible();
   await page.getByLabel('Group issues').click();
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'Rule'}).click();
+  await expect(page).toHaveURL(/group=rule/);
   await expect(page.getByText(/finding/).first()).toBeVisible();
   await page.getByRole('button',{name:'More filters'}).click();
   await expect(page.getByLabel('Source location',{exact:true})).toBeVisible();
@@ -65,9 +66,15 @@ test.describe('production shell',()=>{
 
  test('run route opens confirmation without starting from navigation',async({page})=>{
   await page.goto(PROJECT);
-  await page.getByRole('link',{name:'Choose a revision and scanners'}).click();
+  await page.getByRole('link',{name:'Run analysis'}).click();
   await expect(page).toHaveURL(/#\/projects\/1278177697\/run$/);
   await expect(page.getByRole('dialog',{name:'Run analysis'})).toBeVisible();
+  await expect(page.getByRole('button',{name:/Fast analysis/})).toBeVisible();
+  await page.getByRole('button',{name:/Configure analysis/}).click();
+  await expect(page.getByLabel('Full commit SHA')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Choose a branch or pull request instead'})).toBeVisible();
+  await page.getByRole('button',{name:'Choose a branch or pull request instead'}).click();
+  await expect(page.getByRole('radiogroup',{name:'Revision type'})).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/#\/projects\/1278177697$/);
  });

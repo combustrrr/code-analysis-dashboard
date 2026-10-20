@@ -69,7 +69,7 @@ The one-dispatch budget remains consumed after completion, failure, timeout, or 
 uncertain dispatch; an operator must reset it explicitly. Normal non-evaluation
 projects retain the general two-slot reconciliation policy.
 
-Refreshing or reopening the dashboard is read-only. Only an explicit Run analysis
+Refreshing or reopening the dashboard is read-only. Only an explicit Fast analysis or Configure analysis
 action can consume this budget. If a deterministic request asset already exists in the
 analysis request release, the Worker returns it as queued instead of uploading a
 duplicate. A reset clears only the evaluation lock; it does not delete report evidence.

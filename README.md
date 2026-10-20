@@ -36,9 +36,11 @@ npm run build
 
 For the already configured analysis instance, sign in and open **Projects**, the only
 workspace home, to browse the service's three trusted targets. Project selection,
-settings, and report viewing do not trigger a scan. On a project, **Run analysis** queues
-the configured preferred branch with trusted default channels in one Fast Path action.
-Use **Choose revision and scanners** for the three-step custom flow and exact-SHA review.
+settings, and report viewing do not trigger a scan. On a project, **Fast analysis** resolves
+the latest configured preferred-branch commit and submits trusted safe-default channels in
+one explicit action. **Configure analysis** starts with a full 40-character SHA, offers
+branch or pull-request selection as a fallback, and supports safe defaults, individual
+producer groups, or every currently available channel with explicit vendor confirmation.
 The service verifies the resolved immutable SHA before starting the request. A 202 means
 accepted and preparing, not completed. Different projects and revisions run concurrently;
 matching active project/SHA requests merge missing scanner channels instead of duplicating
@@ -78,8 +80,8 @@ Future scanner, triage, compliance and onboarding work is tracked in
 
 ## Finding filters and connection checks
 
-Issues supports combined severity, scanner, rule, file, directory, source-location and
-scanner-overlap filters, plus free-text search and Clear filters. Multiple scanners
+Issues supports URL-preserved severity, category, scanner, rule, file, directory,
+source-location and scanner-overlap filters, plus free-text search and Clear filters. Multiple scanners
 means supporting scanner families, not proof of a shared root cause. Overview
 shortcuts and target changes clear unrelated filters.
 

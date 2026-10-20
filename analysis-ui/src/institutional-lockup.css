@@ -1,12 +1,12 @@
 .institutional-lockup{display:inline-flex;align-items:center;gap:10px;width:max-content;max-width:100%;padding:6px 11px;border:1px solid rgba(16,25,35,.14);border-radius:8px;background:#fff;box-shadow:0 5px 18px rgba(0,0,0,.12);text-decoration:none;white-space:nowrap}
 .institutional-lockup:hover{border-color:rgba(49,168,154,.65);box-shadow:0 7px 22px rgba(0,0,0,.17)}
 .institutional-lockup:focus-visible{outline:3px solid #67bcb4;outline-offset:3px}
-.institutional-lockup span{color:#65727b;font:500 15px/1 Manrope,sans-serif}
+.institutional-lockup-separator{width:1px;height:20px;background:#d4dadd}
 .institutional-lockup img{display:block;width:auto;padding:0;border:0;border-radius:0;background:transparent;object-fit:contain}
 .institutional-lockup-trustlab{height:31px}
 .institutional-lockup-mphasis{height:27px}
 @media(prefers-reduced-motion:no-preference){.institutional-lockup{transition:border-color .16s ease,box-shadow .16s ease}}
-@media(max-width:600px){.institutional-lockup{gap:7px;padding:5px 8px;border-radius:7px}.institutional-lockup-trustlab{height:26px}.institutional-lockup-mphasis{height:22px}.institutional-lockup span{font-size:12px}}
+@media(max-width:600px){.institutional-lockup{gap:7px;padding:5px 8px;border-radius:7px}.institutional-lockup-trustlab{height:26px}.institutional-lockup-mphasis{height:22px}.institutional-lockup-separator{height:17px}}
 
 /* The institutional lockup owns header branding on public and signed-in surfaces. */
 .landing-nav{grid-template-columns:minmax(190px,1fr) auto}

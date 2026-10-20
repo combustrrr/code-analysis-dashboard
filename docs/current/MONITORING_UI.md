@@ -13,13 +13,15 @@ identifiers.
    projects needing attention, and the last refresh; each of the three cards shows
    repository relationship, preferred branch, one of the four public lifecycle states,
    current SHA, evidence age, channel coverage, limitations, and Review evidence plus
-   Run analysis or View progress actions. There is no Activity route or API.
+   Configure analysis or View progress actions. There is no Activity route or API.
 2. Select one of the three configured source projects. The project overview distinguishes
    the current source-only report from an optional separately retained PR overlay and
    shows compact readiness, active work, source/analyzed SHA, and timestamps. Opening a
    project or browsing revisions is read-only.
-2. Authorized collaborators choose a revision kind (branch, open PR including drafts,
-   or full 40-character commit SHA), select the exact ref, and choose scanner channels.
+2. Authorized collaborators use **Fast analysis** for the latest preferred-branch SHA and
+   safe defaults, or **Configure analysis** to enter a full 40-character commit SHA first.
+   Branch and open-PR selection, including drafts, is available as a fallback.
+   Configured analysis then chooses scanner producer groups.
    Portable channels are selected by default; vendor lanes are opt-in. Shared producer
    groups must be selected together. Disabled channels explain whether they are deferred,
    unavailable, not applicable, or require setup. CodeRabbit is available only for an
@@ -43,14 +45,14 @@ identifiers.
    current overlay keyed by project, PR, head repository/SHA, base SHA, tooling, and
    profile; it is never merged into source-only findings. Readers can inspect reports;
    only writers can submit, and no cancel control is provided.
-3. Overview places report-derived visual evidence near the top: severity bars, scanner
-   completion, scanner-overlap composition, and affected-directory bars, followed by
+3. Overview places report-derived visual evidence near the top: actionable severity and
+   category bars, scanner completion, scanner-overlap composition, and affected-directory bars, followed by
    cautious investigation suggestions. Empty values remain zero or unavailable exactly
    as reported. No invented quality score or proven-root-cause claim.
-4. Issues combines text, severity, scanner, rule, file, directory, source-location
+4. Issues combines text, severity, category, scanner, rule, file, directory, source-location
    and scanner-overlap filters. Selectors are searchable where useful. Clear filters
    resets the selection; overview shortcuts clear unrelated filters. Group by rule,
-   scanner, file or directory. Open an issue for explanation, source line highlighting,
+   scanner, category, file or directory. Filters remain in the project URL. Open an issue for explanation, source line highlighting,
    immutable GitHub links and supporting observations. Shared rules/locations mean
    related findings, not proof that one fix resolves the entire group.
 5. Scanners shows usable evidence, unavailable/setup-required channels, execution

@@ -30,7 +30,7 @@ repository write was performed as part of this implementation.
 2. Open **Projects** and choose one of the configured source targets. Selection opens its
    current report and is read-only; it does not submit a workflow or change configuration.
 3. Authorized collaborators on the fixed execution repository may separately choose
-   **Run analysis**. Project selection and report inspection remain read-only;
+   **Fast analysis** or **Configure analysis**. Project selection and report inspection remain read-only;
    repository administration is required to change the trusted project registry.
 4. Choose the target's configured branch (`Testing` for Kavach and Agentic-Kibana,
    `main` for dashboard self-analysis), an open pull request, or a full 40-character

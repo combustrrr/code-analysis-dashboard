@@ -128,7 +128,7 @@ test('a mismatched target registry is shown as an error, not an empty project li
  await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
  await expect(page.getByRole('alert')).toContainText('Project evidence is unavailable');
  await expect(page.getByText('No configured projects are available.')).toHaveCount(0);
-  await expect(page.getByRole('button',{name:/Run analysis/})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/Fast analysis/})).toHaveCount(0);
  expect(writes).toBe(0);
 });
 
@@ -158,7 +158,7 @@ test('visible tabs recheck collaborator access and clear the session when revoke
    await page.getByRole('button',{name:'Review evidence'}).click();
    await expect(page.getByLabel('Selected analysis revision')).toBeVisible();
    await expect(page.getByText('No report available yet. Run analysis to publish the first report.')).toBeVisible();
-   await expect(page.getByRole('button',{name:/Run analysis/})).toBeDisabled();
+   await expect(page.getByRole('link',{name:/Run analysis/})).toHaveAttribute('aria-disabled','true');
    expect(sessionChecks).toBe(1);
   await page.clock.fastForward(15_000);
   await expect(page.getByText(/Ask a dashboard maintainer to invite your account/)).toBeVisible();
@@ -336,14 +336,14 @@ test('authorized user follows one repository project from selection through publ
   expect(route.request().headers().authorization).toBe('Bearer flow-session');
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
      if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false,projects:[
-      {id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,current_report:{status:'partial'}},
-     {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false},
-     {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:false},
+      {id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Needs attention',readiness_summary:{configured_channels:26,vendor_channels:4},current_report:{status:'partial'}},
+     {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Preparing'},
+     {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:false,lifecycle:'Ready'},
     ]}});
    if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:project,checked_at:new Date().toISOString(),preferred_branch:'Testing',current_overlay:{schema_version:'analysis-pr-overlay-v1',overlay_key:'overlay-seven',status:'complete',head_sha:sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel,documents:{'pr-overlay.json':overlayAssetName},assets:{[overlayAssetName]:{sha256:createHash('sha256').update(compressedOverlay).digest('hex'),bytes:compressedOverlay.byteLength}}},targets:published?[{id:'published-target',label:'Testing',repository:source,source_repository:source,head_sha:sha,kind:'branch',branch:'Testing',checked_at:new Date().toISOString(),status:'partial',collected_run:43,documents:{'report.json':assetName,'findings.json':assetName},assets}]:[]}});
    if(url.pathname==='/api/public/asset')return route.fulfill({headers,body:url.searchParams.get('overlay')==='current'?compressedOverlay:compressedReport});
   if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:source,branches:[{name:'Testing',sha}],prs:[]}});
-   const channels=[{id:'semgrep',channel:'semgrep',mode:'portable',group:'semgrep',status:'configured',reason:'',default_selected:true,selectable:true}];
+   const channels=[{id:'semgrep',channel:'semgrep',mode:'portable',group:'semgrep',status:'configured',reason:'',default_selected:true,selectable:true},{id:'snyk',channel:'snyk',mode:'vendor',group:'snyk',status:'configured',reason:'May use vendor quota.',default_selected:false,selectable:true}];
    if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{tooling_sha:'e'.repeat(40),channels}});
    if(url.pathname==='/api/project-preview')return route.fulfill({headers,json:{preview_id:'preview-access',preview_token:'signed-preview',previewed_at:new Date().toISOString(),project_id:project,source_repository:source,source_repository_id:1278177697,selection:{kind:'branch',ref:'Testing'},target_sha:sha,pr_context:null,tooling_sha:'e'.repeat(40),profile_digest:'f'.repeat(64),channels,cached_channels:[]}});
     if(url.pathname==='/api/project-launch-fast'){
@@ -368,22 +368,42 @@ test('authorized user follows one repository project from selection through publ
     await expect(page.locator('.project-record').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('Not available');
     await expect(page.getByText('Read-only source')).toHaveCount(2);
     await expect(page.getByText('Connected self-analysis')).toHaveCount(1);
+    await page.getByRole('link',{name:'Settings'}).click();
+    await page.locator('.settings-rail a[href*="section=projects"]').click();
+    await expect(page.locator('.settings-project-row').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('26 configured · evidence pending');
+    await expect(page.locator('.settings-project-list')).not.toContainText('0 of 0');
+    await page.locator('.settings-rail a[href*="section=provenance"]').click();
+    await expect(page.locator('.provenance-boundary')).toContainText('Needs attention');
+    await expect(page.locator('.provenance-boundary')).not.toContainText('partial');
+    await page.getByRole('link',{name:'Back to Projects'}).click();
     await page.locator('.project-record').filter({hasText:source}).getByRole('button',{name:'Review evidence'}).click();
      await expect(page).toHaveURL(new RegExp(`#/projects/${project}`));
     await expect(page.getByRole('heading',{name:'Separate PR review overlay · #7'})).toBeVisible();
    await expect(page.getByText('Review fixture advisory')).toBeVisible();
-  await expect(page.getByRole('button',{name:/Run analysis/})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Run analysis'})).toBeVisible();
+  await page.getByRole('link',{name:'Run analysis'}).click();
+  await page.getByRole('button',{name:/Configure analysis/}).click();
+  await page.getByLabel('Full commit SHA').fill(sha);
+  await page.getByRole('button',{name:'Choose scanner channels'}).click();
+  await page.getByRole('button',{name:'Select all available'}).click();
+  await expect(page.getByText('Vendor usage requires confirmation')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Review exact revision'})).toBeDisabled();
+  await page.getByText(/Run snyk\. These integrations/).click();
+  await expect(page.getByRole('button',{name:'Review exact revision'})).toBeEnabled();
+  await page.keyboard.press('Escape');
    expect(new URL(page.url()).hash).toContain(`#/projects/${project}`);
   expect(new URL(page.url()).hash).not.toContain(source);
   expect(launches).toBe(0);
-  await page.getByRole('button',{name:/Run analysis/}).click();
+  await page.getByRole('link',{name:'Run analysis'}).click();
+  await page.getByRole('button',{name:/Fast analysis/}).click();
+  await page.getByRole('button',{name:'Start fast analysis'}).click();
  await expect(page.getByText('Analyzing',{exact:true})).toBeVisible();
  await expect(page.locator('.project-run-tracker')).toContainText(sha.slice(0,12));
  await page.locator('.project-run-tracker').getByRole('button',{name:'Refresh'}).click();
  await expect(page.getByText('Ready',{exact:true})).toBeVisible();
  await expect(page.locator('.project-run-tracker')).toContainText('This request published its report');
- await page.getByRole('button',{name:'Review issues'}).click();
- await expect(page).toHaveURL(/target=published-target/);
+ await page.getByRole('button',{name:'Open report'}).click();
+ await expect(page).toHaveURL(/\/report\?target=published-target/);
  await expect(page.getByLabel('Selected analysis revision')).toContainText(sha.slice(0,12));
    expect(activityReads).toBeGreaterThanOrEqual(2);expect(launches).toBe(1);expect(pageErrors).toEqual([]);
 });
