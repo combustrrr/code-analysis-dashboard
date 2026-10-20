@@ -215,8 +215,8 @@ def deployment_workflow_errors(root: Path) -> list[str]:
         errors.append("Worker deployment validation does not precede deployment")
     if "environment: production" not in worker or "CLOUDFLARE_API_TOKEN" not in worker:
         errors.append("Worker deployment does not use the production Environment token")
-    if "cron: '*/15 * * * *'" not in coordinator or "workflow_dispatch:" in coordinator:
-        errors.append("Queue coordinator is not schedule-only at 15-minute cadence")
+    if "cron: '*/15 * * * *'" not in coordinator or "workflow_dispatch:" not in coordinator:
+        errors.append("Queue coordinator lacks its 15-minute cadence or explicit maintainer wake-up")
     if "/api/internal/queue/claim" not in coordinator or "uses: ./.github/workflows/reusable-source" not in coordinator:
         errors.append("Queue coordinator does not claim and invoke local reusable scanners")
     source_section = coordinator[coordinator.index("  portable:"):coordinator.index("  publish:")]

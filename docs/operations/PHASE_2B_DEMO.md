@@ -41,8 +41,10 @@ until a pull-only collaborator performs it successfully.
 For an explicitly approved refresh of every configured project, maintainers may dispatch
 `Analyze all preferred branches`. It resolves each registry `preferred_branch` to an
 immutable SHA and admits three ordinary FIFO requests through the authenticated internal
-queue boundary. The schedule-only coordinator continues to claim one request per cadence;
-the workflow does not bypass concurrency, scanner isolation, or publication validation.
+queue boundary. The coordinator continues to claim one request per cadence; maintainers
+may also wake it explicitly when GitHub delays scheduled delivery. Either
+trigger claims only one FIFO head and does not bypass concurrency, scanner isolation, or
+publication validation.
 
 ## Known boundaries
 

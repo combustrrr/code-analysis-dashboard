@@ -1,6 +1,7 @@
 name: Code analysis queue coordinator
 run-name: Queue coordinator ${{ github.run_id }}
 on:
+  workflow_dispatch:
   schedule:
     - cron: '*/15 * * * *'
 permissions:

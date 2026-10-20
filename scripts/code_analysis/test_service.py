@@ -481,7 +481,7 @@ class MonitoringTests(unittest.TestCase):
         import yaml
         coordinator=yaml.safe_load(Path(".github/workflows/code-analysis-coordinator.yml").read_text(encoding="utf-8"))
         self.assertEqual(coordinator["permissions"], {"contents": "read"})
-        self.assertEqual(set(coordinator.get("on", coordinator.get(True))), {"schedule"})
+        self.assertEqual(set(coordinator.get("on", coordinator.get(True))), {"schedule", "workflow_dispatch"})
 
         for name in ("11-source-analysis.yml", "12-scanner-diagnostics.yml"):
             workflow=yaml.safe_load(Path(".github/workflows", name).read_text(encoding="utf-8"))
