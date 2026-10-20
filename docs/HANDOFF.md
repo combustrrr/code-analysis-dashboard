@@ -391,3 +391,18 @@ succeeded. The live Pages document and fingerprinted JavaScript asset returned H
 workspace thesis, `Review evidence`, and `How evidence is protected`, with no Activity
 navigation. The Worker public config returned HTTP 200 with admission open; anonymous
 `/api/projects` access correctly returned 403.
+
+## 2026-10-20 evidence-workspace visual refinement
+
+Commit `ed4a734f147156c62638e5c51609d051a88b105c` deployed the refined public
+landing page, locally bundled Sora and Manrope typography, clearer institutional
+co-branding, and the reset-notice lifecycle fix. Pages run `39409970355` completed
+successfully. Worker run `39409970362` completed its validation and deployment gates
+and published version `5d7a8d0d-4ca7-4e80-af62-64ab6fd7f61f`.
+
+The live Pages document and fingerprinted JavaScript asset returned HTTP 200 and were
+visually reviewed at desktop width. The deployed bundle contains `Know what was
+scanned`, `Current project coverage`, and the revised sign-in recovery copy. It no
+longer contains the old evidence-chain heading, generic GitHub sign-in error, or
+`Analysis reset in progress`. The Worker public config reports generation 3 with
+admission open and `reset_notice: null`; anonymous `/api/projects` access remains 403.
