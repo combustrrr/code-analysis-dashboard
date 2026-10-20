@@ -285,3 +285,15 @@ publicly accessible regardless of dashboard authentication.
 The rollout passed service tests, launcher tests, workflow audit, Worker dry run,
 Worker deployment, UI build, focused browser flows, and the required PR compatibility
 check. Deployment changed the Worker and dashboard only; no production scan was run.
+
+## 2026-10-20 Report PDF and export preview
+
+The authenticated report now previews a complete or filtered PDF export before
+generating a download. The preview freezes and displays the export scope, finding
+count, scanner completion, incomplete coverage, active filters, and deterministic
+volume count. The generated PDF is organized as an evidence report with an executive
+summary, severity and category distributions, scanner coverage, explicit limitations,
+immutable provenance, and detailed findings containing source links, scanner and rule
+attribution, explanation, impact, remediation, and workflow evidence. Large exports
+retain deterministic volume splitting and incomplete scanner evidence is never
+presented as zero findings.
