@@ -1,5 +1,13 @@
 # Current implementation state
 
+## 2026-10-20 Settings control-center deployment
+
+Pages run `39415699309` deployed commit
+`01436fda4ac2ee37ff4275b1641ab9e7fecb9e86`. The live application now uses the
+institutional Trust Lab × Mphasis header lockup and the refactored read-only Settings
+control center. Production asset checks and dark/light desktop/mobile rendering passed.
+No Worker deployment or source analysis was part of this release.
+
 ## 2026-10-20 concurrent analysis implementation
 
 The worktree implements `analysis-request-v4`: immediate dispatch, concurrent project and

@@ -1,5 +1,19 @@
 # New-chat handoff: Code Analysis Dashboard
 
+## 2026-10-20 institutional header and Settings deployment
+
+Main commit `01436fda4ac2ee37ff4275b1641ab9e7fecb9e86` replaced the generated
+header badge with the shared Trust Lab × Mphasis lockup and rebuilt Settings as a
+read-only workspace control center. Pages run `39415699309` completed successfully.
+Production serves JavaScript `assets/index-p24qhfP7.js` and stylesheet
+`assets/index-ByYzmldH.css`; both returned HTTP 200, and the bundle contains the new
+branding, Settings, integration-readiness and provenance interfaces. Desktop and mobile
+views were visually checked in dark and light themes with no horizontal overflow.
+
+This was a frontend-only release. The Worker was not redeployed and no analysis was
+started. Live public configuration still requires login for workspace and reports,
+admission is open with no reset notice, and anonymous `/api/projects` access returns 403.
+
 ## 2026-10-20 Projects and evidence workspace redesign
 
 The worktree makes Projects the only signed-in home and removes the Activity route,
