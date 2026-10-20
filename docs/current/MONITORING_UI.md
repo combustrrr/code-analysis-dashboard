@@ -3,6 +3,10 @@
 Open the [dashboard](https://combustrrr.github.io/code-analysis-dashboard/) and sign
 in with GitHub. Accepted collaborators of the service repository may view it;
 scan and configuration permissions are checked separately. Both themes are supported.
+The landing page and signed-in shell share the same brand tokens: Midnight and Slate
+surfaces, Trust Blue navigation, Evidence Cyan data emphasis, Mphasis Magenta primary
+actions, and Signal Amber coverage warnings. Light mode uses the corresponding neutral
+paper surfaces without changing status meaning.
 
 1. Select one of the three configured source projects. The project overview distinguishes
    the current source-only report from an optional separately retained PR overlay and
@@ -32,8 +36,10 @@ scan and configuration permissions are checked separately. Both themes are suppo
    current overlay keyed by project, PR, head repository/SHA, base SHA, tooling, and
    profile; it is never merged into source-only findings. Readers can inspect reports;
    only writers can submit, and no cancel control is provided.
-3. Overview shows severity/scanner distributions, affected directories and cautious
-   investigation suggestions. No invented quality score or proven-root-cause claim.
+3. Overview places report-derived visual evidence near the top: severity bars, scanner
+   completion, scanner-overlap composition, and affected-directory bars, followed by
+   cautious investigation suggestions. Empty values remain zero or unavailable exactly
+   as reported. No invented quality score or proven-root-cause claim.
 4. Issues combines text, severity, scanner, rule, file, directory, source-location
    and scanner-overlap filters. Selectors are searchable where useful. Clear filters
    resets the selection; overview shortcuts clear unrelated filters. Group by rule,

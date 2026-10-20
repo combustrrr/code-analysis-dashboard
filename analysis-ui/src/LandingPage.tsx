@@ -1,10 +1,11 @@
-import { Alert, Button, ConfigProvider, Space, Typography, theme } from 'antd';
+import { Alert, Button, ConfigProvider, Space, Typography } from 'antd';
 import { ArrowDownOutlined, ArrowRightOutlined, BranchesOutlined, CodeOutlined, FileSearchOutlined, GithubOutlined, RadarChartOutlined, SafetyCertificateOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { useLaunchAuth } from './useLaunchAuth';
 import { AppearanceToggle, useAppearance } from './Appearance';
 import './landing.css';
 import trustLabLogo from './assets/trustlab-logo.jpg';
 import mphasisLogo from './assets/mphasis-logo.jpg';
+import { applicationTheme } from './brand';
 
 type Auth = ReturnType<typeof useLaunchAuth>;
 
@@ -15,7 +16,7 @@ export function LandingPage({ auth, onStart, accessError, accessPending = false,
   const primaryAction = signedIn ? onStart : auth.signIn;
   const primaryLabel = checkingAccess ? 'Checking GitHub access…' : signedIn ? 'Open workspace' : 'Sign in with GitHub';
 
-  return <ConfigProvider theme={{ algorithm: appearance === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
+  return <ConfigProvider theme={applicationTheme(appearance)}>
     <main className="landing-page landing-v2">
       <div className="landing-wrap">
         <nav className="landing-nav" aria-label="Main navigation">

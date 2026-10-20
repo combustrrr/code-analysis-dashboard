@@ -19,6 +19,9 @@ test.describe('production shell',()=>{
   await expect(page.getByRole('button',{name:/Run analysis/})).toHaveCount(1);
   await expect(page.getByRole('tab',{name:/Overview/})).toHaveAttribute('aria-selected','true');
   await expect(page.getByText('Reported issues',{exact:true})).toBeVisible();
+  await expect(page.locator('.overview-chart')).toHaveCount(2);
+  await expect(page.locator('.finding-bar')).toHaveCount(6);
+  await expect(page.getByRole('img',{name:'Finding counts by severity'})).toBeVisible();
  });
 
  test('issues support search, grouping, advanced filters, and evidence',async({page})=>{
@@ -47,7 +50,7 @@ test.describe('production shell',()=>{
 
  test('activity and global settings are reachable from the common shell',async({page})=>{
   await page.goto('/#/activity');
-  await expect(page.getByRole('heading',{name:'Analysis in motion'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Analysis progress'})).toBeVisible();
   await page.getByRole('link',{name:'Settings'}).click();
   await expect(page).toHaveURL(/#\/settings\?section=general/);
   await expect(page.getByRole('heading',{name:'Appearance'})).toBeVisible();
