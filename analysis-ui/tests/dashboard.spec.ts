@@ -19,8 +19,10 @@ test.describe('production shell',()=>{
   await expect(page.getByRole('link',{name:'Run analysis'})).toHaveCount(1);
   await expect(page.getByRole('tab',{name:/Overview/})).toHaveAttribute('aria-selected','true');
   await expect(page.getByText('Reported issues',{exact:true})).toBeVisible();
-  await expect(page.locator('.overview-chart')).toHaveCount(3);
+  await expect(page.locator('.overview-chart')).toHaveCount(5);
   await expect(page.getByLabel('Finding counts by severity')).toBeVisible();
+  await expect(page.getByLabel('Finding counts by scanner')).toBeVisible();
+  await expect(page.getByLabel('Finding counts by rule')).toBeVisible();
  });
 
  test('issues support search, grouping, advanced filters, and evidence',async({page})=>{
@@ -38,6 +40,10 @@ test.describe('production shell',()=>{
   await page.getByLabel('Group issues').click();
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'No grouping'}).click();
   await page.locator('.issue-link').first().click();
+  await expect(page.getByText('Reported by',{exact:true})).toBeVisible();
+  await expect(page.getByText('Rules applied',{exact:true})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Open code on GitHub'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Code at the reported location'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Why this was reported'})).toBeVisible();
  });
 

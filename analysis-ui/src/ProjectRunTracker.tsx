@@ -33,7 +33,7 @@ type Activity = {
   error?: string;
   message?: string;
   channel_progress?: {channel:string;status:string;reason?:string;evidence_reused?:boolean;last_attempt_status?:string}[];
-  producer?: { url: string; attempt: number; status: string };
+  producer?: { run_id?: number; url: string; attempt: number; status: string; conclusion?: string | null };
   checked_at?: string;
 };
 
@@ -63,9 +63,11 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [now,setNow]=useState(Date.now());
   const publishedRequest = useRef('');
   const onPhaseRef = useRef(onPhase);
   useEffect(() => { onPhaseRef.current = onPhase; }, [onPhase]);
+  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),30000);return()=>window.clearInterval(timer);},[]);
 
   const checkStatus = useCallback(async () => {
     if (!auth.session) return undefined;
@@ -123,6 +125,10 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
     : request.previousReport
     ? `The currently displayed report is for ${request.previousTargetLabel || 'the previously selected target'}${request.previousAnalyzedSha ? ` at commit ${request.previousAnalyzedSha.slice(0, 12)}` : ''}${request.previousGeneratedAt ? `, published ${new Date(request.previousGeneratedAt).toLocaleString()}` : ''}. It will remain visible until this request publishes.`
     : 'No previous report was captured for this target. Results will appear here after publication.';
+  const elapsedMinutes=Math.max(0,Math.floor((now-new Date(request.submittedAt).getTime())/60000));
+  const progress=activity?.channel_progress||request.channel_progress||[];
+  const finished=progress.filter(channel=>['completed','failed','reused','not_applicable','deferred'].includes(channel.status.toLowerCase())).length;
+  const activeChannels=progress.filter(channel=>['active','running','analyzing','claimed'].includes(channel.status.toLowerCase()));
 
   return <Alert
     className="project-run-tracker"
@@ -130,10 +136,13 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
     showIcon
     title={title}
     description={<>
-      <p><strong>{request.source_repository||request.repository}</strong> · {request.kind} <code>{request.ref}</code>{request.target_sha&&<> · <code>{request.target_sha.slice(0,12)}</code></>} · started {new Date(request.submittedAt).toLocaleString()}</p>
+      <p><strong>{request.source_repository||request.repository}</strong> · {request.kind} <code>{request.ref}</code>{request.target_sha&&<> · <code>{request.target_sha.slice(0,12)}</code></>} · started {new Date(request.submittedAt).toLocaleString()} · elapsed {elapsedMinutes<1?'less than a minute':`${elapsedMinutes} minute${elapsedMinutes===1?'':'s'}`}</p>
+      {progress.length>0&&<div className="analysis-progress-summary" aria-label="Scanner channel progress"><strong>{finished} of {progress.length} channels finished</strong>{activeChannels.length>0&&<span>Running now: {activeChannels.map(channel=>channel.channel).join(', ')}</span>}</div>}
       <p>{activity?.error || previousReportNote}</p>
+      {!terminal&&<p className="analysis-time-note">Completion time depends on repository size and GitHub runner availability. The Actions run shows each scanner as it progresses.</p>}
       {error && <p>Status refresh is temporarily unavailable. Your analysis was not restarted.</p>}
       <div className="run-tracker-actions">
+        {activity?.producer?.url&&<Button size="small" href={activity.producer.url} target="_blank" rel="noreferrer">Open GitHub Actions</Button>}
         {publishedTargetId && <Button size="small" type="primary" onClick={() => onOpenReport(publishedTargetId)}>Open report</Button>}
         {!terminal && auth.session && <Button size="small" loading={checking} onClick={() => setRetry(value => value + 1)}>Refresh</Button>}
         {terminal && <Button size="small" onClick={onDismiss}>Dismiss</Button>}

@@ -399,6 +399,7 @@ test('authorized user follows one repository project from selection through publ
   await page.getByRole('button',{name:'Start fast analysis'}).click();
  await expect(page.getByText('Analyzing',{exact:true})).toBeVisible();
  await expect(page.locator('.project-run-tracker')).toContainText(sha.slice(0,12));
+ await expect(page.locator('.project-run-tracker').getByRole('link',{name:'Open GitHub Actions'})).toHaveAttribute('href',`https://github.com/${execution}/actions/runs/43/attempts/2`);
  await page.locator('.project-run-tracker').getByRole('button',{name:'Refresh'}).click();
  await expect(page.getByText('Ready',{exact:true})).toBeVisible();
  await expect(page.locator('.project-run-tracker')).toContainText('This request published its report');

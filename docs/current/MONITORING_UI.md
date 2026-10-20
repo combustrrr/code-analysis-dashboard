@@ -34,6 +34,9 @@ identifiers.
    forces selected channels instead of reusing matching evidence.
 4. Follow request, producer, and per-channel progress through **Preparing**, **Analyzing**,
    **Ready**, or **Needs attention**. A 202 means accepted/preparing, never completed.
+   While work is active, the project tracker shows elapsed time, completed and active
+   channel counts, and a direct link to the exact GitHub Actions run. Runtime varies with
+   repository size, selected scanners, and GitHub runner availability.
    Different projects, revisions, and selected scanner lanes may execute concurrently;
    active project/SHA duplicates merge missing channels. `NOT_SELECTED`, `NOT_APPLICABLE`,
    `DEFERRED`, failures, and validated completion are separate states. Same-SHA results
@@ -45,15 +48,18 @@ identifiers.
    current overlay keyed by project, PR, head repository/SHA, base SHA, tooling, and
    profile; it is never merged into source-only findings. Readers can inspect reports;
    only writers can submit, and no cancel control is provided.
-3. Overview places report-derived visual evidence near the top: actionable severity and
-   category bars, scanner completion, scanner-overlap composition, and affected-directory bars, followed by
+3. Overview places report-derived visual evidence near the top: actionable severity,
+   category, scanner, rule, scanner-completion, scanner-overlap, and affected-directory
+   views, followed by
    cautious investigation suggestions. Empty values remain zero or unavailable exactly
-   as reported. No invented quality score or proven-root-cause claim.
+   as reported. Missing category metadata is labelled unavailable instead of being drawn
+   as a misleading empty chart. No invented quality score or proven-root-cause claim.
 4. Issues combines text, severity, category, scanner, rule, file, directory, source-location
    and scanner-overlap filters. Selectors are searchable where useful. Clear filters
    resets the selection; overview shortcuts clear unrelated filters. Group by rule,
    scanner, category, file or directory. Filters remain in the project URL. Open an issue for explanation, source line highlighting,
-   immutable GitHub links and supporting observations. Shared rules/locations mean
+   immutable GitHub links, reporting scanners, applied rules, supporting observations,
+   and related evidence. Shared rules/locations mean
    related findings, not proof that one fix resolves the entire group.
 5. Scanners shows usable evidence, unavailable/setup-required channels, execution
    failures and deferrals separately from source findings. Unknown counts are not zero.
