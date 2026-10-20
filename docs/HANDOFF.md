@@ -426,3 +426,10 @@ covers interface copy and controls, Sora covers headings, and IBM Plex Mono is l
 to technical identifiers and numeric evidence. Computed fonts were verified in the
 fixture-backed project workspace, and the production stylesheet was confirmed to
 contain all three locally bundled families.
+
+Commit `c1e5d422ddb757f8e77601408f9b7d275347db9d` replaced the project-card
+evidence rail with four semantic, responsive fact cells and deployed through Pages run
+`39412976890`. Repository names can wrap, revision and coverage values retain their
+technical typography, coverage includes scanner units, and publication timestamps use
+a compact readable format. The production bundle and responsive CSS were verified
+after the fixture build, unit tests, and Playwright suite passed.
