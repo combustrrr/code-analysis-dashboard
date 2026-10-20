@@ -56,7 +56,8 @@ def main():
     expected = os.environ.get('EXPECTED_PROFILE', 'portable')
     if expected == 'portable' and config['profile'].get('mode') != 'portable':
         raise ValueError('This producer requires a portable profile')
-    if expected == 'agentic-soc' and config['profile'] != template['profile']:
+    configured_profile = {key: value for key, value in config['profile'].items() if key != 'mode'}
+    if expected == 'agentic-soc' and configured_profile != template['profile']:
         raise ValueError('Configured commands require a matching reviewed scanner workflow adapter')
     (root / 'config/code-analysis/service.json').write_text(json.dumps(config), encoding='utf-8')
 

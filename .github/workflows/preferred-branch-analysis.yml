@@ -2,6 +2,12 @@ name: Analyze all preferred branches
 run-name: Analyze all configured preferred branches
 on:
   workflow_dispatch:
+    inputs:
+      project_id:
+        description: Optional configured project ID; blank queues every project
+        required: false
+        default: ''
+        type: string
 permissions:
   contents: read
 jobs:
@@ -20,6 +26,7 @@ jobs:
         id: intents
         env:
           GH_TOKEN: ${{ github.token }}
+          PROJECT_ID: ${{ inputs.project_id }}
         run: echo "path=$(python -m scripts.code_analysis.operator_queue)" >> "$GITHUB_OUTPUT"
       - name: Admit trusted requests to the production FIFO
         env:

@@ -27,7 +27,10 @@ def github(path: str) -> dict:
 
 def preferred_intents(document: dict, execution_sha: str) -> list[dict]:
     intents = []
+    selected = os.environ.get("PROJECT_ID", "").strip()
     for project in document["projects"]:
+        if selected and str(project["id"]) != selected:
+            continue
         source = project["source_repository"]
         branch = project["preferred_branch"]
         repository = github(f"repos/{source['full_name']}")
@@ -53,6 +56,8 @@ def preferred_intents(document: dict, execution_sha: str) -> list[dict]:
             "requested_execution_sha": execution_sha,
         }
         intents.append(intent)
+    if selected and not intents:
+        raise ValueError("requested project is not configured")
     return intents
 
 
