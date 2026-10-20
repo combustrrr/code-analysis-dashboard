@@ -10,8 +10,6 @@ import 'antd/dist/reset.css';
 import './style.css';
 import './workspace.css';
 import { useLaunchAuth } from './useLaunchAuth';
-import { RequestStatus } from './Integration';
-import { AnalysisLauncher, type LaunchRequest } from './AnalysisLauncher';
 import { ThreatReport } from './ThreatReport';
 import { Settings } from './Settings';
 import { safeGithubUrl } from './safeUrls';
@@ -20,7 +18,7 @@ import { LandingPage } from './LandingPage';
 import { AppearanceProvider, useAppearance } from './Appearance';
 import { ProjectRunTracker, type ProjectRunRequest } from './ProjectRunTracker';
 import {parseAppRoute,routeHash,type ProjectView} from './appRoutes';
-import {ActivityPage} from './DashboardHome';
+import {ActivityPage} from './ActivityView';
 import {FastPathRunAction} from './FastPathRunAction';
 import {AppShell} from './AppShell';
 import {RevisionRibbon} from './RevisionRibbon';
@@ -86,8 +84,6 @@ function Evidence({ detail, source, error, findings, openFinding }: { detail?: D
 function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const screens = Grid.useBreakpoint();
   const { appearance } = useAppearance();
-  const [runOpen, setRunOpen] = useState(false);
-  const [pendingLaunch, setPendingLaunch] = useState<(LaunchRequest & { previousReport?: string; previousRun?: number }) | undefined>(() => { try { return JSON.parse(sessionStorage.getItem('analysis-pending-launch') || 'null') || undefined; } catch { return undefined; } });
   const [projectRuns, setProjectRuns] = useState<ProjectRunRequest[]>(readProjectRuns);
   const projectRunsRef = useRef(projectRuns);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -136,10 +132,6 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
     launchAuth.api<{can_launch:boolean;can_configure:boolean}>('projects').then(value=>{if(active)setHostAccess(value);}).catch(()=>{});
     return()=>{active=false;};
   },[launchAuth.session?.token]);
-  const launched = pendingLaunch && index?.targets.find(t => t.kind === pendingLaunch.kind && (t.kind === 'pr' ? String(t.pr) === pendingLaunch.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === pendingLaunch.ref.toLowerCase() : t.branch === pendingLaunch.ref));
-  const newOutput = !!(launched?.report && launched.report !== pendingLaunch?.previousReport && ['current', 'partial'].includes(launched.status));
-   const launchPhase = launched?.lifecycle_status || launched?.status;
-   const launchStatus = newOutput ? 'New report available for your selected target' : launchPhase === 'running' || launchPhase === 'scanning' ? 'Analysis is running' : launchPhase === 'collecting' ? 'Collecting scanner results' : launchPhase === 'publishing' ? 'Publishing the canonical report' : launchPhase === 'queued' ? 'Target is queued for analysis' : launchPhase === 'failed' && launched?.scan_run_id !== pendingLaunch?.previousRun ? 'Analysis needs attention' : 'Request submitted — awaiting a new published result';
   const target = index?.targets.find(t => t.id === r.target) || (!r.target ? index?.targets.find(t => t.kind === 'branch' && t.branch === index.preferred_branch) || index?.targets[0] : undefined);
   useEffect(() => {
     if (r.tab === 'repositories' && !r.repository) {
@@ -160,7 +152,6 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
       previousGeneratedAt: request.previousGeneratedAt || report?.generated_at,
     };
     persistProjectRuns([...projectRunsRef.current.filter(item => item.request_id !== run.request_id), run]);
-    setRunOpen(false);
   };
   const updateProjectRunPhase = (requestId: string, phase: string) => {
     const current = projectRunsRef.current;
@@ -220,22 +211,8 @@ function App({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
       return <LandingPage auth={launchAuth} onStart={() => { try { sessionStorage.setItem('analysis-workspace-requested', 'true'); } catch {} location.hash=routeHash({kind:'projects'}); }} />;
     }
     return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers}>
-     {runOpen && r.repository && r.project && <ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={index?.preferred_branch} close={() => setRunOpen(false)} onSubmitted={handleProjectSubmitted}/>}
      {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={index?.preferred_branch} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
-    {runOpen && !(r.repository && r.project) && <AnalysisLauncher
-      onSubmitted={request => {
-        const previous = index?.targets.find(t => t.kind === request.kind && (t.kind === 'pr' ? String(t.pr) === request.ref : t.kind === 'commit' ? t.head_sha.toLowerCase() === request.ref : t.branch === request.ref));
-         const pending = { ...request, previousReport: previous?.report, previousRun: previous?.scan_run_id }; setPendingLaunch(pending); try { sessionStorage.setItem('analysis-pending-launch', JSON.stringify(pending)); } catch {}
-        setRefreshTick(t => t + 1);
-      }} auth={launchAuth} open close={() => setRunOpen(false)}
-      repository={index?.source_repository || index?.targets[0]?.repository} host={index?.analysis_repository}
-      workflowBranch={index?.analysis_default_branch} preferredBranch={index?.preferred_branch}
-      targets={index?.targets || []} initial={target} follow={id => navigate(id, 'overview')}
-      channelCount={report?.channels.length} completedChannels={completed}
-      queued={index ? index.targets.filter(t => t.status === 'queued').length : undefined} scanning={index ? index.targets.filter(t => t.status === 'scanning').length : undefined}
-    />}
     <main className="project-workspace">
-       {pendingLaunch && <Alert className="launch-tracking" type={newOutput ? 'success' : 'info'} showIcon closable onClose={() => { setPendingLaunch(undefined); try { sessionStorage.removeItem('analysis-pending-launch'); } catch {} }} title={launchStatus} description={<><p>{pendingLaunch.kind}: <code>{pendingLaunch.ref}</code>. Submitted {date(pendingLaunch.submittedAt)}. {newOutput ? 'Open the report to inspect its analyzed SHA, producing run, and scanner completeness.' : 'Previous output may remain visible until a new report is published. Status is based on the latest published inventory.'}</p><RequestStatus auth={launchAuth} runId={pendingLaunch.runId}/><Space wrap><a href={pendingLaunch.url} target="_blank" rel="noreferrer">Track analysis request</a>{launched && <Button onClick={() => navigate(launched.id, 'overview')}>{newOutput ? 'Open new report' : 'View selected target'}</Button>}<Button onClick={() => { refreshRepositoryReports(); setRefreshTick(t => t + 1); }}>Check for results</Button></Space></>}/>}
       <RevisionRibbon repository={index?.source_repository||target?.repository||'Configured project'} target={target} targets={index?.targets||[]} fresh={fresh} statusLabel={states[target?.lifecycle_status||target?.status||'']||target?.status||'Unavailable'} onTarget={value=>navigate(value,r.tab==='issues'?'issues':r.tab==='report'?'report':'overview')}/>
       <div className="project-context-actions"><span>Reports checked {date(lastRefresh)}</span><Button size="small" loading={refreshing} onClick={() => { refreshRepositoryReports(); setRefreshing(true); setRefreshTick(t => t + 1); message.loading({ content: 'Checking for a new report…', key: 'refresh', duration: 1.2 }); }}>{refreshing ? 'Refreshing…' : 'Refresh results'}</Button><a href={routeHash({kind:'settings',section:'provenance',projectId:r.project})}>Full provenance</a></div>
        {r.tab!=='run'&&<FastPathRunAction auth={launchAuth} projectId={r.project} repository={r.repository} preferredBranch={index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} warning={report?.status==='partial'?'The current report has incomplete scanner evidence. A new request may still be queued with the trusted default policy.':undefined} onAccepted={handleProjectSubmitted}/>}

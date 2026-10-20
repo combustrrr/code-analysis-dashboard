@@ -6,15 +6,16 @@ viewer authorization, fixed-host APIs, explicit launch requests and report deliv
 `combustrrr/code-analysis-dashboard` is the only execution host for the three trusted
 project-registry entries. Users do not choose or install an execution repository.
 
-Users sign in to a dashboard home with aggregate health, alerts, recent-request metadata,
-global search, and project summaries. Opening **Projects** or a project remains read-only.
+Users sign in to **Projects**. **Activity** contains aggregate health, alerts,
+recent-request metadata, global search, and project summaries. Opening Projects,
+Activity, or a project remains read-only.
 On a project, **Run analysis** is the Fast Path: one action asks the Worker to resolve the
 configured preferred branch, apply trusted default channels, verify current collaborator access,
 and queue the exact SHA. The retained report stays visible while the request is active.
-**Choose revision and scanners** opens the separate three-step custom wizard for branch,
+**Choose revision and scanners** opens the three-step Run analysis flow for branch,
 open-PR, or full-SHA selection, explicit channel selection, immutable-SHA review, and final
 confirmation. The Worker
-checks collaborator access and transactionally persists an immutable `analysis-request-v2` envelope in the SQLite-backed Durable Object with source
+checks collaborator access and transactionally persists an immutable `analysis-request-v3` envelope in the SQLite-backed Durable Object with source
 and fork identities, original/resolved selection, pinned SHA, optional PR context,
 requested channels, tooling/profile digests, actor, and idempotency key. A 202 means
 accepted/queued, never scanner completion. Retries with the same idempotency key return
@@ -23,8 +24,8 @@ the existing durable request.
 The canonical client routes are `#/projects`, `#/activity`,
 `#/projects/:projectId`, `#/projects/:projectId/issues`,
 `#/projects/:projectId/report`, `#/projects/:projectId/run`, and global
-`#/settings?section=<section>&project=<optional-id>`. Older query hashes and superseded
-dashboard, custom-run, and project-settings routes are not aliases. Settings owns
+`#/settings?section=<section>&project=<optional-id>`. No retired query-hash, dashboard,
+custom-run, or project-settings route implementation remains. Settings owns
 General, Projects, Connections & readiness, and Evidence provenance; read-only values
 remain informational. The GitHub configuration history link is visible only when current
 access includes `can_configure`.

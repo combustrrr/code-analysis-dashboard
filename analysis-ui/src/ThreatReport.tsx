@@ -2,6 +2,7 @@ import { Alert, Button, Card, Col, Empty, Input, List, Pagination, Row, Select, 
 import { CopyOutlined, DownloadOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { useEffect, useMemo, useState } from 'react';
 import { refreshRepositoryReports, repositoryJson } from './repositoryReports';
+import {parseAppRoute,routeHash} from './appRoutes';
 import { safeGithubUrl } from './safeUrls';
 import trustLabLogo from './assets/trustlab-logo.jpg';
 import mphasisLogo from './assets/mphasis-logo.jpg';
@@ -45,9 +46,8 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
   useEffect(() => setFindingsPage(1), [query, severity, category, guidance, reportPath]);
   const filters = useMemo<ReportFilterSnapshot>(() => ({ query, severity, category, guidance }), [query, severity, category, guidance]);
   const filtered = useMemo(() => report ? filterThreatFindings(report.findings, filters) : [], [report, filters]);
-  if (error) { const detail = error.toLowerCase(); const expired = detail.includes('expired') || detail.includes('freshness'); const missing = detail.includes('not found') || detail.includes('unavailable'); return <Alert showIcon type="warning" title={expired ? 'Report expired' : missing ? 'Report temporarily unavailable' : 'Threat report could not be retrieved'} description={<>{error} <Space><Button type="link" onClick={() => { refreshRepositoryReports(); setRetry(n => n + 1); }}>Refresh report</Button><Button type="link" onClick={() => { const params = new URLSearchParams(location.hash.slice(1)); params.set('tab', 'overview'); location.hash = params.toString(); }}>Rerun analysis</Button></Space></>} />; }
+  if (error) { const detail = error.toLowerCase(); const expired = detail.includes('expired') || detail.includes('freshness'); const missing = detail.includes('not found') || detail.includes('unavailable'); return <Alert showIcon type="warning" title={expired ? 'Report expired' : missing ? 'Report temporarily unavailable' : 'Threat report could not be retrieved'} description={<>{error} <Space><Button type="link" onClick={() => { refreshRepositoryReports(); setRetry(n => n + 1); }}>Refresh report</Button><Button type="link" onClick={() => { const route=parseAppRoute();if(route.kind==='project')location.hash=routeHash({kind:'project',projectId:route.projectId,view:'overview',target:route.target}); }}>Return to overview</Button></Space></>} />; }
   if (!report) return <div className="empty" role="status"><Empty description="Loading threat report..." /></div>;
-  const legacy = !report.immutable;
   const pageSize = 25;
   const visibleFindings = filtered.slice((findingsPage - 1) * pageSize, findingsPage * pageSize);
   const exportPdf = async (scope: ExportScope) => {
@@ -62,7 +62,6 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
     } finally { setPdfScope(undefined); }
   };
   return <section className="threat-report" aria-label="Threat report">
-    {legacy && <Alert showIcon type="warning" title="Legacy runtime report" description="This report was generated from an older stored analysis and is not an immutable publication artifact. Rerun analysis for a provenance-bound report." />}
     <Space className="report-actions" wrap>
       <Button icon={<CopyOutlined />} onClick={() => navigator.clipboard?.writeText(location.href)}>Copy private report link</Button>
       <Button icon={<DownloadOutlined />} onClick={() => download('threat-report.json', JSON.stringify(report, null, 2), 'application/json')}>Download JSON</Button>

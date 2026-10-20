@@ -42,11 +42,6 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
    if(!selectedTarget)throw new Error('Target report is no longer current. Refresh the target.');
    const document=path.slice(isOverlay?overlayPrefix.length:('data/'+targetPath(selectedTarget)+'/').length);
   const name=selectedTarget.documents?.[document];
-  if(!name && (document==='threat-report.json'||document==='threat-report.md')) {
-    const threatQuery=new URLSearchParams(query); threatQuery.set('target_id',selectedTarget.id);
-    const payload=await (await response(base+'threat-report?'+threatQuery,signal)).json();
-    return (document.endsWith('.md') ? payload.markdown : payload.report) as T;
-  }
   if(!name)throw new Error('Requested report document is unavailable.');
   const assetKey=key+'/'+(isOverlay?'overlay/':'')+name;
  let promise=shards.get(assetKey);

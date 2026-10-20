@@ -34,8 +34,8 @@ summarizes severity/category coverage and deterministic catalog guidance, then l
 back to Issues for scanner evidence. Reports can be copied as authenticated private
 links, downloaded as JSON or Markdown, or exported as a generated PDF. Complete PDF
 export ignores review filters; filtered PDF export freezes the active filters. Large PDF
-exports are packaged as deterministic volumes in one ZIP. Older reports may show an
-explicit non-immutable legacy-runtime warning.
+exports are packaged as deterministic volumes in one ZIP. Reports are loaded only from
+the current immutable publication contract.
 
 ## Local browser fixtures
 
