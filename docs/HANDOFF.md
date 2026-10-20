@@ -360,3 +360,34 @@ All three requests retained their exact source revision, request ID, coordinator
 attempt, and configured tooling provenance. A red coordinator conclusion for either
 configured-source run reflects the explicit Schemathesis failure; it does not invalidate
 or erase the successfully published sibling scanner evidence.
+
+## 2026-10-20 concurrent-analysis and evidence-workspace cutover
+
+Commit `03bcbff06e3174d75401170ec630b789fbf00a91` replaced the global FIFO
+with project/SHA-scoped v4 analysis records and deployed the evidence-first Projects
+workspace. Worker run `39403450257` deployed version
+`4f5506f1-3a2b-4e0e-a4a1-65fa5a5c946f`; Pages run `39403450221` deployed the
+matching frontend. Admission was paused before migration, reset run `39403670012`
+reported zero active v3 requests and removed 11 current-report objects, and resume run
+`39403726075` confirmed `analysis-control-v4`, generation 3, and open admission.
+Retained Actions artifacts were not deleted.
+
+Preferred-branch batch run `39403769301` admitted three immutable analyses. Their
+coordinator workflows claimed and scanned concurrently, with no application FIFO:
+
+- Kavach request `d0123e9c-8b73-42c0-aeb2-9ce6dd94daf5`, source
+  `ARYDESTROYER/Kavach-AgenticSOC@db8d9357e4300763be9b558d073fb23b3d7702bd`,
+  coordinator run `39403805298`.
+- Agentic-Kibana request `75f88dc7-c371-43ed-bcf2-9f27758a5b76`, source
+  `combustrrr/Agentic-Kibana@22d4d2c3b3bbac3fe3ddd22e6b78fe6606aa1971`,
+  coordinator run `39403808983`.
+- Dashboard request `733c6536-e151-4c9c-912c-8a2bb561c9b1`, source
+  `combustrrr/code-analysis-dashboard@ec88c8def1a8f9df6ac303d0145490aa6e475659`,
+  coordinator run `39403812270`.
+
+All three coordinator runs, report publications, and fenced terminal completions
+succeeded. The live Pages document and fingerprinted JavaScript asset returned HTTP
+200 and were visually reviewed at desktop width. The bundle contains the evidence
+workspace thesis, `Review evidence`, and `How evidence is protected`, with no Activity
+navigation. The Worker public config returned HTTP 200 with admission open; anonymous
+`/api/projects` access correctly returned 403.
