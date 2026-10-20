@@ -12,7 +12,7 @@ type Auth=ReturnType<typeof useLaunchAuth>;
 
 let registryToken='',registryValue:Registry|undefined,registryRequest:Promise<Registry>|undefined;
 const shortSha=(value?:string|null)=>value?value.slice(0,12):'Not available';
-const date=(value?:string|null)=>value?new Date(value).toLocaleString():'Not published';
+const date=(value?:string|null)=>value?new Date(value).toLocaleString(undefined,{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'Not published';
 const lifecycle=(project:ConfiguredProject):Lifecycle=>project.lifecycle||(project.active_analysis?.status==='analyzing'?'Analyzing':project.active_analysis?'Preparing':project.current_report?'Ready':'Needs attention');
 const stateColor=(state:Lifecycle)=>state==='Ready'?'green':state==='Needs attention'?'orange':'blue';
 
@@ -34,7 +34,12 @@ export function Repositories({auth}:{auth:Auth}){
     const report=project.current_report,coverage=report?.scanner_summary,total=coverage?.total||project.readiness_summary?.configured_channels||0,completed=coverage?.completed||0,percent=total?Math.round(completed/total*100):0,state=lifecycle(project),active=state==='Preparing'||state==='Analyzing';
     return <article className={`project-record state-${state.toLowerCase().replace(' ','-')}`} key={project.id}>
      <div className="project-record-main"><div className="project-record-title"><span className="project-kind">{project.relationship==='connected'?'Connected self-analysis':'Read-only source'}</span><h2>{project.source_repository}</h2><div className="project-meta"><span><BranchesOutlined/> {project.preferred_branch}</span><span><SafetyCertificateOutlined/> {project.relationship}</span></div></div><Tag color={stateColor(state)} className="project-state">{state}</Tag></div>
-     <div className="evidence-rail" aria-label={`Evidence provenance for ${project.source_repository}`}><div><span>Source</span><strong>{project.source_repository}</strong></div><i/><div><span>Revision</span><code>{shortSha(report?.analyzed_sha||project.active_analysis?.target_sha)}</code></div><i/><div><span>Coverage</span><strong>{total?`${completed} of ${total}`:'Not available'}</strong></div><i/><div><span>Published</span><strong>{date(report?.generated_at)}</strong></div></div>
+     <dl className="evidence-rail" aria-label={`Evidence provenance for ${project.source_repository}`}>
+      <div className="evidence-fact evidence-source"><dt>Source</dt><dd title={project.source_repository}>{project.source_repository}</dd></div>
+      <div className="evidence-fact evidence-revision"><dt>Revision</dt><dd><code>{shortSha(report?.analyzed_sha||project.active_analysis?.target_sha)}</code></dd></div>
+      <div className="evidence-fact evidence-coverage"><dt>Coverage</dt><dd>{total?`${completed} / ${total} scanners`:'Not available'}</dd></div>
+      <div className="evidence-fact evidence-published"><dt>Published</dt><dd>{date(report?.generated_at)}</dd></div>
+     </dl>
      <div className="project-record-detail"><div className="coverage-line"><div><span>Scanner evidence</span><small>{coverage?.incomplete?`${coverage.incomplete} incomplete channel${coverage.incomplete===1?'':'s'}`:report?'No incomplete channels reported':'Awaiting first report'}</small></div><Progress percent={percent} showInfo={false} strokeColor="#31A89A" trailColor="var(--workspace-line)"/></div><div className="project-guidance">{project.attention_reason||(active?`${state} the selected immutable revision.`:'Current evidence is ready for review.')}{report?.limitations?.[0]&&<small>{report.limitations[0].channel}: {report.limitations[0].reason}</small>}</div></div>
      <footer className="project-record-actions"><Button type="primary" icon={<FileProtectOutlined/>} onClick={()=>openProject(project)}>Review evidence</Button>{registry.can_launch&&(active?<Button icon={<ArrowRightOutlined/>} onClick={()=>openProject(project)}>View progress</Button>:<Button icon={<PlayCircleOutlined/>} href={routeHash({kind:'project-run',projectId:project.id})}>Run analysis</Button>)}</footer>
     </article>;
