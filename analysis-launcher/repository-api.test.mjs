@@ -48,7 +48,10 @@ test('project register never treats empty or revisionless scanner evidence as re
   assert.match(revisionless.attention,/immutable source revision/);
   const complete=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),channel_statuses:[{channel:'semgrep',status:'COMPLETED'}]});
   assert.equal(complete.attention,null);
-  assert.deepEqual(complete.report.scanner_summary,{completed:1,total:1,incomplete:0});
+  assert.deepEqual(complete.report.scanner_summary,{completed:1,total:1,incomplete:0,not_run:0});
+  const deferred=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),channel_statuses:[{channel:'semgrep',status:'COMPLETED'},{channel:'snyk',status:'DEFERRED'}]});
+  assert.equal(deferred.attention,null);
+  assert.deepEqual(deferred.report.scanner_summary,{completed:1,total:2,incomplete:0,not_run:1});
 });
 
 test('pull-only collaborators can list and launch from the exact fixed target registry',async()=>{

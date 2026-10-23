@@ -16,8 +16,9 @@ export function registryReportState(target) {
   const channels=Array.isArray(target.channel_statuses)?target.channel_statuses:[];
   const completed=channels.filter(value=>COMPLETED_REPORT_STATUSES.has(value.status)).length;
   const incomplete=channels.filter(value=>!COMPLETED_REPORT_STATUSES.has(value.status)&&!['NOT_SELECTED','DEFERRED'].includes(value.status));
+  const notRun=channels.filter(value=>['NOT_SELECTED','DEFERRED'].includes(value.status)).length;
   const revision=target.analyzed_sha||target.head_sha;
-  const report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null,status:target.report_status||target.status,scanner_summary:{completed,total:channels.length,incomplete:incomplete.length},limitations:incomplete.slice(0,3).map(value=>({channel:value.channel||value.name||'Scanner',status:value.status||'Unavailable',reason:String(value.reason||'Evidence is incomplete.').slice(0,180)}))};
+  const report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null,status:target.report_status||target.status,scanner_summary:{completed,total:channels.length,incomplete:incomplete.length,not_run:notRun},limitations:incomplete.slice(0,3).map(value=>({channel:value.channel||value.name||'Scanner',status:value.status||'Unavailable',reason:String(value.reason||'Evidence is incomplete.').slice(0,180)}))};
   if(!SHA.test(revision||''))return {report,attention:'The current report does not identify an immutable source revision. Run analysis to publish verifiable evidence.'};
   if(channels.length===0)return {report,attention:'The current report contains no scanner results. Run analysis to publish scanner evidence.'};
   if(report.status==='partial'||incomplete.length>0)return {report,attention:'The current report contains incomplete scanner evidence.'};
