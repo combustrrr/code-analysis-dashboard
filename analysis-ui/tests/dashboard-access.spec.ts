@@ -409,6 +409,12 @@ test('authorized user follows one repository project from selection through publ
   await page.getByRole('button',{name:/Fast analysis/}).click();
   await page.getByRole('button',{name:'Start fast analysis'}).click();
  await expect(page.getByText('Analyzing',{exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Building the first reviewable report'})).toBeVisible();
+ await expect(page.getByText('This project has no reviewable report yet.')).toBeVisible();
+ await expect(page.locator('.analysis-entry')).toHaveCount(0);
+ await expect(page.locator('.revision-ribbon')).toHaveCount(0);
+ await expect(page.locator('.project-navigation')).toHaveCount(0);
+ await expect(page.getByText('No report available yet. Run analysis to publish the first report.')).toHaveCount(0);
  await page.locator('.project-run-tracker').getByText('Technical details').click();
  await expect(page.locator('.project-run-tracker')).toContainText(sha.slice(0,12));
  await expect(page.locator('.project-run-tracker').getByRole('link',{name:'Open GitHub Actions'})).toHaveAttribute('href',`https://github.com/${execution}/actions/runs/43/attempts/2`);

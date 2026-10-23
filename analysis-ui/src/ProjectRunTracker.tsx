@@ -132,9 +132,10 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const title = phase ? phaseCopy[phase] || 'Analysis in progress' : error ? 'Could not refresh the analysis status' : auth.session ? 'Checking analysis status…' : 'Sign in to resume tracking this analysis';
   const previousReportNote = phase === 'published' || phase === 'reused'
     ? `Results are ready${activity?.analyzed_sha ? ` for commit ${activity.analyzed_sha.slice(0, 12)}` : ''}. Opening the report now.`
-    : request.previousReport
+    : request.previousReport && request.previousAnalyzedSha
     ? `The currently displayed report is for ${request.previousTargetLabel || 'the previously selected target'}${request.previousAnalyzedSha ? ` at commit ${request.previousAnalyzedSha.slice(0, 12)}` : ''}${request.previousGeneratedAt ? `, published ${new Date(request.previousGeneratedAt).toLocaleString()}` : ''}. It will remain visible until this request publishes.`
-    : 'No previous report is available for this target. Results will appear here after publication.';
+    : 'This project has no reviewable report yet. The first report will open here after publication.';
+  const hasPreviousReport=Boolean(request.previousReport&&request.previousAnalyzedSha);
   const elapsedMinutes=Math.max(0,Math.floor((now-new Date(request.submittedAt).getTime())/60000));
   const progress=activity?.channel_progress||request.channel_progress||[];
   const finished=progress.filter(channel=>['completed','failed','reused','not_applicable','deferred'].includes(channel.status.toLowerCase())).length;
@@ -153,8 +154,9 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
       </div>
       <Progress percent={percent} status={type==='error'?'exception':type==='success'?'success':'active'} showInfo={progress.length>0} />
       {progress.length>0&&<div className="analysis-progress-summary"><strong>{finished} of {progress.length} checks complete</strong>{activeChannels.length>0&&<span>Analysis is in progress.</span>}</div>}
+      {!terminal&&progress.length===0&&<div className="analysis-progress-summary"><strong>Scanner jobs are starting</strong><span>Channel progress will appear after the workflow reports its first result.</span></div>}
       <p>{activity?.error || previousReportNote}</p>
-      {!terminal&&<p className="analysis-time-note">You can keep reviewing the current report or leave this page. New results will open automatically when they are ready.</p>}
+      {!terminal&&<p className="analysis-time-note">{hasPreviousReport?'You can keep reviewing the previous report or leave this page.':'You can leave this page while analysis continues.'} New results will open automatically when they are ready.</p>}
       {error && <p>The status could not be refreshed. The analysis was not restarted.</p>}
       <div className="run-tracker-actions">
         {publishedTargetId && <Button size="small" type="primary" onClick={() => onOpenReport(publishedTargetId)}>Open report</Button>}

@@ -86,6 +86,7 @@ a { color: var(--workspace-accent); }
 .project-run-tracker .ant-alert-description p { margin: 6px 0; color: inherit; }
 .project-run-tracker code { overflow-wrap: anywhere; }
 .analysis-progress-summary{display:flex;flex-wrap:wrap;gap:8px 18px;margin:10px 0;padding:10px 12px;border:1px solid var(--workspace-line);border-radius:6px;background:var(--workspace-panel-raised)}.analysis-progress-summary span,.analysis-time-note{color:var(--workspace-muted)}
+.awaiting-first-report{margin-top:18px;padding:28px;border:1px solid var(--workspace-line);border-left:4px solid var(--workspace-accent);border-radius:8px;background:var(--workspace-panel)}.awaiting-first-report h2{margin:6px 0 8px}.awaiting-first-report p{max-width:720px;margin:0 0 10px;color:var(--workspace-muted)}.awaiting-first-report small{color:var(--workspace-muted)}
 .channel-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
 .channel-progress-item { padding: 3px 7px; border: 1px solid var(--workspace-line); border-radius: 999px; font-size: 12px; }
 .channel-success,.channel-completed { color: #176b45; background: #e6f6ed; }

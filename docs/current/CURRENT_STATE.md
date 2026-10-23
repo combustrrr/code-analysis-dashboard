@@ -42,6 +42,12 @@ no immutable source revision or reports zero scanner results. Such records are s
 **Needs attention** with evidence described as unreported; an empty channel list is not
 presented as complete or **Ready**.
 
+When a project without reviewable prior evidence starts analysis, the active run owns
+the workspace hierarchy. The unavailable revision ribbon, normal Run analysis prompt,
+report tabs, and generic empty-report message are suppressed until publication. The
+tracker distinguishes scanner startup from reported channel progress and makes clear
+that the user may leave while analysis continues.
+
 ## 2026-10-20 interface language review
 
 The primary developer journey now uses consistent, plain-English terminology across
