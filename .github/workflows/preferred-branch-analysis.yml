@@ -46,11 +46,17 @@ jobs:
         run: |
           set -euo pipefail
           jq -c '.[]' "$INTENTS_PATH" | while read -r intent; do
-            response=$(curl --fail --silent --show-error --request POST \
+          status=$(curl --silent --show-error --output response.json --write-out '%{http_code}' --request POST \
               --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
               --data "$(jq -cn --argjson request "$intent" '{request:$request}')" \
               "${WORKER_URL}/api/internal/queue/admit")
+          response=$(cat response.json)
             echo "$response"
+          if [[ "$status" == 409 ]]; then
+            echo "::notice::Project $(jq -r '.project_id' <<< "$intent") already has an active analysis; continuing with the remaining projects."
+            continue
+          fi
+          test "$status" == 200 || test "$status" == 201
             request_id=$(jq -r '.request_id' <<< "$response")
             source_sha=$(jq -r '.intent.source_sha' <<< "$response")
             gh api --method POST "repos/${EXECUTION_REPOSITORY}/actions/workflows/code-analysis-coordinator.yml/dispatches" \

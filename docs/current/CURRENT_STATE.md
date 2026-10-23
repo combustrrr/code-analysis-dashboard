@@ -396,3 +396,12 @@ verification. The stage display is an explanatory UI change only. GitHub continu
 handle credentials, the dashboard never requests or receives the user's GitHub
 password, and the existing PKCE verifier, callback cleanup, short-lived exchange, and
 server-side authorization check remain unchanged.
+
+## 2026-10-23 Expired tooling-profile recovery
+
+Preferred-branch batch admission treats a per-project active-analysis conflict as
+isolated and continues admitting the remaining repositories. The durable control plane
+also permits a newer immutable tooling/profile context to supersede an older active
+record only after every scanner lease on the older record has expired. A current live
+lease still returns a conflict, preserving publication fencing and preventing concurrent
+tooling identities from analyzing the same project revision.
