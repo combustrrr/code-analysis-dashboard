@@ -7,15 +7,16 @@ viewer authorization, fixed-host APIs, explicit launch requests and report deliv
 project-registry entries. Users do not choose or install an execution repository.
 
 Users sign in to **Projects**, the only workspace home. It contains the three fixed
-projects, aggregate Preparing/Analyzing/Needs-attention counts, last refresh time, and
+projects, aggregate Queued/Analyzing/Needs-attention counts, last refresh time, and
 each project's current evidence state. Opening Projects or a project remains read-only.
-Developers see product-level progress only: Preparing, Analyzing, Ready, or Needs attention.
+Developers see product-level progress only: Queued, Analyzing, Preparing report, Ready, or Needs attention.
 Coordinator runs, lease state, scanner job
 links, and individual channel scheduling remain operational details. The exact selected
 revision remains visible throughout.
 On a project, **Fast analysis** is the one-click path: one action asks the Worker to resolve the
-configured preferred branch, apply trusted default channels, verify current collaborator access,
+configured preferred branch, select every approved ready channel, verify current collaborator access,
 and start the exact SHA. The retained report stays visible while the request is active.
+Its speed refers to automatic selection; independent scanner lanes run concurrently and coverage is not reduced.
 **Configure analysis** opens a three-step flow that asks for a full commit SHA first and
 offers branch or pull-request selection as a fallback. It supports safe defaults, individual
 producer groups, or all currently available channels. Selecting vendor channels requires

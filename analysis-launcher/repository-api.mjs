@@ -56,9 +56,9 @@ function scannerChoices(project) {
     const group=SCANNER_GROUPS.find(values=>values.includes(channel));
     const status=reason?'DEFERRED':!supported||UNAVAILABLE_SCANNERS.has(channel)?'NOT_AVAILABLE':setupRequired?'SETUP_REQUIRED':'READY';
     const unavailableReason=UNAVAILABLE_SCANNERS.has(channel)?'This lane requires a cross-repository credential and is withheld from source scanner jobs.':!supported?'No registered adapter in this tooling revision.':setupRequired?'Requires a reviewed language or execution profile.':channel==='coderabbit-ai-advisory'?'Available only when analyzing an open pull request.':'';
-    // Fast analysis is an explicit, reviewed low-latency policy. The complete
-    // enabled profile remains selectable through Configure analysis.
-    const approvedDefault = Array.isArray(project.fast_scanners) && project.fast_scanners.includes(channel);
+    // Fast analysis removes revision/scanner setup; it does not reduce coverage.
+    // CodeRabbit remains contextual because it requires an open pull request.
+    const approvedDefault = channel !== 'coderabbit-ai-advisory';
     return {id:channel,mode,group:group?.join('+')||channel,status,reason:reason||unavailableReason,default_selected:status==='READY'&&approvedDefault,selectable:status==='READY'};
   });
   for(const group of SCANNER_GROUPS){

@@ -107,7 +107,7 @@ test('read-only collaborators can preview an exact branch revision and trusted c
   assert.equal(result.selection.ref,'Testing');
   assert.equal(result.channels.find(channel=>channel.id==='semgrep').default_selected,true);
   assert.equal(result.channels.find(channel=>channel.id==='snyk').mode,'vendor');
-  assert.equal(result.channels.find(channel=>channel.id==='snyk').default_selected,false);
+  assert.equal(result.channels.find(channel=>channel.id==='snyk').default_selected,true);
   assert.ok(result.preview_token);
   assert.ok(h.calls.every(call=>!call.options.method));
 });
@@ -214,7 +214,7 @@ test('Fast Path allows a pull-only collaborator and admits only trusted default 
   assert.equal(result.lifecycle,'Preparing');
   assert.equal(intent.target_sha,'f'.repeat(40));
   assert.equal(intent.selection.ref,source.branch);
-  assert.deepEqual(intent.requested_channels,['semgrep']);
+  assert.deepEqual(intent.requested_channels,['semgrep','snyk']);
   assert.ok(h.queueCalls.some(call=>call.path==='/queue/status'));
   assert.deepEqual(h.wakeCalls,[[key,'f'.repeat(40)]]);
 });

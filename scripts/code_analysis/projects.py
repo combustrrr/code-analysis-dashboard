@@ -53,11 +53,6 @@ def validate(document: dict) -> dict:
             raise ValueError('An explicit repository profile is required')
         if not isinstance(project.get('enabled_scanners'), list) or not all(isinstance(x, str) for x in project['enabled_scanners']):
             raise ValueError('Explicit scanner selection is required')
-        if (not isinstance(project.get('fast_scanners'), list) or not project['fast_scanners']
-                or not all(isinstance(x, str) for x in project['fast_scanners'])):
-            raise ValueError('An explicit non-empty fast scanner selection is required')
-        if not set(project['fast_scanners']).issubset(project['enabled_scanners']):
-            raise ValueError('Fast scanners must be enabled for the project')
         if not isinstance(project.get('deferred_channels', {}), dict):
             raise ValueError('Invalid scanner deferrals')
         if project.get('native_feedback_enabled', False) is not False:

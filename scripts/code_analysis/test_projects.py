@@ -10,7 +10,7 @@ def config():
             'tooling_sha': 'a' * 40,
             'projects': [{'id': '2', 'source_repository': {'id': 2, 'full_name': 'source/project', 'private': False},
                           'relationship': 'observer', 'preferred_branch': 'main', 'profile': {'mode': 'portable'},
-                          'enabled_scanners': ['semgrep'], 'fast_scanners': ['semgrep'], 'deferred_channels': {}}]}
+                          'enabled_scanners': ['semgrep'], 'deferred_channels': {}}]}
 
 
 class ProjectTests(unittest.TestCase):
@@ -73,16 +73,6 @@ class ProjectTests(unittest.TestCase):
                 doc['projects'][0]['relationship'] = 'connected'
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 validate(doc)
-
-    def test_fast_scanners_are_explicit_and_enabled(self):
-        doc = config()
-        doc['projects'][0]['fast_scanners'] = []
-        with self.assertRaisesRegex(ValueError, 'non-empty fast scanner'):
-            validate(doc)
-        doc = config()
-        doc['projects'][0]['fast_scanners'] = ['codeql']
-        with self.assertRaisesRegex(ValueError, 'must be enabled'):
-            validate(doc)
 
     def test_shared_execution_publication_host(self):
         from scripts.code_analysis.configure_instance import configure

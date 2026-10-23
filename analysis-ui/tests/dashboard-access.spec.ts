@@ -434,7 +434,7 @@ test('authorized user follows one repository project from selection through publ
   expect(launches).toBe(0);
   await page.getByRole('link',{name:'Run analysis'}).click();
   await page.getByRole('button',{name:/Fast analysis/}).click();
-  await page.getByRole('button',{name:'Start fast analysis'}).click();
+  await page.getByRole('button',{name:'Analyze latest commit'}).click();
  await expect(page.getByText('Analyzing',{exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Building the first reviewable report'})).toBeVisible();
  await expect(page.getByText('This project has no reviewable report yet.')).toBeVisible();
