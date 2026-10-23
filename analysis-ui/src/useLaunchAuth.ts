@@ -120,7 +120,9 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
         if (!Number.isSafeInteger(registry.execution_repository?.id) || !registry.execution_repository?.full_name || !Array.isArray(registry.projects)) {
           throw new Error('The configured project registry could not be verified. Retry sign-in.');
         }
-        if (requestedProject.repository?.toLowerCase() !== registry.execution_repository.full_name.toLowerCase() || !registry.projects.some(value => String(value.id) === requestedProject.id)) {
+        const repositoryMismatch = requestedProject.repository != null
+          && requestedProject.repository.toLowerCase() !== registry.execution_repository.full_name.toLowerCase();
+        if (repositoryMismatch || !registry.projects.some(value => String(value.id) === requestedProject.id)) {
           try { sessionStorage.removeItem(RETURN_KEY); } catch {}
           throw new Error('The requested project is no longer configured. Retry sign-in and choose a current project.');
         }

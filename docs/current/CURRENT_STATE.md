@@ -2,6 +2,11 @@
 
 ## 2026-10-23 public-shell performance boundary
 
+The GitHub callback validates a requested modern `#/projects/<id>` route against the
+authenticated project registry without requiring the retired repository query parameter.
+If a legacy route explicitly supplies a repository, that repository must still match the
+fixed execution host, and removed project IDs continue to fail closed.
+
 The public landing shell is now a separate production chunk from the authenticated
 workspace. It uses native accessible controls and loads only the five font faces needed
 for the landing view; Ant Design, workspace routes, report readers, scanner tables, and
