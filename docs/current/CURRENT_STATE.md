@@ -24,6 +24,12 @@ was removed because browsers accept that directive only from an HTTP response he
 the remaining meta policy is unchanged. GitHub Pages' ten-minute immutable-asset cache
 is host-controlled and remains the only material repeat-visit recommendation.
 
+Pages publications retain the two preceding successful deployments' hashed assets. This
+prevents a cached entry bundle from receiving a 404 when it requests its lazy-loaded
+workspace chunk during the Pages cache window. The current build still owns `index.html`
+and all matching current asset names. A per-build manifest keeps this compatibility
+window bounded instead of accumulating historical bundles indefinitely.
+
 ## 2026-10-20 interface language review
 
 The primary developer journey now uses consistent, plain-English terminology across

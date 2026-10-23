@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -37,6 +38,33 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npm run build
+      - name: Record current deployment assets
+        run: find analysis-ui/dist/assets -maxdepth 1 -type f -printf '%f\n' | sort > analysis-ui/dist/current-assets.txt
+      - name: Retain assets referenced by recent deployments
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -t previous_runs < <(gh run list --workflow pages.yml --branch main --status success --limit 2 --json databaseId --jq '.[].databaseId')
+          if [ "${#previous_runs[@]}" -eq 0 ]; then
+            echo "No preceding successful Pages deployment is available."
+            exit 0
+          fi
+          for index in "${!previous_runs[@]}"; do
+            download="$RUNNER_TEMP/previous-pages-$index"
+            site="$RUNNER_TEMP/previous-site-$index"
+            mkdir -p "$download" "$site"
+            gh run download "${previous_runs[$index]}" --name github-pages --dir "$download"
+            tar -xf "$download/artifact.tar" -C "$site"
+            if [ -f "$site/current-assets.txt" ]; then
+              while IFS= read -r asset; do
+                case "$asset" in */*|*..*) echo "Unsafe retained asset name: $asset" >&2; exit 1;; esac
+                [ -f "$site/assets/$asset" ] && cp -n "$site/assets/$asset" analysis-ui/dist/assets/
+              done < "$site/current-assets.txt"
+            elif [ -d "$site/assets" ]; then
+              cp -n "$site/assets/"* analysis-ui/dist/assets/
+            fi
+          done
+          echo "Retained assets from the two preceding deployments for cached clients." >> "$GITHUB_STEP_SUMMARY"
       - name: Retain publication metrics
         if: always()
         run: |

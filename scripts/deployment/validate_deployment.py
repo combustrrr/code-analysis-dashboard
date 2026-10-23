@@ -224,6 +224,8 @@ def deployment_workflow_errors(root: Path) -> list[str]:
         errors.append("Source-executing jobs receive the coordinator credential")
     if "deploy-pages" not in pages or "wrangler" in pages:
         errors.append("Pages deployment is not isolated from Worker deployment")
+    if "Retain assets referenced by recent deployments" not in pages or "current-assets.txt" not in pages or "gh run download" not in pages or "cp -n" not in pages:
+        errors.append("Pages deployment does not retain preceding hashed assets for cached clients")
     return errors
 
 
