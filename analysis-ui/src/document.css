@@ -1,0 +1,11 @@
+:root {
+  background: #0b141e;
+}
+
+:root[data-theme='light'] {
+  background: #eef3f5;
+}
+
+body {
+  margin: 0;
+}
