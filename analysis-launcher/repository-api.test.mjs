@@ -6,7 +6,7 @@ import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID} from 
 class Failure extends Error { constructor(status,message,code){super(message);this.status=status;this.code=code;} }
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status});
 const env={APPLICATION_MODE:'repositories',ANALYSIS_REPOSITORY:EXECUTION_REPOSITORY,ANALYSIS_REPOSITORY_ID:String(EXECUTION_REPOSITORY_ID),MAX_LAUNCH_BYTES:2048};
-const config={schema_version:'analysis-projects-v1',execution_repository:{id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY},tooling_sha:'a'.repeat(40),projects:CONFIGURED_TARGETS.map(target=>({id:target.id,source_repository:{id:target.repository_id,full_name:target.repository,private:false},relationship:target.relationship,preferred_branch:target.branch,native_feedback_enabled:target.native_feedback,profile:{mode:'portable'},enabled_scanners:['semgrep','snyk'],deferred_channels:{},report_budget_bytes:900000000}))};
+const config={schema_version:'analysis-projects-v1',execution_repository:{id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY},tooling_sha:'a'.repeat(40),projects:CONFIGURED_TARGETS.map(target=>({id:target.id,source_repository:{id:target.repository_id,full_name:target.repository,private:false},relationship:target.relationship,preferred_branch:target.branch,native_feedback_enabled:target.native_feedback,profile:{mode:'portable'},enabled_scanners:['semgrep','snyk'],fast_scanners:['semgrep'],deferred_channels:{},report_budget_bytes:900000000}))};
 const configBlob={content:Buffer.from(JSON.stringify(config)).toString('base64')};
 const host=(permissions={pull:true,push:true,admin:false})=>({id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY,private:false,default_branch:'main',permissions});
 
@@ -107,7 +107,7 @@ test('read-only collaborators can preview an exact branch revision and trusted c
   assert.equal(result.selection.ref,'Testing');
   assert.equal(result.channels.find(channel=>channel.id==='semgrep').default_selected,true);
   assert.equal(result.channels.find(channel=>channel.id==='snyk').mode,'vendor');
-  assert.equal(result.channels.find(channel=>channel.id==='snyk').default_selected,true);
+  assert.equal(result.channels.find(channel=>channel.id==='snyk').default_selected,false);
   assert.ok(result.preview_token);
   assert.ok(h.calls.every(call=>!call.options.method));
 });
@@ -214,7 +214,7 @@ test('Fast Path allows a pull-only collaborator and admits only trusted default 
   assert.equal(result.lifecycle,'Preparing');
   assert.equal(intent.target_sha,'f'.repeat(40));
   assert.equal(intent.selection.ref,source.branch);
-  assert.deepEqual(intent.requested_channels,['semgrep','snyk']);
+  assert.deepEqual(intent.requested_channels,['semgrep']);
   assert.ok(h.queueCalls.some(call=>call.path==='/queue/status'));
   assert.deepEqual(h.wakeCalls,[[key,'f'.repeat(40)]]);
 });
