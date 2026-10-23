@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {repositoryApi,channelProgress,cachedChannelsForSnapshot} from './repository-api.mjs';
+import {repositoryApi,channelProgress,cachedChannelsForSnapshot,registryReportState} from './repository-api.mjs';
 import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID} from './target-registry.mjs';
 
 class Failure extends Error { constructor(status,message,code){super(message);this.status=status;this.code=code;} }
@@ -38,6 +38,17 @@ test('channel progress follows selected lanes and shared producers',()=>{
     {name:'Isolated Snyk evidence',status:'queued'},
   ],'in_progress');
   assert.deepEqual(progress.map(value=>value.status),['in_progress','success','success','queued']);
+});
+
+test('project register never treats empty or revisionless scanner evidence as ready',()=>{
+  const empty=registryReportState({status:'complete',checked_at:'2026-10-10T00:00:00Z',channel_statuses:[]});
+  assert.equal(empty.report.scanner_summary.total,0);
+  assert.match(empty.attention,/immutable source revision/);
+  const revisionless=registryReportState({status:'complete',channel_statuses:[{channel:'semgrep',status:'COMPLETED'}]});
+  assert.match(revisionless.attention,/immutable source revision/);
+  const complete=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),channel_statuses:[{channel:'semgrep',status:'COMPLETED'}]});
+  assert.equal(complete.attention,null);
+  assert.deepEqual(complete.report.scanner_summary,{completed:1,total:1,incomplete:0});
 });
 
 test('pull-only collaborators can list and launch from the exact fixed target registry',async()=>{

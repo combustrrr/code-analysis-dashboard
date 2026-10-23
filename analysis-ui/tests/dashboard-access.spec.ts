@@ -344,7 +344,7 @@ test('authorized user follows one repository project from selection through publ
      if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false,projects:[
       {id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Needs attention',readiness_summary:{profile_mode:'agentic-soc',configured_channels:26,selectable_channels:24,vendor_channels:3,deferred_channels:9,unavailable_channels:2},current_report:{status:'partial'}},
      {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Preparing'},
-     {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:false,lifecycle:'Ready'},
+     {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:false,lifecycle:'Needs attention',attention_reason:'The current report contains no scanner results. Run analysis to publish scanner evidence.',readiness_summary:{profile_mode:'portable',configured_channels:24,selectable_channels:24,vendor_channels:2,deferred_channels:0,unavailable_channels:0},current_report:{status:'complete',generated_at:'2026-10-10T00:00:00Z',scanner_summary:{completed:0,total:0,incomplete:0}}},
     ]}});
    if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:project,checked_at:new Date().toISOString(),preferred_branch:'Testing',current_overlay:{schema_version:'analysis-pr-overlay-v1',overlay_key:'overlay-seven',status:'complete',head_sha:sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel,documents:{'pr-overlay.json':overlayAssetName},assets:{[overlayAssetName]:{sha256:createHash('sha256').update(compressedOverlay).digest('hex'),bytes:compressedOverlay.byteLength}}},targets:published?[{id:'published-target',label:'Testing',repository:source,source_repository:source,head_sha:sha,kind:'branch',branch:'Testing',checked_at:new Date().toISOString(),status:'partial',collected_run:43,documents:{'report.json':assetName,'findings.json':assetName},assets}]:[]}});
    if(url.pathname==='/api/public/asset')return route.fulfill({headers,body:url.searchParams.get('overlay')==='current'?compressedOverlay:compressedReport});
@@ -374,6 +374,11 @@ test('authorized user follows one repository project from selection through publ
     await expect(page.locator('.project-record').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('Not available');
     await expect(page.getByText('Read-only source')).toHaveCount(2);
     await expect(page.getByText('Connected project')).toHaveCount(1);
+    const connected=page.locator('.project-record').filter({hasText:execution});
+    await expect(connected).toContainText('Needs attention');
+    await expect(connected).toContainText('Evidence not reported');
+    await expect(connected).toContainText('No scanner results were reported');
+    await expect(connected).not.toContainText('All reported channels are complete');
     await page.getByRole('link',{name:'Settings'}).click();
     await page.locator('.settings-rail a[href*="section=projects"]').click();
     await expect(page.locator('.settings-project-row').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('24 available');

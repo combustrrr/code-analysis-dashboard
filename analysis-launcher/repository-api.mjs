@@ -6,9 +6,23 @@ import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID, SUPPO
 const CONFIG = '.github/code-analysis/projects.json';
 const SHA = /^[a-f0-9]{40}$/i;
 const DIGEST = /^[a-f0-9]{64}$/i;
+const COMPLETED_REPORT_STATUSES = new Set(['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE']);
 
 const stable = value => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value);
 const orderedRequests = assets => (assets||[]).filter(asset=>asset.name?.startsWith('request-')&&asset.name.endsWith('.json')).sort((left,right)=>String(left.created_at||'').localeCompare(String(right.created_at||''))||Number(left.id||0)-Number(right.id||0));
+
+export function registryReportState(target) {
+  if (!target) return {report:null, attention:'No current report is available. Run analysis to create the first evidence set.'};
+  const channels=Array.isArray(target.channel_statuses)?target.channel_statuses:[];
+  const completed=channels.filter(value=>COMPLETED_REPORT_STATUSES.has(value.status)).length;
+  const incomplete=channels.filter(value=>!COMPLETED_REPORT_STATUSES.has(value.status)&&!['NOT_SELECTED','DEFERRED'].includes(value.status));
+  const revision=target.analyzed_sha||target.head_sha;
+  const report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null,status:target.report_status||target.status,scanner_summary:{completed,total:channels.length,incomplete:incomplete.length},limitations:incomplete.slice(0,3).map(value=>({channel:value.channel||value.name||'Scanner',status:value.status||'Unavailable',reason:String(value.reason||'Evidence is incomplete.').slice(0,180)}))};
+  if(!SHA.test(revision||''))return {report,attention:'The current report does not identify an immutable source revision. Run analysis to publish verifiable evidence.'};
+  if(channels.length===0)return {report,attention:'The current report contains no scanner results. Run analysis to publish scanner evidence.'};
+  if(report.status==='partial'||incomplete.length>0)return {report,attention:'The current report contains incomplete scanner evidence.'};
+  return {report,attention:null};
+}
 const CHANNEL_LANES = {'eslint':'typescript-quality','typescript':'typescript-quality','github-secret-protection-posture':'github-secret-protection-posture','github-actions-security':'github-actions-security','owasp-js':'owasp-js','owasp-iac-secrets':'owasp-iac-secrets','radon':'complexity','xenon':'complexity','shipping-image-cves':'shipping-image-security','sbom-license-provenance':'shipping-image-security','bandit':'python-bandit','ruff':'python-ruff','pyright':'python-types','coverage':'test-coverage','vulture':'dead-code','atheris':'atheris-state-machine','schemathesis':'schemathesis-fuzz','osv':'osv-scanner','snyk':'snyk','sonarqube-cloud':'sonar','coderabbit-ai-advisory':'coderabbit'};
 export function channelProgress(requested, jobs, runStatus) {
   return (requested||[]).map(channel=>{
@@ -172,19 +186,17 @@ export async function repositoryApi(request, env, session, helpers) {
     const verified = await Promise.all(configuration.projects.map(project => projectFor(configuration, project.id)));
     const checkedAt=new Date().toISOString(),activeByProject=new Map();
     try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();for(const row of payload.requests||[]){if(!['preparing','analyzing'].includes(row.status))continue;const key=String(row.intent?.project_id||''),existing=activeByProject.get(key);if(!existing||row.status==='analyzing')activeByProject.set(key,row);}}}catch{}
-    const completedStatuses=new Set(['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE']);
     const projects=await Promise.all(verified.map(async ({project}) => {
-      let current_report=null,current_overlay=null,publicationError=false;
+      let current_report=null,current_overlay=null,reportAttention=null,publicationError=false;
       const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
       try {
         const response=await publicReports(new Request(reportUrl),env);
-        if(response.ok){const manifest=await response.json(),target=canonicalReportTarget(manifest),overlay=manifest.current_overlay;publicationError=Boolean(manifest.publication_error);if(target){const channels=Array.isArray(target.channel_statuses)?target.channel_statuses:[],completed=channels.filter(value=>completedStatuses.has(value.status)).length,incomplete=channels.filter(value=>!completedStatuses.has(value.status)&&!['NOT_SELECTED','DEFERRED'].includes(value.status));current_report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null,status:target.report_status||target.status,scanner_summary:{completed,total:channels.length,incomplete:incomplete.length},limitations:incomplete.slice(0,3).map(value=>({channel:value.channel||value.name||'Scanner',status:value.status||'Unavailable',reason:String(value.reason||'Evidence is incomplete.').slice(0,180)}))};}if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
+        if(response.ok){const manifest=await response.json(),target=canonicalReportTarget(manifest),overlay=manifest.current_overlay;publicationError=Boolean(manifest.publication_error);const state=registryReportState(target);current_report=state.report;reportAttention=state.attention;if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
       } catch {}
       const active=activeByProject.get(String(project.id));let lifecycle='Ready',attention_reason=null;
       if(active)lifecycle=active.status==='analyzing'?'Analyzing':'Preparing';
       else if(publicationError){lifecycle='Needs attention';attention_reason='The latest report could not be published. Review the project evidence before relying on it.';}
-      else if(!current_report){lifecycle='Needs attention';attention_reason='No current report is available. Run analysis to create the first evidence set.';}
-      else if(current_report.status==='partial'||current_report.scanner_summary.incomplete>0){lifecycle='Needs attention';attention_reason='The current report contains incomplete scanner evidence.';}
+      else if(!current_report||reportAttention){lifecycle='Needs attention';attention_reason=reportAttention||'No current report is available. Run analysis to create the first evidence set.';}
       const choices=scannerChoices(project),selectable=choices.filter(channel=>channel.selectable);
       return {id:String(project.id),source_repository:project.source_repository.full_name,source_repository_id:project.source_repository.id,relationship:project.relationship,preferred_branch:project.preferred_branch,native_feedback_enabled:false,readiness_summary:{profile_mode:project.profile.mode,configured_channels:project.enabled_scanners.length,selectable_channels:selectable.length,vendor_channels:selectable.filter(channel=>channel.mode==='vendor').length,deferred_channels:choices.filter(channel=>channel.status==='DEFERRED').length,unavailable_channels:choices.filter(channel=>['NOT_AVAILABLE','SETUP_REQUIRED'].includes(channel.status)).length},lifecycle,attention_reason,active_analysis:active?{request_id:active.request_id,status:active.status,target_sha:active.intent?.target_sha||active.intent?.source_sha||null,created_at:active.created_at}:null,current_report,current_overlay};
     }));

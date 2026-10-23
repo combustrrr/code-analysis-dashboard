@@ -37,6 +37,11 @@ workspace. Its simple shell, buttons, status labels, alerts, and progress bars u
 HTML; Ant Design remains available only in the deferred complex workspace. Initial
 JavaScript for this route is approximately 69 KB over gzip, down from roughly 372 KB.
 
+The project register fails closed when a legacy or malformed current-report target has
+no immutable source revision or reports zero scanner results. Such records are shown as
+**Needs attention** with evidence described as unreported; an empty channel list is not
+presented as complete or **Ready**.
+
 ## 2026-10-20 interface language review
 
 The primary developer journey now uses consistent, plain-English terminology across
