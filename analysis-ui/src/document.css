@@ -9,3 +9,12 @@
 body {
   margin: 0;
 }
+
+.landing-page .dossier-live {
+  padding-inline: 0;
+  border: 0;
+}
+
+.landing-page .dossier-live i {
+  box-shadow: none;
+}
