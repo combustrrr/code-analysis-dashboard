@@ -17,6 +17,13 @@ entry (approximately 66 KB over gzip) and a 40 KB public stylesheet (approximate
 build artifact sizes, not promises about network latency; GitHub Pages, Cloudflare, and
 GitHub authorization response times remain external dependencies.
 
+Production Lighthouse 13.5.0 measured 99 mobile and 100 desktop performance, with
+mobile FCP 1.6 seconds, LCP 1.7 seconds, TBT 10 milliseconds, and CLS 0.009. Logo
+elements now carry intrinsic dimensions. The ignored `frame-ancestors` meta directive
+was removed because browsers accept that directive only from an HTTP response header;
+the remaining meta policy is unchanged. GitHub Pages' ten-minute immutable-asset cache
+is host-controlled and remains the only material repeat-visit recommendation.
+
 ## 2026-10-20 interface language review
 
 The primary developer journey now uses consistent, plain-English terminology across
