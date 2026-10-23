@@ -77,6 +77,7 @@ test('reviewed agentic scanner profiles remain listable while portable profiles 
   const readiness=await (await repositoryApi(get(`/api/project-readiness?project_id=${CONFIGURED_TARGETS[0].id}`),env,session,agenticHelpers)).json();
   assert.equal(readiness.profile_mode,'agentic-soc');
   assert.equal(readiness.channels.find(channel=>channel.channel==='semgrep').mode,'configured');
+  assert.equal(readiness.channels.find(channel=>channel.channel==='semgrep').default_selected,true);
   assert.equal(readiness.summary.selectable,2);
 
   const invalidConfig={...config,projects:config.projects.map((project,index)=>index===0?{...project,profile:{mode:'portable',commands:{eslint:{cwd:'../outside',argv:['eslint','.']}}}}:project)};

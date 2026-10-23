@@ -431,6 +431,23 @@ class PublicationCompletenessTests(unittest.TestCase):
         self.assertEqual(len(result['recent_runs']), 10)
         self.assertEqual(write.call_args.args[2]['current_target_id'], 'current:1')
 
+    def test_public_manifest_drops_legacy_unbounded_fields(self):
+        from scripts.code_analysis.repository_service import report_publication
+        target={'id':'current:1','canonical_target_id':'current:1','original_target_id':'branch-main',
+                'head_sha':'a'*40,'analyzed_sha':'a'*40,'status':'complete','report_status':'complete',
+                'lifecycle_status':'completed','documents':{'report.json':'asset.gz'},
+                'assets':{'asset.gz':{'bytes':10,'sha256':'b'*64}},'channel_statuses':[{'channel':'semgrep','status':'COMPLETED'}]}
+        previous={'schema_version':'analysis-current-v1','project_id':'1','analysis_repository':'owner/runner',
+                  'current_target_id':'current:1','targets':[target],'legacy_embedded_payload':'x'*(17*1024*1024)}
+        state={'project_id':'1','analysis_repository':'owner/runner','source_repository':'owner/source',
+               'preferred_branch':'main','targets':[],'requests':[]}
+        with patch('scripts.code_analysis.repository_service.release_manifest.read',return_value=previous), \
+                patch('scripts.code_analysis.repository_service.release_manifest.write') as write:
+            result=report_publication({'project_id':'1','analysis_repository':'owner/runner'},state,'analysis-current-1')
+        self.assertNotIn('legacy_embedded_payload',result)
+        self.assertLess(len(json.dumps(write.call_args.args[2]).encode()),1_000_000)
+        self.assertEqual(result['targets'][0]['analyzed_sha'],'a'*40)
+
     def test_report_assets_are_uploaded_under_repository_qualified_keys(self):
         config = {'analysis_repository': 'Owner/Repo', 'report_release': 'analysis-current-1'}
         state = {'targets': [{'id': 'one', 'head_sha': 'a' * 40, 'status': 'collected',

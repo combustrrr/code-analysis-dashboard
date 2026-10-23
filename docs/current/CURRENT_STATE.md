@@ -48,6 +48,12 @@ report tabs, and generic empty-report message are suppressed until publication. 
 tracker distinguishes scanner startup from reported channel progress and makes clear
 that the user may leave while analysis continues.
 
+Fast analysis selects every ready channel in the reviewed project profile, including
+configured-source scanners; PR-only CodeRabbit evidence remains contextual. Public
+report manifests are rebuilt from an explicit bounded schema during publication so
+legacy embedded fields cannot be carried forward into a request larger than the Worker
+ingress limit.
+
 ## 2026-10-20 interface language review
 
 The primary developer journey now uses consistent, plain-English terminology across

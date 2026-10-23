@@ -355,7 +355,30 @@ def report_publication(config, state, report_release, document=None):
         # Manifests written before the canonical identity was introduced had one
         # target only in the common case; retain it as a safe fallback.
         prior_current = previous_targets[0] if len(previous_targets) == 1 else None
-    result = {**previous, **state, 'schema_version':'analysis-current-v1', 'targets':[]}
+    # Rebuild the public manifest from an explicit bounded contract. Older
+    # manifests and coordinator state may contain private or very large fields;
+    # carrying them forward wholesale can exceed the Worker request limit and
+    # makes obsolete data part of every future publication.
+    result = {
+        'schema_version': 'analysis-current-v1',
+        'project_id': str(state.get('project_id') or previous.get('project_id') or config.get('project_id', '')),
+        'analysis_repository': state.get('analysis_repository') or previous.get('analysis_repository') or config.get('analysis_repository'),
+        'source_repository': state.get('source_repository') or previous.get('source_repository') or config.get('source_repository'),
+        'relationship': state.get('relationship') or previous.get('relationship'),
+        'preferred_branch': state.get('preferred_branch') or previous.get('preferred_branch'),
+        'last_request_id': state.get('last_request_id') or previous.get('last_request_id'),
+        'targets': [],
+    }
+    if isinstance(previous.get('current_overlay'), dict):
+        result['current_overlay'] = previous['current_overlay']
+    if state.get('publication_error') or previous.get('publication_error'):
+        result['publication_error'] = state.get('publication_error') or previous.get('publication_error')
+    requests = state.get('requests', []) if isinstance(state.get('requests'), list) else []
+    result['requests'] = [{key: row[key] for key in (
+        'request_id', 'target_id', 'head_sha', 'requested_channels', 'execution_channels',
+        'remaining_channels', 'reused_channels', 'completed_channels', 'failed_channels',
+        'status', 'scan_run_id', 'run_attempt', 'execution_sha', 'error', 'channel_statuses',
+        'overlay_id') if key in row} for row in requests[-20:] if isinstance(row, dict)]
     pending = {}
     entries = []
     with tempfile.TemporaryDirectory(prefix='analysis-publication-') as directory:
