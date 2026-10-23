@@ -9,6 +9,7 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  expect(await page.locator('.dossier-live').evaluate(element=>getComputedStyle(element).borderTopWidth)).toBe('0px');
  expect(await page.locator('.dossier-live i').evaluate(element=>getComputedStyle(element).boxShadow)).toBe('none');
  await expect.poll(()=>page.evaluate(()=>performance.getEntriesByType('resource').map(entry=>entry.name).some(name=>name.includes('WorkspaceApp')))).toBe(false);
+ await expect.poll(()=>page.evaluate(()=>performance.getEntriesByType('resource').map(entry=>entry.name).some(name=>name.includes('ProjectsApp')))).toBe(false);
  await expect(page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'})).toBeVisible();
  await expect(page.locator('.landing-nav')).not.toContainText('Code Analysis');
  await expect(page.locator('.landing-nav')).not.toContainText('Evidence workspace');

@@ -13,8 +13,11 @@ import {isWorkspaceRoute, parseAppRoute, routeHash} from './appRoutes';
 import type {useLaunchAuth} from './useLaunchAuth';
 
 const WorkspaceApp=lazy(()=>import('./WorkspaceApp').then(module=>({default:module.WorkspaceApp})));
-const ProjectsApp=lazy(()=>import('./ProjectsApp').then(module=>({default:module.ProjectsApp})));
+const loadProjectsApp=()=>import('./ProjectsApp');
+const ProjectsApp=lazy(()=>loadProjectsApp().then(module=>({default:module.ProjectsApp})));
 type Auth=ReturnType<typeof useLaunchAuth>;
+
+if(parseAppRoute().kind==='projects')void loadProjectsApp();
 
 function openWorkspace(){
  try{sessionStorage.setItem('analysis-workspace-requested','true');}catch{}
