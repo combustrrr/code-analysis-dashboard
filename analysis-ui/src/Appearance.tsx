@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Segmented } from 'antd';
 
 export type Appearance = 'dark' | 'light';
 
@@ -41,11 +40,7 @@ export function useAppearance() {
 
 export function AppearanceToggle({ className = '' }: { className?: string }) {
   const { appearance, setAppearance } = useAppearance();
-  return <Segmented
-    className={className}
-    aria-label="Color theme"
-    value={appearance}
-    options={[{ label: 'Dark', value: 'dark' }, { label: 'Light', value: 'light' }]}
-    onChange={value => setAppearance(value as Appearance)}
-  />;
+  return <div className={`appearance-toggle ${className}`.trim()} role="group" aria-label="Color theme">
+    {(['dark','light'] as Appearance[]).map(value=><button type="button" key={value} aria-pressed={appearance===value} onClick={()=>setAppearance(value)}>{value[0].toUpperCase()+value.slice(1)}</button>)}
+  </div>;
 }

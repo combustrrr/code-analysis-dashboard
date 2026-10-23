@@ -1,5 +1,22 @@
 # Current implementation state
 
+## 2026-10-23 public-shell performance boundary
+
+The public landing shell is now a separate production chunk from the authenticated
+workspace. It uses native accessible controls and loads only the five font faces needed
+for the landing view; Ant Design, workspace routes, report readers, scanner tables, and
+export code are requested only after an authorized user opens a workspace route. The
+authentication flow, in-memory session handling, 15-second visible-tab access recheck,
+and report authorization boundary are unchanged.
+
+The production build before this change delivered one approximately 1.19 MB minified
+JavaScript entry (approximately 379 KB over gzip) and a 144 KB stylesheet before the
+landing page could run. The validated build now delivers a 208 KB public JavaScript
+entry (approximately 66 KB over gzip) and a 40 KB public stylesheet (approximately
+16 KB over gzip). The authenticated workspace remains an on-demand chunk. These are
+build artifact sizes, not promises about network latency; GitHub Pages, Cloudflare, and
+GitHub authorization response times remain external dependencies.
+
 ## 2026-10-20 interface language review
 
 The primary developer journey now uses consistent, plain-English terminology across
