@@ -387,3 +387,12 @@ channel, and immediately dispatches project-scoped coordinators. PR-only CodeRab
 evidence and language-inapplicable channels remain excluded. Workflow-level concurrency
 prevents overlapping batch admissions without serializing the three project analyses.
 The coordinator's 15-minute schedule remains recovery-only and does not create work.
+
+## 2026-10-23 GitHub sign-in progress
+
+The public landing page now presents the existing GitHub OAuth flow as a three-stage
+journey: GitHub authorization, one-time secure exchange, and workspace access
+verification. The stage display is an explanatory UI change only. GitHub continues to
+handle credentials, the dashboard never requests or receives the user's GitHub
+password, and the existing PKCE verifier, callback cleanup, short-lived exchange, and
+server-side authorization check remain unchanged.

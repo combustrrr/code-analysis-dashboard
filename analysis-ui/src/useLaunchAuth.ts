@@ -46,6 +46,10 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
     const params = new URLSearchParams(location.hash.slice(1));
     return params.has('analysis_auth') || params.has('analysis_auth_error');
   });
+  const [stage, setStage] = useState<'idle' | 'redirecting' | 'exchanging' | 'verifying'>(() => {
+    const params = new URLSearchParams(location.hash.slice(1));
+    return params.has('analysis_auth') || params.has('analysis_auth_error') ? 'exchanging' : 'idle';
+  });
   const handledCallback = useRef(false);
   const origin = enabled ? (() => { try { const u = new URL(endpoint || pendingAuthEndpoint() || ''); return u.protocol === 'https:' && u.pathname === '/' && !u.search && !u.hash && !u.username && !u.password ? u.origin : undefined; } catch { return undefined; } })() : undefined;
 
@@ -63,6 +67,7 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
       try { sessionStorage.removeItem(VERIFIER_KEY); } catch {}
       setError(message);
       setPending(false);
+      setStage('idle');
     };
 
     if (callbackError) {
@@ -83,6 +88,7 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
       let result: { token?: string; login?: string; code?: string } = {};
       try { result = await response.json(); } catch {}
       if (!response.ok || typeof result.token !== 'string' || typeof result.login !== 'string') throw new Error(friendlyAuthError(result.code));
+      setStage('verifying');
       const verification = await fetch(`${origin}/api/session`, { cache: 'no-store', credentials: 'omit', headers: { Authorization: `Bearer ${result.token}` } });
       let verificationResult: { code?: string } = {};
       try { verificationResult = await verification.json(); } catch {}
@@ -123,6 +129,7 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
       setVerified(true);
       setError('');
       setPending(false);
+      setStage('idle');
       restoreAuthDestination();
     }).catch(reason => fail(reason instanceof Error ? reason.message : friendlyAuthError())).finally(() => {
       try { sessionStorage.removeItem(VERIFIER_KEY); } catch {}
@@ -132,6 +139,7 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
   const signIn = useCallback(() => {
     if (!origin || pending) return;
     setPending(true);
+    setStage('redirecting');
     void (async () => {
       try {
         const verifier = randomVerifier();
@@ -144,6 +152,7 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
       } catch {
         setError(friendlyAuthError());
         setPending(false);
+        setStage('idle');
       }
     })();
   }, [origin, pending]);
@@ -169,9 +178,10 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
     setSession(undefined);
     setVerified(false);
     setPending(false);
+    setStage('idle');
     setError('');
     try { sessionStorage.removeItem(VERIFIER_KEY); sessionStorage.removeItem(RETURN_KEY); sessionStorage.removeItem(ENDPOINT_KEY); } catch {}
     if (origin && handle) void fetch(`${origin}/api/logout`, { method:'POST', cache:'no-store', credentials:'omit', headers:{Authorization:`Bearer ${handle}`}}).catch(()=>{});
   }, [origin, session]);
-  return useMemo(() => ({ available: !!origin, session, verified, pending, error, signIn, signOut, api }), [origin, session, verified, pending, error, signIn, signOut, api]);
+  return useMemo(() => ({ available: !!origin, session, verified, pending, stage, error, signIn, signOut, api }), [origin, session, verified, pending, stage, error, signIn, signOut, api]);
 }

@@ -28,6 +28,33 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  await expect(page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'})).toBeVisible();
 });
 
+test('GitHub sign-in explains the secure exchange and access verification stages',async({page,context})=>{
+ test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+ const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type'};
+ await context.route('https://launcher.example/**',async route=>{
+  const url=new URL(route.request().url());
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
+  if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+  if(url.pathname==='/api/auth/redeem'){
+   await new Promise(resolve=>setTimeout(resolve,350));
+   return route.fulfill({headers,json:{token:'staged-session',login:'developer'}});
+  }
+  if(url.pathname==='/api/session'){
+   await new Promise(resolve=>setTimeout(resolve,350));
+   return route.fulfill({headers,json:{login:'developer'}});
+  }
+  if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[]}});
+  throw new Error(`Unexpected request ${url.pathname}`);
+ });
+ await page.goto('/#/projects');
+ await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
+ await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('Confirming your GitHub sign-in');
+ await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('never sees your password');
+ await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('Verifying workspace access');
+ await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
+});
+
 test('view access requires login and clears on logout',async({page,context})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  let reports=0;let allowed=true;
