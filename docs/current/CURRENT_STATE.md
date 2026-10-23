@@ -31,10 +31,11 @@ and all matching current asset names. A per-build manifest keeps this compatibil
 window bounded instead of accumulating historical bundles indefinitely.
 
 The authenticated project register is also a separate route chunk. Opening `#/projects`
-loads the public entry, a shared UI dependency (about 100 KB over gzip), and an
-approximately 3 KB project-register module instead of downloading the full report,
-issue investigation, settings, and analysis-configuration workspace. Initial JavaScript
-for this route is approximately 169 KB over gzip, down from roughly 372 KB.
+loads the public entry and an approximately 2.5 KB project-register module instead of
+downloading the full report, issue investigation, settings, and analysis-configuration
+workspace. Its simple shell, buttons, status labels, alerts, and progress bars use native
+HTML; Ant Design remains available only in the deferred complex workspace. Initial
+JavaScript for this route is approximately 69 KB over gzip, down from roughly 372 KB.
 
 ## 2026-10-20 interface language review
 
