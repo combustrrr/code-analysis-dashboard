@@ -2,6 +2,13 @@
 
 ## 2026-10-23 public-shell performance boundary
 
+The analysis workspace presents five user-facing states: Queued, Analyzing,
+Preparing report, Ready, and Needs attention. Operational identifiers and raw service
+errors are collapsed under Technical details. The primary interface does not expose
+tooling-profile conflicts, coordinator state, report shards, storage limits, or
+publication mechanics. Completed reports continue to open automatically for the active
+project.
+
 The GitHub callback validates a requested modern `#/projects/<id>` route against the
 authenticated project registry without requiring the retired repository query parameter.
 If a legacy route explicitly supplies a repository, that repository must still match the

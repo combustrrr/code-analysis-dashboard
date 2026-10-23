@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Collapse, Progress } from 'antd';
 import type { useLaunchAuth } from './useLaunchAuth';
 import { refreshRepositoryReports } from './repositoryReports';
+import {analysisStage,analysisStatus,plainAnalysisIssue} from './analysisPresentation';
 
 type Auth = ReturnType<typeof useLaunchAuth>;
 export type ProjectRunRequest = {
@@ -37,21 +38,12 @@ type Activity = {
   checked_at?: string;
 };
 
-const terminalPhases = new Set(['published', 'reused', 'failed', 'superseded']);
+const terminalPhases = new Set(['published', 'reused', 'failed', 'superseded', 'cancelled_cutover']);
 const phaseCopy: Record<string, string> = {
-  preparing: 'Preparing',
-  scanning: 'Analyzing',
-  running: 'Analyzing',
-  analyzing: 'Analyzing',
-  collecting: 'Preparing',
-  publishing: 'Preparing',
-  published: 'Ready',
-  reused: 'Ready',
-  failed: 'Needs attention',
-  superseded: 'Ready',
-  cancelled_cutover: 'Needs attention',
+  preparing: 'Queued', scanning: 'Analyzing', running: 'Analyzing', analyzing: 'Analyzing',
+  collecting: 'Preparing report', publishing: 'Preparing report', published: 'Ready', reused: 'Ready',
+  failed: 'Needs attention', superseded: 'Ready', cancelled_cutover: 'Needs attention',
 };
-
 export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPhase }: {
   auth: Auth;
   request: ProjectRunRequest;
@@ -127,8 +119,9 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
 
   const phase = activity?.phase;
   const terminal = !!phase && terminalPhases.has(phase);
+  const status = analysisStatus(phase || request.phase);
   const publishedTargetId = phase === 'published' || phase === 'reused' ? activity?.target_id : undefined;
-  const type = phase === 'published' || phase === 'reused' ? 'success' : phase === 'failed' ? 'error' : phase === 'superseded' ? 'warning' : 'info';
+  const type = phase === 'published' || phase === 'reused' ? 'success' : phase === 'failed' || phase === 'cancelled_cutover' ? 'error' : phase === 'superseded' ? 'warning' : 'info';
   const title = phase ? phaseCopy[phase] || 'Analysis in progress' : error ? 'Could not refresh the analysis status' : auth.session ? 'Checking analysis status…' : 'Sign in to resume tracking this analysis';
   const previousReportNote = phase === 'published' || phase === 'reused'
     ? `Results are ready${activity?.analyzed_sha ? ` for commit ${activity.analyzed_sha.slice(0, 12)}` : ''}. Opening the report now.`
@@ -141,7 +134,9 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const finished=progress.filter(channel=>['completed','failed','reused','not_applicable','deferred'].includes(channel.status.toLowerCase())).length;
   const activeChannels=progress.filter(channel=>['active','running','analyzing','claimed'].includes(channel.status.toLowerCase()));
   const percent=progress.length>0?Math.round((finished/progress.length)*100):(terminal?100:8);
-  const journeyStep=phase==='published'||phase==='reused'||phase==='superseded'?2:1;
+  const journeyStep=analysisStage(status);
+  const primaryIssue=phase==='failed'||phase==='cancelled_cutover'?plainAnalysisIssue(activity?.error||activity?.message):'';
+  const stages=['Choose','Queued','Analyzing','Preparing report','Ready'];
 
   return <Alert
     className="project-run-tracker"
@@ -150,14 +145,14 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
     title={title}
     description={<>
       <div className="analysis-journey" aria-label="Analysis journey">
-        {['Choose', 'Analyze', 'Review'].map((label,index)=><div key={label} className={index<journeyStep?'done':index===journeyStep?'current':''}><span>{index+1}</span><b>{label}</b></div>)}
+        {stages.map((label,index)=><div key={label} className={index<journeyStep?'done':index===journeyStep?'current':''}><span>{index<journeyStep?'✓':index+1}</span><b>{label}</b></div>)}
       </div>
       <Progress percent={percent} status={type==='error'?'exception':type==='success'?'success':'active'} showInfo={progress.length>0} />
       {progress.length>0&&<div className="analysis-progress-summary"><strong>{finished} of {progress.length} checks complete</strong>{activeChannels.length>0&&<span>Analysis is in progress.</span>}</div>}
       {!terminal&&progress.length===0&&<div className="analysis-progress-summary"><strong>Scanner jobs are starting</strong><span>Channel progress will appear after the workflow reports its first result.</span></div>}
-      <p>{activity?.error || previousReportNote}</p>
+      <p>{primaryIssue || previousReportNote}</p>
       {!terminal&&<p className="analysis-time-note">{hasPreviousReport?'You can keep reviewing the previous report or leave this page.':'You can leave this page while analysis continues.'} New results will open automatically when they are ready.</p>}
-      {error && <p>The status could not be refreshed. The analysis was not restarted.</p>}
+      {error && <p>The analysis is still running. Refresh in a moment; this does not start another analysis.</p>}
       <div className="run-tracker-actions">
         {publishedTargetId && <Button size="small" type="primary" onClick={() => onOpenReport(publishedTargetId)}>Open report</Button>}
         {!terminal && auth.session && <Button size="small" loading={checking} onClick={() => setRetry(value => value + 1)}>Refresh</Button>}
@@ -168,6 +163,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
         <p>Started {new Date(request.submittedAt).toLocaleString()} · elapsed {elapsedMinutes<1?'less than a minute':`${elapsedMinutes} minute${elapsedMinutes===1?'':'s'}`}</p>
         {progress.length>0&&<p>{finished} of {progress.length} channels finished{activeChannels.length>0?` · active: ${activeChannels.map(channel=>channel.channel).join(', ')}`:''}</p>}
         {activity?.producer?.url&&<Button size="small" href={activity.producer.url} target="_blank" rel="noreferrer">Open GitHub Actions</Button>}
+        {(activity?.error||activity?.message||error)&&<p><strong>Service detail:</strong> {activity?.error||activity?.message||error}</p>}
       </>}]} />
     </>}
   />;

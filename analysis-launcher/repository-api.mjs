@@ -96,7 +96,7 @@ export async function repositoryApi(request, env, session, helpers) {
   if (requestedRepository && requestedRepository.toLowerCase() !== EXECUTION_REPOSITORY.toLowerCase()) throw new Failure(400, 'Routes are bound to the configured execution repository.', 'repository_not_configurable');
   async function admit(intent){
     const admitted=await queue('/queue/admit',{request:intent}),body=await admitted.json();
-    if(admitted.status===409)throw new Failure(409,body.error==='analysis_active'?'Wait for the active analysis of this project and revision to finish before running it again.':body.error==='active_context_conflict'?'This revision is already being analyzed with a different immutable tooling profile.':'This idempotency key already identifies a different analysis request.',body.error||'idempotency_conflict');
+    if(admitted.status===409)throw new Failure(409,body.error==='analysis_active'?'This project is already being analyzed. Its newest report will open when ready.':body.error==='active_context_conflict'?'A previous analysis is finishing. Wait a moment, then try again.':'This analysis request was already submitted.',body.error||'idempotency_conflict');
     if(!admitted.ok)throw new Failure(503,body.error==='admission_paused'?(body.reset_notice||'Analysis admission is paused for maintenance.'):'The analysis control plane is temporarily unavailable; no request was accepted.',body.error==='admission_paused'?'admission_paused':'analysis_unavailable');
     let wake_status='scheduled_recovery';
     try{if(wakeCoordinator){await wakeCoordinator(body.request_id||intent.request_id,intent.source_sha);wake_status='signalled';}}catch{}

@@ -23,6 +23,7 @@ import { useAppearance } from './Appearance';
 import { ProjectRunTracker, type ProjectRunRequest } from './ProjectRunTracker';
 import {parseAppRoute,routeHash,type IssueRouteFilters,type ProjectView} from './appRoutes';
 import {AppShell} from './AppShell';
+import {plainAnalysisIssue} from './analysisPresentation';
 import {RevisionRibbon} from './RevisionRibbon';
 import {applicationTheme} from './brand';
 
@@ -234,7 +235,8 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
         const desc = error || index?.discovery_error || index?.publication_error || target?.error || '';
         const isNoCurrent = typeof desc === 'string' && desc.toLowerCase().includes('report not found in storage');
         const isRepositoryUnavailable = !!applicationEndpoint && isRepositoryAvailabilityError(desc);
-         return <Alert showIcon type={isNoCurrent ? 'info' : 'error'} title={isRepositoryUnavailable ? 'Repository unavailable' : isNoCurrent ? 'No current report yet' : 'Report service error'} description={isRepositoryUnavailable ? (r.repository || 'This repository') + ' is retired or unsupported by the live analysis service. No other repository was selected.' : isNoCurrent ? 'Run analysis to generate the first report for this target.' : desc}/>;
+         const guidance=isRepositoryUnavailable?(r.repository||'This repository')+' is no longer available in this workspace.':isNoCurrent?'Run analysis to create the first report for this project.':plainAnalysisIssue(desc);
+         return <Alert showIcon type={isNoCurrent ? 'info' : 'error'} title={isRepositoryUnavailable ? 'Project unavailable' : isNoCurrent ? 'No report yet' : 'Report needs attention'} description={<>{guidance}{!isNoCurrent&&<Collapse ghost size="small" className="run-technical-details" items={[{key:'details',label:'Technical details',children:<p>{desc}</p>}]} />}</>}/>;
       })()}
        {report && (target?.status === 'failed' || !fresh || report.status === 'partial') && <Alert showIcon type="warning" title={target?.status === 'failed' ? 'Showing last successful report' : !fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={target?.status === 'failed' ? `The newer analysis failed. These findings belong to commit ${report.analyzed_sha} and are retained as the last successful report; inspect the failure above before treating them as current.` : !fresh ? 'These findings belong to the older analyzed commit shown above.' : `Available findings are shown. Incomplete scanners: ${report.channels.filter(c=>!['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE','DEFERRED'].includes(c.status)).map(c=>c.name).join(', ') || 'see Report for evidence details'}. Open Report for the failure reason.`}/>}
         {(report||!activeProjectRun)&&<Tabs className="project-navigation" activeKey={r.tab==='run'?'overview':r.tab} onChange={tab=>navigate(target?.id||'',tab as ProjectView)} items={[{key:'overview',label:'Overview'},{key:'issues',label:`Issues${report?` (${report.finding_count.toLocaleString()})`:''}`},{key:'report',label:'Report'}]}/>}

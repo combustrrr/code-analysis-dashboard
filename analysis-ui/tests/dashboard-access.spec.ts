@@ -404,7 +404,7 @@ test('authorized user follows one repository project from selection through publ
     const connected=page.locator('.project-record').filter({hasText:execution});
     await expect(connected).toContainText('Needs attention');
     await expect(connected).toContainText('Evidence not reported');
-    await expect(connected).toContainText('No scanner results were reported');
+    await expect(connected).toContainText('No checks were reported');
     await expect(connected).not.toContainText('All reported channels are complete');
     await page.getByRole('link',{name:'Settings'}).click();
     await page.locator('.settings-rail a[href*="section=projects"]').click();
@@ -446,7 +446,7 @@ test('authorized user follows one repository project from selection through publ
  await expect(page.locator('.project-run-tracker')).toContainText(sha.slice(0,12));
  await expect(page.locator('.project-run-tracker').getByRole('link',{name:'Open GitHub Actions'})).toHaveAttribute('href',`https://github.com/${execution}/actions/runs/43/attempts/2`);
  await page.locator('.project-run-tracker').getByRole('button',{name:'Refresh'}).click();
- await expect(page.getByText('Ready',{exact:true})).toBeVisible();
+ await expect(page.locator('.project-run-tracker').locator('.ant-alert-title')).toHaveText('Ready');
  await expect(page.locator('.project-run-tracker')).toContainText('Results are ready');
  await expect(page).toHaveURL(/\/report\?target=published-target/);
  await expect(page.getByLabel('Selected analysis revision')).toContainText(sha.slice(0,12));
