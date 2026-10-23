@@ -182,6 +182,22 @@ class ReportTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'producer workflow'):
                 service.collect({'analysis_repository': 'service/host'}, row, self.root)
 
+    def test_exact_current_coordinator_may_collect_before_its_workflow_finishes(self):
+        row = {**self.identity, 'scan_run_id': 123, 'tooling_sha': 'd' * 40, 'run_attempt': 1}
+        run = {'path': '.github/workflows/code-analysis-coordinator.yml', 'head_sha': 'd' * 40, 'status': 'in_progress'}
+        config = {'analysis_repository': 'service/host', 'source_workflow': run['path'], 'active_coordinator_run_id': 123}
+        with patch.object(service, 'api', return_value=run), patch.object(service, 'pages', return_value=[]):
+            with self.assertRaisesRegex(ValueError, 'exact producer report missing'):
+                service.collect(config, row, self.root)
+
+    def test_unrelated_in_progress_coordinator_is_rejected(self):
+        row = {**self.identity, 'scan_run_id': 123, 'tooling_sha': 'd' * 40, 'run_attempt': 1}
+        run = {'path': '.github/workflows/code-analysis-coordinator.yml', 'head_sha': 'd' * 40, 'status': 'in_progress'}
+        config = {'analysis_repository': 'service/host', 'source_workflow': run['path'], 'active_coordinator_run_id': 456}
+        with patch.object(service, 'api', return_value=run):
+            with self.assertRaisesRegex(ValueError, 'producer workflow identity'):
+                service.collect(config, row, self.root)
+
     def test_expired_exact_artifact_is_unavailable(self):
         row = {**self.identity, 'scan_run_id': 123, 'tooling_sha': 'd' * 40, 'run_attempt': 2}
         run = {'path': '.github/workflows/11-source-analysis.yml', 'head_sha': 'd' * 40, 'status': 'completed'}

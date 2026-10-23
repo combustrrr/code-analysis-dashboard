@@ -405,3 +405,9 @@ also permits a newer immutable tooling/profile context to supersede an older act
 record only after every scanner lease on the older record has expired. A current live
 lease still returns a conflict, preserving publication fencing and preventing concurrent
 tooling identities from analyzing the same project revision.
+
+Coordinator publication accepts its own exact in-progress workflow run only after the
+producer dependencies have completed and the exact-attempt report artifact exists. This
+removes the former circular requirement that the workflow be completed before its own
+publish job could collect evidence. Completed historical producer runs retain the same
+identity checks; unrelated in-progress runs remain ineligible.

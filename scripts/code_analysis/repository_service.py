@@ -614,6 +614,8 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         queue_advanced=False
         config = service_config(document, project['id'], template)
         config['source_workflow'] = WORKFLOW
+        if external_queue:
+            config['active_coordinator_run_id'] = int(os.environ['GITHUB_RUN_ID'])
         current=config['report_release']
         current_manifest=release_manifest.read(config,current)
         source = github.api('repos/' + config['source_repository'])
@@ -682,7 +684,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                        or recover_completed_producer_run(config, row, runs))
                 if run and run['head_sha'] == row.get('execution_sha'):
                     row.update(scan_run_id=run['id'],run_attempt=run['run_attempt'],
-                               status='collected' if run['status']=='completed' else 'scanning',run_conclusion=run['conclusion'])
+                               status='collected' if run['status']=='completed' or (external_queue and owns_active_request(row,intent) and str(run['id'])==str(config['active_coordinator_run_id'])) else 'scanning',run_conclusion=run['conclusion'])
                 continue  # Never retry a dispatch with an uncertain outcome.
             if row.get('status')=='cached':
                 continue
