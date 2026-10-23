@@ -411,3 +411,8 @@ producer dependencies have completed and the exact-attempt report artifact exist
 removes the former circular requirement that the workflow be completed before its own
 publish job could collect evidence. Completed historical producer runs retain the same
 identity checks; unrelated in-progress runs remain ineligible.
+
+Accepted queue requests replace both the structured immutable identity and its derived
+analysis-key hash when tooling changes. Reconciliation therefore no longer classifies a
+newly accepted current-profile request as stale and removes its coordinator run receipt
+before publication.

@@ -649,6 +649,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                 accepted.update(requested_channels=intent['requested_channels'],pr_context=intent.get('pr_context'),
                                 tooling_sha=intent['tooling_sha'],profile_digest=intent['profile_digest'],
                                 analysis_key_components=intent['analysis_key'],run_again=intent.get('run_again',False))
+                accepted['analysis_key'] = analysis_key(accepted, intent['tooling_sha'], config)
                 requested=accepted['requested_channels']
                 cached_target=next((target for target in current_manifest.get('targets',[])
                                     if target.get('original_target_id')==selected['id']
