@@ -30,6 +30,12 @@ workspace chunk during the Pages cache window. The current build still owns `ind
 and all matching current asset names. A per-build manifest keeps this compatibility
 window bounded instead of accumulating historical bundles indefinitely.
 
+The authenticated project register is also a separate route chunk. Opening `#/projects`
+loads the public entry, a shared UI dependency (about 100 KB over gzip), and an
+approximately 3 KB project-register module instead of downloading the full report,
+issue investigation, settings, and analysis-configuration workspace. Initial JavaScript
+for this route is approximately 169 KB over gzip, down from roughly 372 KB.
+
 ## 2026-10-20 interface language review
 
 The primary developer journey now uses consistent, plain-English terminology across

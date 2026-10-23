@@ -50,6 +50,7 @@ test('view access requires login and clears on logout',async({page,context})=>{
  await expect(page.getByRole('link',{name:/Run analysis/})).toHaveCount(0);
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
  await expect(page.getByRole('link',{name:/Run analysis/})).toBeVisible();expect(reports).toBe(0);
+  await expect.poll(()=>page.evaluate(()=>performance.getEntriesByType('resource').map(entry=>entry.name).some(name=>name.includes('WorkspaceApp')))).toBe(false);
  await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.getByRole('link',{name:/Run analysis/})).toHaveCount(0);
   allowed=false;await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();await expect(page.getByText(/Ask a dashboard maintainer to invite your account/)).toBeVisible();await expect(page.getByRole('link',{name:/Run analysis/})).toHaveCount(0);
  });

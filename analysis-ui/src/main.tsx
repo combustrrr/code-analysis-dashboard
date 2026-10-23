@@ -1,4 +1,4 @@
-import React, {lazy, Suspense} from 'react';
+import React, {lazy, Suspense, useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import '@fontsource/manrope/400.css';
 import '@fontsource/manrope/600.css';
@@ -9,10 +9,11 @@ import './document.css';
 import {AppearanceProvider} from './Appearance';
 import {DashboardAccess} from './DashboardAccess';
 import {LandingPage} from './LandingPage';
-import {isWorkspaceRoute, routeHash} from './appRoutes';
+import {isWorkspaceRoute, parseAppRoute, routeHash} from './appRoutes';
 import type {useLaunchAuth} from './useLaunchAuth';
 
 const WorkspaceApp=lazy(()=>import('./WorkspaceApp').then(module=>({default:module.WorkspaceApp})));
+const ProjectsApp=lazy(()=>import('./ProjectsApp').then(module=>({default:module.ProjectsApp})));
 type Auth=ReturnType<typeof useLaunchAuth>;
 
 function openWorkspace(){
@@ -26,7 +27,13 @@ function PublicLanding({auth,accessError,accessPending,workspaceRequested}:{auth
 
 function Authenticated({auth}:{auth:Auth}){
  if(!isWorkspaceRoute())return <PublicLanding auth={auth}/>;
- return <Suspense fallback={<main className="workspace-loading" role="status">Opening workspace...</main>}><WorkspaceApp viewerAuth={auth}/></Suspense>;
+ return <WorkspaceRoute auth={auth}/>;
+}
+
+function WorkspaceRoute({auth}:{auth:Auth}){
+ const [kind,setKind]=useState(()=>parseAppRoute().kind);
+ useEffect(()=>{const update=()=>setKind(parseAppRoute().kind);window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
+ return <Suspense fallback={<main className="workspace-loading" role="status">Opening workspace...</main>}>{kind==='projects'?<ProjectsApp viewerAuth={auth}/>:<WorkspaceApp viewerAuth={auth}/>}</Suspense>;
 }
 
 createRoot(document.getElementById('root')!).render(

@@ -19,7 +19,6 @@ import { useLaunchAuth } from './useLaunchAuth';
 import { ThreatReport } from './ThreatReport';
 import { Settings } from './Settings';
 import { safeGithubUrl } from './safeUrls';
-import { Repositories } from './Repositories';
 import { useAppearance } from './Appearance';
 import { ProjectRunTracker, type ProjectRunRequest } from './ProjectRunTracker';
 import {parseAppRoute,routeHash,type IssueRouteFilters,type ProjectView} from './appRoutes';
@@ -217,9 +216,8 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
   useEffect(()=>{if(r.tab!=='issues'||!target)return;const timer=window.setTimeout(()=>{const filters={query,severity,category,scanner,rule,file,directory,location:locationFilter,overlap,group:groupBy==='none'?'':groupBy};const next=routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:r.issue||undefined,filters});if(location.hash!==next)history.replaceState(null,'',next);},50);return()=>window.clearTimeout(timer);},[r.tab,r.project,r.issue,target?.id,query,severity,category,scanner,rule,file,directory,locationFilter,overlap,groupBy]);
    const appTheme=applicationTheme(appearance);
     if (!r.repository) {
-      if(r.tab==='projects')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth}><main className="workspace-home"><Repositories auth={launchAuth}/></main></AppShell></ConfigProvider>;
       if(r.tab==='settings')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth}><Settings auth={launchAuth} onRun={projectId=>location.hash=routeHash({kind:'project-run',projectId})}/></AppShell></ConfigProvider>;
-      return <Repositories auth={launchAuth}/>;
+      return null;
     }
     return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers.length ? projectRunTrackers : undefined}>
      {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
