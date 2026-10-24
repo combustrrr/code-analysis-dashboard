@@ -13,7 +13,11 @@ TOOLING_REPOSITORY = 'combustrrr/code-analysis-dashboard'
 def reusable_source(portable=True):
     config = json.loads((ROOT / 'config/code-analysis/service.json').read_text(encoding='utf-8-sig'))
     if portable:
-        config.update(profile={'mode':'portable'}, scanner_extensions=[])
+        # Portable projects still use reviewed, credentialless service extensions.
+        # Dropping them here allowed an enabled channel to be selected without a
+        # corresponding producer job in the reusable workflow.
+        extensions = [row for row in config.get('scanner_extensions', []) if not row.get('secrets')]
+        config.update(profile={'mode':'portable'}, scanner_extensions=extensions)
     document = yaml.safe_load(generate(config))
     document['name'] = 'Reusable source analysis'
     document.pop('run-name', None)

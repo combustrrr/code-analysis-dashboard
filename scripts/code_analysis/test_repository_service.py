@@ -98,6 +98,12 @@ class RepositoryExecutionTests(unittest.TestCase):
     def test_generated_producer_is_current(self):
         self.assertEqual(reusable_source(),Path('.github/workflows/reusable-source.yml').read_text(encoding='utf-8-sig'))
 
+    def test_portable_producer_includes_credentialless_service_extensions(self):
+        workflow = reusable_source()
+        self.assertIn('ext-github-security-advisories:', workflow)
+        self.assertIn('extension_runner ext-github-security-advisories', workflow)
+        self.assertNotIn('secrets.GITHUB_TOKEN', workflow)
+
     def test_observer_never_calls_native_api(self):
         with patch('scripts.code_analysis.native_feedback.github.api') as api:
             result=publish(config(),'2',{}, {}, [],dashboard_url='https://example.test')

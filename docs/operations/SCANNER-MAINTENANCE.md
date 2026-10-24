@@ -163,6 +163,9 @@ workflows after changing these jobs. Workflow 12 remains vendor-diagnostics-only
 The reusable workflows are generated separately by
 `python -m scripts.code_analysis.generate_reusable_workflows`:
 `reusable-source.yml` (portable) and `reusable-source-full.yml` (full profile).
+The portable producer retains every reviewed credentialless service extension so
+an enabled extension always has a runnable job; extensions requiring secrets remain
+outside source-executing portable jobs.
 Regenerate both sets after changing scanner workflows, profiles, or extensions,
 inspect the complete diff, and run the relevant parity checks before claiming a
 workflow change is live.
