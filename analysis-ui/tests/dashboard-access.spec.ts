@@ -232,7 +232,8 @@ test('repository deep links open the authenticated workspace with a shared theme
    await expect(page.getByRole('button',{name:'Review evidence'})).toBeVisible();
  await expect(page.locator('.shell-user')).toContainText('developer');
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
- await page.getByText('Dark',{exact:true}).click();
+ await page.locator('.shell-header').getByRole('link',{name:'Settings'}).click();
+ await page.locator('.settings-control-card').getByText('Dark',{exact:true}).click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
  await page.setViewportSize({width:390,height:844});
  const mobileLayout=await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,overflowing:[...document.querySelectorAll('body *')].map(element=>({element:element.tagName+'.'+(element as HTMLElement).className?.toString().replaceAll(' ',' .'),right:Math.round(element.getBoundingClientRect().right)})).filter(item=>item.right>innerWidth+1).slice(0,8)}));
@@ -418,7 +419,7 @@ test('authorized user follows one repository project from selection through publ
     await page.locator('.settings-rail a[href*="section=provenance"]').click();
     await expect(page.locator('.provenance-boundary')).toContainText('Needs attention');
     await expect(page.locator('.provenance-boundary')).not.toContainText('partial');
-    await page.getByRole('link',{name:'Back to Projects'}).click();
+    await page.locator('.shell-header').getByRole('link',{name:'Project register'}).click();
     await page.locator('.project-record').filter({hasText:source}).getByRole('button',{name:'Review evidence'}).click();
      await expect(page).toHaveURL(new RegExp(`#/projects/${project}`));
     await expect(page.getByRole('heading',{name:'Separate PR review overlay · #7'})).toBeVisible();

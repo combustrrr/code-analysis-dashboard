@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState,type ReactNode} from 'react';
 import {Alert,Button,Empty,Select,Skeleton,Tag} from './ui';
-import {ArrowLeftOutlined,FolderOpenOutlined,LinkOutlined,SafetyCertificateOutlined,SettingOutlined} from './icons';
+import {FolderOpenOutlined,LinkOutlined,SafetyCertificateOutlined,SettingOutlined} from './icons';
 import {Connections} from './Integration';
 import {AppearanceToggle} from './Appearance';
 import {applicationEndpoint} from './repositoryReports';
@@ -65,7 +65,7 @@ export function Settings({auth,onRun}:{auth:Auth;onRun:(projectId:string)=>void}
  </section>;
 
  return <main className="settings-workspace">
-  <header className="settings-heading"><div><span className="eyebrow">Workspace control center</span><h1>Settings</h1><p>Review personal preferences, trusted source configuration, integration readiness, and evidence boundaries.</p></div><div className="settings-heading-actions"><Button href={routeHash({kind:'projects'})} icon={<ArrowLeftOutlined/>}>Back to Projects</Button></div></header>
+  <header className="settings-heading"><div><span className="eyebrow">Workspace control center</span><h1>Settings</h1><p>Review personal preferences, trusted source configuration, integration readiness, and evidence boundaries.</p></div></header>
   {error&&<Alert className="settings-error" type="error" showIcon title="Settings could not be loaded" description={`${error} Return to Projects or try this page again.`}/>}
   <label className="settings-mobile-section"><span>Settings section</span><Select aria-label="Settings section" value={route.section} options={sections.map(section=>({value:section.key,label:section.label}))} onChange={section=>navigate(section)}/></label>
   <div className="settings-control-plane"><aside className="settings-rail" aria-label="Settings sections"><span>Control center</span>{sections.map(section=><a key={section.key} className={route.section===section.key?'active':''} aria-current={route.section===section.key?'page':undefined} href={routeHash({kind:'settings',section:section.key,projectId:selected?.id})}>{section.icon}<strong>{section.label}</strong></a>)}</aside><div className="settings-panel">{route.section!=='general'&&<header className="settings-project-context">{projectControl}</header>}{content}</div></div>
