@@ -454,3 +454,11 @@ Accepted queue requests replace both the structured immutable identity and its d
 analysis-key hash when tooling changes. Reconciliation therefore no longer classifies a
 newly accepted current-profile request as stale and removes its coordinator run receipt
 before publication.
+
+## 2026-10-24 njsscan result handling
+
+The OWASP JavaScript lane now treats njsscan exit code `1` as completed evidence with
+findings, while exit codes above `1` remain scanner failures. Before recording the lane
+as complete, the job requires a non-empty, parseable SARIF document with a `runs` array.
+This prevents ordinary findings from failing the coordinator without concealing genuine
+execution or evidence-generation failures.

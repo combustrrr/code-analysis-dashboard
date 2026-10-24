@@ -62,6 +62,15 @@ class CommunityScannerTests(unittest.TestCase):
         self.assertIn("owasp-iac-status.json", rendered)
         self.assertNotIn("trufflehog-status.json", rendered)
 
+    def test_njsscan_findings_are_completed_evidence(self):
+        steps = scanner_jobs()["community-owasp-js"]["steps"]
+        analyze = next(step for step in steps
+                       if step.get("name") == "Analyze exact-revision JavaScript and TypeScript")
+        command = analyze["run"]
+        self.assertIn('if [ "$scanner_status" -gt 1 ]', command)
+        self.assertIn("test -s owasp-js.sarif", command)
+        self.assertIn("json.load", command)
+
 
 if __name__ == "__main__":
     unittest.main()

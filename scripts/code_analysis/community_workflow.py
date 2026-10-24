@@ -45,7 +45,13 @@ def scanner_jobs():
         "steps": common + [
             {"name": "Install pinned njsscan", "run": "python -m pip install njsscan==1.0.1"},
             {"name": "Analyze exact-revision JavaScript and TypeScript", "run":
-             "njsscan --sarif --output owasp-js.sarif .source"},
+             "set +e\n"
+             "njsscan --sarif --output owasp-js.sarif .source\n"
+             "scanner_status=$?\n"
+             "set -e\n"
+             "if [ \"$scanner_status\" -gt 1 ]; then exit \"$scanner_status\"; fi\n"
+             "test -s owasp-js.sarif\n"
+             "python -c \"import json; document=json.load(open('owasp-js.sarif', encoding='utf-8')); assert isinstance(document.get('runs'), list)\""},
             {"name": "Record completed njsscan evidence", "run":
              "printf '%s\\n' '{\"scanner_family\":\"njsscan\",\"status\":\"COMPLETED\",\"reason\":\"Native SARIF retained for the exact revision.\",\"scanner_version\":\"1.0.1\"}' > njsscan-status.json"},
             {"uses": UPLOAD, "if": "always()", "with": {
