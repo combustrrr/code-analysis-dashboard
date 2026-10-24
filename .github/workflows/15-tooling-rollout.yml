@@ -44,13 +44,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          branch="tooling-rollout/${GITHUB_SHA}"
           # The first pass creates or inspects the narrowly scoped promotion PR.
           # Keep this one workflow alive for its exact-head compatibility check
           # instead of spawning a second workflow_run reconciliation.
           for attempt in $(seq 1 36); do
             python -m scripts.code_analysis.promote_tooling
-            open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$branch" --json number --jq 'length')
+            open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+              --json headRefName --jq '[.[] | select(.headRefName | startswith("tooling-rollout/"))] | length')
             if [[ "$open" == 0 ]]; then
               exit 0
             fi

@@ -30,5 +30,5 @@ class PromotionTests(unittest.TestCase):
         self.assertIn('scanner_smoke',json.dumps(workflow['jobs']['validate']))
         reconcile=json.dumps(workflow['jobs']['promote'])
         self.assertIn('seq 1 36',reconcile)
-        self.assertIn('tooling-rollout/${GITHUB_SHA}',reconcile)
+        self.assertIn('startswith(\\"tooling-rollout/\\")',reconcile)
         self.assertNotIn('workflow_run',json.dumps(workflow.get(True,workflow.get('on'))))
