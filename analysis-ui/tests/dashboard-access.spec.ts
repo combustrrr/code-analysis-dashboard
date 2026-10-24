@@ -21,6 +21,10 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  await expect(page.getByText(/Only approved GitHub collaborators can access this workspace/)).toBeVisible();
  await expect(page.getByRole('button',{name:'Sign in with GitHub'})).toHaveCount(2);
  await expect(page.locator('.landing-actions').getByRole('button',{name:'Sign in with GitHub'})).toBeEnabled();
+ await page.setViewportSize({width:1254,height:790});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(1254);
+ const dossierBox=await page.locator('.analysis-dossier').boundingBox();
+ expect(dossierBox).not.toBeNull();expect(dossierBox!.x).toBeGreaterThanOrEqual(0);expect(dossierBox!.x+dossierBox!.width).toBeLessThanOrEqual(1254);
  await page.getByRole('link',{name:'Learn how evidence is protected'}).click();
  await expect(page).toHaveURL(/#method$/);
  await expect(page.getByRole('heading',{name:/Evidence answers questions that a status badge cannot/})).toBeVisible();
@@ -452,5 +456,8 @@ test('authorized user follows one repository project from selection through publ
  await expect(page.locator('.project-run-tracker')).toContainText('Results are ready');
  await expect(page).toHaveURL(/\/report\?target=published-target/);
  await expect(page.getByLabel('Selected analysis revision')).toContainText(sha.slice(0,12));
+ await page.getByRole('tab',{name:'Overview'}).click();
+ const [gridBox,priorityBox]=await Promise.all([page.locator('.insights-grid').boundingBox(),page.locator('.priority-panel').boundingBox()]);
+ expect(gridBox).not.toBeNull();expect(priorityBox).not.toBeNull();expect(priorityBox!.width).toBeGreaterThan(gridBox!.width*.9);
    expect(activityReads).toBeGreaterThanOrEqual(2);expect(launches).toBe(1);expect(pageErrors).toEqual([]);
 });

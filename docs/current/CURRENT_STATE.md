@@ -497,3 +497,12 @@ starts installation-token resolution alongside execution-repository verification
 loads active queue state alongside all project report manifests. These latency changes
 do not cache authorization, relax revocation, serialize project evidence, or change the
 immutable target registry.
+
+## 2026-10-24 responsive evidence layout
+
+The overview's highest-severity register spans the full evidence canvas and arranges its
+four retained examples in two columns on desktop and one column on narrow screens. The
+public landing canvas is horizontally contained at desktop, intermediate, and mobile
+widths; its hero changes to one column before the evidence dossier can crowd or clip the
+page. PDF cover generation reserves separate vertical space for the evidence eyebrow,
+report title, repository, and immutable revision so those elements do not overlap.
