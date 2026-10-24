@@ -65,6 +65,7 @@ test('pull-only collaborators can list and launch from the exact fixed target re
   assert.deepEqual(result.projects.map(project=>project.id),CONFIGURED_TARGETS.map(project=>project.id));
   assert.deepEqual(result.projects.map(({id,relationship})=>[id,relationship]),CONFIGURED_TARGETS.map(({id,relationship})=>[id,relationship]));
   assert.ok(h.calls.some(call=>call.path.includes('/contents/.github/code-analysis/projects.json')&&call.token==='central-app-read-token'));
+  assert.ok(CONFIGURED_TARGETS.filter(target=>target.repository!==EXECUTION_REPOSITORY).every(target=>!h.calls.some(call=>call.path===`repos/${target.repository}`)), 'read-only registry must not re-fetch source repositories');
   assert.ok(!JSON.stringify(result).includes('user-token'));
 });
 
@@ -264,5 +265,6 @@ test('identity drift or an incomplete target registry fails closed',async()=>{
   const sourceMismatch=helpers({overrides:{[`repos/${CONFIGURED_TARGETS[0].repository}`]:{id:99,full_name:CONFIGURED_TARGETS[0].repository,private:false}}});
   await assert.rejects(()=>repositoryApi(get('/api/project-readiness?project_id=1267340546'),env,session,sourceMismatch),error=>error.status===409&&error.code==='project_identity');
   const listMismatch=helpers({overrides:{[`repos/${CONFIGURED_TARGETS[1].repository}`]:{id:99,full_name:CONFIGURED_TARGETS[1].repository,private:false}}});
-  await assert.rejects(()=>repositoryApi(get('/api/projects'),env,session,listMismatch),error=>error.status===409&&error.code==='project_identity');
+  assert.equal((await repositoryApi(get('/api/projects'),env,session,listMismatch)).status,200);
+  await assert.rejects(()=>repositoryApi(get('/api/project-identity?project_id=1278177697'),env,session,listMismatch),error=>error.status===409&&error.code==='project_identity');
 });

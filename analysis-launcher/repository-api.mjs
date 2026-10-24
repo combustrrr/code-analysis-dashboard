@@ -132,7 +132,7 @@ export async function repositoryApi(request, env, session, helpers) {
     return {repository, configuration, appToken};
   }
 
-  async function projectFor(configuration, id) {
+  function configuredProject(configuration, id) {
     const project = configuration.projects.find(value => String(value.id) === String(id));
     if (!project || !CONFIGURED_TARGETS.some(value => value.id === String(id))) throw new Failure(404, 'Configured project is unavailable.', 'project_unavailable');
     try {
@@ -140,6 +140,11 @@ export async function repositoryApi(request, env, session, helpers) {
       if (project.profile.mode === 'portable') validatePortableProfile(project.profile);
     }
     catch { throw new Failure(503, 'The configured project profile is invalid.', 'project_profile_invalid'); }
+    return project;
+  }
+
+  async function projectFor(configuration, id) {
+    const project = configuredProject(configuration, id);
     let source;
     try { source = await github(`repos/${project.source_repository.full_name}`, token); }
     catch (error) {
@@ -186,10 +191,13 @@ export async function repositoryApi(request, env, session, helpers) {
 
   if (request.method === 'GET' && url.pathname === '/api/projects') {
     const {repository, configuration} = await context();
-    const verified = await Promise.all(configuration.projects.map(project => projectFor(configuration, project.id)));
+    // The reviewed registry already pins public repository names and numeric IDs.
+    // Keep the read-only register fast; launch and revision endpoints still verify
+    // the live source identity before accepting an immutable SHA.
+    const projectsInRegistry = configuration.projects.map(project => configuredProject(configuration, project.id));
     const checkedAt=new Date().toISOString(),activeByProject=new Map();
     try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();for(const row of payload.requests||[]){if(!['preparing','analyzing'].includes(row.status))continue;const key=String(row.intent?.project_id||''),existing=activeByProject.get(key);if(!existing||row.status==='analyzing')activeByProject.set(key,row);}}}catch{}
-    const projects=await Promise.all(verified.map(async ({project}) => {
+    const projects=await Promise.all(projectsInRegistry.map(async project => {
       let current_report=null,current_overlay=null,reportAttention=null,publicationError=false;
       const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
       try {

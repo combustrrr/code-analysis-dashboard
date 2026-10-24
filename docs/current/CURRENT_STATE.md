@@ -73,6 +73,11 @@ run-progress, and threat-report modules only when their routes or panels are ope
 project register therefore stays small, while the full evidence workspace no longer pays
 the JavaScript cost of every secondary workflow during its initial render.
 
+The read-only Projects response uses the already validated trusted registry instead of
+re-querying every public source repository before rendering. Starting or configuring an
+analysis still verifies the live repository identity and resolves the requested revision
+to an immutable SHA before admission.
+
 ## 2026-10-20 interface language review
 
 The primary developer journey now uses consistent, plain-English terminology across
