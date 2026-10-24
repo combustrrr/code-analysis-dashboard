@@ -35,6 +35,9 @@ test.describe('production shell',()=>{
   await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();
   await expect(page.getByText('How to read this evidence')).toBeVisible();
   await expect(page.getByText(/scanner.*support.*finding/i).first()).toBeVisible();
+  await expect(page.getByLabel('Location',{exact:true})).toBeVisible();
+  await page.getByLabel('Location',{exact:true}).selectOption('located');
+  await expect(page).toHaveURL(/location=located/);
   await page.getByLabel('Search issues').fill('CVE-2026-42561');
   await expect(page).toHaveURL(/q=CVE-2026-42561/);
   await expect(page.locator('.ant-table-tbody > tr.ant-table-row').first()).toBeVisible();
@@ -42,7 +45,7 @@ test.describe('production shell',()=>{
   await expect(page).toHaveURL(/group=rule/);
   await expect(page.getByText(/finding/).first()).toBeVisible();
   await page.getByRole('button',{name:'More filters'}).click();
-  await expect(page.getByLabel('Source location',{exact:true})).toBeVisible();
+  await expect(page.getByLabel('File',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Clear filters',exact:true}).click();
   await page.getByLabel('Group issues').selectOption('none');
   await page.locator('.issue-link').first().click();

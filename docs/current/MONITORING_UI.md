@@ -60,7 +60,8 @@ identifiers.
 4. Issues combines text, severity, category, scanner, rule, file, directory, source-location
    and scanner-overlap filters. Selectors are searchable where useful. Clear filters
    resets the selection; overview shortcuts clear unrelated filters. Group by rule,
-   scanner, category, file or directory. Filters remain in the project URL. Open an issue for explanation, source line highlighting,
+   scanner, category, file, directory, or an exact searchable `file:line` location. Location also supports
+   all located findings and missing-location evidence. Filters remain in the project URL. Open an issue for explanation, source line highlighting,
    immutable GitHub links, reporting scanners, applied rules, scanner-family and retained-observation counts, supporting observations,
    and related evidence. Shared rules/locations mean
    related findings, not proof that one fix resolves the entire group.
