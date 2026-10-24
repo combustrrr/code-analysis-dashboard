@@ -51,7 +51,6 @@
       "analysis-ui/src/useLaunchAuth.ts"
     ],
     "infrastructure_adapters": [
-      ".github/workflows/05-issue-aggregation.yml",
       "scripts/code_analysis/github_service.py",
       ".github/workflows/code-analysis-coordinator.yml",
       ".github/workflows/11-source-analysis.yml",

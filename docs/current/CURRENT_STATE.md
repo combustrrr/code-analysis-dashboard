@@ -404,15 +404,26 @@ opens its report and then removes the temporary progress panel. Durable request 
 revision identifiers are shown with the selected project in Settings, while report
 and workflow provenance remains available from Security & provenance and Report.
 
-## 2026-10-20 Proactive preferred-branch evidence
+## 2026-10-24 Single analysis entry point
 
-`preferred-branch-analysis.yml` now runs at minute 17 every six hours as well as on
+The application button and the protected coordinator are the only production analysis
+path. The former manual `01`-`08` chain and standalone `16`-`24` Actions entry points
+were retired; their reusable scanner recipes live outside `.github/workflows`. The
+preferred-branch batch is now manual, so opening or merely configuring a project never
+creates periodic scans. Scanner lanes remain concurrent and only publication is fenced
+per project. Tooling promotion no longer runs a duplicate `workflow_run` trigger after
+the compatibility workflow; merge/push and daily reconciliation remain authoritative.
+
+## 2026-10-20 Proactive preferred-branch evidence (historical)
+
+At that time, `preferred-branch-analysis.yml` ran at minute 17 every six hours as well as on
 manual dispatch. Each invocation resolves the configured preferred branch of all three
 trusted public projects to an immutable SHA, requests every enabled non-deferred branch
 channel, and immediately dispatches project-scoped coordinators. PR-only CodeRabbit
 evidence and language-inapplicable channels remain excluded. Workflow-level concurrency
 prevents overlapping batch admissions without serializing the three project analyses.
-The coordinator's 15-minute schedule remains recovery-only and does not create work.
+The proactive schedule was retired on 2026-10-24. The coordinator's 15-minute schedule
+remains recovery-only and does not create work.
 
 ## 2026-10-23 GitHub sign-in progress
 

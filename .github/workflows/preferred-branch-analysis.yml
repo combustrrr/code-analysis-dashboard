@@ -1,9 +1,6 @@
 name: Analyze all preferred branches
 run-name: Analyze all configured preferred branches
 on:
-  schedule:
-    # Keep preferred-branch evidence warm without continuously consuming public runners.
-    - cron: '17 */6 * * *'
   workflow_dispatch:
     inputs:
       project_id:

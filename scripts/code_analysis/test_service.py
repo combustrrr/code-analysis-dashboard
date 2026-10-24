@@ -328,9 +328,9 @@ class MonitoringTests(unittest.TestCase):
             self.assertIn("wallSnapshot",page)
             self.assertLess(page.index("What was found?"), page.index("Analysis operations"))
             self.assertIn("Run Web of Scanners",page)
-            self.assertIn("08-full-code-analysis.yml",page)
+            self.assertIn("github.io/${repositoryParts[1]}/#/projects",page)
             self.assertIn("Build Issue Wall",page)
-            self.assertIn("05-issue-aggregation.yml",page)
+            self.assertNotIn("05-issue-aggregation.yml",page)
             self.assertIn('class="action-card primary"', page)
             self.assertIn("Select a branch and analyze its latest head commit", page)
             self.assertIn("GitHub-controlled", page)
@@ -430,12 +430,6 @@ class MonitoringTests(unittest.TestCase):
         self.assertIn("domain",layout["layers"])
         self.assertIn("presentation",layout["layers"])
         self.assertIn("infrastructure_adapters",layout["layers"])
-        aggregation=(Path(__file__).resolve().parents[2]/".github/workflows/05-issue-aggregation.yml").read_text(encoding="utf-8")
-        self.assertIn('conclusion:$conclusion',aggregation)
-        self.assertIn("Upload current-findings-dashboard-",aggregation)
-        self.assertIn("Bounded pipeline diagnostic",aggregation)
-        self.assertIn("tail -n 30 pipeline-diagnostic.log",aggregation)
-        self.assertIn("REDACTED",aggregation)
         coderabbit=(Path(__file__).resolve().parents[2]/".coderabbit.yaml").read_text(encoding="utf-8")
         self.assertIn('base_branches:\n      - ".*"',coderabbit)
         self.assertIn("timeout_ms: 900000",coderabbit)
@@ -472,10 +466,8 @@ class MonitoringTests(unittest.TestCase):
         self.assertEqual(check_key("repo","a"),check_key("repo","a"));self.assertNotEqual(check_key("repo","a"),check_key("repo","b"))
     def test_unreviewed_identity_migration_fails(self):
         with self.assertRaises(EvidenceError): effective_triage({"decisions":[],"identity_migrations":[{"from_stable_id":"a","to_stable_id":"b"}]})
-    def test_workflow_has_only_minimum_write_permission(self):
-        text=Path(".github/workflows/05-issue-aggregation.yml").read_text(encoding="utf-8")
-        permissions=text.split("permissions:",1)[1].split("jobs:",1)[0]
-        self.assertIn("checks: write",permissions);self.assertIn("contents: read",permissions);self.assertIn("actions: read",permissions)
+    def test_production_coordinator_has_no_source_write_permission(self):
+        text=Path(".github/workflows/code-analysis-coordinator.yml").read_text(encoding="utf-8")
         self.assertNotIn("issues: write",text);self.assertNotIn("pull-requests: write",text);self.assertNotIn("contents: write",text)
     def test_native_sarif_permission_is_limited_to_trusted_reconciliation(self):
         import yaml
@@ -489,6 +481,22 @@ class MonitoringTests(unittest.TestCase):
             for job_name, job in workflow["jobs"].items():
                 self.assertNotEqual((job.get("permissions") or {}).get("security-events"), "write",
                                      f"{name}: {job_name}")
+
+    def test_application_has_one_production_analysis_entrypoint(self):
+        workflow_root=Path(".github/workflows")
+        retired={f"0{number}-" for number in (1,2,3,4,5,7,8)} | {
+            f"{number}-" for number in range(16,25)}
+        names={path.name for path in workflow_root.glob("*.yml")}
+        self.assertFalse(any(name.startswith(prefix) for name in names for prefix in retired))
+        coordinator=(workflow_root/"code-analysis-coordinator.yml").read_text(encoding="utf-8")
+        self.assertIn("name: Run analysis",coordinator)
+        self.assertIn("uses: ./.github/workflows/reusable-vendor.yml",coordinator)
+        self.assertIn("uses: ./.github/workflows/reusable-source.yml",coordinator)
+        self.assertIn("uses: ./.github/workflows/reusable-source-full.yml",coordinator)
+        preferred=(workflow_root/"preferred-branch-analysis.yml").read_text(encoding="utf-8")
+        self.assertNotIn("schedule:",preferred)
+        rollout=(workflow_root/"15-tooling-rollout.yml").read_text(encoding="utf-8")
+        self.assertNotIn("workflow_run:",rollout)
 
     def test_snapshot_reconciles_findings_and_observations(self):
         result=snapshot([raw("CodeQL"),raw("Semgrep")])
@@ -559,28 +567,23 @@ class MonitoringTests(unittest.TestCase):
             self.assertEqual(state['status'],'PARTIAL')
 
     def test_manual_scanners_and_coordinator_have_distinct_entrypoints(self):
+        template_root=Path("config/code-analysis/workflow-templates")
         for name in ("01-code-quality.yml","02-security-sast.yml",
                      "03-dependency-security.yml","04-code-health.yml"):
-            workflow=Path(".github/workflows",name).read_text(encoding="utf-8")
+            workflow=(template_root/name).read_text(encoding="utf-8")
             self.assertIn('workflow_dispatch:',workflow)
             self.assertNotIn('\n  push:\n',workflow)
             self.assertNotIn('\n  pull_request:\n',workflow)
         scheduler=Path(".github/workflows/code-analysis-coordinator.yml").read_text(encoding="utf-8")
         self.assertIn("cron: '*/15 * * * *'",scheduler)
-        aggregator=Path(".github/workflows/05-issue-aggregation.yml").read_text(encoding="utf-8")
-        self.assertIn("workflow_call:",aggregator)
-        self.assertNotIn("workflow_run:",aggregator)
-        self.assertNotIn("workflow_dispatch:",aggregator)
-        self.assertNotIn("schedule:",aggregator)
-        self.assertNotIn("\n  push:\n",aggregator)
-        dependency=Path(".github/workflows/03-dependency-security.yml").read_text(encoding="utf-8")
+        dependency=(template_root/"03-dependency-security.yml").read_text(encoding="utf-8")
         self.assertIn("mv results.sarif gitleaks-results.sarif",dependency)
         self.assertIn("CONFIGURED_PARTIAL", dependency)
         self.assertIn("potential projects failed|Missing required packages", dependency)
         self.assertIn('[[ "$scan_exit" -le 1 ]]', dependency)
 
     def test_manual_cross_branch_jobs_never_execute_target_only_analysis_tooling(self):
-        quality=Path(".github/workflows/01-code-quality.yml").read_text(encoding="utf-8")
+        quality=Path("config/code-analysis/workflow-templates/01-code-quality.yml").read_text(encoding="utf-8")
         self.assertIn("python .analysis-tooling/scripts/code_analysis/audit_workflows.py",
                       quality)
         self.assertNotIn("run: python scripts/code_analysis/audit_workflows.py", quality)
@@ -591,7 +594,7 @@ class MonitoringTests(unittest.TestCase):
 
         for workflow_name in ("01-code-quality.yml", "02-security-sast.yml",
                               "03-dependency-security.yml", "04-code-health.yml"):
-            workflow=Path(".github/workflows",workflow_name).read_text(encoding="utf-8")
+            workflow=Path("config/code-analysis/workflow-templates",workflow_name).read_text(encoding="utf-8")
             self.assertIn("inputs.scan_sha || github.event.pull_request.head.sha || github.sha",
                           workflow)
 
@@ -708,9 +711,10 @@ class MonitoringTests(unittest.TestCase):
             self.assertTrue((output/"dashboard/index.html").is_file())
 
     def test_legacy_manual_scanners_keep_exact_source_checkout_and_aggregation(self):
+        template_root=Path("config/code-analysis/workflow-templates")
         for name in ("01-code-quality.yml","02-security-sast.yml",
                      "03-dependency-security.yml","04-code-health.yml"):
-            workflow=Path(".github/workflows",name).read_text(encoding="utf-8")
+            workflow=(template_root/name).read_text(encoding="utf-8")
             self.assertIn('workflow_dispatch:',workflow)
             self.assertNotIn("branches: [claude/main, Testing]",workflow)
             target_checkouts=workflow.count(
@@ -720,19 +724,9 @@ class MonitoringTests(unittest.TestCase):
             self.assertGreaterEqual(target_checkouts,1)
             self.assertEqual(workflow.count("uses: actions/checkout@"),
                              target_checkouts+tooling_checkouts)
-        aggregate=Path(".github/workflows/05-issue-aggregation.yml").read_text(encoding="utf-8")
-        self.assertIn("workflow_call:",aggregate)
-        self.assertNotIn("github.event.workflow_run",aggregate)
-        self.assertNotIn('contains(fromJSON',aggregate)
-        self.assertIn("branch_hash=",aggregate)
-        self.assertIn("steps.analysis-artifact.outputs.artifact-id",aggregate)
-        self.assertIn("Artifact ID for validated manual recovery",aggregate)
-        self.assertIn("declare -A run_ids=()", aggregate)
-        self.assertIn("One shared deadline keeps the four-workflow handoff bounded", aggregate)
-        self.assertEqual(aggregate.count("for attempt in $(seq 1 40)"), 1)
 
     def test_security_expansion_is_structured_and_runtime_lanes_stay_isolated(self):
-        dependency=Path(".github/workflows/03-dependency-security.yml").read_text(encoding="utf-8")
+        dependency=Path("config/code-analysis/workflow-templates/03-dependency-security.yml").read_text(encoding="utf-8")
         for marker in ("shipping-image-security:","workflow-security-posture:",
                        "backend.cdx.json","webui.spdx.json","zizmor==1.29.0",
                        "secret_scanning_push_protection","shipping-image-provenance.intoto.json"):
@@ -746,7 +740,7 @@ class MonitoringTests(unittest.TestCase):
         posture=dependency.split("  workflow-security-posture:",1)[1].split(
             "  openssf-scorecard:",1)[0]
         self.assertIn("security-events: write", posture)
-        dynamic=Path(".github/workflows/07-api-fuzzing.yml").read_text(encoding="utf-8")
+        dynamic=Path("config/code-analysis/workflow-templates/07-api-fuzzing.yml").read_text(encoding="utf-8")
         self.assertNotIn('\n  schedule:\n',dynamic)
         self.assertIn("atheris==3.0.0",dynamic)
         self.assertIn("-runs=25000",dynamic)
@@ -866,7 +860,7 @@ class MonitoringTests(unittest.TestCase):
         self.assertLess(page.index('id="workflowProvenanceTitle"'),page.index('<summary>Snapshot Proof</summary>'))
 
     def test_sonar_uses_trusted_tooling_for_external_source(self):
-        workflow=Path(".github/workflows/01-code-quality.yml").read_text(encoding="utf-8")
+        workflow=Path("config/code-analysis/workflow-templates/01-code-quality.yml").read_text(encoding="utf-8")
         sonar=workflow.split("  sonarqube-cloud:",1)[1].split("  python-ruff:",1)[0]
         self.assertIn("Checkout trusted Sonar tooling",sonar)
         self.assertIn("ref: ${{ github.event.repository.default_branch }}",sonar)
@@ -878,13 +872,14 @@ class MonitoringTests(unittest.TestCase):
         self.assertIn("ref: ${{ inputs.scan_sha || github.event.pull_request.head.sha || github.sha }}",sonar)
 
     def test_scorecard_records_unsupported_manual_tooling_ref(self):
-        workflow=Path(".github/workflows/03-dependency-security.yml").read_text(encoding="utf-8")
+        workflow=Path("config/code-analysis/workflow-templates/03-dependency-security.yml").read_text(encoding="utf-8")
         scorecard=workflow.split("  openssf-scorecard:",1)[1]
         self.assertIn("Record unsupported Scorecard tooling ref",scorecard)
         self.assertIn('"status":"NOT_APPLICABLE"',scorecard)
         self.assertIn("openssf-scorecard-status.json",scorecard)
         self.assertEqual(scorecard.count("if: github.event_name == 'pull_request' || github.ref_name == github.event.repository.default_branch"),2)
 
+    @unittest.skip("retired manual analysis entry point")
     def test_one_click_manual_analysis_dispatches_all_scanners(self):
         workflow=Path(".github/workflows/08-full-code-analysis.yml").read_text(encoding="utf-8")
         self.assertIn("workflow_dispatch:",workflow)
@@ -932,6 +927,7 @@ class MonitoringTests(unittest.TestCase):
         self.assertIn('--status success --limit',aggregation)
         self.assertNotIn('--event workflow_dispatch --status success',aggregation)
 
+    @unittest.skip("retired manual Issue Wall entry point")
     def test_issue_wall_has_no_automatic_or_scheduled_publication_path(self):
         workflow=Path(".github/workflows/08-full-code-analysis.yml").read_text(encoding="utf-8")
         self.assertNotIn('\n  schedule:\n',workflow)
@@ -946,6 +942,7 @@ class MonitoringTests(unittest.TestCase):
         self.assertNotIn("actions: write",refresh)
         self.assertNotIn("pull_request_target:",workflow)
 
+    @unittest.skip("retired manual scanner entry points")
     def test_latest_branch_head_supersedes_stale_analysis_work(self):
         groups = {
             "01-code-quality.yml": "code-quality-",
@@ -988,9 +985,6 @@ class MonitoringTests(unittest.TestCase):
         current=canonicalize([parsed[0].__dict__, raw()],repository,RUN,MANIFEST)
         lanes={row["evidence_source"] for row in current["findings"]}
         self.assertEqual(lanes,{"AI_ADVISORY","DETERMINISTIC"})
-        aggregate=Path(".github/workflows/05-issue-aggregation.yml").read_text(encoding="utf-8")
-        self.assertIn("pull-requests: read",aggregate)
-        self.assertIn("collect_coderabbit.py",aggregate)
         refresh=Path(".github/workflows/09-coderabbit-advisory-refresh.yml").read_text(encoding="utf-8")
         self.assertIn("pull_request_review:",refresh)
         self.assertIn("issue_comment:",refresh)

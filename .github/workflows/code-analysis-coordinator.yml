@@ -1,5 +1,5 @@
-name: Code analysis coordinator
-run-name: Analysis coordinator ${{ github.run_id }}
+name: Run analysis
+run-name: ${{ github.event_name == 'schedule' && 'Recover accepted analyses' || format('Analyze request {0}', inputs.request_id) }}
 on:
   workflow_dispatch:
     inputs:

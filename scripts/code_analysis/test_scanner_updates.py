@@ -108,7 +108,8 @@ class ScannerUpdateTests(unittest.TestCase):
             (root/'.ci').mkdir()
             (root/'.github/workflows').mkdir(parents=True)
             (root/'scripts/code_analysis').mkdir(parents=True)
-            shutil.copy('.github/workflows/01-code-quality.yml', root/'.github/workflows')
+            templates=root/'config/code-analysis/workflow-templates';templates.mkdir(parents=True)
+            shutil.copy('config/code-analysis/workflow-templates/01-code-quality.yml', templates)
             shutil.copy('scripts/code_analysis/generate_source_workflow.py', root/'scripts/code_analysis')
             pin = {'version': '9.0.0', 'checksum_version': '5.5.0', 'sha256': 'a'*64}
             path = root/'.ci/scorecard.json'

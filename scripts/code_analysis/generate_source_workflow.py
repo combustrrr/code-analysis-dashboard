@@ -35,8 +35,11 @@ def generate(config=None):
                   {'name': 'Validate trusted tooling and selected target', 'id': 'identity',
                     'env': {'GH_TOKEN':'${{ github.token }}','TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}','REQUEST_ID':'${{ inputs.request_id }}'},
                    'run': 'python -m scripts.code_analysis.source_identity'}]}
+    # Scanner recipes are inputs to the generated production workflows, not
+    # independently runnable Actions entry points.
+    templates = ROOT / 'config/code-analysis/workflow-templates'
     for number in (1, 2, 3, 4, 7):
-        path = next((ROOT / '.github/workflows').glob(f'0{number}-*.yml'))
+        path = next(templates.glob(f'0{number}-*.yml'))
         old = yaml.safe_load(path.read_text(encoding='utf-8'))
         for name, original in old['jobs'].items():
             if name in {'workflow-security-posture','snyk','sonarqube-cloud'}:

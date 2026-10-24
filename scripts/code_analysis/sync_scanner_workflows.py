@@ -27,7 +27,7 @@ def sync(root: Path):
             raise ValueError('Missing or ambiguous official release checksum')
         pin.update(sha256=matches[0], checksum_version=version)
         pin_path.write_text(json.dumps(pin, indent=2) + '\n')
-    document = yaml.safe_load((root / '.github/workflows/01-code-quality.yml').read_text(encoding='utf-8'))
+    document = yaml.safe_load((root / 'config/code-analysis/workflow-templates/01-code-quality.yml').read_text(encoding='utf-8'))
     actions = {}
     for job in document['jobs'].values():
         for step in job.get('steps', []):
