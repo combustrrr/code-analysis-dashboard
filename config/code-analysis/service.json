@@ -103,8 +103,7 @@
       "adapter": "scripts/code_analysis/adapters/github_security_advisories.py",
       "timeout_minutes": 5,
       "evidence_source": "DETERMINISTIC",
-      "sensitive": false,
-      "deferred_reason": "Opt-in vendor API channel; enable only for repositories that require advisory inventory."
+      "sensitive": false
     }
   ],
   "launch_endpoint": "https://code-analysis-launcher.icsarthak9.workers.dev"

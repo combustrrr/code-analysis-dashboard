@@ -15,7 +15,7 @@ class GitHubSecurityAdvisoriesAdapterTests(unittest.TestCase):
         self.root = Path(self.temp.name)
 
     def _run_adapter(self, request_json, mock_gh_output=None, mock_gh_returncode=0):
-        """Run the adapter with a request and optional mocked gh output."""
+        """Run the adapter with a request and optional mocked API output."""
         request_file = self.root / "request.json"
         output_file = self.root / "output.json"
         request_file.write_text(json.dumps(request_json))
@@ -39,6 +39,10 @@ class GitHubSecurityAdvisoriesAdapterTests(unittest.TestCase):
                 adapter_main()
             finally:
                 sys.argv = old_argv
+
+            command = mock_run.call_args.args[0]
+            self.assertEqual(command[0], "curl")
+            self.assertNotIn("Authorization", " ".join(command))
 
         return json.loads(output_file.read_text())
 
@@ -87,8 +91,8 @@ class GitHubSecurityAdvisoriesAdapterTests(unittest.TestCase):
         self.assertEqual(result["status"], "COMPLETED_OPTIONAL")
         self.assertEqual(result["findings"], [])
 
-    def test_adapter_gh_api_failure(self):
-        """Test adapter when gh api fails (e.g., no auth, rate limit)."""
+    def test_adapter_github_api_failure(self):
+        """Test adapter when the public API fails (for example, rate limiting)."""
         request = {
             "target": {
                 "source_repository": "owner/repo",

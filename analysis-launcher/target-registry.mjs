@@ -5,7 +5,7 @@ export const CONFIGURED_TARGETS = [
   { id: '1278177697', repository_id: 1278177697, repository: 'combustrrr/Agentic-Kibana', relationship: 'observer', branch: 'Testing', native_feedback: false },
   { id: '1360051890', repository_id: 1360051890, repository: EXECUTION_REPOSITORY, relationship: 'connected', branch: 'main', native_feedback: false },
 ];
-export const SUPPORTED_SCANNERS = ['atheris','bandit','checkov','codeql','coderabbit-ai-advisory','coverage','eslint','github-actions-security','github-secret-protection-posture','gitleaks','hadolint','openssf-scorecard','osv','owasp-iac-secrets','owasp-js','pyright','radon','ruff','sbom-license-provenance','schemathesis','semgrep','shipping-image-cves','snyk','sonarqube-cloud','trivy','typescript','vulture','xenon'];
+export const SUPPORTED_SCANNERS = ['atheris','bandit','checkov','codeql','coderabbit-ai-advisory','coverage','eslint','ext-github-security-advisories','github-actions-security','github-secret-protection-posture','gitleaks','hadolint','openssf-scorecard','osv','owasp-iac-secrets','owasp-js','pyright','radon','ruff','sbom-license-provenance','schemathesis','semgrep','shipping-image-cves','snyk','sonarqube-cloud','trivy','typescript','vulture','xenon'];
 export const VENDOR_SCANNERS = new Set(['coderabbit-ai-advisory','github-secret-protection-posture','snyk','sonarqube-cloud']);
 export const UNAVAILABLE_SCANNERS = new Set(['github-secret-protection-posture']);
 export const SCANNER_GROUPS = [['eslint','typescript'],['radon','xenon'],['shipping-image-cves','sbom-license-provenance']];

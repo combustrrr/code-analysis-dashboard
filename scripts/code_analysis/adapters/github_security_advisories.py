@@ -1,13 +1,11 @@
-"""GitHub Security Advisories adapter: fetch published repository security advisories (GHSA).
+"""GitHub Security Advisories adapter: fetch public repository advisories (GHSA).
 
 Read-only adapter that queries the GitHub API for published security advisories
 for the selected repository. Does not run any analysis on external repositories.
 """
 import argparse
 import json
-import os
 import subprocess
-import sys
 from pathlib import Path
 
 _MAX_STDERR_CHARS = 200
@@ -58,17 +56,22 @@ def main():
     owner, repo = source_repository.split("/", 1)
 
     try:
-        # Fetch published security advisories for the repository
-        # Uses gh CLI which authenticates with GITHUB_TOKEN from the workflow environment
+        # Published advisories for public repositories are exposed by GitHub's
+        # read-only REST API without a credential.  Deliberately avoid gh here:
+        # gh requires a token even when the underlying endpoint does not.
         result = subprocess.run(
-            ["gh", "api", f"repos/{owner}/{repo}/security-advisories", "--paginate"],
+            [
+                "curl", "--fail", "--silent", "--show-error", "--location",
+                "--header", "Accept: application/vnd.github+json",
+                "--header", "X-GitHub-Api-Version: 2022-11-28",
+                f"https://api.github.com/repos/{owner}/{repo}/security-advisories?per_page=100",
+            ],
             capture_output=True,
             text=True,
             timeout=60,
         )
         if result.returncode != 0:
-            # No token or API unavailable - report gracefully
-            raise RuntimeError(f"gh api failed: {_sanitize_stderr(result.stderr)}")
+            raise RuntimeError(f"GitHub API request failed: {_sanitize_stderr(result.stderr)}")
 
         advisories = json.loads(result.stdout) if result.stdout.strip() else []
 

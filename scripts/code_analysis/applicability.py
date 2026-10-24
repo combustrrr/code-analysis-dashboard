@@ -63,10 +63,15 @@ GENERATED_JOBS = PORTABLE_JOBS | VENDOR_JOBS | PYTHON_JOBS | {
 
 
 def selection(config: dict, source: Path, requested_channels: list[str] | None = None) -> tuple[list[str], dict, list[str]]:
-    known = {channel for channels in GROUPS.values() for channel in channels}
+    from scripts.code_analysis.extensions import registry
+    extensions = registry(config)
+    extension_channels = {row['channel'] for row in extensions}
+    builtins = {channel for channels in GROUPS.values() for channel in channels}
+    known = builtins | extension_channels
     enabled = set(config.get('enabled_scanners', known))
     deferred = config.get('deferred_channels', {})
-    if (enabled & set(deferred) or enabled | set(deferred) != known
+    if (enabled & set(deferred) or (enabled & builtins) | set(deferred) != builtins
+            or enabled - known or set(deferred) - builtins
             or any(not isinstance(reason, str) or not reason.strip() for reason in deferred.values())):
         raise ValueError('Every known scanner must be enabled or explicitly deferred with a reason')
     requested = set(requested_channels) if requested_channels is not None else enabled
@@ -146,9 +151,11 @@ def selection(config: dict, source: Path, requested_channels: list[str] | None =
                 p.is_file() and p.suffix in {'.yml', '.yaml'} for p in workflow_directory.iterdir()))):
         excluded['github-actions-security'] = {
             'status': 'NOT_APPLICABLE', 'reason': 'Selected source contains no GitHub Actions workflow definitions'}
-    from scripts.code_analysis.extensions import registry
-    for extension in registry(config):
-        if extension['channel'] not in requested:
+    for extension in extensions:
+        if extension['channel'] not in enabled:
+            excluded[extension['channel']] = {
+                'status': 'DEFERRED', 'reason': 'Not enabled by the trusted project profile'}
+        elif extension['channel'] not in requested:
             excluded[extension['channel']] = {'status':'NOT_SELECTED','reason':'Not selected for this request'}
         elif extension.get('deferred_reason'):
             excluded[extension['channel']] = {'status': 'DEFERRED', 'reason': extension['deferred_reason']}
