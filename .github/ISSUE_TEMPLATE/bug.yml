@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible problem in the dashboard or analysis service
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not report vulnerabilities or include credentials or detected secret values here. Follow SECURITY.md instead.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the problem and the result you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include the project, target type, revision, and safe steps needed to reproduce the behavior.
+    validations:
+      required: true
+  - type: input
+    id: provenance
+    attributes:
+      label: Revision or workflow run
+      description: Provide an immutable commit SHA or GitHub Actions run URL when applicable.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Dashboard UI
+        - Authentication or launcher
+        - Scanner workflow
+        - Report generation or publication
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, operating system, viewport, and assistive technology if relevant.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed credentials, detected secret values, and private report data.
+          required: true
+        - label: This is not a privately reportable security vulnerability.
+          required: true
+

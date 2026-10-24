@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose an improvement to the dashboard or analysis workflow
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Explain the user need and who is affected.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior rather than only an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Supporting evidence
+      description: Add safe screenshots, workflow runs, or examples without credentials or private report data.
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Security and provenance considerations
+      description: Note effects on read-only analysis, credential isolation, immutable revisions, and incomplete evidence.
+

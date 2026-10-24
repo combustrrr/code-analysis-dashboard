@@ -3,6 +3,11 @@
 A standalone code-analysis application: lightweight React dashboard, Cloudflare
 authentication, GitHub Actions orchestration, scanner adapters, and current reports.
 
+Before contributing, read [CONTRIBUTING.md](CONTRIBUTING.md). Report security
+vulnerabilities privately as described in [SECURITY.md](SECURITY.md), and see
+[ACCESSIBILITY.md](ACCESSIBILITY.md) for the accessibility commitment and known
+limitations.
+
 Start with the [documentation index](docs/README.md), then read the
 [system architecture](docs/architecture/SYSTEM_OVERVIEW.md). Operational guides are grouped under
 the [current](docs/current/README.md), [architecture](docs/architecture/README.md),
