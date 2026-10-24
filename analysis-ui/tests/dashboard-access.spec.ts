@@ -238,10 +238,11 @@ test('repository deep links open the authenticated workspace with a shared theme
  await page.setViewportSize({width:390,height:844});
  const mobileLayout=await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,overflowing:[...document.querySelectorAll('body *')].map(element=>({element:element.tagName+'.'+(element as HTMLElement).className?.toString().replaceAll(' ',' .'),right:Math.round(element.getBoundingClientRect().right)})).filter(item=>item.right>innerWidth+1).slice(0,8)}));
  expect(mobileLayout.scrollWidth,JSON.stringify(mobileLayout.overflowing)).toBeLessThanOrEqual(390);
-  const workspaceLockup=page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'}).first();
-  await expect(workspaceLockup).toBeVisible();
+  await expect(page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'})).toHaveCount(0);
+  const projectRegister=page.locator('.shell-header').getByRole('link',{name:'Project register'});
+  await expect(projectRegister).toBeVisible();
   await expect(page.locator('.shell-header')).not.toContainText('Evidence workspace');
-  await workspaceLockup.click();
+  await projectRegister.click();
   await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
 });
 
@@ -440,7 +441,7 @@ test('authorized user follows one repository project from selection through publ
   expect(launches).toBe(0);
   await page.getByRole('link',{name:'Run analysis'}).click();
   await page.getByRole('button',{name:/Fast analysis/}).click();
-  await page.getByRole('button',{name:'Repeat last analysis'}).click();
+  await page.getByRole('button',{name:'Analyze with all scanners'}).click();
  await expect(page.locator('.ant-alert-title').getByText('Analyzing',{exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Building the first reviewable report'})).toBeVisible();
  await expect(page.getByText('This project has no reviewable report yet.')).toBeVisible();
