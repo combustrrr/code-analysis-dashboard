@@ -2,7 +2,7 @@
 
 ## 2026-10-23 public-shell performance boundary
 
-The analysis workspace presents five user-facing states: Queued, Analyzing,
+The analysis workspace presents five user-facing states: Preparing, Analyzing,
 Preparing report, Ready, and Needs attention. Operational identifiers and raw service
 errors are collapsed under Technical details. The primary interface does not expose
 tooling-profile conflicts, coordinator state, report shards, storage limits, or
@@ -67,6 +67,11 @@ remains contextual. Public
 report manifests are rebuilt from an explicit bounded schema during publication so
 legacy embedded fields cannot be carried forward into a request larger than the Worker
 ingress limit.
+
+The browser preconnects to the authenticated Worker and loads settings, analysis-launch,
+run-progress, and threat-report modules only when their routes or panels are opened. The
+project register therefore stays small, while the full evidence workspace no longer pays
+the JavaScript cost of every secondary workflow during its initial render.
 
 ## 2026-10-20 interface language review
 

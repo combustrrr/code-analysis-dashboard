@@ -40,7 +40,7 @@ type Activity = {
 
 const terminalPhases = new Set(['published', 'reused', 'failed', 'superseded', 'cancelled_cutover']);
 const phaseCopy: Record<string, string> = {
-  preparing: 'Queued', scanning: 'Analyzing', running: 'Analyzing', analyzing: 'Analyzing',
+  preparing: 'Preparing', scanning: 'Analyzing', running: 'Analyzing', analyzing: 'Analyzing',
   collecting: 'Preparing report', publishing: 'Preparing report', published: 'Ready', reused: 'Ready',
   failed: 'Needs attention', superseded: 'Ready', cancelled_cutover: 'Needs attention',
 };
@@ -136,7 +136,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const percent=progress.length>0?Math.round((finished/progress.length)*100):(terminal?100:8);
   const journeyStep=analysisStage(status);
   const primaryIssue=phase==='failed'||phase==='cancelled_cutover'?plainAnalysisIssue(activity?.error||activity?.message):'';
-  const stages=['Choose','Queued','Analyzing','Preparing report','Ready'];
+  const stages=['Choose','Preparing','Analyzing','Preparing report','Ready'];
 
   return <Alert
     className="project-run-tracker"

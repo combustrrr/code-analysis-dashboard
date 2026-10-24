@@ -1,5 +1,5 @@
-name: Code analysis queue coordinator
-run-name: Queue coordinator ${{ github.run_id }}
+name: Code analysis coordinator
+run-name: Analysis coordinator ${{ github.run_id }}
 on:
   workflow_dispatch:
     inputs:

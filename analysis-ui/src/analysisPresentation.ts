@@ -1,4 +1,4 @@
-export type AnalysisStatus = 'Queued' | 'Analyzing' | 'Preparing report' | 'Ready' | 'Needs attention';
+export type AnalysisStatus = 'Preparing' | 'Analyzing' | 'Preparing report' | 'Ready' | 'Needs attention';
 
 const ready = new Set(['published', 'reused', 'superseded']);
 const failed = new Set(['failed', 'cancelled_cutover']);
@@ -8,7 +8,7 @@ export function analysisStatus(phase?: string): AnalysisStatus {
   if (failed.has(phase || '')) return 'Needs attention';
   if (phase === 'collecting' || phase === 'publishing') return 'Preparing report';
   if (phase === 'scanning' || phase === 'running' || phase === 'analyzing') return 'Analyzing';
-  return 'Queued';
+  return 'Preparing';
 }
 
 export function analysisStage(status: AnalysisStatus) {

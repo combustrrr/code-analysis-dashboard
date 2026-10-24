@@ -1,5 +1,4 @@
 import { refreshRepositoryReports } from './repositoryReports';
-import { ProjectLauncher } from './ProjectLauncher';
 import { applicationEndpoint, repositoryJson } from './repositoryReports';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Collapse, ConfigProvider, Drawer, Empty, Grid, Input, Progress, Select, Space, Statistic, Table, Tabs, Tag, message } from 'antd';
@@ -16,16 +15,19 @@ import '@fontsource/ibm-plex-mono/400.css';
 import './style.css';
 import './workspace.css';
 import { useLaunchAuth } from './useLaunchAuth';
-import { ThreatReport } from './ThreatReport';
-import { Settings } from './Settings';
 import { safeGithubUrl } from './safeUrls';
 import { useAppearance } from './Appearance';
-import { ProjectRunTracker, type ProjectRunRequest } from './ProjectRunTracker';
+import type { ProjectRunRequest } from './ProjectRunTracker';
 import {parseAppRoute,routeHash,type IssueRouteFilters,type ProjectView} from './appRoutes';
 import {AppShell} from './AppShell';
 import {plainAnalysisIssue} from './analysisPresentation';
 import {RevisionRibbon} from './RevisionRibbon';
 import {applicationTheme} from './brand';
+
+const ProjectLauncher=React.lazy(()=>import('./ProjectLauncher').then(module=>({default:module.ProjectLauncher})));
+const ProjectRunTracker=React.lazy(()=>import('./ProjectRunTracker').then(module=>({default:module.ProjectRunTracker})));
+const Settings=React.lazy(()=>import('./Settings').then(module=>({default:module.Settings})));
+const ThreatReport=React.lazy(()=>import('./ThreatReport').then(module=>({default:module.ThreatReport})));
 
 type Target = { scan_run_id?: number; run_attempt?: number; tooling_sha?: string; lifecycle_status?: string; id: string; label: string; repository: string; source_repository: string; head_sha: string; kind: string; branch: string; pr?: number; base_branch?: string; base_sha?: string; checked_at: string; status: string; report?: string; error?: string };
 type Index = { report_storage?: {compressed_bytes:number}; publishing_repository?: string; launch_endpoint?: string; source_repository?: string; analysis_default_branch?: string; metrics?: {site_bytes: number; site_limit_bytes: number; queued?: number; scanning?: number}; schema_version: string; checked_at: string; targets: Target[]; preferred_branch: string; analysis_repository: string; current_overlay?: {overlay_key:string;status:string;head_sha:string;checked_at?:string;pr_context:{number:number;title?:string;draft?:boolean;head_repository:string;head_branch:string;base_repository:string;base_branch:string;base_sha:string};channel:{status:string;reason?:string}}; discovery_error?: string; publication_error?: string };
@@ -64,7 +66,7 @@ function FindingBars({values,onSelect,label='Finding counts by severity'}:{value
 function ReportWorkspace({report,target}:{report:Report;target:Target}){
  const [status,setStatus]=useState('');
  const rows=report.channels.filter(channel=>!status||channel.status===status);
- return <section className="report-workspace"><header className="report-workspace-heading"><div><span className="eyebrow">IMMUTABLE EVIDENCE</span><h2>Published report and scanner coverage</h2><p>Review the published report and the result of every requested scanner channel.</p></div><Select aria-label="Execution status" value={status} onChange={setStatus} options={[{value:'',label:'All statuses'},...[...new Set(report.channels.map(channel=>channel.status))].sort().map(value=>({value,label:value.replaceAll('_',' ')}))]}/></header><Alert showIcon type="info" title="Coverage does not guarantee that the code is secure" description="Failed, deferred, or unavailable channels remain incomplete. Findings from successful channels are still retained."/><Table<Channel> rowKey="channel" size="middle" dataSource={rows} pagination={false} scroll={{x:760}} columns={[{title:'Scanner',key:'scanner',render:(_,channel)=><><strong>{channel.name}</strong><small>{channel.class}</small></>},{title:'Status',key:'status',render:(_,channel)=><Badge value={channel.status}/>},{title:'Findings',key:'findings',render:(_,channel)=>channel.findings===null?'Unavailable':channel.findings.toLocaleString()},{title:'Evidence limitation',key:'reason',render:(_,channel)=>channel.reason||'Retained evidence is available'}]}/>{target.report?<ThreatReport reportPath={target.report} targetSha={target.head_sha}/>:<Empty description="The immutable report is unavailable for this revision."/>}</section>;
+ return <section className="report-workspace"><header className="report-workspace-heading"><div><span className="eyebrow">IMMUTABLE EVIDENCE</span><h2>Published report and scanner coverage</h2><p>Review the published report and the result of every requested scanner channel.</p></div><Select aria-label="Execution status" value={status} onChange={setStatus} options={[{value:'',label:'All statuses'},...[...new Set(report.channels.map(channel=>channel.status))].sort().map(value=>({value,label:value.replaceAll('_',' ')}))]}/></header><Alert showIcon type="info" title="Coverage does not guarantee that the code is secure" description="Failed, deferred, or unavailable channels remain incomplete. Findings from successful channels are still retained."/><Table<Channel> rowKey="channel" size="middle" dataSource={rows} pagination={false} scroll={{x:760}} columns={[{title:'Scanner',key:'scanner',render:(_,channel)=><><strong>{channel.name}</strong><small>{channel.class}</small></>},{title:'Status',key:'status',render:(_,channel)=><Badge value={channel.status}/>},{title:'Findings',key:'findings',render:(_,channel)=>channel.findings===null?'Unavailable':channel.findings.toLocaleString()},{title:'Evidence limitation',key:'reason',render:(_,channel)=>channel.reason||'Retained evidence is available'}]}/>{target.report?<React.Suspense fallback={<div className="workspace-loading" role="status">Opening report…</div>}><ThreatReport reportPath={target.report} targetSha={target.head_sha}/></React.Suspense>:<Empty description="The immutable report is unavailable for this revision."/>}</section>;
 }
 
 function Evidence({ detail, source, error, findings, openFinding }: { detail?: Detail; source: string[]; error: string; findings: Finding[]; openFinding: (id: string) => void }) {

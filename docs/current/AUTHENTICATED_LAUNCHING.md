@@ -7,9 +7,9 @@ viewer authorization, fixed-host APIs, explicit launch requests and report deliv
 project-registry entries. Users do not choose or install an execution repository.
 
 Users sign in to **Projects**, the only workspace home. It contains the three fixed
-projects, aggregate Queued/Analyzing/Needs-attention counts, last refresh time, and
+projects, aggregate Preparing/Analyzing/Needs-attention counts, last refresh time, and
 each project's current evidence state. Opening Projects or a project remains read-only.
-Developers see product-level progress only: Queued, Analyzing, Preparing report, Ready, or Needs attention.
+Developers see product-level progress only: Preparing, Analyzing, Preparing report, Ready, or Needs attention.
 Coordinator runs, lease state, scanner job
 links, and individual channel scheduling remain operational details. The exact selected
 revision remains visible throughout.

@@ -597,7 +597,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
     if external_queue:
         runs.append({'id':int(os.environ['GITHUB_RUN_ID']),'run_attempt':int(os.environ.get('GITHUB_RUN_ATTEMPT','1')),
                      'status':'completed','conclusion':'success','head_sha':os.environ['GITHUB_SHA'],
-                     'display_title':'Queue coordinator '+os.environ['GITHUB_RUN_ID']})
+                     'display_title':'Analysis coordinator '+os.environ['GITHUB_RUN_ID']})
     runs = list({run['id']:run for run in runs}.values())
     running = sum(run['status'] != 'completed' for run in runs)
     by_id = {run['id']:run for run in runs}

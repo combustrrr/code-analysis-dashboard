@@ -3,7 +3,7 @@ import {analysisStage,analysisStatus,plainAnalysisIssue} from './analysisPresent
 
 describe('analysis presentation',()=>{
   it('maps backend phases to the five user-facing states',()=>{
-    expect(analysisStatus('preparing')).toBe('Queued');
+    expect(analysisStatus('preparing')).toBe('Preparing');
     expect(analysisStatus('scanning')).toBe('Analyzing');
     expect(analysisStatus('collecting')).toBe('Preparing report');
     expect(analysisStatus('published')).toBe('Ready');
