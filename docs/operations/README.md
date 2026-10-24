@@ -7,6 +7,7 @@ Runbooks and maintenance procedures for the deployed service.
 | Free-tier limits and diagnostics | [Free services](FREE_SERVICES.md) |
 | Dashboard access | [Dashboard access](DASHBOARD-ACCESS.md) |
 | Repository setup and launch | [Repository application](REPOSITORY_APPLICATION.md) |
+| Continuous integration and delivery | [CI and CD](CI-CD.md) |
 | Scanner maintenance | [Scanner maintenance](SCANNER-MAINTENANCE.md) |
 | Secret management and rotation | [Secret management](SECRET-MANAGEMENT.md) |
 | Portable profiles | [Portable profiles](PORTABLE_PROFILES.md) |

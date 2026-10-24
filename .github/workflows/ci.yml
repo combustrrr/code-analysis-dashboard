@@ -1,0 +1,99 @@
+name: Continuous integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  service:
+    name: CI · service and workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: .ci/requirements.txt
+      - name: Install pinned service dependencies
+        run: python -m pip install --requirement .ci/requirements.txt
+      - name: Run code-analysis service tests
+        run: python -m unittest discover -s scripts/code_analysis -p 'test_*.py'
+      - name: Run deployment contract tests
+        run: python -m pytest scripts/deployment -q
+      - name: Audit workflow security and generated parity
+        run: python -m scripts.code_analysis.audit_workflows
+
+  launcher:
+    name: CI · launcher
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+      - name: Test authentication, queue, and report contracts
+        run: node --test analysis-launcher/*.test.mjs
+      - name: Validate deployment isolation
+        run: python -m scripts.deployment.validate_deployment
+
+  ui:
+    name: CI · UI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: analysis-ui
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: analysis-ui/package-lock.json
+      - name: Install locked UI dependencies
+        run: npm ci --ignore-scripts
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Run UI unit tests
+        run: npm run test:unit
+      - name: Build production UI
+        env:
+          VITE_APPLICATION_MODE: repositories
+          VITE_LAUNCH_ENDPOINT: https://code-analysis-launcher.icsarthak9.workers.dev
+          VITE_DEFAULT_EXECUTION_REPOSITORY: combustrrr/code-analysis-dashboard
+          VITE_DEFAULT_PROJECT_ID: '1360051890'
+        run: npm run build
+
+  ci:
+    name: CI
+    if: always()
+    needs: [service, launcher, ui]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every CI lane
+        env:
+          SERVICE_RESULT: ${{ needs.service.result }}
+          LAUNCHER_RESULT: ${{ needs.launcher.result }}
+          UI_RESULT: ${{ needs.ui.result }}
+        run: |
+          test "$SERVICE_RESULT" = success
+          test "$LAUNCHER_RESULT" = success
+          test "$UI_RESULT" = success

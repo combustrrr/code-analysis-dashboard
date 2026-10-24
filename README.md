@@ -78,6 +78,10 @@ Source-only observer projects do not upload checks or security findings to the s
 
 The shared UI is hosted on GitHub Pages; Cloudflare handles authentication,
 authorization and report delivery. Reports are not bundled into the UI build.
+Every pull request and `main` push runs the repository-wide CI workflow. Scoped CD
+workflows deploy UI changes to Pages, Worker changes to Cloudflare, and validated
+scanner changes through immutable tooling promotion. See the
+[CI/CD runbook](docs/operations/CI-CD.md).
 The checked-in project registry targets `ARYDESTROYER/Kavach-AgenticSOC`,
 `combustrrr/code-analysis-dashboard`, and `combustrrr/Agentic-Kibana`; the dashboard is
 the fixed execution host and its self-analysis target. Registry/workflow changes are

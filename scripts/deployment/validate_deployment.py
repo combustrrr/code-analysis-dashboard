@@ -207,7 +207,23 @@ def deployment_workflow_errors(root: Path) -> list[str]:
     worker = (root / ".github/workflows/worker-deploy.yml").read_text(encoding="utf-8")
     coordinator = (root / ".github/workflows/code-analysis-coordinator.yml").read_text(encoding="utf-8")
     pages = (root / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+    ci = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     errors = []
+    required_ci_commands = (
+        "python -m unittest discover",
+        "python -m pytest scripts/deployment",
+        "python -m scripts.code_analysis.audit_workflows",
+        "node --test analysis-launcher/*.test.mjs",
+        "npm audit --omit=dev --audit-level=high",
+        "npm run test:unit",
+        "npm run build",
+    )
+    if "pull_request:" not in ci or "branches: [main]" not in ci or "name: CI\n" not in ci:
+        errors.append("Repository-wide CI lacks pull request, main, or aggregate status coverage")
+    if any(command not in ci for command in required_ci_commands):
+        errors.append("Repository-wide CI does not cover every required service, launcher, and UI check")
+    if "secrets." in ci or "CLOUDFLARE_API_TOKEN" in ci or "deploy-pages" in ci:
+        errors.append("Repository-wide CI is not isolated from deployment credentials or actions")
     if "pull_request:" not in worker or "github.event_name == 'push'" not in worker or "github.ref == 'refs/heads/main'" not in worker:
         errors.append("Worker deployment is not restricted to trusted main after PR validation")
     if worker.index("node --test") > worker.index("wrangler@4.129.1 deploy --dry-run") or worker.index("needs: validate") > worker.index("wrangler@4.129.1 deploy\n"):
