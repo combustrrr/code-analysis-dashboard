@@ -36,7 +36,6 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import click
-from defusedxml import ElementTree as ET
 
 try:
     from rich.console import Console
@@ -819,6 +818,10 @@ class SchemathesisParser:
     """Convert Schemathesis JUnit failures into structured dynamic findings."""
 
     def parse(self, path: Path) -> list[Finding]:
+        # Only the XML-specific lane needs this dependency; JSON/SARIF scanner
+        # jobs intentionally keep their isolated dependency sets minimal.
+        from defusedxml import ElementTree as ET
+
         root = ET.parse(path).getroot()
         findings: list[Finding] = []
         for case in root.iter("testcase"):
