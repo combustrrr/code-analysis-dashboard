@@ -48,14 +48,14 @@ def main():
         changed_files=github.pages(f'repos/{repo}/pulls/{pr["number"]}/files')
         if set(p['filename'] for p in changed_files)!=set(FILES) or actual!=expected:
             raise ValueError('Rollout no longer matches exact managed files; review required')
-        checks=github.pages(f'repos/{repo}/commits/{head}/check-runs','check_runs')
-        passed=any(c['name']=='Scanner compatibility' and c.get('app',{}).get('slug')=='github-actions' and c['head_sha']==head and c['conclusion']=='success' for c in checks)
-        if not passed:
-            print('Rollout PR awaits exact-head Scanner compatibility.');return
         detail=api(f'pulls/{pr["number"]}')
         if detail.get('mergeable_state')=='behind':
             api(f'pulls/{pr["number"]}/update-branch',{'expected_head_sha':head},'PUT')
             print('Updated rollout branch; fresh checks required.');return
+        checks=github.pages(f'repos/{repo}/commits/{head}/check-runs','check_runs')
+        passed=any(c['name']=='Scanner compatibility' and c.get('app',{}).get('slug')=='github-actions' and c['head_sha']==head and c['conclusion']=='success' for c in checks)
+        if not passed:
+            print('Rollout PR awaits exact-head Scanner compatibility.');return
         if detail.get('mergeable_state')!='clean':
             print('Rollout is waiting for remaining branch-protection checks.');return
         result=api(f'pulls/{pr["number"]}/merge',{'sha':head,'merge_method':'squash'},'PUT')

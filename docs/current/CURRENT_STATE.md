@@ -412,7 +412,8 @@ were retired; their reusable scanner recipes live outside `.github/workflows`. T
 preferred-branch batch is now manual, so opening or merely configuring a project never
 creates periodic scans. Scanner lanes remain concurrent and only publication is fenced
 per project. Tooling promotion no longer runs a duplicate `workflow_run` trigger after
-the compatibility workflow; merge/push and daily reconciliation remain authoritative.
+the compatibility workflow; the original promotion run waits boundedly for its exact-head
+check, while main changes and daily reconciliation remain authoritative.
 
 ## 2026-10-20 Proactive preferred-branch evidence (historical)
 

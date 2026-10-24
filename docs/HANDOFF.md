@@ -9,8 +9,9 @@ workflow entry points were retired. Core scanner recipes moved to
 `config/code-analysis/workflow-templates/` so generated workflows retain their reviewed
 scanner definitions without advertising competing Actions buttons. The preferred-branch
 batch is manual rather than scheduled, and tooling rollout no longer duplicates main
-promotion through a `workflow_run` trigger. Immediate Worker wakes and the coordinator's
-15-minute accepted-work recovery schedule remain.
+promotion through a `workflow_run` trigger; its original run waits boundedly for the
+exact-head compatibility result. Immediate Worker wakes and the coordinator's 15-minute
+accepted-work recovery schedule remain.
 
 ## 2026-10-20 proactive preferred-branch refresh
 
