@@ -506,3 +506,13 @@ public landing canvas is horizontally contained at desktop, intermediate, and mo
 widths; its hero changes to one column before the evidence dossier can crowd or clip the
 page. PDF cover generation reserves separate vertical space for the evidence eyebrow,
 report title, repository, and immutable revision so those elements do not overlap.
+
+## 2026-10-24 authenticated Projects prefetch
+
+After the one-time OAuth exchange, the browser now starts session verification and the
+configured-project register request together. Both remain protected Worker requests and
+retain current GitHub identity, collaborator, repository, and registry validation. The
+verified register response is carried only in the in-memory session and consumed by the
+Projects screen, avoiding a duplicate `/api/projects` request. Periodic 15-second access
+revalidation, logout revocation, removed-project checks, and fresh sign-in after reload
+remain unchanged.

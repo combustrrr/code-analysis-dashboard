@@ -36,6 +36,7 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
 test('GitHub sign-in explains the secure exchange and access verification stages',async({page,context})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type'};
+ let sessionStarted=0,projectsStarted=0,projectsRequests=0;
  await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -46,10 +47,11 @@ test('GitHub sign-in explains the secure exchange and access verification stages
    return route.fulfill({headers,json:{token:'staged-session',login:'developer'}});
   }
   if(url.pathname==='/api/session'){
-   await new Promise(resolve=>setTimeout(resolve,350));
+   sessionStarted=Date.now();
+   await new Promise(resolve=>setTimeout(resolve,800));
    return route.fulfill({headers,json:{login:'developer'}});
   }
-  if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[]}});
+  if(url.pathname==='/api/projects'){projectsStarted=Date.now();projectsRequests++;await new Promise(resolve=>setTimeout(resolve,800));return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[]}});}
   throw new Error(`Unexpected request ${url.pathname}`);
  });
  await page.goto('/#/projects');
@@ -58,6 +60,7 @@ test('GitHub sign-in explains the secure exchange and access verification stages
  await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('never sees your password');
  await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('Verifying workspace access');
  await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
+ expect(Math.abs(sessionStarted-projectsStarted)).toBeLessThan(100);expect(projectsRequests).toBe(1);
 });
 
 test('view access requires login and clears on logout',async({page,context})=>{
@@ -74,7 +77,7 @@ test('view access requires login and clears on logout',async({page,context})=>{
   expect(route.request().headers().authorization).toBe('Bearer opaque-session');
   if(u.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
     if(u.pathname==='/api/session')return route.fulfill({headers,status:allowed?200:403,json:allowed?{login:'combustrrr'}:{error:'Account not authorized',code:'viewer_not_authorized'}});
-  if(u.pathname==='/api/projects')return route.fulfill({headers,json:registry});
+  if(u.pathname==='/api/projects')return route.fulfill({headers,status:allowed?200:403,json:allowed?registry:{error:'Account not authorized',code:'viewer_not_authorized'}});
   if(u.pathname==='/api/public/manifest'){reports++;return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:'1278177697',targets:[]}});}
   throw new Error(`Unexpected request ${u.pathname}`);
  });
@@ -140,7 +143,7 @@ test('a revoked workspace API request clears the session immediately',async({pag
    await page.goto('/#/projects');
   revoked=true;
    await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
-   await expect(page.getByText('Access expired or was revoked. Sign in with an authorized GitHub account.')).toBeVisible();
+   await expect(page.getByText(/Ask a dashboard maintainer to invite your account/)).toBeVisible();
   await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
   expect(reportRequests).toBe(0);
  });
@@ -296,7 +299,8 @@ test('authorization restores the exact requested repository route',async({page,c
   await expect(page.getByLabel('Selected analysis revision')).toBeVisible();
   await expect.poll(()=>new URL(page.url()).hash).toBe(destination);
   await expect.poll(()=>requestOrder.includes('manifest')).toBe(true);
-  expect(requestOrder.indexOf('session')).toBeLessThan(requestOrder.indexOf('projects'));
+  expect(requestOrder).toContain('session');
+  expect(requestOrder).toContain('projects');
   expect(requestOrder.indexOf('projects')).toBeLessThan(requestOrder.indexOf('manifest'));
  });
 

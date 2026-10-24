@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 const VERIFIER_KEY = 'analysis-auth-verifier';
 const RETURN_KEY = 'analysis-auth-return';
 const ENDPOINT_KEY = 'analysis-auth-endpoint';
+type ProjectRegistry = { execution_repository: { id: number; full_name: string }; projects: Array<{ id: string | number }>; [key:string]: unknown };
 
 function randomVerifier() {
   return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
@@ -39,7 +40,7 @@ function friendlyAuthError(code?: string) {
 }
 
 export function useLaunchAuth(endpoint?: string, enabled = true) {
-  const [session, setSession] = useState<{ token: string; login: string }>();
+  const [session, setSession] = useState<{ token: string; login: string; registry?: ProjectRegistry }>();
   const [error, setError] = useState('');
   const [verified, setVerified] = useState(false);
   const [pending, setPending] = useState(() => {
@@ -89,12 +90,9 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
       try { result = await response.json(); } catch {}
       if (!response.ok || typeof result.token !== 'string' || typeof result.login !== 'string') throw new Error(friendlyAuthError(result.code));
       setStage('verifying');
-      const verification = await fetch(`${origin}/api/session`, { cache: 'no-store', credentials: 'omit', headers: { Authorization: `Bearer ${result.token}` } });
-      let verificationResult: { code?: string } = {};
-      try { verificationResult = await verification.json(); } catch {}
-      if (!verification.ok) throw new Error(friendlyAuthError(verificationResult.code));
       const destination = pendingAuthDestination();
       let requestedProject: { repository: string | null; id: string } | undefined;
+      let workspaceDestination = false;
       if (destination) {
         try {
           const target = new URL(destination, location.origin);
@@ -104,22 +102,34 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
           const modernParts = modernPath.split('/').filter(Boolean);
           const parameters = new URLSearchParams(modern ? modernQuery : rawHash);
           const project = modernParts[0] === 'projects' && /^\d+$/.test(modernParts[1] || '') ? modernParts[1] : parameters.get('project');
+          workspaceDestination = target.origin === location.origin && modernParts[0] === 'projects';
           if (target.origin === location.origin && project) requestedProject = { repository: parameters.get('repository'), id: project };
         } catch {}
       }
+      const authHeaders={Authorization:`Bearer ${result.token}`};
+      const verificationPromise=fetch(`${origin}/api/session`,{cache:'no-store',credentials:'omit',headers:authHeaders});
+      const registryPromise=workspaceDestination?fetch(`${origin}/api/projects`,{cache:'no-store',credentials:'omit',headers:authHeaders}).catch(()=>null):undefined;
+      const [verification,registryResponse]=await Promise.all([verificationPromise,registryPromise]);
+      let verificationResult: { code?: string } = {};
+      try { verificationResult = await verification.json(); } catch {}
+      if (!verification.ok) throw new Error(friendlyAuthError(verificationResult.code));
+      let registry: ProjectRegistry | undefined;
+      if (registryResponse) {
+        if (!registryResponse.ok) {
+          let failure: {code?:string}={};try{failure=await registryResponse.json();}catch{}
+          if(registryResponse.status===401||registryResponse.status===403)throw new Error(friendlyAuthError(failure.code));
+          if(requestedProject)throw new Error('Configured projects could not be verified. Retry sign-in.');
+        } else {
+          let candidate: Partial<ProjectRegistry> = {};
+          try { candidate = await registryResponse.json(); } catch {}
+          if (!Number.isSafeInteger(candidate.execution_repository?.id) || !candidate.execution_repository?.full_name || !Array.isArray(candidate.projects)) {
+            throw new Error('The configured project registry could not be verified. Retry sign-in.');
+          }
+          registry = candidate as ProjectRegistry;
+        }
+      }
       if (requestedProject) {
-        let registryResponse: Response;
-        try {
-          registryResponse = await fetch(`${origin}/api/projects`, { cache: 'no-store', credentials: 'omit', headers: { Authorization: `Bearer ${result.token}` } });
-        } catch {
-          throw new Error('Configured projects could not be verified. Check your connection and retry.');
-        }
-        if (!registryResponse.ok) throw new Error('Configured projects could not be verified. Retry sign-in.');
-        let registry: { execution_repository?: { id?: number; full_name?: string }; projects?: Array<{ id: string | number }> } = {};
-        try { registry = await registryResponse.json(); } catch {}
-        if (!Number.isSafeInteger(registry.execution_repository?.id) || !registry.execution_repository?.full_name || !Array.isArray(registry.projects)) {
-          throw new Error('The configured project registry could not be verified. Retry sign-in.');
-        }
+        if (!registry) throw new Error('Configured projects could not be verified. Check your connection and retry.');
         const repositoryMismatch = requestedProject.repository != null
           && requestedProject.repository.toLowerCase() !== registry.execution_repository.full_name.toLowerCase();
         if (repositoryMismatch || !registry.projects.some(value => String(value.id) === requestedProject.id)) {
@@ -127,7 +137,7 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
           throw new Error('The requested project is no longer configured. Retry sign-in and choose a current project.');
         }
       }
-      setSession({ token: result.token, login: result.login });
+      setSession({ token: result.token, login: result.login, registry });
       setVerified(true);
       setError('');
       setPending(false);
