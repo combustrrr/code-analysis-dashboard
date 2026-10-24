@@ -44,28 +44,28 @@ those are capacity changes, not extra UI implementations.
 
 `13-scanner-updates.yml` reconciles dependencies daily and can be run manually.
 It uses self-hosted Renovate on Actions; no hosted Renovate account is required.
-It proposes at most two concurrent update PRs, keeps exact pins, ignores unstable
-releases, and waits three days after a release. Failed checks leave current pins
+It groups the available scanner changes into one update PR, keeps exact pins,
+ignores unstable releases, and waits three days after a release. Failed checks leave current pins
 and current reports in place. A failure to check for updates is an Actions failure,
 not evidence that the scanners are current.
 
-Coverage includes scanner Actions, `.ci` Python requirements, inline pinned Python
-scanner packages, Snyk CLI, Gitleaks images, and Scorecard releases. Scorecard updates
-fetch the official release checksum and retain verification at installation.
-Generated workflows and generator Action constants are synchronized in the same PR.
-Future adapters with ordinary `package==version` pins are detected automatically;
-other package formats need another Renovate manager/annotation and a compatibility
-test. SaaS-owned engines update at the provider. Source-owned ESLint/TypeScript
+Coverage includes scanner Actions, `.ci` Python requirements, authoritative workflow
+templates, inline pinned Python scanner packages, service-owned JavaScript tools,
+Snyk CLI, Gitleaks images, and Scorecard and TruffleHog releases. Scorecard and
+TruffleHog updates fetch their official release checksum and retain verification at
+installation. Generated workflows, portable action constants, and generator action
+constants are synchronized in the same PR. Future scanner pins must be added to an
+existing dependency pattern or a new Renovate manager plus compatibility test.
+SaaS-owned engines update at the provider. Source-owned ESLint/TypeScript
 versions follow the selected repository'"'"'s lockfile; the service does not rewrite
 upstream dependencies to force a newer compiler.
 
 `14-scanner-compatibility.yml` runs service/extension regression tests, workflow
 checks, and native-output canaries with read-only permissions and no scanner or
-publication secrets. Only stable patch updates to the explicitly canary-covered
-Bandit, Radon, Vulture, and Xenon families can auto-merge after that check passes
-(Ruff is registered but its current 0.x releases remain review-only). Other updates,
-including major changes, vendor CLIs, Actions, and Scorecard, get reviewable PRs.
-Add a scanner'"'"'s real compatibility test before allowing its automatic merge.
+publication secrets. Stable major, minor, patch, digest, and pin updates can
+auto-merge only after that required check and every other branch protection passes.
+The grouped PR makes the exact scanner stack the unit that is tested and promoted.
+Add a scanner's real compatibility test before registering its pin for automatic merge.
 Passing tests reduces upgrade risk; it cannot guarantee that arbitrary future
 scanner versions or source projects will never break.
 

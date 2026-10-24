@@ -1,9 +1,25 @@
 """Credentialless source-scanner jobs shared by every trusted project profile."""
 
+import json
+import re
+from pathlib import Path
+
 from scripts.code_analysis.generate_source_workflow import CHECKOUT, PYTHON, UPLOAD
 
 
+def trufflehog_pin():
+    pin = json.loads((Path(__file__).resolve().parents[2] / ".ci/trufflehog.json").read_text(encoding="utf-8"))
+    version = pin.get("version", "")
+    checksum = pin.get("sha256", "")
+    if pin.get("checksum_version") != version or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise ValueError("Invalid TruffleHog version metadata")
+    if not re.fullmatch(r"[0-9a-f]{64}", checksum):
+        raise ValueError("Invalid TruffleHog checksum")
+    return version, checksum
+
+
 def scanner_jobs():
+    trufflehog_version, trufflehog_sha256 = trufflehog_pin()
     common = [
         {"uses": CHECKOUT, "with": {"ref": "${{ inputs.tooling_sha }}", "persist-credentials": False}},
         {"uses": PYTHON, "with": {"python-version": "3.11"}},
@@ -68,15 +84,15 @@ def scanner_jobs():
         "timeout-minutes": 25,
         "permissions": {"contents": "read"},
         "steps": common + [
-            {"name": "Install verified TruffleHog 3.99.3", "run":
-             "curl --fail --location --retry 3 https://github.com/trufflesecurity/trufflehog/releases/download/v3.99.3/trufflehog_3.99.3_linux_amd64.tar.gz -o trufflehog.tar.gz\n"
-             "echo '029b182e0ed35fd5b02cd1eadc2a94bd457ab14ad22a9380b6e5d9652261d28d  trufflehog.tar.gz' | sha256sum --check\n"
+            {"name": f"Install verified TruffleHog {trufflehog_version}", "run":
+             f"curl --fail --location --retry 3 https://github.com/trufflesecurity/trufflehog/releases/download/v{trufflehog_version}/trufflehog_{trufflehog_version}_linux_amd64.tar.gz -o trufflehog.tar.gz\n"
+             f"echo '{trufflehog_sha256}  trufflehog.tar.gz' | sha256sum --check\n"
              "tar -xzf trufflehog.tar.gz trufflehog"},
             {"name": "Analyze exact revision without retaining secret values", "run":
              "set -o pipefail\n./trufflehog filesystem .source --json --no-update 2>/dev/null | "
              "python -I scripts/code_analysis/trufflehog_to_sarif.py --output owasp-iac-secrets.sarif"},
             {"name": "Record completed redacted TruffleHog evidence", "run":
-             "printf '%s\\n' '{\"scanner_family\":\"TruffleHog\",\"status\":\"COMPLETED\",\"reason\":\"Redacted SARIF retained for the exact revision.\",\"scanner_version\":\"3.99.3\"}' > owasp-iac-status.json"},
+             f"printf '%s\\n' '{{\"scanner_family\":\"TruffleHog\",\"status\":\"COMPLETED\",\"reason\":\"Redacted SARIF retained for the exact revision.\",\"scanner_version\":\"{trufflehog_version}\"}}' > owasp-iac-status.json"},
             {"uses": UPLOAD, "if": "always()", "with": {
                 "name": "owasp-iac-secrets", "path": "owasp-iac-secrets.sarif\nowasp-iac-status.json",
                 "if-no-files-found": "error", "retention-days": 7}},

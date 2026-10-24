@@ -473,11 +473,11 @@ jobs:
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - *id002
     - *id003
-    - name: Install verified TruffleHog 3.99.3
-      run: 'curl --fail --location --retry 3 https://github.com/trufflesecurity/trufflehog/releases/download/v3.99.3/trufflehog_3.99.3_linux_amd64.tar.gz
+    - name: Install verified TruffleHog 3.99.7
+      run: 'curl --fail --location --retry 3 https://github.com/trufflesecurity/trufflehog/releases/download/v3.99.7/trufflehog_3.99.7_linux_amd64.tar.gz
         -o trufflehog.tar.gz
 
-        echo ''029b182e0ed35fd5b02cd1eadc2a94bd457ab14ad22a9380b6e5d9652261d28d  trufflehog.tar.gz'' | sha256sum
+        echo ''bdbea0508e439b144f49de14e775908de5f902f3d14ea7ae8354bae72b0b72ef  trufflehog.tar.gz'' | sha256sum
         --check
 
         tar -xzf trufflehog.tar.gz trufflehog'
@@ -488,7 +488,7 @@ jobs:
         --output owasp-iac-secrets.sarif'
     - name: Record completed redacted TruffleHog evidence
       run: printf '%s\n' '{"scanner_family":"TruffleHog","status":"COMPLETED","reason":"Redacted SARIF retained
-        for the exact revision.","scanner_version":"3.99.3"}' > owasp-iac-status.json
+        for the exact revision.","scanner_version":"3.99.7"}' > owasp-iac-status.json
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:

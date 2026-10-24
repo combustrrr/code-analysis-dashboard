@@ -27,20 +27,21 @@ class ScannerUpdateTests(unittest.TestCase):
         self.assertEqual(len(manifest['required_static_channels']), 100)
         self.assertEqual(len(catalog['tools']), 100)
 
-    def test_automerge_requires_native_compatibility_and_excludes_major_updates(self):
+    def test_all_stable_updates_require_native_compatibility_before_automerge(self):
         policy = json.loads(Path('.github/renovate-scanners.json').read_text())
-        self.assertFalse(policy['automerge'])
+        self.assertTrue(policy['automerge'])
         self.assertFalse(policy['ignoreTests'])
+        self.assertTrue(policy['ignoreUnstable'])
+        self.assertEqual(policy['minimumReleaseAge'], '3 days')
         # Renovate removed requiredStatusChecks; enforce the named gate through
         # branch protection rather than a deprecated configuration key.
         updater = Path('.github/workflows/13-scanner-updates.yml').read_text()
         self.assertIn('protection/required_status_checks', updater)
         self.assertIn('Scanner compatibility', updater)
         self.assertNotIn('requiredStatusChecks', policy)
-        for rule in policy['packageRules']:
-            if rule.get('automerge'):
-                self.assertEqual(rule['matchUpdateTypes'], ['patch'])
-                self.assertLessEqual(set(rule['matchPackageNames']), {'bandit', 'ruff', 'radon', 'vulture', 'xenon'})
+        update_types = set(policy['packageRules'][0]['matchUpdateTypes'])
+        self.assertEqual(update_types, {'major', 'minor', 'patch', 'digest', 'pin'})
+        self.assertEqual(policy['packageRules'][0]['groupName'], 'validated scanner stack')
         workflow = yaml.safe_load(Path('.github/workflows/14-scanner-compatibility.yml').read_text())
         self.assertEqual(workflow['permissions'], {'contents': 'read'})
         self.assertNotIn('secrets.', json.dumps(workflow))
@@ -110,10 +111,14 @@ class ScannerUpdateTests(unittest.TestCase):
             (root/'scripts/code_analysis').mkdir(parents=True)
             templates=root/'config/code-analysis/workflow-templates';templates.mkdir(parents=True)
             shutil.copy('config/code-analysis/workflow-templates/01-code-quality.yml', templates)
+            shutil.copy('config/code-analysis/workflow-templates/03-dependency-security.yml', templates)
             shutil.copy('scripts/code_analysis/generate_source_workflow.py', root/'scripts/code_analysis')
+            shutil.copy('scripts/code_analysis/portable_workflow.py', root/'scripts/code_analysis')
             pin = {'version': '9.0.0', 'checksum_version': '5.5.0', 'sha256': 'a'*64}
             path = root/'.ci/scorecard.json'
             path.write_text(json.dumps(pin))
+            (root/'.ci/trufflehog.json').write_text(json.dumps({
+                'version': '3.99.7', 'checksum_version': '3.99.7', 'sha256': 'b'*64}))
             with patch('urllib.request.urlopen', return_value=io.BytesIO(b'wrong asset')), \
                     patch('subprocess.run') as execute:
                 with self.assertRaises(ValueError): sync(root)
@@ -124,6 +129,33 @@ class ScannerUpdateTests(unittest.TestCase):
                 sync(root)
             self.assertEqual(json.loads(path.read_text())['sha256'], 'b'*64)
             self.assertEqual(json.loads(path.read_text())['checksum_version'], '9.0.0')
+
+    def test_trufflehog_update_cannot_keep_an_old_checksum(self):
+        import io
+        import shutil
+        import tempfile
+        from unittest.mock import patch
+        from scripts.code_analysis.sync_scanner_workflows import sync
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root/'.ci').mkdir()
+            (root/'.github/workflows').mkdir(parents=True)
+            (root/'scripts/code_analysis').mkdir(parents=True)
+            templates = root/'config/code-analysis/workflow-templates'; templates.mkdir(parents=True)
+            shutil.copy('config/code-analysis/workflow-templates/01-code-quality.yml', templates)
+            shutil.copy('config/code-analysis/workflow-templates/03-dependency-security.yml', templates)
+            shutil.copy('scripts/code_analysis/generate_source_workflow.py', root/'scripts/code_analysis')
+            shutil.copy('scripts/code_analysis/portable_workflow.py', root/'scripts/code_analysis')
+            (root/'.ci/scorecard.json').write_text(json.dumps({
+                'version': '5.5.0', 'checksum_version': '5.5.0', 'sha256': 'a'*64}))
+            pin = {'version': '4.0.0', 'checksum_version': '3.99.7', 'sha256': 'b'*64}
+            path = root/'.ci/trufflehog.json'; path.write_text(json.dumps(pin))
+            checksum = ('c'*64 + '  trufflehog_4.0.0_linux_amd64.tar.gz\n').encode()
+            with patch('urllib.request.urlopen', return_value=io.BytesIO(checksum)), patch('subprocess.run'):
+                sync(root)
+            updated = json.loads(path.read_text())
+            self.assertEqual(updated['sha256'], 'c'*64)
+            self.assertEqual(updated['checksum_version'], '4.0.0')
 
 
 if __name__ == '__main__':
