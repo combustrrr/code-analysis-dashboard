@@ -104,7 +104,7 @@ The generator also produces reusable workflows `reusable-source.yml` and
 
 ## Adoption of validated tooling
 
-15-tooling-rollout.yml validates trusted main with scanner tests and canaries, then proposes an exact three-file tooling pin PR. A main tooling change or daily reconciliation merges only matching managed files after exact-head Scanner compatibility and remaining branch protections pass. No default-branch force updates are used. The publisher uses the maintenance token separately from scanner validation. Main advancing during validation postpones promotion. New connections read the adopted revision from the service profile rather than requiring a Worker redeploy. Existing external execution repositories keep their own reviewed pins; this instance currently hosts all three projects itself.
+15-tooling-rollout.yml validates trusted main with scanner tests and canaries, then proposes an exact tooling-pin PR. A main tooling change or daily reconciliation merges only matching managed files after exact-head Scanner compatibility and remaining branch protections pass. Stale rollout branches are compared with current main and refreshed before their checks are trusted. No default-branch force updates are used. The publisher uses the maintenance token separately from scanner validation. Main advancing during validation postpones promotion. New connections read the adopted revision from the service profile rather than requiring a Worker redeploy. Existing external execution repositories keep their own reviewed pins; this instance currently hosts all three projects itself.
 
 Live adoption proof: PR #16 was automatically created, validated and merged; active
 verified pin is 7cc92da3ecb6229359e364d163d42a70c305c096. Consult the

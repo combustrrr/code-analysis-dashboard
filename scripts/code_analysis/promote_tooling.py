@@ -49,7 +49,8 @@ def main():
         if set(p['filename'] for p in changed_files)!=set(FILES) or actual!=expected:
             raise ValueError('Rollout no longer matches exact managed files; review required')
         detail=api(f'pulls/{pr["number"]}')
-        if detail.get('mergeable_state')=='behind':
+        comparison=api(f'compare/{current}...{head}')
+        if comparison.get('behind_by',0)>0 or detail.get('mergeable_state')=='behind':
             api(f'pulls/{pr["number"]}/update-branch',{'expected_head_sha':head},'PUT')
             print('Updated rollout branch; fresh checks required.');return
         checks=github.pages(f'repos/{repo}/commits/{head}/check-runs','check_runs')
