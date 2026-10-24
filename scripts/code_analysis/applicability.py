@@ -1,7 +1,6 @@
 """Trusted scanner selection from explicit configuration and the checked-out tree."""
 from pathlib import Path
 
-
 IGNORED_DISCOVERY_DIRS = {'.git', '.venv', 'venv', 'node_modules', 'vendor',
                           'dist', 'build', '.tox', '.mypy_cache', '.pytest_cache'}
 DEPENDENCY_MANIFEST_NAMES = {

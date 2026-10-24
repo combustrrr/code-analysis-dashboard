@@ -1,8 +1,8 @@
 import { refreshRepositoryReports } from './repositoryReports';
 import { applicationEndpoint, repositoryJson } from './repositoryReports';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Collapse, ConfigProvider, Drawer, Empty, Grid, Input, Progress, Select, Space, Statistic, Table, Tabs, Tag, message } from './ui';
-import { GithubOutlined, SearchOutlined } from './icons';
+import { Alert, Button, Collapse, ConfigProvider, Drawer, Empty, Grid, Input, Progress, Select, Space, Table, Tabs, Tag, message } from './ui';
+import { SearchOutlined } from './icons';
 import '@fontsource/manrope/latin-500.css';
 import '@fontsource/sora/latin-500.css';
 import '@fontsource/sora/latin-700.css';

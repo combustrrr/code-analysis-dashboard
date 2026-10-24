@@ -21,7 +21,7 @@ TRIAGE_STATES = {"UNREVIEWED", "CONFIRMED", "FALSE_POSITIVE", "ACCEPTED_RISK", "
 
 def check_key(repository: str, commit: str, name: str = "Code Analysis Dashboard",
               namespace: str = "agentic-soc-static-monitoring-v1") -> str:
-    return "\0".join((repository, commit, name, namespace))
+    return f"{repository}\x00{commit}\x00{name}\x00{namespace}"
 
 
 class EvidenceError(ValueError):
@@ -189,7 +189,7 @@ def canonicalize(raw_findings: list[dict[str, Any]], repository: str, run: dict[
             # Preserve every occurrence without changing existing singleton identities.
             observation["observation_id"] = (base_observation_id if occurrence == 0 else
                 "obs-v1:" + hashlib.sha256(
-                    f"{base_observation_id}\0occurrence:{occurrence}".encode("utf-8")).hexdigest())
+                    f"{base_observation_id}\0occurrence:{occurrence}".encode()).hexdigest())
             member_observations.append(observation)
             observations.append(observation)
         families = sorted({row["scanner_family"] for row in member_observations})
@@ -347,7 +347,7 @@ def _strong_matches(baseline: list[dict[str, Any]], current: list[dict[str, Any]
         ranked = sorted(by_old[old_id], key=lambda row: (-row[0], row[1], row[2]))
         best = ranked[0]
         margin = best[0] - ranked[1][0] if len(ranked) > 1 else 1.0
-        reverse = sorted(by_new[best[2]], key=lambda row: (-row[0], row[1], row[2]))[0]
+        reverse = min(by_new[best[2]], key=lambda row: (-row[0], row[1], row[2]))
         if margin >= 0.15 and reverse[2] == old_id and best[2] not in used_new:
             matches[old_id] = (best[2], best[0])
             used_new.add(best[2])
@@ -405,7 +405,7 @@ def compare(current: dict[str, Any], baseline: dict[str, Any] | None,
         previous_states.update({sid: "EXISTING" for sid in previous_exact})
         previous_old = [previous_by_id[sid] for sid in sorted(set(previous_by_id) - previous_exact)]
         previous_new = [new_by_id[sid] for sid in sorted(set(new_by_id) - previous_exact)]
-        for _, (new_id, _) in _strong_matches(previous_old, previous_new).items():
+        for (new_id, _) in _strong_matches(previous_old, previous_new).values():
             previous_states[new_id] = "MOVED"
         for sid in new_by_id:
             previous_states.setdefault(sid, "NEW")

@@ -1,14 +1,13 @@
 """Load reviewed execution-repository settings into an isolated tooling checkout."""
 import json
 import os
-from pathlib import Path
 import subprocess
-import urllib.request
-from urllib.parse import quote
-
 import sys
+import urllib.request
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.code_analysis.projects import validate, service_config
+from scripts.code_analysis.projects import service_config, validate
 
 
 def fetch(path):

@@ -1,3 +1,5 @@
+/* This compatibility layer intentionally accepts Ant-style dynamic prop bags. */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React,{useEffect,useState,type CSSProperties,type ReactNode} from 'react';
 import './ui.css';
 

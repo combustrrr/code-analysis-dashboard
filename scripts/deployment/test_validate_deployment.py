@@ -1,9 +1,13 @@
 """Tests for Worker deployment configuration validation."""
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "deployment"))
-from validate_deployment import deployment_workflow_errors, missing_worker_configuration, required_worker_secrets
+from validate_deployment import (
+    deployment_workflow_errors,
+    missing_worker_configuration,
+    required_worker_secrets,
+)
 
 
 def test_repository_mode_requires_canonical_app_configuration():

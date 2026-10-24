@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+
 from scripts.code_analysis import github_service as github
 
 FILES=('.github/code-analysis/projects.json',)
@@ -46,7 +47,7 @@ def main():
         subprocess.run(['git','merge-base','--is-ancestor',pin,current],check=True)
         actual=contents(repo,head);expected=replacement(files,pin)
         changed_files=github.pages(f'repos/{repo}/pulls/{pr["number"]}/files')
-        if set(p['filename'] for p in changed_files)!=set(FILES) or actual!=expected:
+        if {p['filename'] for p in changed_files}!=set(FILES) or actual!=expected:
             raise ValueError('Rollout no longer matches exact managed files; review required')
         detail=api(f'pulls/{pr["number"]}')
         comparison=api(f'compare/{current}...{head}')

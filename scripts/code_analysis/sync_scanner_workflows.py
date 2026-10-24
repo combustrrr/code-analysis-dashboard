@@ -1,10 +1,10 @@
 """Synchronize generated scanner workflows after dependency bot changes."""
-import re
 import json
-from pathlib import Path
+import re
 import subprocess
 import sys
 import urllib.request
+from pathlib import Path
 
 import yaml
 
@@ -23,7 +23,7 @@ def sync_release_checksum(root: Path, relative_path: str, product: str, url_temp
             raise ValueError('Oversized release checksum file')
         asset = asset_template.format(version=version)
         pattern = rf'^([0-9a-f]{{64}})\s+\*?{re.escape(asset)}$'
-        matches = re.findall(pattern, checksums.decode('utf-8'), flags=re.M)
+        matches = re.findall(pattern, checksums.decode('utf-8'), flags=re.MULTILINE)
         if len(matches) != 1:
             raise ValueError('Missing or ambiguous official release checksum')
         pin.update(sha256=matches[0], checksum_version=version)
@@ -63,7 +63,7 @@ def sync(root: Path):
             # R2-backed workflows no longer invoke upload-artifact. Keep the
             # existing pinned constant for compatibility with the generator.
             continue
-        content, count = re.subn(rf"^{constant} = '[^']+'$", f"{constant} = '{actions[name]}'", content, flags=re.M)
+        content, count = re.subn(rf"^{constant} = '[^']+'$", f"{constant} = '{actions[name]}'", content, flags=re.MULTILINE)
         if count != 1:
             raise ValueError('Missing generator action constant')
     path.write_text(content, encoding='utf-8')
@@ -73,7 +73,7 @@ def sync(root: Path):
         raise ValueError('Missing OSV action pin in dependency-security template')
     portable_path = root / 'scripts/code_analysis/portable_workflow.py'
     portable = portable_path.read_text(encoding='utf-8')
-    portable, count = re.subn(r"^OSV_ACTION = '[^']+'$", f"OSV_ACTION = '{osv}'", portable, flags=re.M)
+    portable, count = re.subn(r"^OSV_ACTION = '[^']+'$", f"OSV_ACTION = '{osv}'", portable, flags=re.MULTILINE)
     if count != 1:
         raise ValueError('Missing portable OSV action constant')
     portable_path.write_text(portable, encoding='utf-8')

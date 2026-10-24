@@ -1,22 +1,59 @@
-import json, tempfile, unittest
+import json
+import tempfile
+import unittest
 from argparse import Namespace
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
+
 from click.testing import CliRunner
-from scripts.code_analysis.audit_workflows import audit as audit_workflows, audit_runtime_isolation
+
+from scripts.code_analysis.audit_workflows import audit as audit_workflows
+from scripts.code_analysis.audit_workflows import audit_runtime_isolation
 from scripts.code_analysis.bound_sarif import bound as bound_sarif
 from scripts.code_analysis.channel_status import build as build_channel_status
 from scripts.code_analysis.collect_coderabbit import collect as collect_coderabbit
-from scripts.code_analysis.dashboard import artifact_readme, generate, github_summary, validate_snapshot, write_dashboard
+from scripts.code_analysis.dashboard import (
+    artifact_readme,
+    generate,
+    github_summary,
+    validate_snapshot,
+    write_dashboard,
+)
 from scripts.code_analysis.evidence_contract import build as build_evidence_contract
 from scripts.code_analysis.export_sonar_issues import export as export_sonar_issues
-from scripts.code_analysis.monitoring import EvidenceError, build_snapshot, canonicalize, check_key, compare, effective_triage, scanner_family, stable_id
-from scripts.code_analysis.normalizer import CodeRabbitParser, CoverageParser, Finding, RadonParser, SarifParser, SchemathesisParser, SonarExternalIssuesExporter, SonarParser, TscParser, XenonParser, main as normalize_cli, normalize_concept
+from scripts.code_analysis.monitoring import (
+    EvidenceError,
+    build_snapshot,
+    canonicalize,
+    check_key,
+    compare,
+    effective_triage,
+    scanner_family,
+    stable_id,
+)
+from scripts.code_analysis.normalizer import (
+    CodeRabbitParser,
+    CoverageParser,
+    Finding,
+    RadonParser,
+    SarifParser,
+    SchemathesisParser,
+    SonarExternalIssuesExporter,
+    SonarParser,
+    TscParser,
+    XenonParser,
+    normalize_concept,
+)
+from scripts.code_analysis.normalizer import main as normalize_cli
 from scripts.code_analysis.pipeline import build as build_pipeline
 from scripts.code_analysis.provenance import build as build_provenance
-from scripts.code_analysis.validate_sbom import _denied_license, evaluate as evaluate_sbom
-from scripts.code_analysis.snapshot import build_analysis_channels, build_analysis_snapshot
+from scripts.code_analysis.snapshot import (
+    build_analysis_channels,
+    build_analysis_snapshot,
+)
+from scripts.code_analysis.validate_sbom import _denied_license
+from scripts.code_analysis.validate_sbom import evaluate as evaluate_sbom
 
 MANIFEST={"schema_version":"1","required_static_channels":[
     {"channel":"codeql","scanner_family":"CodeQL","surface":"semantic","artifact_patterns":["*codeql*.sarif"]},

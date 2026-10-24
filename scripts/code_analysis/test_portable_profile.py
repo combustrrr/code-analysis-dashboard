@@ -1,14 +1,14 @@
 import json
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from scripts.code_analysis.portable_profile import validate,readiness
+
+from scripts.code_analysis.portable_profile import readiness, validate
 from scripts.code_analysis.portable_runner import execute
-from scripts.code_analysis.applicability import selection
 from scripts.code_analysis.snapshot import build_analysis_channels
+
 
 class PortableTests(unittest.TestCase):
     def test_distinct_layouts_and_missing_commands(self):

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import copy
 import re
-from typing import Any
 
 SCHEMA = 'analysis-projects-v1'
 PROTECTED_SOURCE = 'arydestroyer/kavach-agenticsoc'
@@ -63,7 +62,9 @@ def validate(document: dict) -> dict:
         if any(not isinstance(x, str) or not x.strip() for x in project.get('deferred_channels', {}).values()):
             raise ValueError('Every deferral requires a reason')
         if project['profile'].get('mode') == 'portable':
-            from scripts.code_analysis.portable_profile import validate as validate_profile
+            from scripts.code_analysis.portable_profile import (
+                validate as validate_profile,
+            )
             validate_profile(project['profile'])
         project['source_repository'] = source
     result['execution_repository'] = execution

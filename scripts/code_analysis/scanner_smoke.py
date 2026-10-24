@@ -1,9 +1,9 @@
 """Exercise the native output contracts eligible for automatic patch upgrades."""
 import json
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 
 def check(module, arguments, root, exits=(0, 1)):

@@ -9,7 +9,12 @@ from pathlib import Path
 try:
     from monitoring import build_snapshot, canonicalize, load_json, write_json
 except ModuleNotFoundError:  # package import in repository tests
-    from scripts.code_analysis.monitoring import build_snapshot, canonicalize, load_json, write_json
+    from scripts.code_analysis.monitoring import (
+        build_snapshot,
+        canonicalize,
+        load_json,
+        write_json,
+    )
 
 
 CLASSES = {"code", "security", "dependencies", "infrastructure", "reliability"}

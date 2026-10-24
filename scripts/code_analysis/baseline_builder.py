@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Materialize the explicitly accepted legacy run as immutable schema-v2 evidence."""
 from __future__ import annotations
-import argparse, json
+
+import argparse
+import json
 from pathlib import Path
+
 from monitoring import canonicalize, write_json
+
 
 def main() -> None:
     p=argparse.ArgumentParser();p.add_argument("--raw-findings",type=Path,required=True);p.add_argument("--manifest",type=Path,required=True);p.add_argument("--channel-manifest",type=Path,required=True);p.add_argument("--repository",required=True);p.add_argument("--output",type=Path,required=True);a=p.parse_args()

@@ -3,10 +3,11 @@
 The generated workflow has no SARIF publication privileges, persisted checkout
 credentials, or source-inherited tooling.
 """
-from pathlib import Path
 import copy
-import re
 import json
+import re
+from pathlib import Path
+
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -94,7 +95,7 @@ def generate(config=None):
             for step in job['steps']:
                 uses = step.get('uses', '')
                 if 'R2_' in json.dumps(step):
-                    command = re.search(r'aws s3 cp\s+(.*?)\s+s3://', str(step.get('run', '')), re.S)
+                    command = re.search(r'aws s3 cp\s+(.*?)\s+s3://', str(step.get('run', '')), re.DOTALL)
                     if not command:
                         raise ValueError('Cannot safely convert R2 upload in ' + str(step.get('name', 'unnamed')))
                     paths = '\n'.join(line.strip().rstrip('\\\\') for line in command.group(1).splitlines() if line.strip())
@@ -314,7 +315,9 @@ def generate(config=None):
                          'if': "${{ contains(fromJSON(needs.identity.outputs.jobs), '" + channel + "') }}",
                          'runs-on': 'ubuntu-24.04', 'timeout-minutes': extension.get('timeout_minutes', 15) + 5,
                          'permissions': {'contents': 'read'}, 'steps': steps}
-    from scripts.code_analysis.community_workflow import scanner_jobs as community_scanner_jobs
+    from scripts.code_analysis.community_workflow import (
+        scanner_jobs as community_scanner_jobs,
+    )
     jobs.update(community_scanner_jobs())
     if profile.get('mode') == 'portable':
         from scripts.code_analysis.portable_workflow import scanner_jobs

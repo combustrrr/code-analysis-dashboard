@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from scripts.code_analysis.github_service import api, gh, extract_zip, pages
+from scripts.code_analysis.github_service import api, extract_zip, gh, pages
 from scripts.code_analysis.hosted import load, target, write
 from scripts.code_analysis.hosted_pipeline import assemble
 

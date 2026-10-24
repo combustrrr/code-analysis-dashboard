@@ -4,9 +4,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
 import urllib.request
 import uuid
+from pathlib import Path
 
 PR_ONLY_CHANNELS = {"coderabbit-ai-advisory"}
 

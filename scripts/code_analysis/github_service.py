@@ -10,7 +10,6 @@ import io
 import json
 import os
 import re
-import shutil
 import subprocess
 import tempfile
 import uuid
@@ -18,7 +17,16 @@ import zipfile
 from pathlib import Path
 from urllib.parse import quote
 
-from scripts.code_analysis.hosted import accept, analysis_key, digest, load, now, reconcile, target, write
+from scripts.code_analysis.hosted import (
+    accept,
+    analysis_key,
+    digest,
+    load,
+    now,
+    reconcile,
+    target,
+    write,
+)
 
 GH_TIMEOUT_SECONDS = 120
 
@@ -51,7 +59,7 @@ def gh(*args: str, payload: object | None = None, binary: bool = False):
         command += ['--input', '-']
     try:
         result = subprocess.run(command, input=json.dumps(payload).encode() if payload is not None else None,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+                                capture_output=True, check=False,
                                 timeout=GH_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired as exc:
         # A hung GitHub request must not leave publication or queue state ambiguous.
@@ -103,9 +111,9 @@ def discover(config: dict) -> list[dict]:
 
 
 
-import urllib.request
 import urllib.error
-import os
+import urllib.request
+
 
 def cf_api(config: dict, path: str, method: str = 'GET', data: bytes | None = None, content_type: str = 'application/json') -> bytes:
     endpoint = config.get('launch_endpoint')
@@ -214,7 +222,7 @@ def resolve_selection(config: dict, selected: str, rows: list[dict]) -> dict:
                or (r.get('pr') and value == f"PR #{r['pr']}")]
     if len(matches) == 1:
         return matches[0]
-    if re.fullmatch(r'PR #?[1-9][0-9]*', value, re.I):
+    if re.fullmatch(r'PR #?[1-9][0-9]*', value, re.IGNORECASE):
         number = int(re.search(r'[0-9]+', value)[0])
         p = api(f'repos/{repo}/pulls/{number}')
         return target(repo, p['head']['ref'], p['head']['sha'], pr=number,

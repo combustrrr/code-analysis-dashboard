@@ -1,6 +1,12 @@
 import unittest
 
-from scripts.code_analysis.evaluation import can_dispatch, idempotency_key, profile_digest, state_for, consume
+from scripts.code_analysis.evaluation import (
+    can_dispatch,
+    consume,
+    idempotency_key,
+    profile_digest,
+    state_for,
+)
 
 
 class EvaluationGuardTests(unittest.TestCase):

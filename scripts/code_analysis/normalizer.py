@@ -31,12 +31,12 @@ import json
 import os
 import re
 import sys
-import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar
 
 import click
+from defusedxml import ElementTree as ET
 
 try:
     from rich.console import Console

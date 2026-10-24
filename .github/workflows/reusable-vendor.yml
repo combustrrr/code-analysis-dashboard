@@ -163,14 +163,17 @@ jobs:
         continue-on-error: true
         env:
           SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
+          SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+          SOURCE_BRANCH: ${{ fromJSON(inputs.target).branch }}
+          SOURCE_SHA: ${{ fromJSON(inputs.target).head_sha }}
         run: |
           python .analysis-tooling/scripts/code_analysis/export_sonar_issues.py \
             --report-task .source/.scannerwork/report-task.txt \
             --output sonar-native-issues.json \
-            --project "${{ fromJSON(inputs.target).source_repository }}" \
-            --branch "${{ fromJSON(inputs.target).branch }}" \
-            --sonar-branch "${{ fromJSON(inputs.target).branch }}" \
-            --commit "${{ fromJSON(inputs.target).head_sha }}"
+            --project "$SOURCE_REPOSITORY" \
+            --branch "$SOURCE_BRANCH" \
+            --sonar-branch "$SOURCE_BRANCH" \
+            --commit "$SOURCE_SHA"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
@@ -199,14 +202,20 @@ jobs:
       - name: Collect exact pull-request evidence
         env:
           COLLECTOR_SHA: ${{ inputs.tooling_sha }}
+          SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+          SOURCE_BRANCH: ${{ fromJSON(inputs.target).pr_context.head_branch }}
+          SOURCE_SHA: ${{ fromJSON(inputs.target).pr_context.head_sha }}
+          PR_NUMBER: ${{ fromJSON(inputs.target).pr_context.number }}
+          BASE_SHA: ${{ fromJSON(inputs.target).pr_context.base_sha }}
+          BASE_BRANCH: ${{ fromJSON(inputs.target).pr_context.base_branch }}
         run: |
           python .analysis-tooling/scripts/code_analysis/collect_coderabbit.py \
-            --repository "${{ fromJSON(inputs.target).source_repository }}" \
-            --branch "${{ fromJSON(inputs.target).pr_context.head_branch }}" \
-            --commit "${{ fromJSON(inputs.target).pr_context.head_sha }}" \
-            --pr-number "${{ fromJSON(inputs.target).pr_context.number }}" \
-            --base-sha "${{ fromJSON(inputs.target).pr_context.base_sha }}" \
-            --base-branch "${{ fromJSON(inputs.target).pr_context.base_branch }}" \
+            --repository "$SOURCE_REPOSITORY" \
+            --branch "$SOURCE_BRANCH" \
+            --commit "$SOURCE_SHA" \
+            --pr-number "$PR_NUMBER" \
+            --base-sha "$BASE_SHA" \
+            --base-branch "$BASE_BRANCH" \
             --output-dir coderabbit-evidence
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()

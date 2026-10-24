@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
 from scripts.code_analysis.portable_profile import validate
 
 FAMILIES={'bandit':'Bandit','ruff':'Ruff','radon':'Radon','xenon':'Xenon','vulture':'Vulture','eslint':'ESLint','typescript':'TypeScript','coverage':'Coverage.py','atheris':'Atheris','schemathesis':'Schemathesis','pyright':'Pyright','osv':'OSV-Scanner', 'coderabbit-ai-advisory': 'CodeRabbit', 'codex-security': 'Codex', 'alibaba-ocr': 'Alibaba', 'flounder-audit': 'Flounder', 'vulnagent-triage': 'VulnAgent', 'owasp-jvm': 'FindSecBugs', 'owasp-go': 'Gosec', 'owasp-js': 'njsscan', 'owasp-ruby': 'Brakeman', 'owasp-iac-secrets': 'TruffleHog'}

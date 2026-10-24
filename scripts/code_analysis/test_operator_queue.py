@@ -7,9 +7,11 @@ from scripts.code_analysis.operator_queue import preferred_intents
 
 
 class OperatorQueueTests(unittest.TestCase):
-    def test_preferred_branch_refresh_runs_four_times_daily(self):
+    def test_preferred_branch_batch_is_explicit_and_serialized(self):
         workflow = Path('.github/workflows/preferred-branch-analysis.yml').read_text(encoding='utf-8')
-        self.assertIn("cron: '17 */6 * * *'", workflow)
+        self.assertIn('workflow_dispatch:', workflow)
+        self.assertNotIn('schedule:', workflow)
+        self.assertNotIn('cron:', workflow)
         self.assertIn('group: preferred-branch-analysis', workflow)
         self.assertIn('cancel-in-progress: false', workflow)
 

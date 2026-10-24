@@ -13,3 +13,10 @@ registered public projects. API or rate-limit failures remain visible as
 operational failure evidence rather than being converted to a successful scan.
 Extension provenance is bound to the checked-out trusted tooling revision, not
 to the caller workflow commit that may contain a later promotion-only change.
+
+Scanner findings are reconciled against the current revision before remediation.
+Generated canaries and deliberate negative fixtures remain detectable rather than
+being "fixed" out of the test suite. Vendor workflow values derived from a target
+envelope are passed through environment variables instead of interpolated into
+shell source, scanner-produced XML is parsed with pinned `defusedxml`, and the UI
+lint toolchain is declared and pinned so TypeScript findings are reproducible.

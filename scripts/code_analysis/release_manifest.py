@@ -5,6 +5,7 @@ the manifest is not: callers must stop before they can publish a state which
 would discard the previously valid one.
 """
 import json
+
 from scripts.code_analysis import github_service as github
 
 CHANNEL_SUMMARY_FIELDS = {

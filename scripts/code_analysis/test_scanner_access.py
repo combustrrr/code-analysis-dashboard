@@ -1,19 +1,20 @@
 import io
 import json
-import unittest
-import urllib.error
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import unittest
+import urllib.error
+from pathlib import Path
 from unittest.mock import patch
 
-from scripts.code_analysis import ensure_sonar_browse as ensure_browse
-from scripts.code_analysis.sonar_identity import project_identity
 import yaml
+
+from scripts.code_analysis import ensure_sonar_browse as ensure_browse
 from scripts.code_analysis import probe_sonar_access as probe
-from scripts.code_analysis.generate_source_workflow import generate, diagnostics
+from scripts.code_analysis.generate_source_workflow import diagnostics, generate
+from scripts.code_analysis.sonar_identity import project_identity
 
 
 class ScannerAccessTests(unittest.TestCase):

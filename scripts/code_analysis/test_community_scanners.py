@@ -1,11 +1,11 @@
 import io
 import json
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from scripts.code_analysis.community_workflow import scanner_jobs
-from scripts.code_analysis.trufflehog_to_sarif import convert
 from scripts.code_analysis.monitoring import canonicalize
+from scripts.code_analysis.trufflehog_to_sarif import convert
 
 
 class CommunityScannerTests(unittest.TestCase):

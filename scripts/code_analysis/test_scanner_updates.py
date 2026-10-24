@@ -1,6 +1,6 @@
 import json
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 import yaml
 
@@ -11,6 +11,7 @@ class ScannerUpdateTests(unittest.TestCase):
     def test_standalone_tooling_cannot_borrow_product_configuration(self):
         import tempfile
         from unittest.mock import patch
+
         from scripts.code_analysis import audit_workflows as audit
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -55,6 +56,7 @@ class ScannerUpdateTests(unittest.TestCase):
 
     def test_bad_adapter_does_not_discard_a_healthy_sibling(self):
         import tempfile
+
         from scripts.code_analysis import hosted
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -84,7 +86,9 @@ class ScannerUpdateTests(unittest.TestCase):
         import tempfile
         from types import SimpleNamespace
         from unittest.mock import patch
-        from scripts.code_analysis import extension_runner as runner, hosted
+
+        from scripts.code_analysis import extension_runner as runner
+        from scripts.code_analysis import hosted
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             row = json.loads(Path('config/code-analysis/scanner-extension.example.json').read_text())
@@ -110,6 +114,7 @@ class ScannerUpdateTests(unittest.TestCase):
         import shutil
         import tempfile
         from unittest.mock import patch
+
         from scripts.code_analysis.sync_scanner_workflows import sync
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -142,6 +147,7 @@ class ScannerUpdateTests(unittest.TestCase):
         import shutil
         import tempfile
         from unittest.mock import patch
+
         from scripts.code_analysis.sync_scanner_workflows import sync
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

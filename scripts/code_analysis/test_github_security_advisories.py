@@ -3,9 +3,11 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
 
-from scripts.code_analysis.adapters.github_security_advisories import main as adapter_main
+from scripts.code_analysis.adapters.github_security_advisories import (
+    main as adapter_main,
+)
 
 
 class GitHubSecurityAdvisoriesAdapterTests(unittest.TestCase):
@@ -30,7 +32,6 @@ class GitHubSecurityAdvisoriesAdapterTests(unittest.TestCase):
             else:
                 mock_run.return_value = Mock(returncode=1, stdout="", stderr="auth failed")
 
-            import subprocess
             import sys
             # Simulate command line args
             old_argv = sys.argv

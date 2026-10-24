@@ -1,10 +1,10 @@
 """Scan an explicit manifest profile; never invoke arbitrary project build tools."""
 import json
 import os
-from pathlib import Path
+import re
 import subprocess
 import tempfile
-import re
+from pathlib import Path
 
 
 def main():

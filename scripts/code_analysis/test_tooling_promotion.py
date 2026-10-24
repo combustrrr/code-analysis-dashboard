@@ -1,6 +1,9 @@
 import json
 import unittest
-from scripts.code_analysis.promote_tooling import FILES,replacement,relevant
+
+from scripts.code_analysis.promote_tooling import FILES, relevant, replacement
+
+
 class PromotionTests(unittest.TestCase):
     def test_changes_only_exact_immutable_pins(self):
         files={FILES[0]:json.dumps({'tooling_sha':'a'*40,'projects':[{'id':'1'}]})}
@@ -22,6 +25,7 @@ class PromotionTests(unittest.TestCase):
 
     def test_promotion_is_separate_from_credential_free_validation(self):
         from pathlib import Path
+
         import yaml
         workflow=yaml.safe_load(Path('.github/workflows/15-tooling-rollout.yml').read_text())
         self.assertEqual(workflow['permissions'],{'contents':'read'})

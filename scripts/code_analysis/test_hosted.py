@@ -1,17 +1,15 @@
 """Behavior tests for exact-revision, current-only public report publication."""
-import copy
-import gzip
 import io
 import json
 import tempfile
 import unittest
 import zipfile
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from scripts.code_analysis import hosted as h
 from scripts.code_analysis import github_service as service
+from scripts.code_analysis import hosted as h
 
 
 def snapshot():
@@ -216,7 +214,7 @@ class ReportTests(unittest.TestCase):
 
 
     def test_snyk_metadata_rejects_executable_requirements(self):
-        from scripts.code_analysis.snyk_metadata import requirements, metadata
+        from scripts.code_analysis.snyk_metadata import metadata, requirements
         path = self.root / 'requirements.txt'
         for unsafe in ['-e .', 'package @ https://example.com/source.tar.gz', '../package']:
             path.write_text(unsafe)
@@ -281,7 +279,7 @@ class ReportTests(unittest.TestCase):
             service.request_refresh(state, 'deleted-branch')
 
     def test_generated_docs_branch_has_explicit_project_inapplicability(self):
-        from scripts.code_analysis.applicability import selection, apply
+        from scripts.code_analysis.applicability import apply, selection
         config = h.load(Path('config/code-analysis/service.json'))
         jobs, excluded, languages = selection(config, self.root)
         self.assertEqual(languages, [])
@@ -305,7 +303,7 @@ class ReportTests(unittest.TestCase):
             apply(snapshot, excluded)
 
     def test_request_scope_marks_unselected_channels_without_failure(self):
-        from scripts.code_analysis.applicability import selection, apply
+        from scripts.code_analysis.applicability import apply, selection
         config=h.load(Path('config/code-analysis/service.json'))
         jobs,excluded,_=selection(config,self.root,['semgrep'])
         self.assertIn('semgrep',jobs)

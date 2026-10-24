@@ -1,11 +1,13 @@
 import json
 import unittest
-from unittest.mock import patch
-from scripts.code_analysis.test_projects import config
-from scripts.code_analysis.native_feedback import publish, sarif
-from scripts.code_analysis.generate_reusable_workflows import reusable_source
-from scripts.code_analysis.repository_service import report_publication
 from pathlib import Path
+from unittest.mock import patch
+
+from scripts.code_analysis.generate_reusable_workflows import reusable_source
+from scripts.code_analysis.native_feedback import publish, sarif
+from scripts.code_analysis.repository_service import report_publication
+from scripts.code_analysis.test_projects import config
+
 
 class RepositoryExecutionTests(unittest.TestCase):
     def test_terminal_queue_request_recovers_published_run_without_target_row(self):
@@ -79,7 +81,11 @@ class RepositoryExecutionTests(unittest.TestCase):
         self.assertEqual(forced_reused,[])
 
     def test_selected_channels_are_dispatched_together_with_deterministic_producer_lanes(self):
-        from scripts.code_analysis.repository_service import channel_lanes,concurrent_execution_channels,producer_dispatch_id
+        from scripts.code_analysis.repository_service import (
+            channel_lanes,
+            concurrent_execution_channels,
+            producer_dispatch_id,
+        )
         channels=['semgrep','eslint','typescript','snyk']
         lanes=channel_lanes(channels)
         self.assertEqual(lanes,[['semgrep'],['eslint','typescript'],['snyk']])
@@ -152,7 +158,9 @@ class TrustedBootstrapTests(unittest.TestCase):
 
 class PublicationRecoveryTests(unittest.TestCase):
     def test_completed_report_artifact_recovers_lost_dispatch_receipt(self):
-        from scripts.code_analysis.repository_service import recover_completed_producer_run
+        from scripts.code_analysis.repository_service import (
+            recover_completed_producer_run,
+        )
         row = {'request_id': 'request', 'execution_sha': 'a' * 40}
         runs = [{
             'id': 42, 'path': '.github/workflows/code-analysis-coordinator.yml',
@@ -168,8 +176,11 @@ class PublicationRecoveryTests(unittest.TestCase):
             )
 
     def test_native_buckets_preserve_all_results_and_have_stable_categories(self):
+        import base64
+        import gzip
+        import json
+
         from scripts.code_analysis.native_feedback import security_shards
-        import gzip, base64, json
         findings=[{'id':str(i),'file':'safe.py','scanners':['Bandit'],'message':'test','rules':['B1']} for i in range(6000)]
         payloads=[json.loads(gzip.decompress(base64.b64decode(p))) for p in security_shards(findings,'1')]
         self.assertEqual(sum(len(p['runs'][0]['results']) for p in payloads),6000)
@@ -237,8 +248,8 @@ class ExternalServiceBoundaryTests(unittest.TestCase):
 
 class IndependentSecurityChannelsTests(unittest.TestCase):
     def test_available_security_channels_remain_dashboard_only(self):
+
         from scripts.code_analysis.native_feedback import publish
-        import gzip,base64,json
         doc=config();project=doc['projects'][0]
         project.update(id='1',relationship='connected',source_repository=doc['execution_repository'])
         report={'analyzed_sha':'b'*40,'target':{'repository':'owner/runner','source_repository':'owner/runner','head_sha':'b'*40},'status':'partial','finding_count':0,'channels':[{'channel':'trivy','name':'Trivy','status':'COMPLETED'}]}
@@ -251,7 +262,11 @@ class IndependentSecurityChannelsTests(unittest.TestCase):
 
 class PublicationCompletenessTests(unittest.TestCase):
     def test_pr_overlay_is_separately_keyed_and_filters_to_its_channel(self):
-        from scripts.code_analysis.repository_service import build_pr_overlay,matching_pr_overlay,pr_overlay_key
+        from scripts.code_analysis.repository_service import (
+            build_pr_overlay,
+            matching_pr_overlay,
+            pr_overlay_key,
+        )
         context={'number':7,'head_repository':'fork/source','head_repository_id':998,'head_branch':'topic','base_repository':'owner/source','base_branch':'main','base_sha':'b'*40}
         channel={'channel':'coderabbit-ai-advisory','status':'COMPLETED','observation_ids':['cr-1']}
         advisory={'stable_id':'advisory-1','observation_ids':['cr-1'],'severity':'MEDIUM'}
@@ -478,7 +493,6 @@ class PublicationCompletenessTests(unittest.TestCase):
         self.assertRegex(uploaded[0][0], r'^/api/report/repositories/owner/repo/analysis-current-1/analysis-[a-f0-9]{64}\.json\.gz$')
 
     def test_reconciliation_preserves_partial_and_never_deletes_before_upload(self):
-        import json
         old={'id':'one','head_sha':'a'*40,'analyzed_sha':'a'*40,'collected_run':'12-1','report_status':'partial','assets':{},'documents':{}}
         state={'targets':[{'id':'one','head_sha':'a'*40,'status':'collected','scan_run_id':12,'run_attempt':1}]}
         config={'analysis_repository':'owner/repo','report_budget_bytes':1000, 'launch_endpoint': 'http://localhost'}

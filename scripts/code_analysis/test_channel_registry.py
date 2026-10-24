@@ -1,8 +1,9 @@
 import unittest
+
 from scripts.code_analysis.channel_registry import (
-    load_channels,
-    get_channel,
     channels_by_class,
+    get_channel,
+    load_channels,
     validate_descriptor,
 )
 

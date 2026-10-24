@@ -8,7 +8,7 @@ from pathlib import Path
 
 from scripts.code_analysis import channel_status, evidence_contract, provenance
 from scripts.code_analysis.hosted import build, load, write
-from scripts.code_analysis.monitoring import canonicalize, build_snapshot
+from scripts.code_analysis.monitoring import build_snapshot, canonicalize
 from scripts.code_analysis.snapshot import build_analysis_snapshot
 
 
@@ -53,7 +53,7 @@ def assemble(artifacts: Path, output: Path, identity: dict, producer_repository:
                 if not channel['observation_count']:
                     channel['findings'] = None
     # Persist the strict gate result unchanged; hosted validity permits missing evidence.
-    from scripts.code_analysis.applicability import selection, apply
+    from scripts.code_analysis.applicability import apply, selection
     service = config_root / 'service.json'
     if service.exists():
         _, excluded, _ = selection(load(service), source, requested_channels)

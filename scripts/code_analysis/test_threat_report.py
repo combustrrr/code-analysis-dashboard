@@ -2,8 +2,13 @@ import copy
 import json
 import unittest
 
-import scripts.code_analysis.threat_report as threat_report
-from scripts.code_analysis.threat_report import enrich, load_catalog, markdown, normalize_channel
+from scripts.code_analysis import threat_report
+from scripts.code_analysis.threat_report import (
+    enrich,
+    load_catalog,
+    markdown,
+    normalize_channel,
+)
 
 
 class ThreatReportTests(unittest.TestCase):

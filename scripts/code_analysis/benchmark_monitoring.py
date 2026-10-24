@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """Deterministic 10k-finding MVP scale gate."""
 from __future__ import annotations
-import argparse, json, tempfile, time, tracemalloc
+
+import argparse
+import json
+import tempfile
+import time
+import tracemalloc
 from pathlib import Path
+
 from dashboard import generate, write_dashboard
 from monitoring import build_snapshot, canonicalize
 from snapshot import build_analysis_snapshot
+
 
 def main() -> None:
     parser=argparse.ArgumentParser();parser.add_argument("--preview-dir",type=Path);args=parser.parse_args()

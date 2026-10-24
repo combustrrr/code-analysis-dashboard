@@ -5,16 +5,16 @@ temporary directory; only dist-info METADATA enters the inspection environment.
 No wheel code, entry points, .pth files, setup.py, or repository scripts run.
 """
 import argparse
-from email.message import Message
 import json
 import os
-from pathlib import Path
 import re
 import shlex
 import subprocess
 import sys
 import tempfile
 import venv
+from email.message import Message
+from pathlib import Path
 
 from pip._vendor.packaging.requirements import Requirement
 

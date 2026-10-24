@@ -1,5 +1,5 @@
 """Generated portable jobs: credentials never accompany reviewed source commands."""
-from scripts.code_analysis.generate_source_workflow import CHECKOUT, UPLOAD, PYTHON
+from scripts.code_analysis.generate_source_workflow import CHECKOUT, PYTHON, UPLOAD
 
 JOBS={'python-bandit':['bandit'],'python-ruff':['ruff'],'complexity':['radon','xenon'],'dead-code':['vulture'],'typescript-quality':['eslint','typescript'],'test-coverage':['coverage'],'atheris-state-machine':['atheris'],'schemathesis-fuzz':['schemathesis'],'python-types':['pyright']}
 

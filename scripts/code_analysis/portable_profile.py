@@ -18,7 +18,7 @@ def validate(profile):
     commands=profile.get('commands',{})
     if not isinstance(commands,dict) or set(commands)-COMMAND_CHANNELS:
         raise ValueError('Unknown command adapter')
-    for channel,command in commands.items():
+    for command in commands.values():
         if not isinstance(command,dict) or set(command)-{'argv','cwd','install','output'}:
             raise ValueError('Invalid command adapter')
         path(command.get('cwd','.'))

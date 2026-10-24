@@ -1,11 +1,16 @@
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
 import yaml
-from scripts.code_analysis.configure_instance import configure, bundle
-from scripts.code_analysis.applicability import selection, PORTABLE_JOBS, discover_capabilities
+
+from scripts.code_analysis.applicability import (
+    PORTABLE_JOBS,
+    discover_capabilities,
+    selection,
+)
+from scripts.code_analysis.configure_instance import bundle, configure
 from scripts.code_analysis.generate_source_workflow import generate
 from scripts.code_analysis.hosted import load
 

@@ -20,7 +20,6 @@ from pathlib import Path
 
 import click
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Expected Detection Registry
 # One entry per canary file — defines what MUST be detected and by WHOM

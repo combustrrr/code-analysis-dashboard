@@ -1,6 +1,11 @@
+import {parseAppRoute} from './appRoutes';
+
 // Read current repository-owned reports without bundling data into the UI build.
-const manifests = new Map<string, {at:number; value:any}>();
-const manifestRequests = new Map<string, Promise<any>>();
+type ManifestAsset={sha256:string;bytes:number};
+type ManifestTarget={id:string;collected_run:number;documents?:Record<string,string>;assets:Record<string,ManifestAsset>;[key:string]:unknown};
+type RepositoryManifest={targets:ManifestTarget[];current_overlay?:ManifestTarget;metrics?:unknown;[key:string]:unknown};
+const manifests = new Map<string, {at:number; value:RepositoryManifest}>();
+const manifestRequests = new Map<string, Promise<RepositoryManifest>>();
 const shards = new Map<string, Promise<Record<string, unknown>>>();
 export const applicationEndpoint = import.meta.env.VITE_LAUNCH_ENDPOINT as string | undefined;
 const fixtureBuild = import.meta.env.MODE === 'fixtures';
@@ -27,7 +32,7 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
    if(fixtureBuild)return (await response(path,signal)).json() as Promise<T>;
    throw new Error('Live report endpoint is not configured.');
   }
-   const {repository,project,target}=selection();
+   const {repository,project}=selection();
   const base=`${applicationEndpoint}/api/public/`;
   const query=new URLSearchParams({repository:repository!,project_id:project!});
   const key=query.toString();
@@ -36,18 +41,18 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
   signal?.throwIfAborted();
   let request=manifestRequests.get(key);
   if(!request){
-   request=(async()=>{const value=await (await response(base+'manifest?'+query)).json();return value;})();
+   request=(async()=>await (await response(base+'manifest?'+query)).json() as RepositoryManifest)();
    manifestRequests.set(key,request);request.finally(()=>{if(manifestRequests.get(key)===request)manifestRequests.delete(key);}).catch(()=>{});
   }
   const value=await request;signal?.throwIfAborted();entry={at:Date.now(),value};manifests.set(key,entry);if(manifests.size>10)manifests.delete(manifests.keys().next().value!);
  }
   const manifest=entry.value;
-  const targetPath=(t:any)=>`repository-reports/${t.id}/${t.collected_run}`;
+  const targetPath=(t:ManifestTarget)=>`repository-reports/${t.id}/${t.collected_run}`;
   if(path==='data/index.json')return {...manifest,launch_endpoint:applicationEndpoint,publishing_repository:repository,repository_assets:true,
-    metrics:undefined,report_storage:manifest.metrics,targets:manifest.targets.map((t:any)=>({...t,report:t.documents?targetPath(t):undefined}))} as T;
+    metrics:undefined,report_storage:manifest.metrics,targets:manifest.targets.map(t=>({...t,report:t.documents?targetPath(t):undefined}))} as T;
    const overlayPrefix='data/current-overlay/';
    const isOverlay=path.startsWith(overlayPrefix);
-   const selectedTarget=isOverlay?manifest.current_overlay:manifest.targets.find((t:any)=>path.startsWith('data/'+targetPath(t)+'/'));
+   const selectedTarget=isOverlay?manifest.current_overlay:manifest.targets.find(t=>path.startsWith('data/'+targetPath(t)+'/'));
    if(!selectedTarget)throw new Error('Target report is no longer current. Refresh the target.');
    const document=path.slice(isOverlay?overlayPrefix.length:('data/'+targetPath(selectedTarget)+'/').length);
   const name=selectedTarget.documents?.[document];
@@ -67,4 +72,3 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
  if(!(document in documents))throw new Error('Report document missing from verified asset.');
  return documents[document] as T;
 }
-import {parseAppRoute} from './appRoutes';

@@ -1,12 +1,12 @@
 """Allow Snyk's staged resolver imports while keeping source off Python's import path."""
+import json
 import os
-from pathlib import Path
 import runpy
 import subprocess
 import sys
 import tempfile
-import json
 import traceback
+from pathlib import Path
 
 
 def resolver_path(argument: str, source: Path) -> Path:

@@ -95,7 +95,7 @@ def main() -> None:
         def log_message(self, _format: str, *_args: object) -> None:
             return
 
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             parsed = urllib.parse.urlsplit(self.path)
             if parsed.path == "/":
                 body = f"""<!doctype html><meta charset=utf-8><title>Create analysis GitHub App</title>

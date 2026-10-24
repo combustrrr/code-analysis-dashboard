@@ -2,9 +2,11 @@
 import copy
 import hashlib
 import json
-from pathlib import Path
 import tempfile
-from scripts.code_analysis import github_service as github, release_manifest
+from pathlib import Path
+
+from scripts.code_analysis import github_service as github
+from scripts.code_analysis import release_manifest
 
 
 def migrated_manifest(manifest, source, destination):

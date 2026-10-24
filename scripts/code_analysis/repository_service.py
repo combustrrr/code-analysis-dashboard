@@ -1,20 +1,20 @@
 """Serialized repository-local scheduler and current Release publisher."""
 from __future__ import annotations
-import argparse
-import base64
-import json
-import hashlib
-import os
-from pathlib import Path
-import tempfile
-from urllib.parse import quote
-import uuid
 
-from scripts.code_analysis import github_service as github, release_manifest
-from scripts.code_analysis.hosted import analysis_key, reconcile, now, accept
-from scripts.code_analysis.projects import validate, service_config
-from scripts.code_analysis.report_assets import shard, verify_asset
+import base64
+import hashlib
+import json
+import os
+import tempfile
+from pathlib import Path
+from urllib.parse import quote
+
+from scripts.code_analysis import github_service as github
+from scripts.code_analysis import release_manifest
 from scripts.code_analysis.applicability import GROUPS as SCANNER_GROUPS
+from scripts.code_analysis.hosted import accept, analysis_key, now, reconcile
+from scripts.code_analysis.projects import service_config, validate
+from scripts.code_analysis.report_assets import shard, verify_asset
 
 WORKFLOW = '.github/workflows/code-analysis-coordinator.yml'
 GENERATED_WORKFLOW = '.github/workflows/11-source-analysis.yml'

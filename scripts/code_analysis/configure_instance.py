@@ -33,6 +33,7 @@ def configure(template: dict, source: str, analysis: str, publishing: str, branc
 def bundle(config: dict, destination: Path, endpoint: str, dashboard_url: str, client_id: str, worker_name: str) -> None:
     """Write a coordinated configuration overlay, never mutate the current instance."""
     import re
+
     from scripts.code_analysis.generate_source_workflow import generate
     from scripts.code_analysis.hosted import write
     worker, dashboard = urlsplit(endpoint), urlsplit(dashboard_url)

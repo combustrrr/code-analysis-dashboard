@@ -5,9 +5,10 @@ import subprocess
 import sys
 import time
 import urllib.request
-from urllib.parse import urlsplit
-import xml.etree.ElementTree as ET
 from pathlib import Path
+from urllib.parse import urlsplit
+
+from defusedxml import ElementTree as ET
 
 from scripts.code_analysis.hosted import load, write
 

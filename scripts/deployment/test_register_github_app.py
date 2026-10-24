@@ -1,10 +1,8 @@
 """Tests for cross-platform command selection in register_github_app.py."""
-import sys
 import os
+import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "deployment"))
 from register_github_app import _find_npx, _find_openssl

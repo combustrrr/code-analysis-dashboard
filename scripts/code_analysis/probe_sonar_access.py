@@ -8,6 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
 try:
     from .sonar_identity import environment_identity
 except ImportError:

@@ -6,8 +6,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from scripts.code_analysis import run_profile
 from scripts.code_analysis import hosted as h
+from scripts.code_analysis import run_profile
 
 
 class ExplicitProfileTests(unittest.TestCase):

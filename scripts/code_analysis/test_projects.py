@@ -1,6 +1,11 @@
 import copy
 import unittest
-from scripts.code_analysis.projects import validate, service_config, native_feedback_allowed
+
+from scripts.code_analysis.projects import (
+    native_feedback_allowed,
+    service_config,
+    validate,
+)
 from scripts.code_analysis.report_assets import shard, verify_asset
 
 
@@ -75,9 +80,10 @@ class ProjectTests(unittest.TestCase):
                 validate(doc)
 
     def test_shared_execution_publication_host(self):
+        from pathlib import Path
+
         from scripts.code_analysis.configure_instance import configure
         from scripts.code_analysis.hosted import load
-        from pathlib import Path
         output = configure(load(Path('config/code-analysis/service.json')), 'source/project',
                            'owner/runner', 'owner/runner', 'main', {'mode': 'portable'})
         self.assertEqual(output['analysis_repository'], output['publishing_repository'])

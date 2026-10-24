@@ -1,8 +1,10 @@
 """Generate the reusable portable producer from the existing isolated scanners."""
 import json
 from pathlib import Path
+
 import yaml
-from scripts.code_analysis.generate_source_workflow import generate, CHECKOUT
+
+from scripts.code_analysis.generate_source_workflow import generate
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLING_REPOSITORY = 'combustrrr/code-analysis-dashboard'

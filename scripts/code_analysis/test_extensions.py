@@ -1,5 +1,4 @@
 """Extension acceptance: identity, partial evidence, secrets and generated jobs."""
-import copy
 import json
 import shutil
 import tempfile
@@ -7,8 +6,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.code_analysis import extensions as e, hosted as h
-from scripts.code_analysis.monitoring import canonicalize, build_snapshot
+from scripts.code_analysis import extensions as e
+from scripts.code_analysis import hosted as h
+from scripts.code_analysis.monitoring import build_snapshot, canonicalize
 from scripts.code_analysis.snapshot import build_analysis_snapshot
 
 
@@ -68,8 +68,9 @@ class ExtensionTests(unittest.TestCase):
                 e.registry({'scanner_extensions':[{**self.extension, **update}]})
 
     def test_generated_vendor_jobs_do_not_checkout_source(self):
-        from scripts.code_analysis import generate_source_workflow as generator
         import yaml
+
+        from scripts.code_analysis import generate_source_workflow as generator
         shutil.copytree('.github/workflows', self.root/'.github/workflows')
         shutil.copytree('config/code-analysis/workflow-templates',
                         self.root/'config/code-analysis/workflow-templates')

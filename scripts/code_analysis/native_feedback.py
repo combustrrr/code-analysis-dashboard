@@ -1,8 +1,8 @@
 """GitHub-native feedback with an explicit connected-source boundary."""
 import base64
+import copy
 import gzip
 import hashlib
-import copy
 import json
 from urllib.parse import urlencode
 
