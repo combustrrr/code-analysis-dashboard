@@ -35,8 +35,10 @@ can merge.
 | `analysis-launcher/**` or queue contract | `worker-deploy.yml` | Cloudflare Worker production environment |
 | Scanner workflows, profiles, adapters, or pins | `15-tooling-rollout.yml` | Protected immutable tooling promotion PR |
 
-Pages builds the application without report assets and retains recently referenced
-hashed assets for cached clients. Worker deployment runs tests, deployment validation,
+Pages builds the application without report assets and retains the current asset list
+from up to twenty preceding successful deployments. This bounded compatibility window
+keeps lazy-loaded chunks available to browser tabs that still hold a recently cached
+application shell. Worker deployment runs tests, deployment validation,
 and a Wrangler dry run before the production job. Tooling changes pass compatibility
 tests and are adopted through an exact-head promotion instead of being executed directly
 from an unvalidated commit.
