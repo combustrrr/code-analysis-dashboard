@@ -60,6 +60,15 @@ SaaS-owned engines update at the provider. Source-owned ESLint/TypeScript
 versions follow the selected repository'"'"'s lockfile; the service does not rewrite
 upstream dependencies to force a newer compiler.
 
+Dependabot separately owns version updates for the dashboard application's npm
+manifest and lockfile under `analysis-ui/`. It checks weekly, groups compatible
+minor and patch updates into production and development PRs, and leaves major
+updates separate for explicit review. Its open PR count is bounded. Dependabot
+does not manage `.ci` scanner requirements, generated workflows, GitHub Action
+pins, scanner images, or inline scanner versions; Renovate retains those surfaces
+so update proposals are not duplicated and scanner changes continue through the
+compatibility and immutable-tooling promotion gates.
+
 Python and Node runtime lines are deliberately excluded from scanner dependency
 updates. Runtime migrations are compatibility decisions of their own; mixing a
 `3.11` patch pin with a `3.15` migration creates ambiguous upgrade targets and can

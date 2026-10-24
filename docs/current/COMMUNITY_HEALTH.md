@@ -15,6 +15,11 @@ Blank issues are disabled. Vulnerabilities must use private reporting, and
 public forms remind reporters not to include credentials, detected secret
 values, or private report data.
 
+`.github/dependabot.yml` enables weekly grouped npm version updates for
+`analysis-ui/`. Scanner and workflow dependency pins remain under the existing
+Renovate compatibility process documented in
+[scanner maintenance](../operations/SCANNER-MAINTENANCE.md).
+
 The repository does not currently declare an open-source license. Selecting a
 license is an owner decision because it changes downstream rights; add a
 recognized `LICENSE` file only after that decision is explicit.
