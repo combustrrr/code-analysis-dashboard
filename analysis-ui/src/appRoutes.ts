@@ -1,4 +1,4 @@
-export type ProjectView='overview'|'issues'|'report';
+export type ProjectView='overview'|'issues'|'coverage'|'report';
 export type IssueRouteFilters={query?:string;severity?:string;category?:string;scanner?:string;rule?:string;file?:string;directory?:string;location?:string;overlap?:string;group?:string};
 export type SettingsSection='general'|'projects'|'connections'|'provenance';
 export type AppRoute=
@@ -22,7 +22,7 @@ export function parseAppRoute(hash=location.hash):AppRoute{
  const projectId=parts[0]==='projects'?safeProject(parts[1]):undefined;
  if(projectId){
   if(parts[2]==='run')return{kind:'project-run',projectId};
-  const view:ProjectView=parts[2]==='issues'?'issues':parts[2]==='report'?'report':'overview';
+  const view:ProjectView=parts[2]==='issues'?'issues':parts[2]==='coverage'?'coverage':parts[2]==='report'?'report':'overview';
   const filters=view==='issues'?{query:clean(params.get('q')),severity:clean(params.get('severity')),category:clean(params.get('category')),scanner:clean(params.get('scanner')),rule:clean(params.get('rule')),file:clean(params.get('file')),directory:clean(params.get('directory')),location:clean(params.get('location')),overlap:clean(params.get('overlap')),group:clean(params.get('group'))}:undefined;
   return{kind:'project',projectId,view,target:clean(params.get('target')),issue:view==='issues'?clean(params.get('issue')):undefined,filters};
  }

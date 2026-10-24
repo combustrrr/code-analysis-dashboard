@@ -49,12 +49,26 @@ test.describe('production shell',()=>{
   await expect(page.getByRole('heading',{name:'Why this was reported'})).toBeVisible();
  });
 
- test('report combines scanner outcomes and immutable coverage context',async({page})=>{
-  await page.goto(PROJECT+'/report');
-  await expect(page.getByRole('heading',{name:'Published report and scanner coverage'})).toBeVisible();
+ test('coverage keeps scanner outcomes separate from downloadable reports',async({page})=>{
+  await page.goto(PROJECT+'/coverage');
+  await expect(page.getByRole('heading',{name:'Analysis channels'})).toBeVisible();
   await expect(page.getByText('Atheris',{exact:true})).toBeVisible();
   await expect(page.getByText('Schemathesis',{exact:true})).toBeVisible();
   await expect(page.getByText('Coverage does not guarantee that the code is secure')).toBeVisible();
+ });
+
+ test('reports provides a direct issues PDF export without duplicating issue content',async({page})=>{
+  await page.route('**/data/reports/retained/threat-report.json',route=>route.fulfill({json:{schema_version:'threat-report-v1',report_id:'report-fixture',analysis_id:'analysis-fixture',immutable:true,source_repository:'combustrrr/Agentic-Kibana',ref:'Testing',target_sha:'2c38720d0b6814383779b701345b0c286b7c5f77',generated_at:'2026-09-07T00:00:00Z',guidance_catalog_version:'fixture',generator_version:'fixture',status:'partial',limitations:['Fixture limitation'],coverage:{status:'partial',expected_channels:['semgrep','atheris'],available_channels:['semgrep'],incomplete_channels:['atheris'],positioning_statement:'Fixture evidence.',channel_matrix:[]},metrics:{findings_total:1,findings_by_category:{security:1},findings_by_severity:{HIGH:1},advisories_total:0,guidance_matched:1,guidance_fallback:0},findings:[{finding_id:'finding-1',category:'security',severity:'HIGH',evidence_sources:['semgrep'],guidance_source:'catalog',guidance_match:'fixture',title:'Fixture issue',explanation:'Fixture explanation',impact:'Fixture impact',remediation_steps:['Fixture remediation'],references:[],message:'Fixture scanner message',file:'src/example.ts',line:12,rule:'fixture-rule',scanners:['semgrep']}]}}));
+  await page.route('**/data/reports/retained/threat-report.md',route=>route.fulfill({body:'# Fixture report',contentType:'text/markdown'}));
+  await page.goto(PROJECT+'/report');
+  await expect(page.getByRole('heading',{name:'Downloadable reports'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Complete issues report'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Download issues PDF'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Highest-severity findings'})).toHaveCount(0);
+  await expect(page.getByText('Channel coverage',{exact:true})).toHaveCount(0);
+  const download=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Download issues PDF'}).click();
+  expect((await download).suggestedFilename()).toMatch(/Agentic-Kibana-2c38720d0b68-complete\.pdf$/);
  });
 
  test('legacy activity URLs fall through to Projects and settings remains reachable',async({page})=>{

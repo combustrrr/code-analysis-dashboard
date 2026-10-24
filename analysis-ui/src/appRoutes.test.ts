@@ -7,4 +7,7 @@ describe('project evidence routes',()=>{
   expect(hash).not.toContain('combustrrr');
   expect(parseAppRoute(hash)).toEqual({kind:'project',projectId:'1278177697',target:'branch:Testing',view:'issues',issue:'finding-1',filters:{query:undefined,severity:'HIGH',category:'security',scanner:undefined,rule:undefined,file:undefined,directory:'src/api',location:undefined,overlap:undefined,group:'rule'}});
  });
+ test('keeps coverage as a distinct project section',()=>{
+  expect(parseAppRoute('#/projects/1278177697/coverage?target=branch%3ATesting')).toEqual({kind:'project',projectId:'1278177697',view:'coverage',target:'branch:Testing',issue:undefined,filters:undefined});
+ });
 });
