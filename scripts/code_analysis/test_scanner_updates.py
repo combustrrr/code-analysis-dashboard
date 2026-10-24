@@ -33,6 +33,7 @@ class ScannerUpdateTests(unittest.TestCase):
         self.assertFalse(policy['ignoreTests'])
         self.assertTrue(policy['ignoreUnstable'])
         self.assertEqual(policy['minimumReleaseAge'], '3 days')
+        self.assertEqual(set(policy['ignoreDeps']), {'python', 'node'})
         runtime_rule = next(rule for rule in policy['packageRules']
                             if set(rule.get('matchPackageNames', [])) == {'python', 'node'})
         self.assertFalse(runtime_rule['enabled'])
@@ -46,7 +47,7 @@ class ScannerUpdateTests(unittest.TestCase):
         scanner_rule = next(rule for rule in policy['packageRules'] if rule.get('groupName'))
         update_types = set(scanner_rule['matchUpdateTypes'])
         self.assertEqual(update_types, {'major', 'minor', 'patch', 'digest', 'pin'})
-        self.assertEqual(scanner_rule['groupName'], 'validated scanner stack')
+        self.assertEqual(scanner_rule['groupName'], 'validated scanner dependencies')
         workflow = yaml.safe_load(Path('.github/workflows/14-scanner-compatibility.yml').read_text())
         self.assertEqual(workflow['permissions'], {'contents': 'read'})
         self.assertNotIn('secrets.', json.dumps(workflow))

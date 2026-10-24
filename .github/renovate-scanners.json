@@ -75,6 +75,7 @@
   "prHourlyLimit": 1,
   "minimumReleaseAge": "3 days",
   "ignoreUnstable": true,
+  "ignoreDeps": ["python", "node"],
   "rangeStrategy": "pin",
   "automerge": true,
   "automergeType": "pr",
@@ -101,7 +102,7 @@
         ".github/code-analysis/projects.json"
       ],
       "matchUpdateTypes": ["major", "minor", "patch", "digest", "pin"],
-      "groupName": "validated scanner stack",
+      "groupName": "validated scanner dependencies",
       "automerge": true
     }
   ],
