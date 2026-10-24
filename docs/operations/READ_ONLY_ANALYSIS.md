@@ -87,6 +87,13 @@ is a scanner fixture). The Kavach product profile retains its Python/API/web/ima
 specific adapters. Unsupported integrations remain explicitly deferred/unavailable,
 not clean zeroes.
 
+The coordinator contains two static reusable-workflow call sites because GitHub Actions
+cannot choose a reusable workflow dynamically. Exactly one is applicable: the dashboard
+self-analysis uses the portable-profile lane, while Kavach and Agentic-Kibana use the
+agentic-soc-profile lane. Actions displays the non-applicable profile branch as skipped;
+this is expected profile routing and is not an incomplete scanner channel. The jobs use
+explicit profile names so this routing is not confused with scanner execution failure.
+
 An analysis can publish a valid partial report while some channels are unavailable.
 Known limitations include vendor access/plan entitlement and GitHub security-posture
 permissions. Scanner counts are evidence from that exact run and revision; absence of

@@ -218,7 +218,9 @@ def deployment_workflow_errors(root: Path) -> list[str]:
         errors.append("Queue coordinator lacks its 15-minute cadence or explicit maintainer wake-up")
     if "/api/internal/queue/claim" not in coordinator or "uses: ./.github/workflows/reusable-source" not in coordinator:
         errors.append("Queue coordinator does not claim and invoke local reusable scanners")
-    source_section = coordinator[coordinator.index("  portable:"):coordinator.index("  publish:")]
+    source_section = coordinator[
+        coordinator.index("  portable_profile:"):coordinator.index("  publish:")
+    ]
     if "WORKER_API_TOKEN" in source_section:
         errors.append("Source-executing jobs receive the coordinator credential")
     if "deploy-pages" not in pages or "wrangler" in pages:
