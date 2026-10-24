@@ -39,12 +39,12 @@ jobs:
         '
     - name: Install pinned Snyk CLI
       if: env.SNYK_TOKEN != ''
-      run: npm install --global snyk@1.1307.4
+      run: npm install --global snyk@1.1308.1
     - name: Set up Python 3.11 for complete pip dependency trees
       if: env.SNYK_TOKEN != ''
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: '3.11.17'
         cache: pip
         cache-dependency-path: '.ci/requirements.txt
 
@@ -296,9 +296,9 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.11'
+        python-version: '3.11.17'
     - name: Install Checkov
-      run: pip install "checkov==3.2.468"
+      run: pip install "checkov==3.3.30"
     - name: Run Checkov
       run: "checkov \\\n  --directory . \\\n  --framework dockerfile,github_actions \\\n  --output sarif \\\n  --output-file-path\
         \ checkov.sarif \\\n  --soft-fail || true\n"
@@ -456,7 +456,7 @@ jobs:
       shell: bash
       run: 'set -euo pipefail
 
-        pip install "zizmor==1.29.0"
+        pip install "zizmor==1.31.1"
 
         set +e
 

@@ -69,10 +69,10 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         if: env.SNYK_TOKEN != ''
         with:
-          node-version: '20'
+          node-version: '20.20.2'
       - name: Install pinned Snyk CLI
         if: env.SNYK_TOKEN != ''
-        run: npm install --global snyk@1.1307.4
+        run: npm install --global snyk@1.1308.1
       - name: Run Snyk dependency and code scans
         if: env.SNYK_TOKEN != ''
         working-directory: .source
