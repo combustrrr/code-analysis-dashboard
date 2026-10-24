@@ -24,3 +24,17 @@ export function plainAnalysisIssue(detail?: string) {
   if (value.includes('report') || value.includes('asset') || value.includes('storage') || value.includes('delivery') || value.includes('publish')) return 'The report could not be prepared. Your previous report is still available; try the analysis again.';
   return 'The analysis did not finish. Your previous report is unchanged, and you can try again.';
 }
+
+export function displayRuleId(rule?: string) {
+  const value = String(rule || '').trim();
+  if (!value) return 'Rule unavailable';
+  return value.replace(/^.*(?:\.github[./])?semgrep-rules[./]+/i, '');
+}
+
+export function displayFindingMessage(message?: string) {
+  return String(message || '').replace(/\[([^\]]+)\]\(https?:\/\/[^)\s]+\)/g, '$1');
+}
+
+export function isCompleteChannelStatus(status?: string) {
+  return ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(String(status || '').toUpperCase());
+}

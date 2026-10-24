@@ -56,7 +56,10 @@ identifiers.
    views, followed by
    cautious investigation suggestions. Empty values remain zero or unavailable exactly
    as reported. Missing category metadata is labelled unavailable instead of being drawn
-   as a misleading empty chart. No invented quality score or proven-root-cause claim.
+   as a misleading empty chart. Coverage limitation counts use the same channel set as
+   the accompanying names, including deferred and not-applicable channels. Display labels
+   remove runner-local prefixes and Markdown URL syntax while filters and evidence retain
+   the exact underlying scanner values. No invented quality score or proven-root-cause claim.
 4. Issues combines text, severity, category, scanner, rule, file, directory, source-location
    and scanner-overlap filters. Selectors are searchable where useful. Clear filters
    resets the selection; overview shortcuts clear unrelated filters. Group by rule,
