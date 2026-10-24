@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Alert,Button,Checkbox,Collapse,Descriptions,Input,Modal,Radio,Select,Space,Steps,Tag,Typography} from 'antd';
-import {ControlOutlined,ThunderboltOutlined} from '@ant-design/icons';
+import {Alert,Button,Checkbox,Collapse,Descriptions,Input,Modal,Radio,Select,Space,Steps,Tag,Typography} from './ui';
+import {ControlOutlined,ThunderboltOutlined} from './icons';
 import {useLaunchAuth} from './useLaunchAuth';
 import type {ProjectRunRequest} from './ProjectRunTracker';
 import {FastPathRunAction} from './FastPathRunAction';

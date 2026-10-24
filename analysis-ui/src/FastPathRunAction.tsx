@@ -1,6 +1,6 @@
 import {useRef,useState} from 'react';
-import {Alert,Button,message,Space,Tooltip} from 'antd';
-import {PlayCircleOutlined} from '@ant-design/icons';
+import {Alert,Button,message,Space,Tooltip} from './ui';
+import {PlayCircleOutlined} from './icons';
 import type {useLaunchAuth} from './useLaunchAuth';
 import type {ProjectRunRequest} from './ProjectRunTracker';
 

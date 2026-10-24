@@ -1,5 +1,5 @@
-import { Alert, Button, Card, Col, Empty, Input, List, Modal, Pagination, Row, Select, Space, Statistic, Table, Tag, Typography } from 'antd';
-import { CopyOutlined, DownloadOutlined, FilePdfOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Col, Empty, Input, List, Modal, Pagination, Row, Select, Space, Statistic, Table, Tag, Typography } from './ui';
+import { CopyOutlined, DownloadOutlined, FilePdfOutlined } from './icons';
 import { useEffect, useMemo, useState } from 'react';
 import { refreshRepositoryReports, repositoryJson } from './repositoryReports';
 import {parseAppRoute,routeHash} from './appRoutes';

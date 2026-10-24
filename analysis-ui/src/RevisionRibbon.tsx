@@ -1,5 +1,5 @@
-import {Select,Tag,type SelectProps} from 'antd';
-import {BranchesOutlined,ClockCircleOutlined,SafetyCertificateOutlined} from '@ant-design/icons';
+import {Select,Tag,type SelectProps} from './ui';
+import {BranchesOutlined,ClockCircleOutlined,SafetyCertificateOutlined} from './icons';
 
 type Target={id:string;label:string;kind:string;head_sha:string;status:string;lifecycle_status?:string};
 export function RevisionRibbon({repository,target,targets,fresh,statusLabel,coverage,published,onTarget}:{repository:string;target?:Target;targets:Target[];fresh:boolean;statusLabel:string;coverage:string;published?:string;onTarget:(id:string)=>void}){

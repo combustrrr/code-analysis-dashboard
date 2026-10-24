@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Collapse, Space, Tag } from 'antd';
-import {CloudOutlined,CodeOutlined,DatabaseOutlined,DeploymentUnitOutlined} from '@ant-design/icons';
+import { Alert, Button, Collapse, Space, Tag } from './ui';
+import {CloudOutlined,CodeOutlined,DatabaseOutlined,DeploymentUnitOutlined} from './icons';
 import { applicationEndpoint } from './repositoryReports';
 import type { useLaunchAuth } from './useLaunchAuth';
 

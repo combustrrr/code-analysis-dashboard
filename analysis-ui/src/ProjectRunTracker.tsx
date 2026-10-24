@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Collapse, Progress } from 'antd';
+import { Alert, Button, Collapse, Progress } from './ui';
 import type { useLaunchAuth } from './useLaunchAuth';
 import { refreshRepositoryReports } from './repositoryReports';
 import {analysisStage,analysisStatus,plainAnalysisIssue} from './analysisPresentation';

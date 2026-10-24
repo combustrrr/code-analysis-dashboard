@@ -1,6 +1,6 @@
 # Code Analysis Dashboard
 
-A standalone code-analysis application: React/Ant Design dashboard, Cloudflare
+A standalone code-analysis application: lightweight React dashboard, Cloudflare
 authentication, GitHub Actions orchestration, scanner adapters, and current reports.
 
 Start with the [documentation index](docs/README.md), then read

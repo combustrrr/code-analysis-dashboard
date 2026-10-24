@@ -462,3 +462,14 @@ findings, while exit codes above `1` remain scanner failures. Before recording t
 as complete, the job requires a non-empty, parseable SARIF document with a `runs` array.
 This prevents ordinary findings from failing the coordinator without concealing genuine
 execution or evidence-generation failures.
+
+## 2026-10-24 authenticated workspace performance
+
+The authenticated workspace no longer ships Ant Design or Ant Design Icons. Its
+buttons, alerts, dialogs, drawers, selects, tables, tabs, progress indicators, and
+status primitives are implemented by the small repository-owned React layer in
+`analysis-ui/src/ui.tsx`, with local SVG icons in `analysis-ui/src/icons.tsx`.
+The production `WorkspaceApp` JavaScript chunk fell from approximately 792 KB to
+59 KB uncompressed in the verified local build. The public landing-page split,
+GitHub authorization boundary, report provenance, dark/light themes, responsive
+navigation, and keyboard-visible controls remain intact.

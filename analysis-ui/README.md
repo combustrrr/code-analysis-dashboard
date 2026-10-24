@@ -1,13 +1,16 @@
 # Analysis Dashboard UI
 
-Static React/Ant Design application deployed to GitHub Pages.
+Static React application deployed to GitHub Pages. Workspace controls use the
+repository-owned native component layer in `src/ui.tsx`; no general-purpose UI
+framework is shipped to browsers.
 
 | Area | Location |
 |---|---|
 | Application entrypoint | `src/main.tsx` |
 | Application shell | `src/AppShell.tsx` |
 | Modern route contract | `src/appRoutes.ts` |
-| Brand and theme tokens | `src/brand.ts` |
+| Theme tokens | `src/ui.css` |
+| Native controls and icons | `src/ui.tsx`, `src/icons.tsx` |
 | Fixed target selection | `src/Repositories.tsx` |
 | Explicit launch flow | `src/ProjectLauncher.tsx` |
 | Integration checks | `src/Integration.tsx` |

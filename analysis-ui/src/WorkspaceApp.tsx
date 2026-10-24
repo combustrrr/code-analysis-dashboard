@@ -1,9 +1,8 @@
 import { refreshRepositoryReports } from './repositoryReports';
 import { applicationEndpoint, repositoryJson } from './repositoryReports';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Collapse, ConfigProvider, Drawer, Empty, Grid, Input, Progress, Select, Space, Statistic, Table, Tabs, Tag, message } from 'antd';
-import { GithubOutlined, SearchOutlined } from '@ant-design/icons';
-import 'antd/dist/reset.css';
+import { Alert, Button, Collapse, ConfigProvider, Drawer, Empty, Grid, Input, Progress, Select, Space, Statistic, Table, Tabs, Tag, message } from './ui';
+import { GithubOutlined, SearchOutlined } from './icons';
 import '@fontsource/manrope/400.css';
 import '@fontsource/manrope/500.css';
 import '@fontsource/manrope/600.css';
@@ -16,13 +15,11 @@ import './style.css';
 import './workspace.css';
 import { useLaunchAuth } from './useLaunchAuth';
 import { safeGithubUrl } from './safeUrls';
-import { useAppearance } from './Appearance';
 import type { ProjectRunRequest } from './ProjectRunTracker';
 import {parseAppRoute,routeHash,type IssueRouteFilters,type ProjectView} from './appRoutes';
 import {AppShell} from './AppShell';
 import {plainAnalysisIssue} from './analysisPresentation';
 import {RevisionRibbon} from './RevisionRibbon';
-import {applicationTheme} from './brand';
 
 const ProjectLauncher=React.lazy(()=>import('./ProjectLauncher').then(module=>({default:module.ProjectLauncher})));
 const ProjectRunTracker=React.lazy(()=>import('./ProjectRunTracker').then(module=>({default:module.ProjectRunTracker})));
@@ -91,7 +88,6 @@ function Evidence({ detail, source, error, findings, openFinding }: { detail?: D
 
 export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaunchAuth>}) {
   const screens = Grid.useBreakpoint();
-  const { appearance } = useAppearance();
   const [projectRuns, setProjectRuns] = useState<ProjectRunRequest[]>(readProjectRuns);
   const projectRunsRef = useRef(projectRuns);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -217,12 +213,11 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
   const completed = report?.channels.filter(c => ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(c.status)).length || 0;
   const issueRoute=(filters:IssueRouteFilters={},issue='')=>{if(!target)return;location.hash=routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:issue||undefined,filters});};
   useEffect(()=>{if(r.tab!=='issues'||!target)return;const timer=window.setTimeout(()=>{const filters={query,severity,category,scanner,rule,file,directory,location:locationFilter,overlap,group:groupBy==='none'?'':groupBy};const next=routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:r.issue||undefined,filters});if(location.hash!==next)history.replaceState(null,'',next);},50);return()=>window.clearTimeout(timer);},[r.tab,r.project,r.issue,target?.id,query,severity,category,scanner,rule,file,directory,locationFilter,overlap,groupBy]);
-   const appTheme=applicationTheme(appearance);
     if (!r.repository) {
-      if(r.tab==='settings')return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth}><Settings auth={launchAuth} onRun={projectId=>location.hash=routeHash({kind:'project-run',projectId})}/></AppShell></ConfigProvider>;
+      if(r.tab==='settings')return <ConfigProvider><AppShell auth={viewerAuth}><Settings auth={launchAuth} onRun={projectId=>location.hash=routeHash({kind:'project-run',projectId})}/></AppShell></ConfigProvider>;
       return null;
     }
-    return <ConfigProvider theme={appTheme}><AppShell auth={viewerAuth} status={projectRunTrackers.length ? projectRunTrackers : undefined}>
+    return <ConfigProvider><AppShell auth={viewerAuth} status={projectRunTrackers.length ? projectRunTrackers : undefined}>
      {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
     <main className="project-workspace">
       {(report||!activeProjectRun)&&<RevisionRibbon repository={index?.source_repository||target?.repository||'Configured project'} target={target} targets={index?.targets||[]} fresh={fresh} statusLabel={states[target?.lifecycle_status||target?.status||'']||target?.status||'Unavailable'} coverage={report?`${completed} of ${report.channels.length}`:'Unavailable'} published={report?.generated_at} onTarget={value=>navigate(value,r.tab==='issues'?'issues':r.tab==='report'?'report':'overview')}/>}

@@ -34,15 +34,13 @@ test.describe('production shell',()=>{
   await page.getByLabel('Search issues').fill('CVE-2026-42561');
   await expect(page).toHaveURL(/q=CVE-2026-42561/);
   await expect(page.locator('.ant-table-tbody > tr.ant-table-row').first()).toBeVisible();
-  await page.getByLabel('Group issues').click();
-  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'Rule'}).click();
+  await page.getByLabel('Group issues').selectOption('rule');
   await expect(page).toHaveURL(/group=rule/);
   await expect(page.getByText(/finding/).first()).toBeVisible();
   await page.getByRole('button',{name:'More filters'}).click();
   await expect(page.getByLabel('Source location',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Clear filters',exact:true}).click();
-  await page.getByLabel('Group issues').click();
-  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:'No grouping'}).click();
+  await page.getByLabel('Group issues').selectOption('none');
   await page.locator('.issue-link').first().click();
   await expect(page.getByText('Reported by',{exact:true})).toBeVisible();
   await expect(page.getByText('Rules applied',{exact:true})).toBeVisible();

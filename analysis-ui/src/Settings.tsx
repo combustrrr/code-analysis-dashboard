@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState,type ReactNode} from 'react';
-import {Alert,Button,Empty,Select,Skeleton,Tag} from 'antd';
-import {ArrowLeftOutlined,FolderOpenOutlined,LinkOutlined,SafetyCertificateOutlined,SettingOutlined} from '@ant-design/icons';
+import {Alert,Button,Empty,Select,Skeleton,Tag} from './ui';
+import {ArrowLeftOutlined,FolderOpenOutlined,LinkOutlined,SafetyCertificateOutlined,SettingOutlined} from './icons';
 import {Connections} from './Integration';
 import {AppearanceToggle} from './Appearance';
 import {applicationEndpoint} from './repositoryReports';
