@@ -9,6 +9,9 @@ project-registry entries. Users do not choose or install an execution repository
 Users sign in to **Projects**, the only workspace home. It contains the three fixed
 projects, aggregate Preparing/Analyzing/Needs-attention counts, last refresh time, and
 each project's current evidence state. Opening Projects or a project remains read-only.
+Every successful sign-in opens the Projects register, including sign-ins started from a
+previously copied project URL. Users select the project they want to review from the
+current trusted registry; authentication never drops them directly into a project.
 Developers see product-level progress only: Preparing, Analyzing, Preparing report, Ready, or Needs attention.
 Coordinator runs, lease state, scanner job
 links, and individual channel scheduling remain operational details. The exact selected

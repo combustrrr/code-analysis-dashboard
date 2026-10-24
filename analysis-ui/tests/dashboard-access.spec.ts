@@ -270,12 +270,10 @@ test('workspace intent survives a transient hash reset while GitHub access is ch
   await expect(page).toHaveURL(/#\/projects$/);
  });
 
-test('authorization restores the exact requested repository route',async({page,context})=>{
+test('authorization opens the project register instead of restoring a project route',async({page,context})=>{
   test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
   const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
-   const destination='#/projects/1278177697';
   const requestOrder:string[]=[];
-  let projectsVerified=false;
   await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -284,27 +282,25 @@ test('authorization restores the exact requested repository route',async({page,c
   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'route-session',login:'developer'}});
    if(url.pathname==='/api/session'){requestOrder.push('session');return route.fulfill({headers,json:{login:'developer'}});}
     if(url.pathname==='/api/projects'){
-     requestOrder.push('projects');projectsVerified=true;
+     requestOrder.push('projects');
      return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
     }
     if(url.pathname==='/api/public/manifest'){
-     expect(projectsVerified).toBe(true);requestOrder.push('manifest');
+     requestOrder.push('manifest');
      return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:'combustrrr/code-analysis-dashboard',project_id:'1278177697',checked_at:new Date().toISOString(),preferred_branch:'Testing',targets:[]}});
     }
   throw new Error(`Unexpected request ${url.pathname}`);
  });
- await page.goto('/#/projects');
+ await page.goto('/#/projects/1278177697');
   await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
-  await page.getByRole('button',{name:'Review evidence'}).click();
-  await expect(page.getByLabel('Selected analysis revision')).toBeVisible();
-  await expect.poll(()=>new URL(page.url()).hash).toBe(destination);
-  await expect.poll(()=>requestOrder.includes('manifest')).toBe(true);
+  await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
+  await expect(page).toHaveURL(/#\/projects$/);
   expect(requestOrder).toContain('session');
   expect(requestOrder).toContain('projects');
-  expect(requestOrder.indexOf('projects')).toBeLessThan(requestOrder.indexOf('manifest'));
+  expect(requestOrder).not.toContain('manifest');
  });
 
-test('a removed requested project is not restored or fetched after sign-in',async({page,context})=>{
+test('a stale project URL falls back to the current project register after sign-in',async({page,context})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
  let reportRequests=0;
@@ -321,8 +317,9 @@ test('a removed requested project is not restored or fetched after sign-in',asyn
  });
  await page.goto('/#/projects/1278177697/issues');
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
- await expect(page.getByText(/The requested project is no longer configured/)).toBeVisible();
- expect(new URL(page.url()).hash).toBe('');
+ await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'ARYDESTROYER/Kavach-AgenticSOC'})).toBeVisible();
+ expect(new URL(page.url()).hash).toBe('#/projects');
  expect(reportRequests).toBe(0);
 });
 
@@ -404,9 +401,7 @@ test('authorized user follows one repository project from selection through publ
    const pageErrors:string[]=[];page.on('pageerror',error=>pageErrors.push(error.message));
    await page.goto('/');
    await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
-   await expect(page.locator('.landing-actions').getByRole('button',{name:'Open workspace'})).toBeVisible();
-   await page.locator('.landing-actions').getByRole('button',{name:'Open workspace'}).click();
-     await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
+   await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
     await expect(page.locator('.project-record')).toHaveCount(3);
     await expect(page.locator('.project-record').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('Not available');
     await expect(page.getByText('Read-only source')).toHaveCount(2);

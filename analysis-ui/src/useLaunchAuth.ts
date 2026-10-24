@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 const VERIFIER_KEY = 'analysis-auth-verifier';
 const RETURN_KEY = 'analysis-auth-return';
 const ENDPOINT_KEY = 'analysis-auth-endpoint';
+const SIGNED_IN_HOME = '#/projects';
 type ProjectRegistry = { execution_repository: { id: number; full_name: string }; projects: Array<{ id: string | number }>; [key:string]: unknown };
 
 function randomVerifier() {
@@ -156,7 +157,9 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
       try {
         const verifier = randomVerifier();
         const challenge = await challengeFor(verifier);
-        if (!pendingAuthDestination()) sessionStorage.setItem(RETURN_KEY, location.pathname + location.search + location.hash);
+        // Authentication always enters through the project register. A project may
+        // only be opened after the user has seen and selected it from that registry.
+        sessionStorage.setItem(RETURN_KEY, location.pathname + location.search + SIGNED_IN_HOME);
         sessionStorage.setItem(VERIFIER_KEY, verifier);
         sessionStorage.setItem(ENDPOINT_KEY, origin);
         setError('');
