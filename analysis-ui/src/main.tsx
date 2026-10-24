@@ -32,8 +32,13 @@ function PublicLanding({auth,accessError,accessPending,workspaceRequested}:{auth
 }
 
 function Authenticated({auth}:{auth:Auth}){
- if(!isWorkspaceRoute())return <PublicLanding auth={auth}/>;
+ if(!isWorkspaceRoute())return <AuthenticatedHome auth={auth}/>;
  return <WorkspaceRoute auth={auth}/>;
+}
+
+function AuthenticatedHome({auth}:{auth:Auth}){
+ useEffect(()=>{history.replaceState(null,'',routeHash({kind:'projects'}));},[]);
+ return <Suspense fallback={<main className="workspace-loading" role="status">Opening project register...</main>}><ProjectsApp viewerAuth={auth}/></Suspense>;
 }
 
 function WorkspaceRoute({auth}:{auth:Auth}){

@@ -300,6 +300,9 @@ test('authorization opens the project register instead of restoring a project ro
   expect(requestOrder).toContain('session');
   expect(requestOrder).toContain('projects');
   expect(requestOrder).not.toContain('manifest');
+ await page.evaluate(()=>{location.hash='';});
+ await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
+ await expect(page).toHaveURL(/#\/projects$/);
  });
 
 test('a stale project URL falls back to the current project register after sign-in',async({page,context})=>{

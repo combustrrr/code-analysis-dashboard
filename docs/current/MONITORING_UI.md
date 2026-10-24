@@ -9,7 +9,9 @@ incomplete coverage. Light mode uses Paper surfaces without changing status mean
 Manrope is bundled for interface copy, Sora is used for headings, and IBM Plex Mono is reserved for immutable
 identifiers.
 
-1. Projects is the only signed-in home. Its compact summary shows active analyses,
+1. Projects is the only signed-in home. After access is verified, opening the site root
+   is normalized to `#/projects`; the public landing page is only shown before sign-in.
+   Its compact summary shows active analyses,
    projects needing attention, and the last refresh; each of the three cards shows
    repository relationship, preferred branch, one of the four public lifecycle states,
    current SHA, evidence age, channel coverage, limitations, and Review evidence plus
