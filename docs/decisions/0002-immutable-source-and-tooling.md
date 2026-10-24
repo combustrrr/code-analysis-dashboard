@@ -24,4 +24,3 @@ actor, and idempotency key. Published evidence retains workflow run and attempt 
 - Cache reuse is allowed only when source, tooling, profile, and contextual identity
   match.
 - More metadata must be preserved throughout admission, execution, and publication.
-

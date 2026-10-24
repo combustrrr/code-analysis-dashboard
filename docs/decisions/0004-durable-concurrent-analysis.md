@@ -27,4 +27,3 @@ revision.
 - Heartbeats, lease expiry, supersession, and stale-finalizer rejection add control-plane
   complexity.
 - Publication latency includes a deliberate barrier for requested scanner evidence.
-

@@ -25,4 +25,3 @@ authorized report reads. Application assets remain on GitHub Pages.
 - Operators must manage lifecycle, capacity, qualified keys, and legacy-read migration.
 - GitHub Actions artifacts remain separate execution evidence and are not made private by
   this storage decision.
-

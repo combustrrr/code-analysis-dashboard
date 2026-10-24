@@ -15,4 +15,3 @@ current structure.
 
 Use [ADR-0000](0000-template.md) as the template for new decisions. Follow the process
 in [documentation governance](../governance/DOCUMENTATION.md).
-

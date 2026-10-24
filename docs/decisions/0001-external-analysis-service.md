@@ -25,4 +25,3 @@ sources checked out at immutable SHAs. Upstream changes require separate authori
 - Native source feedback is disabled unless a future decision explicitly authorizes it.
 - Cross-repository onboarding requires explicit identity, permission, and acceptance
   verification.
-

@@ -26,4 +26,3 @@ Protected requests revalidate current GitHub identity and collaborator access.
 - Periodic access checks can remove a revoked viewer without waiting for session expiry.
 - Protected startup depends on GitHub and Worker latency; independent checks should run
   concurrently without caching away revocation.
-

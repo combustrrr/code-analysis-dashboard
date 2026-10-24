@@ -109,4 +109,3 @@ Update documentation in the same change when any of these occurs:
 - Use lowercase kebab-case for new ADR filenames after their numeric prefix.
 - Prefer one subject per document.
 - Avoid filenames such as `notes.md`, `new.md`, `final.md`, or date-only names.
-

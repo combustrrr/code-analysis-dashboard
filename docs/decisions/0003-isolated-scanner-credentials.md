@@ -23,4 +23,3 @@ producer artifacts and never executes source-controlled commands.
 - Vendor scans require an additional snapshot preparation boundary.
 - Publication must validate artifact identity, size, schema, and provenance.
 - Workflows contain more jobs, but each job has a smaller and auditable authority set.
-

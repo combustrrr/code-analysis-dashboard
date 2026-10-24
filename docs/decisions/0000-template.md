@@ -42,4 +42,3 @@ State the chosen direction precisely.
 ### Follow-up
 
 - Required implementation, migration, measurement, or review
-
