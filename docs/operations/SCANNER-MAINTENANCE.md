@@ -117,7 +117,9 @@ Production workflows use the explicit `ubuntu-24.04` runner image so a future
 Pages, and CodeQL actions are pinned to reviewed Node 24-compatible commits.
 CodeQL source lanes preserve their local SARIF for report assembly and set both
 `upload: never` and `upload-database: false`; they must not request Code Scanning
-publication access. Ruff's advisory console pass uses concise output so findings
+publication access. Their job token has read-only `security-events` access because
+CodeQL v4 reads its feature configuration API; it never has write access. Ruff's
+advisory console pass uses concise output so findings
 remain in its JSON report without also becoming workflow error annotations.
 Do not suppress genuine scanner execution failures: those belong in the scanner
 status evidence and remain operationally visible.

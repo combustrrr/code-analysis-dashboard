@@ -77,6 +77,10 @@ def generate(config=None):
             job = normalize_expressions(job)
             job['needs'] = ['identity']
             job['permissions'] = {'contents': 'read'}
+            if name == 'codeql':
+                # CodeQL v4 reads its feature/configuration endpoints even when
+                # SARIF and database publication are explicitly disabled.
+                job['permissions']['security-events'] = 'read'
             job.pop('if', None)
             job['if'] = "${{ contains(fromJSON(needs.identity.outputs.jobs), '" + name + "') }}"
             if name == 'codeql':
