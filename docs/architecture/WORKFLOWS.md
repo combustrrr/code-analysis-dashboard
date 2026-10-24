@@ -12,15 +12,18 @@ Run analysis button
   -> Worker authorization, SHA resolution, durable admission
   -> Run analysis coordinator
        -> vendor lane         (only selected vendor scanners)
-       -> portable lane       (portable project profile)
-       -> configured lane     (agentic-soc project profile)
+       -> portable-profile lane     (portable project profile)
+       -> agentic-soc-profile lane  (agentic-soc project profile)
        -> per-project publication fence
   -> Ready / Needs attention in the application
 ```
 
-Only one of the portable and configured source producers runs for a request. Scanner
-jobs inside the selected producer are independent jobs and therefore run concurrently.
-Source-executing jobs receive neither vendor nor publication credentials.
+Only one source-profile producer runs for a request. GitHub renders the other static
+workflow branch as skipped because reusable-workflow selection cannot be dynamic. That
+skip means **not applicable to this project's reviewed profile**, not that a requested
+scanner failed to run. Scanner jobs inside the selected producer are independent jobs
+and therefore run concurrently. Source-executing jobs receive neither vendor nor
+publication credentials.
 
 ## Active workflows
 

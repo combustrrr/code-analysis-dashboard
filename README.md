@@ -47,10 +47,10 @@ npm run build
 For the already configured analysis instance, sign in and open **Projects**, the only
 workspace home, to browse the service's three trusted targets. Project selection,
 settings, and report viewing do not trigger a scan. On a project, **Fast analysis** repeats
-that user's most recent branch, pull request, commit, and scanner selection for the project.
-Without prior history it resolves the configured preferred branch and submits every approved
-scanner. The independent scanner lanes run concurrently; “Fast” refers to automatic selection
-and does not further reduce the scanner coverage remembered from that run. **Configure analysis** starts with a full 40-character SHA, offers
+that user's most recent branch, pull request, or commit, then recomputes and submits every
+scanner currently available for the resolved revision. Without prior history it resolves the
+configured preferred branch. The independent scanner lanes run concurrently; “Fast” refers to
+automatic selection and never reuses an older reduced scanner subset. **Configure analysis** starts with a full 40-character SHA, offers
 branch or pull-request selection as a fallback, and supports safe defaults, individual
 producer groups, or every currently available channel with explicit vendor confirmation.
 The service verifies the resolved immutable SHA before starting the request. A 202 means
@@ -78,6 +78,10 @@ Source-only observer projects do not upload checks or security findings to the s
 
 The shared UI is hosted on GitHub Pages; Cloudflare handles authentication,
 authorization and report delivery. Reports are not bundled into the UI build.
+Every pull request and `main` push runs the repository-wide CI workflow. Scoped CD
+workflows deploy UI changes to Pages, Worker changes to Cloudflare, and validated
+scanner changes through immutable tooling promotion. See the
+[CI/CD runbook](docs/operations/CI-CD.md).
 The checked-in project registry targets `ARYDESTROYER/Kavach-AgenticSOC`,
 `combustrrr/code-analysis-dashboard`, and `combustrrr/Agentic-Kibana`; the dashboard is
 the fixed execution host and its self-analysis target. Registry/workflow changes are

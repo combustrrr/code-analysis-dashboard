@@ -244,26 +244,25 @@ export async function repositoryApi(request, env, session, helpers) {
       return json({status:row.status,lifecycle,request_id:row.request_id,run_id:row.result?.run_id||null,repository:repository.full_name,source_repository:source.full_name,target_sha:row.intent.target_sha,selection:row.intent.selection,selection_source:row.intent.selection_source||'remembered',preferred_branch:project.preferred_branch,requested_channels:row.intent.requested_channels,pr_context:row.intent.pr_context||null,duplicate:true},202);
     }
     const actor=await github('user',token);
-    let selection={kind:'branch',ref:project.preferred_branch},rememberedChannels,selectionSource='preferred_branch';
+    let selection={kind:'branch',ref:project.preferred_branch},selectionSource='preferred_branch';
     try{
       const recent=await queue('/queue/recent',{});
       if(recent.ok){
         const rows=(await recent.json()).requests||[];
         const remembered=rows.find(row=>String(row.intent?.project_id)===String(project.id)&&row.intent?.actor_id===actor.id&&['branch','pr','commit'].includes(row.intent?.selection?.kind)&&typeof row.intent.selection.ref==='string');
-        if(remembered){selection=remembered.intent.selection;rememberedChannels=remembered.intent.requested_channels;selectionSource='remembered';}
+        if(remembered){selection=remembered.intent.selection;selectionSource='remembered';}
       }
     }catch{}
     let current;
     try{current=await revisionSnapshot(configuration,project,source,selection);}
     catch(error){
       if(selectionSource!=='remembered'||!error||![404,409].includes(error.status))throw error;
-      selection={kind:'branch',ref:project.preferred_branch};selectionSource='preferred_branch';rememberedChannels=undefined;
+      selection={kind:'branch',ref:project.preferred_branch};selectionSource='preferred_branch';
       current=await revisionSnapshot(configuration,project,source,selection);
     }
-    const available=new Set(current.channels.filter(channel=>channel.selectable).map(channel=>channel.id));
-    let requestedChannels=Array.isArray(rememberedChannels)?[...new Set(rememberedChannels)].filter(channel=>available.has(channel)):[];
-    for(const group of SCANNER_GROUPS)if(group.some(channel=>requestedChannels.includes(channel))){if(group.every(channel=>available.has(channel)))requestedChannels=[...new Set([...requestedChannels,...group])];else requestedChannels=[];}
-    if(!requestedChannels.length)requestedChannels=current.channels.filter(channel=>channel.default_selected&&channel.selectable).map(channel=>channel.id);
+    // Fast analysis remembers the code selection, never an old reduced scanner
+    // subset. Recompute every scanner that is selectable for the exact revision.
+    const requestedChannels=current.channels.filter(channel=>channel.selectable).map(channel=>channel.id);
     if(!requestedChannels.length)throw new Failure(409,'The trusted project has no usable default scanner channel.','default_channels_unavailable');
     if(SCANNER_GROUPS.some(group=>group.some(channel=>requestedChannels.includes(channel))&&!group.every(channel=>requestedChannels.includes(channel))))throw new Failure(409,'The trusted default scanner policy contains an incomplete shared lane.','default_channels_unavailable');
     const targetSha=current.target_sha;

@@ -17,15 +17,16 @@ Coordinator runs, lease state, scanner job
 links, and individual channel scheduling remain operational details. The exact selected
 revision remains visible throughout.
 On a project, **Fast analysis** is the one-click path: one action asks the Worker to reuse that
-user's most recent branch, pull request, commit, and scanner selection for the project. With no
-usable history it selects the preferred branch and every approved ready channel. The Worker
+user's most recent branch, pull request, or commit for the project and recompute every channel
+that is ready and applicable to that revision. With no usable history it selects the preferred
+branch. The Worker
 verifies current collaborator access, resolves a moving selection to its current exact SHA, and
 starts that immutable revision. The retained report stays visible while the request is active.
-Its speed refers to automatic selection; independent scanner lanes run concurrently, and Fast does
-not further reduce the scanner coverage remembered from the previous selection.
+Its speed refers to automatic selection; independent scanner lanes run concurrently, and Fast
+never carries forward a reduced scanner subset from the previous request.
 **Configure analysis** opens a three-step flow that asks for a full commit SHA first and
-offers branch or pull-request selection as a fallback. It supports safe defaults, individual
-producer groups, or all currently available channels. Selecting vendor channels requires
+offers branch or pull-request selection as a fallback. It initially selects every currently
+available channel while allowing explicit customization by producer group. Selecting vendor channels requires
 an explicit usage confirmation before preview and submission. The immutable-SHA review is
 the final confirmation boundary. The Worker
 checks collaborator access and transactionally persists an immutable `analysis-request-v4` envelope in the SQLite-backed Durable Object with source

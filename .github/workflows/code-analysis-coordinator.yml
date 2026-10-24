@@ -111,7 +111,8 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
       CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
-  portable:
+  portable_profile:
+    name: Source scanners · portable profile
     if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'portable'
     needs: claim
     permissions:
@@ -123,7 +124,8 @@ jobs:
       tooling_sha: ${{ needs.claim.outputs.tooling_sha }}
       target: ${{ needs.claim.outputs.target }}
       request_id: ${{ needs.claim.outputs.request_id }}
-  configured:
+  agentic_profile:
+    name: Source scanners · agentic-soc profile
     if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'agentic-soc'
     needs: claim
     permissions:
@@ -137,7 +139,7 @@ jobs:
       request_id: ${{ needs.claim.outputs.request_id }}
   publish:
     if: always() && needs.claim.outputs.claimed == 'true'
-    needs: [claim, vendor, portable, configured]
+    needs: [claim, vendor, portable_profile, agentic_profile]
     runs-on: ubuntu-24.04
     concurrency:
       group: analysis-publication-${{ needs.claim.outputs.project_id }}
@@ -175,7 +177,7 @@ jobs:
         run: python -m scripts.code_analysis.repository_service
   complete:
     if: always() && needs.claim.outputs.claimed == 'true'
-    needs: [claim, vendor, portable, configured, publish]
+    needs: [claim, vendor, portable_profile, agentic_profile, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     environment: production
@@ -189,8 +191,8 @@ jobs:
           REQUEST_ID: ${{ needs.claim.outputs.request_id }}
           GENERATION: ${{ needs.claim.outputs.generation }}
           LEASE_TOKEN: ${{ needs.claim.outputs.lease_token }}
-          PORTABLE_RESULT: ${{ needs.portable.result }}
-          CONFIGURED_RESULT: ${{ needs.configured.result }}
+          PORTABLE_RESULT: ${{ needs.portable_profile.result }}
+          CONFIGURED_RESULT: ${{ needs.agentic_profile.result }}
           VENDOR_RESULT: ${{ needs.vendor.result }}
           PUBLISH_RESULT: ${{ needs.publish.result }}
         run: |

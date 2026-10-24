@@ -6,7 +6,7 @@ import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID} from 
 class Failure extends Error { constructor(status,message,code){super(message);this.status=status;this.code=code;} }
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status});
 const env={APPLICATION_MODE:'repositories',ANALYSIS_REPOSITORY:EXECUTION_REPOSITORY,ANALYSIS_REPOSITORY_ID:String(EXECUTION_REPOSITORY_ID),MAX_LAUNCH_BYTES:2048};
-const config={schema_version:'analysis-projects-v1',execution_repository:{id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY},tooling_sha:'a'.repeat(40),projects:CONFIGURED_TARGETS.map(target=>({id:target.id,source_repository:{id:target.repository_id,full_name:target.repository,private:false},relationship:target.relationship,preferred_branch:target.branch,native_feedback_enabled:target.native_feedback,profile:{mode:'portable'},enabled_scanners:['semgrep','snyk'],fast_scanners:['semgrep'],deferred_channels:{},report_budget_bytes:900000000}))};
+const config={schema_version:'analysis-projects-v1',execution_repository:{id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY},tooling_sha:'a'.repeat(40),projects:CONFIGURED_TARGETS.map(target=>({id:target.id,source_repository:{id:target.repository_id,full_name:target.repository,private:false},relationship:target.relationship,preferred_branch:target.branch,native_feedback_enabled:target.native_feedback,profile:{mode:'portable'},enabled_scanners:['semgrep','snyk'],deferred_channels:{},report_budget_bytes:900000000}))};
 const configBlob={content:Buffer.from(JSON.stringify(config)).toString('base64')};
 const host=(permissions={pull:true,push:true,admin:false})=>({id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY,private:false,default_branch:'main',permissions});
 
@@ -223,7 +223,7 @@ test('pull-only collaborator launch persists a pinned v4 envelope and idempotent
   assert.equal(h.calls.some(call=>call.options.method&&call.options.method!=='GET'),false);
 });
 
-test('Fast Path allows a pull-only collaborator and admits only trusted default channels',async()=>{
+test('Fast Path allows a pull-only collaborator and admits every available channel',async()=>{
   const source=CONFIGURED_TARGETS[0],key='44444444-4444-4444-8444-444444444444';
   const h=helpers({permissions:{pull:true,push:false,admin:false},overrides:{[`repos/${source.repository}/branches/${source.branch}`]:{commit:{sha:'f'.repeat(40)}}}});
   const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,strategy:'LAST_USED_OR_PREFERRED'},key),env,session,h);
@@ -238,16 +238,21 @@ test('Fast Path allows a pull-only collaborator and admits only trusted default 
   assert.deepEqual(h.wakeCalls,[[key,'f'.repeat(40)]]);
 });
 
-test('Fast Path repeats the current users last project selection and scanner scope',async()=>{
+test('Fast Path repeats the current users last revision and restores every available scanner',async()=>{
   const source=CONFIGURED_TARGETS[1],key='44444444-4444-4444-8444-444444444445',sha='c'.repeat(40),base='d'.repeat(40);
   const remembered={request_id:'33333333-3333-4333-8333-333333333333',status:'published',intent:{project_id:source.id,actor_id:73,selection:{kind:'pr',ref:'12'},requested_channels:['semgrep']}};
-  const h=helpers({queueRecent:[remembered],overrides:{[`repos/${source.repository}/pulls/12`]:{number:12,title:'Remembered PR',draft:false,head:{sha,ref:'feature',repo:{id:source.repository_id,full_name:source.repository}},base:{sha:base,ref:source.branch,repo:{full_name:source.repository}}}}});
+  const allScannerConfig={...config,projects:config.projects.map(project=>String(project.id)===source.id?{...project,enabled_scanners:['semgrep','snyk','coderabbit-ai-advisory']}:project)};
+  const h=helpers({queueRecent:[remembered],overrides:{
+    [`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`]:{content:Buffer.from(JSON.stringify(allScannerConfig)).toString('base64')},
+    [`repos/${source.repository}/pulls/12`]:{number:12,title:'Remembered PR',draft:false,head:{sha,ref:'feature',repo:{id:source.repository_id,full_name:source.repository}},base:{sha:base,ref:source.branch,repo:{full_name:source.repository}}}
+  }});
   const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,strategy:'LAST_USED_OR_PREFERRED'},key),env,session,h);
   const result=await response.json(),intent=h.queueCalls.find(call=>call.path==='/queue/admit').body.request;
   assert.equal(response.status,202);
   assert.deepEqual(result.selection,{kind:'pr',ref:'12'});
   assert.equal(result.selection_source,'remembered');
-  assert.deepEqual(result.requested_channels,['semgrep']);
+  assert.deepEqual(result.requested_channels,['coderabbit-ai-advisory','semgrep','snyk']);
+  assert.deepEqual(intent.requested_channels,['coderabbit-ai-advisory','semgrep','snyk']);
   assert.equal(result.pr_context.number,12);
   assert.equal(intent.target_sha,sha);
   assert.equal(intent.actor_id,73);

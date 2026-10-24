@@ -31,10 +31,14 @@ class ScannerAccessTests(unittest.TestCase):
 
     def test_source_profiles_run_independently_from_vendor_evidence(self):
         workflow = yaml.safe_load(Path('.github/workflows/code-analysis-coordinator.yml').read_text(encoding='utf-8'))
-        for name in ('portable', 'configured'):
+        for name in ('portable_profile', 'agentic_profile'):
             condition = workflow['jobs'][name]['if']
             self.assertIn('always()', condition)
             self.assertEqual(workflow['jobs'][name]['needs'], 'claim')
+        self.assertEqual(workflow['jobs']['portable_profile']['name'], 'Source scanners · portable profile')
+        self.assertEqual(workflow['jobs']['agentic_profile']['name'], 'Source scanners · agentic-soc profile')
+        self.assertIn("profile_mode == 'portable'", workflow['jobs']['portable_profile']['if'])
+        self.assertIn("profile_mode == 'agentic-soc'", workflow['jobs']['agentic_profile']['if'])
 
     def test_vendor_diagnostics_cannot_publish_a_target_report(self):
         workflow = yaml.safe_load(diagnostics())
