@@ -121,7 +121,7 @@ class ScannerAccessTests(unittest.TestCase):
             for job in workflow['jobs'].values():
                 permissions = job.get('permissions', {})
                 self.assertNotIn('checks', permissions)
-                self.assertNotIn('security-events', permissions)
+                self.assertNotEqual(permissions.get('security-events'), 'write')
 
 
 if __name__ == '__main__':

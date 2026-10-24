@@ -117,6 +117,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      security-events: read
     uses: ./.github/workflows/reusable-source.yml
     with:
       tooling_sha: ${{ needs.claim.outputs.tooling_sha }}
@@ -128,6 +129,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      security-events: read
     uses: ./.github/workflows/reusable-source-full.yml
     with:
       tooling_sha: ${{ needs.claim.outputs.tooling_sha }}
