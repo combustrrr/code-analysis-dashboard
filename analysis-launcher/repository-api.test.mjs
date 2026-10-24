@@ -10,12 +10,12 @@ const config={schema_version:'analysis-projects-v1',execution_repository:{id:EXE
 const configBlob={content:Buffer.from(JSON.stringify(config)).toString('base64')};
 const host=(permissions={pull:true,push:true,admin:false})=>({id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY,private:false,default_branch:'main',permissions});
 
-function helpers({permissions,overrides={},wakeCoordinator}={}) {
+function helpers({permissions,overrides={},wakeCoordinator,queueRecent=[]}={}) {
   const calls=[],queueCalls=[],wakeCalls=[];
   const serviceToken=async()=> 'central-app-read-token';
   const github=async(path,token,options={})=>{
     calls.push({path,token,options});
-    if(Object.hasOwn(overrides,path))return overrides[path];
+    if(Object.hasOwn(overrides,path)){if(overrides[path] instanceof Error)throw overrides[path];return overrides[path];}
     if(path===`repos/${EXECUTION_REPOSITORY}`)return host(permissions);
     if(path===`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`)return configBlob;
     if(path==='user')return {id:73,login:'scanner-writer'};
@@ -23,7 +23,7 @@ function helpers({permissions,overrides={},wakeCoordinator}={}) {
     if(source)return {id:source.repository_id,full_name:source.repository,private:false,default_branch:source.branch,permissions:{pull:true}};
     throw new Error(`Unexpected GitHub request: ${path}`);
   };
-  return {calls,queueCalls,wakeCalls,Failure,json,github,serviceToken,pages:async()=>[],wakeCoordinator:async(...args)=>{wakeCalls.push(args);if(wakeCoordinator)return wakeCoordinator(...args);},queue:async(path,body)=>{queueCalls.push({path,body});if(path==='/queue/status')return json({error:'not_found'},404);if(path==='/queue/recent')return json({requests:[]});return json({...body.request,intent:body.request,status:'preparing'},201);},seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
+  return {calls,queueCalls,wakeCalls,Failure,json,github,serviceToken,pages:async()=>[],wakeCoordinator:async(...args)=>{wakeCalls.push(args);if(wakeCoordinator)return wakeCoordinator(...args);},queue:async(path,body)=>{queueCalls.push({path,body});if(path==='/queue/status')return json({error:'not_found'},404);if(path==='/queue/recent')return json({requests:queueRecent});return json({...body.request,intent:body.request,status:'preparing'},201);},seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
 }
 
 const session={token:'user-token'};
@@ -111,6 +111,24 @@ test('read-only collaborators can preview an exact branch revision and trusted c
   assert.equal(result.channels.find(channel=>channel.id==='snyk').default_selected,true);
   assert.ok(result.preview_token);
   assert.ok(h.calls.every(call=>!call.options.method));
+});
+
+test('Configure analysis resolves branch pull request and commit selections for all configured projects',async()=>{
+  for(const [index,source] of CONFIGURED_TARGETS.entries()){
+    const branchSha=String(index+1).repeat(40),prSha=String(index+4).repeat(40),baseSha=String(index+7).repeat(40),commitSha=String.fromCharCode(97+index).repeat(40);
+    const h=helpers({overrides:{
+      [`repos/${source.repository}/branches/${encodeURIComponent(source.branch)}`]:{commit:{sha:branchSha}},
+      [`repos/${source.repository}/pulls/7`]:{number:7,title:'Configured PR',draft:false,head:{sha:prSha,ref:'feature',repo:{id:source.repository_id,full_name:source.repository}},base:{sha:baseSha,ref:source.branch,repo:{full_name:source.repository}}},
+      [`repos/${source.repository}/commits/${commitSha}`]:{sha:commitSha},
+    }});
+    for(const selection of [{kind:'branch',ref:source.branch},{kind:'pr',ref:'7'},{kind:'commit',ref:commitSha}]){
+      const response=await repositoryApi(post('/api/project-preview',{project_id:source.id,selection}),env,session,h),result=await response.json();
+      assert.equal(response.status,200,`${source.repository} ${selection.kind}`);
+      assert.deepEqual(result.selection,selection);
+      assert.match(result.target_sha,/^[a-f0-9]{40}$/);
+      if(selection.kind==='pr')assert.equal(result.pr_context.number,7);else assert.equal(result.pr_context,null);
+    }
+  }
 });
 
 test('analysis choices omit deferred scanners that are irrelevant to the project profile',async()=>{
@@ -208,7 +226,7 @@ test('pull-only collaborator launch persists a pinned v4 envelope and idempotent
 test('Fast Path allows a pull-only collaborator and admits only trusted default channels',async()=>{
   const source=CONFIGURED_TARGETS[0],key='44444444-4444-4444-8444-444444444444';
   const h=helpers({permissions:{pull:true,push:false,admin:false},overrides:{[`repos/${source.repository}/branches/${source.branch}`]:{commit:{sha:'f'.repeat(40)}}}});
-  const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,refType:'PREFERRED_BRANCH'},key),env,session,h);
+  const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,strategy:'LAST_USED_OR_PREFERRED'},key),env,session,h);
   const result=await response.json(),intent=h.queueCalls.find(call=>call.path==='/queue/admit').body.request;
   assert.equal(response.status,202);
   assert.equal(result.request_id,key);
@@ -220,10 +238,40 @@ test('Fast Path allows a pull-only collaborator and admits only trusted default 
   assert.deepEqual(h.wakeCalls,[[key,'f'.repeat(40)]]);
 });
 
-test('a failed wake does not undo durable queue acceptance',async()=>{const source=CONFIGURED_TARGETS[0],key='45555555-5555-4555-8555-555555555555';const h=helpers({wakeCoordinator:async()=>{throw new Error('dispatch unavailable');},overrides:{[`repos/${source.repository}/branches/${source.branch}`]:{commit:{sha:'f'.repeat(40)}}}});const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,refType:'PREFERRED_BRANCH'},key),env,session,h);assert.equal(response.status,202);assert.equal((await response.json()).wake_status,'scheduled_recovery');assert.ok(h.queueCalls.some(call=>call.path==='/queue/admit'));});
+test('Fast Path repeats the current users last project selection and scanner scope',async()=>{
+  const source=CONFIGURED_TARGETS[1],key='44444444-4444-4444-8444-444444444445',sha='c'.repeat(40),base='d'.repeat(40);
+  const remembered={request_id:'33333333-3333-4333-8333-333333333333',status:'published',intent:{project_id:source.id,actor_id:73,selection:{kind:'pr',ref:'12'},requested_channels:['semgrep']}};
+  const h=helpers({queueRecent:[remembered],overrides:{[`repos/${source.repository}/pulls/12`]:{number:12,title:'Remembered PR',draft:false,head:{sha,ref:'feature',repo:{id:source.repository_id,full_name:source.repository}},base:{sha:base,ref:source.branch,repo:{full_name:source.repository}}}}});
+  const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,strategy:'LAST_USED_OR_PREFERRED'},key),env,session,h);
+  const result=await response.json(),intent=h.queueCalls.find(call=>call.path==='/queue/admit').body.request;
+  assert.equal(response.status,202);
+  assert.deepEqual(result.selection,{kind:'pr',ref:'12'});
+  assert.equal(result.selection_source,'remembered');
+  assert.deepEqual(result.requested_channels,['semgrep']);
+  assert.equal(result.pr_context.number,12);
+  assert.equal(intent.target_sha,sha);
+  assert.equal(intent.actor_id,73);
+});
+
+test('Fast Path falls back safely and launches every configured project',async()=>{
+  for(const [index,source] of CONFIGURED_TARGETS.entries()){
+    const key=`77777777-7777-4777-8777-${String(index+1).padStart(12,'0')}`,sha=String(index+4).repeat(40);
+    const stale={request_id:`88888888-8888-4888-8888-${String(index+1).padStart(12,'0')}`,status:'published',intent:{project_id:source.id,actor_id:73,selection:{kind:'branch',ref:'deleted-branch'},requested_channels:['semgrep']}};
+    const h=helpers({queueRecent:[stale],overrides:{[`repos/${source.repository}/branches/deleted-branch`]:new Failure(404,'missing','not_found'),[`repos/${source.repository}/branches/${source.branch}`]:{commit:{sha}}}});
+    const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,strategy:'LAST_USED_OR_PREFERRED'},key),env,session,h);
+    const result=await response.json();
+    assert.equal(response.status,202);
+    assert.equal(result.source_repository,source.repository);
+    assert.deepEqual(result.selection,{kind:'branch',ref:source.branch});
+    assert.equal(result.selection_source,'preferred_branch');
+    assert.equal(result.target_sha,sha);
+  }
+});
+
+test('a failed wake does not undo durable queue acceptance',async()=>{const source=CONFIGURED_TARGETS[0],key='45555555-5555-4555-8555-555555555555';const h=helpers({wakeCoordinator:async()=>{throw new Error('dispatch unavailable');},overrides:{[`repos/${source.repository}/branches/${source.branch}`]:{commit:{sha:'f'.repeat(40)}}}});const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,strategy:'LAST_USED_OR_PREFERRED'},key),env,session,h);assert.equal(response.status,202);assert.equal((await response.json()).wake_status,'scheduled_recovery');assert.ok(h.queueCalls.some(call=>call.path==='/queue/admit'));});
 
 test('Fast Path requires a key, exact intent, and current collaborator access',async()=>{
-  const source=CONFIGURED_TARGETS[0],intent={projectId:source.id,refType:'PREFERRED_BRANCH'};
+  const source=CONFIGURED_TARGETS[0],intent={projectId:source.id,strategy:'LAST_USED_OR_PREFERRED'};
   await assert.rejects(()=>repositoryApi(post('/api/project-launch-fast',intent),env,session,helpers()),error=>error.status===400&&error.code==='invalid_idempotency_key');
   await assert.rejects(()=>repositoryApi(postWithKey('/api/project-launch-fast',{...intent,channels:['semgrep']},'55555555-5555-4555-8555-555555555555'),env,session,helpers()),error=>error.status===400&&error.code==='invalid_fast_path_intent');
   await assert.rejects(()=>repositoryApi(postWithKey('/api/project-launch-fast',intent,'55555555-5555-4555-8555-555555555555'),env,session,helpers({permissions:{pull:false,push:false,admin:false}})),error=>error.status===403&&error.code==='repository_read_required');
@@ -232,8 +280,8 @@ test('Fast Path requires a key, exact intent, and current collaborator access',a
 test('Fast Path retries return the original accepted request',async()=>{
   const source=CONFIGURED_TARGETS[0],key='66666666-6666-4666-8666-666666666666';
   const h=helpers();h.queue=async(path,body)=>{h.queueCalls.push({path,body});if(path==='/queue/status')return json({request_id:key,status:'queued',queue_position:3,intent:{project_id:source.id,selection:{kind:'branch',ref:source.branch},target_sha:'d'.repeat(40),requested_channels:['semgrep']}},200);throw new Error('must not admit duplicate');};
-  const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,refType:'PREFERRED_BRANCH'},key),env,session,h);
-  assert.equal(response.status,202);assert.deepEqual(await response.json(),{status:'queued',lifecycle:'Preparing',request_id:key,run_id:null,repository:EXECUTION_REPOSITORY,source_repository:source.repository,target_sha:'d'.repeat(40),preferred_branch:source.branch,requested_channels:['semgrep'],duplicate:true});
+  const response=await repositoryApi(postWithKey('/api/project-launch-fast',{projectId:source.id,strategy:'LAST_USED_OR_PREFERRED'},key),env,session,h);
+  assert.equal(response.status,202);assert.deepEqual(await response.json(),{status:'queued',lifecycle:'Preparing',request_id:key,run_id:null,repository:EXECUTION_REPOSITORY,source_repository:source.repository,target_sha:'d'.repeat(40),selection:{kind:'branch',ref:source.branch},selection_source:'remembered',preferred_branch:source.branch,requested_channels:['semgrep'],pr_context:null,duplicate:true});
 });
 
 test('projects is the workspace home contract and dashboard is retired',async()=>{

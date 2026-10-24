@@ -381,9 +381,9 @@ test('authorized user follows one repository project from selection through publ
    if(url.pathname==='/api/project-preview')return route.fulfill({headers,json:{preview_id:'preview-access',preview_token:'signed-preview',previewed_at:new Date().toISOString(),project_id:project,source_repository:source,source_repository_id:1278177697,selection:{kind:'branch',ref:'Testing'},target_sha:sha,pr_context:null,tooling_sha:'e'.repeat(40),profile_digest:'f'.repeat(64),channels,cached_channels:[]}});
     if(url.pathname==='/api/project-launch-fast'){
     launches++;
-      expect(route.request().postDataJSON()).toEqual({projectId:project,refType:'PREFERRED_BRANCH'});
+      expect(route.request().postDataJSON()).toEqual({projectId:project,strategy:'LAST_USED_OR_PREFERRED'});
       expect(route.request().headers()['idempotency-key']).toMatch(/^[a-f0-9-]{36}$/);
-    return route.fulfill({headers,status:202,json:{status:'queued',request_id:'flow-request',run_id:42,queue_position:2,source_repository:source,target_sha:sha,preferred_branch:'Testing',requested_channels:['semgrep']}});
+    return route.fulfill({headers,status:202,json:{status:'preparing',lifecycle:'Preparing',request_id:'flow-request',run_id:42,source_repository:source,target_sha:sha,preferred_branch:'Testing',selection:{kind:'branch',ref:'Testing'},selection_source:'preferred_branch',requested_channels:['semgrep']}});
   }
   if(url.pathname==='/api/project-activity'){
    activityReads++;const isPublished=activityReads>1;published=isPublished;
@@ -434,7 +434,7 @@ test('authorized user follows one repository project from selection through publ
   expect(launches).toBe(0);
   await page.getByRole('link',{name:'Run analysis'}).click();
   await page.getByRole('button',{name:/Fast analysis/}).click();
-  await page.getByRole('button',{name:'Analyze latest commit'}).click();
+  await page.getByRole('button',{name:'Repeat last analysis'}).click();
  await expect(page.locator('.ant-alert-title').getByText('Analyzing',{exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Building the first reviewable report'})).toBeVisible();
  await expect(page.getByText('This project has no reviewable report yet.')).toBeVisible();

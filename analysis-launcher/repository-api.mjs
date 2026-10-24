@@ -229,7 +229,7 @@ export async function repositoryApi(request, env, session, helpers) {
 
   if (request.method === 'POST' && url.pathname === '/api/project-launch-fast') {
     const input=await requestBody();
-    if(!input||Object.keys(input).sort().join(',')!=='projectId,refType'||input.refType!=='PREFERRED_BRANCH')throw new Failure(400,'Fast Path accepts only the configured preferred branch intent.','invalid_fast_path_intent');
+    if(!input||Object.keys(input).sort().join(',')!=='projectId,strategy'||input.strategy!=='LAST_USED_OR_PREFERRED')throw new Failure(400,'Fast analysis accepts only the last-used selection strategy.','invalid_fast_path_intent');
     const idempotencyKey=request.headers.get('Idempotency-Key')||'';
     if(!/^[0-9a-f-]{36}$/i.test(idempotencyKey))throw new Failure(400,'A request idempotency key is required.','invalid_idempotency_key');
     const {repository,configuration}=await context('pull');
@@ -239,18 +239,37 @@ export async function repositoryApi(request, env, session, helpers) {
     const prior=await queue('/queue/status',{request_id:requestId});
     if(prior.ok){
       const row=await prior.json();
-      if(String(row.intent?.project_id)!==String(project.id)||row.intent?.selection?.kind!=='branch'||row.intent?.selection?.ref!==project.preferred_branch)throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
+      if(String(row.intent?.project_id)!==String(project.id))throw new Failure(409,'This idempotency key already identifies a different analysis request.','idempotency_conflict');
       const lifecycle=row.status==='analyzing'?'Analyzing':['published','reused'].includes(row.status)?'Ready':['failed','superseded','cancelled_cutover'].includes(row.status)?'Needs attention':'Preparing';
-      return json({status:row.status,lifecycle,request_id:row.request_id,run_id:row.result?.run_id||null,repository:repository.full_name,source_repository:source.full_name,target_sha:row.intent.target_sha,preferred_branch:project.preferred_branch,requested_channels:row.intent.requested_channels,duplicate:true},202);
+      return json({status:row.status,lifecycle,request_id:row.request_id,run_id:row.result?.run_id||null,repository:repository.full_name,source_repository:source.full_name,target_sha:row.intent.target_sha,selection:row.intent.selection,selection_source:row.intent.selection_source||'remembered',preferred_branch:project.preferred_branch,requested_channels:row.intent.requested_channels,pr_context:row.intent.pr_context||null,duplicate:true},202);
     }
-    const current=await revisionSnapshot(configuration,project,source,{kind:'branch',ref:project.preferred_branch});
-    const requestedChannels=current.channels.filter(channel=>channel.default_selected&&channel.selectable).map(channel=>channel.id);
+    const actor=await github('user',token);
+    let selection={kind:'branch',ref:project.preferred_branch},rememberedChannels,selectionSource='preferred_branch';
+    try{
+      const recent=await queue('/queue/recent',{});
+      if(recent.ok){
+        const rows=(await recent.json()).requests||[];
+        const remembered=rows.find(row=>String(row.intent?.project_id)===String(project.id)&&row.intent?.actor_id===actor.id&&['branch','pr','commit'].includes(row.intent?.selection?.kind)&&typeof row.intent.selection.ref==='string');
+        if(remembered){selection=remembered.intent.selection;rememberedChannels=remembered.intent.requested_channels;selectionSource='remembered';}
+      }
+    }catch{}
+    let current;
+    try{current=await revisionSnapshot(configuration,project,source,selection);}
+    catch(error){
+      if(selectionSource!=='remembered'||!error||![404,409].includes(error.status))throw error;
+      selection={kind:'branch',ref:project.preferred_branch};selectionSource='preferred_branch';rememberedChannels=undefined;
+      current=await revisionSnapshot(configuration,project,source,selection);
+    }
+    const available=new Set(current.channels.filter(channel=>channel.selectable).map(channel=>channel.id));
+    let requestedChannels=Array.isArray(rememberedChannels)?[...new Set(rememberedChannels)].filter(channel=>available.has(channel)):[];
+    for(const group of SCANNER_GROUPS)if(group.some(channel=>requestedChannels.includes(channel))){if(group.every(channel=>available.has(channel)))requestedChannels=[...new Set([...requestedChannels,...group])];else requestedChannels=[];}
+    if(!requestedChannels.length)requestedChannels=current.channels.filter(channel=>channel.default_selected&&channel.selectable).map(channel=>channel.id);
     if(!requestedChannels.length)throw new Failure(409,'The trusted project has no usable default scanner channel.','default_channels_unavailable');
     if(SCANNER_GROUPS.some(group=>group.some(channel=>requestedChannels.includes(channel))&&!group.every(channel=>requestedChannels.includes(channel))))throw new Failure(409,'The trusted default scanner policy contains an incomplete shared lane.','default_channels_unavailable');
-    const actor=await github('user',token);const targetSha=current.target_sha;
-    const intent={schema_version:'analysis-request-v4',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection:current.selection,resolved_selection:{repository:source.full_name,repository_id:source.id,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:null,requested_channels:[...requestedChannels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:idempotencyKey.toLowerCase(),run_again:false,preview_id:crypto.randomUUID(),created_at:new Date().toISOString()};
+    const targetSha=current.target_sha;
+    const intent={schema_version:'analysis-request-v4',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection:current.selection,selection_source:selectionSource,resolved_selection:{repository:source.full_name,repository_id:source.id,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...requestedChannels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:idempotencyKey.toLowerCase(),run_again:false,preview_id:crypto.randomUUID(),created_at:new Date().toISOString()};
     const admittedBody=await admit(intent);
-    return json({status:'preparing',lifecycle:'Preparing',request_id:admittedBody.request_id||requestId,run_id:null,repository:repository.full_name,source_repository:source.full_name,target_sha:targetSha,preferred_branch:project.preferred_branch,requested_channels:admittedBody.intent?.requested_channels||[...requestedChannels].sort(),duplicate:admittedBody.duplicate===true,wake_status:admittedBody.wake_status},202);
+    return json({status:'preparing',lifecycle:'Preparing',request_id:admittedBody.request_id||requestId,run_id:null,repository:repository.full_name,source_repository:source.full_name,target_sha:targetSha,selection:current.selection,selection_source:selectionSource,preferred_branch:project.preferred_branch,requested_channels:admittedBody.intent?.requested_channels||[...requestedChannels].sort(),pr_context:current.pr_context,duplicate:admittedBody.duplicate===true,wake_status:admittedBody.wake_status},202);
   }
 
   if (request.method === 'POST' && url.pathname === '/api/project-preview') {

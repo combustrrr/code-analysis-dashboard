@@ -18,10 +18,11 @@ identifiers.
    the current source-only report from an optional separately retained PR overlay and
    shows compact readiness, active work, source/analyzed SHA, and timestamps. Opening a
    project or browsing revisions is read-only.
-2. Authorized collaborators use **Fast analysis** to select the latest preferred-branch SHA
-   and every approved scanner automatically, or **Configure analysis** to enter a full
-   40-character commit SHA first. Independent scanner lanes run concurrently; Fast analysis
-   does not reduce coverage.
+2. Authorized collaborators use **Fast analysis** to repeat their most recent revision and
+   scanner selection for that project. With no usable history it selects the latest preferred-
+   branch SHA and every approved scanner. **Configure analysis** accepts a full 40-character
+   commit SHA or any available branch or open pull request. Independent scanner lanes run
+   concurrently; Fast analysis does not impose serial execution.
    Branch and open-PR selection, including drafts, is available as a fallback.
    Configured analysis then chooses scanner producer groups.
    Portable channels are selected by default; vendor lanes are opt-in. Shared producer

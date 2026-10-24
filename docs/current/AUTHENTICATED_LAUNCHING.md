@@ -13,10 +13,13 @@ Developers see product-level progress only: Preparing, Analyzing, Preparing repo
 Coordinator runs, lease state, scanner job
 links, and individual channel scheduling remain operational details. The exact selected
 revision remains visible throughout.
-On a project, **Fast analysis** is the one-click path: one action asks the Worker to resolve the
-configured preferred branch, select every approved ready channel, verify current collaborator access,
-and start the exact SHA. The retained report stays visible while the request is active.
-Its speed refers to automatic selection; independent scanner lanes run concurrently and coverage is not reduced.
+On a project, **Fast analysis** is the one-click path: one action asks the Worker to reuse that
+user's most recent branch, pull request, commit, and scanner selection for the project. With no
+usable history it selects the preferred branch and every approved ready channel. The Worker
+verifies current collaborator access, resolves a moving selection to its current exact SHA, and
+starts that immutable revision. The retained report stays visible while the request is active.
+Its speed refers to automatic selection; independent scanner lanes run concurrently, and Fast does
+not further reduce the scanner coverage remembered from the previous selection.
 **Configure analysis** opens a three-step flow that asks for a full commit SHA first and
 offers branch or pull-request selection as a fallback. It supports safe defaults, individual
 producer groups, or all currently available channels. Selecting vendor channels requires

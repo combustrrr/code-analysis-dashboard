@@ -60,10 +60,12 @@ report tabs, and generic empty-report message are suppressed until publication. 
 tracker distinguishes scanner startup from reported channel progress and makes clear
 that the user may leave while analysis continues.
 
-Fast analysis automatically selects the latest preferred-branch commit and every ready
-channel in the reviewed project profile. Independent scanner lanes run concurrently;
-the name describes fewer setup steps, not reduced coverage. PR-only CodeRabbit evidence
-remains contextual. Public
+Fast analysis repeats the current user's most recent branch, pull request, commit, and
+scanner selection for that project. With no usable history it selects the latest preferred-
+branch commit and every ready channel in the reviewed project profile. Independent scanner
+lanes run concurrently; the name describes fewer setup steps and does not further reduce the
+remembered scanner coverage. PR-only
+CodeRabbit evidence remains contextual. Public
 report manifests are rebuilt from an explicit bounded schema during publication so
 legacy embedded fields cannot be carried forward into a request larger than the Worker
 ingress limit.
