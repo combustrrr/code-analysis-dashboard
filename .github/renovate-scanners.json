@@ -82,6 +82,12 @@
   "ignoreTests": false,
   "packageRules": [
     {
+      "description": "Scanner jobs choose runtime lines explicitly; do not mix runtime migrations with scanner updates",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["python", "node"],
+      "enabled": false
+    },
+    {
       "description": "Group stable scanner releases into one compatibility-tested tooling promotion",
       "matchFileNames": [
         ".ci/**",

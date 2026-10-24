@@ -60,6 +60,12 @@ SaaS-owned engines update at the provider. Source-owned ESLint/TypeScript
 versions follow the selected repository'"'"'s lockfile; the service does not rewrite
 upstream dependencies to force a newer compiler.
 
+Python and Node runtime lines are deliberately excluded from scanner dependency
+updates. Runtime migrations are compatibility decisions of their own; mixing a
+`3.11` patch pin with a `3.15` migration creates ambiguous upgrade targets and can
+hide a scanner change. Setup actions remain managed, but runtime versions change
+only in an explicit, separately tested maintenance change.
+
 `14-scanner-compatibility.yml` runs service/extension regression tests, workflow
 checks, and native-output canaries with read-only permissions and no scanner or
 publication secrets. Stable major, minor, patch, digest, and pin updates can

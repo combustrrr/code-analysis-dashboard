@@ -33,15 +33,20 @@ class ScannerUpdateTests(unittest.TestCase):
         self.assertFalse(policy['ignoreTests'])
         self.assertTrue(policy['ignoreUnstable'])
         self.assertEqual(policy['minimumReleaseAge'], '3 days')
+        runtime_rule = next(rule for rule in policy['packageRules']
+                            if set(rule.get('matchPackageNames', [])) == {'python', 'node'})
+        self.assertFalse(runtime_rule['enabled'])
+        self.assertEqual(runtime_rule['matchManagers'], ['github-actions'])
         # Renovate removed requiredStatusChecks; enforce the named gate through
         # branch protection rather than a deprecated configuration key.
         updater = Path('.github/workflows/13-scanner-updates.yml').read_text()
         self.assertIn('protection/required_status_checks', updater)
         self.assertIn('Scanner compatibility', updater)
         self.assertNotIn('requiredStatusChecks', policy)
-        update_types = set(policy['packageRules'][0]['matchUpdateTypes'])
+        scanner_rule = next(rule for rule in policy['packageRules'] if rule.get('groupName'))
+        update_types = set(scanner_rule['matchUpdateTypes'])
         self.assertEqual(update_types, {'major', 'minor', 'patch', 'digest', 'pin'})
-        self.assertEqual(policy['packageRules'][0]['groupName'], 'validated scanner stack')
+        self.assertEqual(scanner_rule['groupName'], 'validated scanner stack')
         workflow = yaml.safe_load(Path('.github/workflows/14-scanner-compatibility.yml').read_text())
         self.assertEqual(workflow['permissions'], {'contents': 'read'})
         self.assertNotIn('secrets.', json.dumps(workflow))
