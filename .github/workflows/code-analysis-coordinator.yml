@@ -17,7 +17,7 @@ permissions:
   contents: read
 jobs:
   claim:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     environment: production
     outputs:
@@ -73,7 +73,7 @@ jobs:
   heartbeat:
     if: needs.claim.outputs.claimed == 'true'
     needs: claim
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     environment: production
     permissions: {}
@@ -136,7 +136,7 @@ jobs:
   publish:
     if: always() && needs.claim.outputs.claimed == 'true'
     needs: [claim, vendor, portable, configured]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     concurrency:
       group: analysis-publication-${{ needs.claim.outputs.project_id }}
       cancel-in-progress: false
@@ -174,7 +174,7 @@ jobs:
   complete:
     if: always() && needs.claim.outputs.claimed == 'true'
     needs: [claim, vendor, portable, configured, publish]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     environment: production
     permissions:

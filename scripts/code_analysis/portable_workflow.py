@@ -15,11 +15,11 @@ def scanner_jobs():
         for channel in channels:
             steps.append({'name':'Run reviewed '+channel+' adapter','run':f'python -I scripts/code_analysis/trusted_entry.py portable_runner {channel} --source .source --output portable-output/{channel}'})
         steps.append({'uses':UPLOAD,'if':'always()','with':{'name':'portable-'+job,'path':'portable-output/','retention-days':7,'if-no-files-found':'error'}})
-        result['portable-'+job]={'name':'Portable '+job,'needs':['identity'],'if':"${{ contains(fromJSON(needs.identity.outputs.jobs), '"+job+"') }}",'runs-on':'ubuntu-latest','timeout-minutes':35,'permissions':{'contents':'read'},'steps':steps}
+        result['portable-'+job]={'name':'Portable '+job,'needs':['identity'],'if':"${{ contains(fromJSON(needs.identity.outputs.jobs), '"+job+"') }}",'runs-on':'ubuntu-24.04','timeout-minutes':35,'permissions':{'contents':'read'},'steps':steps}
     result['portable-osv-scanner']={
         'name':'Portable osv-scanner', 'needs':['identity'],
         'if':"${{ contains(fromJSON(needs.identity.outputs.jobs), 'osv-scanner') }}",
-        'runs-on':'ubuntu-latest', 'timeout-minutes':20, 'permissions':{'contents':'read'},
+        'runs-on':'ubuntu-24.04', 'timeout-minutes':20, 'permissions':{'contents':'read'},
         'steps':[
             {'uses': CHECKOUT, 'with': {'ref':'${{ inputs.tooling_sha }}','persist-credentials':False}},
             {'uses': CHECKOUT, 'with': {'repository':'${{ fromJSON(inputs.target).source_repository }}','ref':'${{ fromJSON(inputs.target).head_sha }}','path':'.source','persist-credentials':False}},

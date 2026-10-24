@@ -26,7 +26,7 @@ concurrency:
 jobs:
   sonarqube-cloud:
     name: SonarQube Cloud (Optional)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -167,7 +167,7 @@ jobs:
         \ https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
   python-ruff:
     name: Ruff (Python Lint + Format)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
     - name: Checkout
@@ -209,7 +209,7 @@ jobs:
     - name: "Ruff lint (default rules \u2014 matches existing python-static CI gate)"
       run: python -m ruff check backend/app backend/tests --exit-zero
     - name: "Ruff lint (extended rules \u2014 advisory for baseline phase)"
-      run: "python -m ruff check backend/ \\\n  --config .analysis-tooling/config/code-analysis/ruff.toml \\\n  --output-format=github\
+      run: "python -m ruff check backend/ \\\n  --config .analysis-tooling/config/code-analysis/ruff.toml \\\n  --output-format=concise\
         \ \\\n  --exit-zero\n"
     - name: Ruff format check (advisory)
       run: "python -m ruff format --check backend/ \\\n  --config .analysis-tooling/config/code-analysis/ruff.toml \\\n  ||\
@@ -228,7 +228,7 @@ jobs:
         --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
   python-bandit:
     name: Bandit (Python Security)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -276,7 +276,7 @@ jobs:
         \ \\\n  --output bandit-normalized/github-security.sarif \\\n  --maximum 5000\n"
     - name: Upload SARIF to GitHub Security tab
       if: always()
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: bandit-normalized/github-security.sarif
         category: bandit
@@ -290,7 +290,7 @@ jobs:
         \ }/${ github.run_attempt }/bandit-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
   python-types:
     name: Pyright (Python Type Checking)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
     - name: Checkout
@@ -325,7 +325,7 @@ jobs:
         --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
   typescript-quality:
     name: ESLint + tsc (TypeScript/React)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:

@@ -110,6 +110,18 @@ header in each file identifies the source script.
 The generator also produces reusable workflows `reusable-source.yml` and
 `reusable-source-full.yml` used by portable profile execution.
 
+### Actions runtime and annotation hygiene
+
+Production workflows use the explicit `ubuntu-24.04` runner image so a future
+`ubuntu-latest` migration cannot silently change scanner behavior. Artifact,
+Pages, and CodeQL actions are pinned to reviewed Node 24-compatible commits.
+CodeQL source lanes preserve their local SARIF for report assembly and set both
+`upload: never` and `upload-database: false`; they must not request Code Scanning
+publication access. Ruff's advisory console pass uses concise output so findings
+remain in its JSON report without also becoming workflow error annotations.
+Do not suppress genuine scanner execution failures: those belong in the scanner
+status evidence and remain operationally visible.
+
 ## Adoption of validated tooling
 
 15-tooling-rollout.yml validates trusted main with scanner tests and canaries, then proposes an exact tooling-pin PR. A main tooling change or daily reconciliation merges only matching managed files after exact-head Scanner compatibility and remaining branch protections pass. Stale rollout branches are compared with current main and refreshed before their checks are trusted. No default-branch force updates are used. The publisher uses the maintenance token separately from scanner validation. Main advancing during validation postpones promotion. New connections read the adopted revision from the service profile rather than requiring a Worker redeploy. Existing external execution repositories keep their own reviewed pins; this instance currently hosts all three projects itself.

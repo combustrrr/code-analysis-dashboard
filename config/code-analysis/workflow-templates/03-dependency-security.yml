@@ -21,7 +21,7 @@ concurrency:
 jobs:
   snyk:
     name: Snyk (Optional SCA + Code)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -108,7 +108,7 @@ jobs:
         \ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
   osv-scanner:
     name: OSV-Scanner (Dependency CVEs)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -134,7 +134,7 @@ jobs:
           --output=osv-results.sarif'
     - name: Upload SARIF to GitHub Security tab
       if: always()
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: osv-results.sarif
         category: osv-scanner
@@ -148,7 +148,7 @@ jobs:
         --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
   dependency-review:
     name: Dependency Review (PR Gate)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     if: github.event_name == 'pull_request'
     continue-on-error: true
@@ -165,7 +165,7 @@ jobs:
         deny-licenses: GPL-2.0, AGPL-3.0
   gitleaks:
     name: Gitleaks (Secrets Detection)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -201,7 +201,7 @@ jobs:
         --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
   trivy:
     name: Trivy (Filesystem & Container Security)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -229,13 +229,13 @@ jobs:
         output: trivy-config.sarif
         severity: CRITICAL,HIGH
     - name: "Upload SARIF \u2014 filesystem"
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       if: always()
       with:
         sarif_file: trivy-fs.sarif
         category: trivy-fs
     - name: "Upload SARIF \u2014 config"
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       if: always()
       with:
         sarif_file: trivy-config.sarif
@@ -250,7 +250,7 @@ jobs:
         \ }/trivy-results --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
   hadolint:
     name: Hadolint (Dockerfile Lint)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -269,7 +269,7 @@ jobs:
         no-fail: true
     - name: Upload SARIF
       if: always()
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: hadolint.sarif
         category: hadolint
@@ -283,7 +283,7 @@ jobs:
         --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
   checkov:
     name: Checkov (IaC Security)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -311,7 +311,7 @@ jobs:
         \ produce SARIF evidence\"\n  exit 1\nfi\n"
     - name: Upload SARIF
       if: always()
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: checkov-results.sarif
         category: checkov
@@ -325,7 +325,7 @@ jobs:
         --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
   shipping-image-security:
     name: Shipping Images (CVEs + SBOM + License Policy)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -413,19 +413,19 @@ jobs:
         \ \\\n  > shipping-image-trivy-status.json\n"
     - name: Upload backend image SARIF
       if: always()
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: trivy-backend-image.sarif
         category: shipping-backend-image
     - name: Upload web UI image SARIF
       if: always()
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: trivy-webui-image.sarif
         category: shipping-webui-image
     - name: Upload SBOM license-policy SARIF
       if: always()
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: sbom-license-policy.sarif
         category: sbom-license-policy
@@ -441,7 +441,7 @@ jobs:
         \ --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
   workflow-security-posture:
     name: Workflow Security (zizmor + Scorecard + Secret Posture)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -490,7 +490,7 @@ jobs:
         \ \\\n  > repository-security-posture-status.json\n"
     - name: Upload zizmor SARIF
       if: always()
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: zizmor-results.sarif
         category: zizmor-workflow-security
@@ -506,7 +506,7 @@ jobs:
   openssf-scorecard:
     name: OpenSSF Scorecard (Repository Supply Chain)
     if: github.event_name != 'push' || github.ref_name == github.event.repository.default_branch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -526,7 +526,7 @@ jobs:
         publish_results: false
     - name: Upload Scorecard SARIF
       if: github.event_name == 'pull_request' || github.ref_name == github.event.repository.default_branch
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: openssf-scorecard.sarif
         category: openssf-scorecard

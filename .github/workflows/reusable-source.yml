@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   identity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       jobs: ${{ steps.identity.outputs.jobs }}
@@ -39,7 +39,7 @@ jobs:
       run: python -m scripts.code_analysis.source_identity
   scanner-2-codeql:
     name: CodeQL (Semantic SAST)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -76,7 +76,7 @@ jobs:
 
         cp "$RUNNER_TEMP/analysis-tooling/.github/codeql/codeql-config.yml" "$GITHUB_WORKSPACE/.git/code-analysis/codeql-config.yml"'
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         languages: ${{ matrix.language }}
         queries: +security-extended,security-and-quality
@@ -85,11 +85,12 @@ jobs:
       if: matrix.language == 'python'
       run: "echo \"Python \u2014 autobuild skipped, using source\""
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         category: /language:${{ matrix.language }}
         output: codeql-output
-        upload: false
+        upload: never
+        upload-database: false
     - name: Canonicalize CodeQL SARIF artifact
       shell: bash
       env:
@@ -99,7 +100,7 @@ jobs:
         \ ${#sarif_files[@]}\"\n  exit 1\nfi\ncp \"${sarif_files[0]}\" \"codeql-${CODEQL_LANGUAGE}.sarif\"\n"
     - name: Upload codeql-${{ matrix.language }}-sarif as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: codeql-${{ matrix.language }}-sarif
         path: codeql-${{ matrix.language }}.sarif
@@ -112,7 +113,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'codeql') }}
   scanner-2-semgrep:
     name: Semgrep (Pattern Analysis)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -155,7 +156,7 @@ jobs:
         \ \\\n  --input-dir semgrep-scan-results \\\n  --output-dir semgrep-normalized\n"
     - name: Upload semgrep-sarif as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: semgrep-sarif
         path: semgrep-normalized/normalized.sarif
@@ -163,7 +164,7 @@ jobs:
         retention-days: 7
     - name: Upload semgrep-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: semgrep-results
         path: semgrep-results.json
@@ -176,7 +177,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'semgrep') }}
   scanner-3-gitleaks:
     name: Gitleaks (Secrets Detection)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -195,7 +196,7 @@ jobs:
       run: jq -e '(.runs | type) == "array"' gitleaks-results.sarif > /dev/null
     - name: Upload gitleaks-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: gitleaks-results
         path: gitleaks-results.sarif
@@ -208,7 +209,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'gitleaks') }}
   scanner-3-trivy:
     name: Trivy (Filesystem & Container Security)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -238,7 +239,7 @@ jobs:
         severity: CRITICAL,HIGH
     - name: Upload trivy-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: trivy-results
         path: 'trivy-fs.sarif
@@ -253,7 +254,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'trivy') }}
   scanner-3-checkov:
     name: Checkov (IaC Security)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -282,7 +283,7 @@ jobs:
         \  echo \"::error::Checkov did not produce SARIF evidence\"\n  exit 1\nfi\n"
     - name: Upload checkov-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: checkov-results
         path: checkov-results.sarif
@@ -295,7 +296,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'checkov') }}
   scanner-3-openssf-scorecard:
     name: OpenSSF Scorecard (Repository Supply Chain)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -339,7 +340,7 @@ jobs:
       run: "if [[ \"$OUTCOME\" != success ]]; then\n  jq -n '{scanner_family:\"OpenSSF Scorecard\",status:\"OPERATIONAL_FAILURE\"\
         ,reason:\"Native Scorecard execution or source identity validation failed\"}' > scorecard-status.json\n\
         fi"
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: openssf-scorecard
@@ -359,7 +360,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'github-actions-security') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -395,7 +396,7 @@ jobs:
     - name: Record completed zizmor evidence
       run: printf '%s\n' '{"scanner_family":"zizmor","status":"COMPLETED","reason":"Native SARIF retained for the
         exact revision.","scanner_version":"1.31.1"}' > zizmor-status.json
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: github-actions-security
@@ -409,7 +410,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-js') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
       contents: read
@@ -444,7 +445,7 @@ jobs:
     - name: Record completed njsscan evidence
       run: printf '%s\n' '{"scanner_family":"njsscan","status":"COMPLETED","reason":"Native SARIF retained for the
         exact revision.","scanner_version":"1.0.1"}' > njsscan-status.json
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: owasp-js
@@ -458,7 +459,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-iac-secrets') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
       contents: read
@@ -489,7 +490,7 @@ jobs:
     - name: Record completed redacted TruffleHog evidence
       run: printf '%s\n' '{"scanner_family":"TruffleHog","status":"COMPLETED","reason":"Redacted SARIF retained
         for the exact revision.","scanner_version":"3.99.7"}' > owasp-iac-status.json
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: owasp-iac-secrets
@@ -503,7 +504,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-bandit') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -533,7 +534,7 @@ jobs:
         persist-credentials: false
     - name: Run reviewed bandit adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner bandit --source .source --output portable-output/bandit
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: portable-python-bandit
@@ -545,7 +546,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-ruff') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -575,7 +576,7 @@ jobs:
         persist-credentials: false
     - name: Run reviewed ruff adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner ruff --source .source --output portable-output/ruff
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: portable-python-ruff
@@ -587,7 +588,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'complexity') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -619,7 +620,7 @@ jobs:
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner radon --source .source --output portable-output/radon
     - name: Run reviewed xenon adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner xenon --source .source --output portable-output/xenon
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: portable-complexity
@@ -631,7 +632,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'dead-code') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -661,7 +662,7 @@ jobs:
         persist-credentials: false
     - name: Run reviewed vulture adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner vulture --source .source --output portable-output/vulture
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: portable-dead-code
@@ -673,7 +674,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'typescript-quality') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -706,7 +707,7 @@ jobs:
     - name: Run reviewed typescript adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner typescript --source .source --output
         portable-output/typescript
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: portable-typescript-quality
@@ -718,7 +719,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'test-coverage') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -748,7 +749,7 @@ jobs:
         persist-credentials: false
     - name: Run reviewed coverage adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner coverage --source .source --output portable-output/coverage
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: portable-test-coverage
@@ -760,7 +761,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'atheris-state-machine') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -790,7 +791,7 @@ jobs:
         persist-credentials: false
     - name: Run reviewed atheris adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner atheris --source .source --output portable-output/atheris
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: portable-atheris-state-machine
@@ -802,7 +803,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'schemathesis-fuzz') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -833,7 +834,7 @@ jobs:
     - name: Run reviewed schemathesis adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner schemathesis --source .source --output
         portable-output/schemathesis
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: portable-schemathesis-fuzz
@@ -845,7 +846,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-types') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -875,7 +876,7 @@ jobs:
         persist-credentials: false
     - name: Run reviewed pyright adapter
       run: python -I scripts/code_analysis/trusted_entry.py portable_runner pyright --source .source --output portable-output/pyright
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: portable-python-types
@@ -887,7 +888,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'osv-scanner') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -917,7 +918,7 @@ jobs:
       uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67
       with:
         scan-args: --recursive --format=sarif --output=portable-output/osv/osv-results.sarif .source
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: portable-osv-scanner
@@ -947,7 +948,7 @@ jobs:
     - portable-python-types
     - portable-osv-scanner
     if: ${{ always() && needs.identity.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -984,7 +985,7 @@ jobs:
         REQUEST_ID: ${{ inputs.request_id }}
         IS_REUSABLE_ANALYSIS: 'true'
       run: python -m scripts.code_analysis.source_identity --assemble
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: hosted-report-${{ github.run_id }}-${{ github.run_attempt }}
         path: .hosted/report/

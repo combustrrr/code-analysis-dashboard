@@ -11,7 +11,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKOUT = 'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803'
-UPLOAD = 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
+UPLOAD = 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
 PYTHON = 'actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1'
 
 
@@ -27,7 +27,7 @@ def generate(config=None):
                  # artifact is assembled.
                   'concurrency': {'group': 'source-analysis-${{ inputs.dispatch_id }}', 'cancel-in-progress': False}, 'jobs': {}}
     jobs = document['jobs']
-    jobs['identity'] = {'runs-on': 'ubuntu-latest', 'timeout-minutes': 5,
+    jobs['identity'] = {'runs-on': 'ubuntu-24.04', 'timeout-minutes': 5,
         'outputs': {'jobs': '${{ steps.identity.outputs.jobs }}', 'languages': '${{ steps.identity.outputs.languages }}'},
         'steps': [{'uses': CHECKOUT, 'with': {'persist-credentials': False}},
                   {'uses': CHECKOUT, 'with': {'repository': '${{ fromJSON(inputs.target).source_repository }}',
@@ -115,7 +115,10 @@ def generate(config=None):
                         options.update(repository='${{ fromJSON(inputs.target).source_repository }}',
                                        ref='${{ fromJSON(inputs.target).head_sha }}')
                 if 'github/codeql-action/analyze@' in uses:
-                    step.setdefault('with', {})['upload'] = False
+                    # Reports retain the local SARIF. Source lanes intentionally
+                    # have no Code Scanning or database-publication permission.
+                    step.setdefault('with', {})['upload'] = 'never'
+                    step['with']['upload-database'] = False
                 # Gitleaks scanner-only operation: never runs the public PR commenting action.
                 if uses.startswith('gitleaks/gitleaks-action@'):
                     step = {'name': 'Run pinned Gitleaks without PR mutation', 'run':
@@ -305,7 +308,7 @@ def generate(config=None):
                    'if-no-files-found': 'error'}}]
         jobs[channel] = {'name': extension['name'], 'needs': ['identity'],
                          'if': "${{ contains(fromJSON(needs.identity.outputs.jobs), '" + channel + "') }}",
-                         'runs-on': 'ubuntu-latest', 'timeout-minutes': extension.get('timeout_minutes', 15) + 5,
+                         'runs-on': 'ubuntu-24.04', 'timeout-minutes': extension.get('timeout_minutes', 15) + 5,
                          'permissions': {'contents': 'read'}, 'steps': steps}
     from scripts.code_analysis.community_workflow import scanner_jobs as community_scanner_jobs
     jobs.update(community_scanner_jobs())
@@ -313,7 +316,7 @@ def generate(config=None):
         from scripts.code_analysis.portable_workflow import scanner_jobs
         jobs.update(scanner_jobs())
     jobs['report'] = {'needs': list(jobs), 'if': "${{ always() && needs.identity.result == 'success' }}",
-        'runs-on': 'ubuntu-latest', 'timeout-minutes': 30, 'permissions': {'contents': 'read', 'actions': 'read'},
+        'runs-on': 'ubuntu-24.04', 'timeout-minutes': 30, 'permissions': {'contents': 'read', 'actions': 'read'},
         'steps': [{'uses': CHECKOUT, 'with': {'ref': '${{ inputs.tooling_sha }}', 'persist-credentials': False}},
             {'uses': PYTHON, 'with': {'python-version': '3.11'}},
             {'name': 'Install trusted reporting dependencies', 'run': 'python -m pip install click==8.5.0 ruff==0.16.9'},

@@ -6,7 +6,7 @@ permissions:
 jobs:
   schemathesis-fuzz:
     name: Schemathesis API Fuzzer
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     services:
       postgres:
@@ -79,7 +79,7 @@ jobs:
         --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
   atheris-state-machine:
     name: Atheris (Bounded Decision-State Fuzzing)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
     - name: Checkout exact workflow target

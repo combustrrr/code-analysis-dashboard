@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   identity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       jobs: ${{ steps.identity.outputs.jobs }}
@@ -48,7 +48,7 @@ jobs:
       run: python -m scripts.code_analysis.source_identity
   scanner-1-python-ruff:
     name: Ruff (Python Lint + Format)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
     - name: Checkout
@@ -81,7 +81,7 @@ jobs:
       run: python -m ruff check backend/app backend/tests --exit-zero
     - name: "Ruff lint (extended rules \u2014 advisory for baseline phase)"
       run: "python -m ruff check backend/ \\\n  --config $RUNNER_TEMP/analysis-tooling/config/code-analysis/ruff.toml\
-        \ \\\n  --output-format=github \\\n  --exit-zero\n"
+        \ \\\n  --output-format=concise \\\n  --exit-zero\n"
     - name: Ruff format check (advisory)
       run: "python -m ruff format --check backend/ \\\n  --config $RUNNER_TEMP/analysis-tooling/config/code-analysis/ruff.toml\
         \ \\\n  || true\n"
@@ -91,7 +91,7 @@ jobs:
         \ \\\n  --output-format=json \\\n  --exit-zero \\\n  --output-file ruff-results.json\n"
     - name: Upload ruff-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: ruff-results
         path: ruff-results.json
@@ -106,7 +106,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-ruff') }}
   scanner-1-python-bandit:
     name: Bandit (Python Security)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -153,7 +153,7 @@ jobs:
         \ \\\n  --output bandit-normalized/github-security.sarif \\\n  --maximum 5000\n"
     - name: Upload bandit-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: bandit-results
         path: 'bandit-results.json
@@ -168,7 +168,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-bandit') }}
   scanner-1-python-types:
     name: Pyright (Python Type Checking)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
     - name: Checkout
@@ -197,7 +197,7 @@ jobs:
       run: "pyright backend/app \\\n  --outputjson > pyright-results.json \\\n  || true\n"
     - name: Upload pyright-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: pyright-results
         path: pyright-results.json
@@ -212,7 +212,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'python-types') }}
   scanner-1-typescript-quality:
     name: ESLint + tsc (TypeScript/React)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
@@ -262,7 +262,7 @@ jobs:
         '
     - name: Upload eslint-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: eslint-results
         path: webui/eslint-results.json
@@ -270,7 +270,7 @@ jobs:
         retention-days: 7
     - name: Upload tsc-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: tsc-results
         path: webui/tsc-results.txt
@@ -280,7 +280,7 @@ jobs:
       if: always()
       run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile javascript-test
         --source "$GITHUB_WORKSPACE"
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: typescript-tests
@@ -295,7 +295,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'typescript-quality') }}
   scanner-2-codeql:
     name: CodeQL (Semantic SAST)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -325,7 +325,7 @@ jobs:
 
         cp "$RUNNER_TEMP/analysis-tooling/.github/codeql/codeql-config.yml" "$GITHUB_WORKSPACE/.git/code-analysis/codeql-config.yml"'
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         languages: ${{ matrix.language }}
         queries: +security-extended,security-and-quality
@@ -335,13 +335,14 @@ jobs:
       run: "echo \"Python \u2014 autobuild skipped, using source\""
     - name: Autobuild (TypeScript/React)
       if: matrix.language == 'javascript-typescript'
-      uses: github/codeql-action/autobuild@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/autobuild@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         category: /language:${{ matrix.language }}
         output: codeql-output
-        upload: false
+        upload: never
+        upload-database: false
     - name: Canonicalize CodeQL SARIF artifact
       shell: bash
       env:
@@ -351,7 +352,7 @@ jobs:
         \ ${#sarif_files[@]}\"\n  exit 1\nfi\ncp \"${sarif_files[0]}\" \"codeql-${CODEQL_LANGUAGE}.sarif\"\n"
     - name: Upload codeql-${{ matrix.language }}-sarif as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: codeql-${{ matrix.language }}-sarif
         path: codeql-${{ matrix.language }}.sarif
@@ -364,7 +365,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'codeql') }}
   scanner-2-semgrep:
     name: Semgrep (Pattern Analysis)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -403,7 +404,7 @@ jobs:
         \ \\\n  --input-dir semgrep-scan-results \\\n  --output-dir semgrep-normalized\n"
     - name: Upload semgrep-sarif as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: semgrep-sarif
         path: semgrep-normalized/normalized.sarif
@@ -411,7 +412,7 @@ jobs:
         retention-days: 7
     - name: Upload semgrep-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: semgrep-results
         path: semgrep-results.json
@@ -424,7 +425,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'semgrep') }}
   scanner-3-osv-scanner:
     name: OSV-Scanner (Dependency CVEs)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -451,7 +452,7 @@ jobs:
           --output=osv-results.sarif'
     - name: Upload osv-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: osv-results
         path: osv-results.sarif
@@ -464,7 +465,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'osv-scanner') }}
   scanner-3-gitleaks:
     name: Gitleaks (Secrets Detection)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -483,7 +484,7 @@ jobs:
       run: jq -e '(.runs | type) == "array"' gitleaks-results.sarif > /dev/null
     - name: Upload gitleaks-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: gitleaks-results
         path: gitleaks-results.sarif
@@ -496,7 +497,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'gitleaks') }}
   scanner-3-trivy:
     name: Trivy (Filesystem & Container Security)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -526,7 +527,7 @@ jobs:
         severity: CRITICAL,HIGH
     - name: Upload trivy-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: trivy-results
         path: 'trivy-fs.sarif
@@ -541,7 +542,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'trivy') }}
   scanner-3-hadolint:
     name: Hadolint (Dockerfile Lint)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -561,7 +562,7 @@ jobs:
         no-fail: true
     - name: Upload hadolint-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: hadolint-results
         path: hadolint.sarif
@@ -574,7 +575,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'hadolint') }}
   scanner-3-checkov:
     name: Checkov (IaC Security)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -603,7 +604,7 @@ jobs:
         \  echo \"::error::Checkov did not produce SARIF evidence\"\n  exit 1\nfi\n"
     - name: Upload checkov-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: checkov-results
         path: checkov-results.sarif
@@ -616,7 +617,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'checkov') }}
   scanner-3-shipping-image-security:
     name: Shipping Images (CVEs + SBOM + License Policy)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -708,7 +709,7 @@ jobs:
         ,finding_count:$findings,observation_count:$findings}' \\\n  > shipping-image-trivy-status.json\n"
     - name: Upload shipping-image-security as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: shipping-image-security
         path: 'trivy-backend-image.sarif
@@ -741,7 +742,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'shipping-image-security') }}
   scanner-3-openssf-scorecard:
     name: OpenSSF Scorecard (Repository Supply Chain)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -777,7 +778,7 @@ jobs:
       run: "if [[ \"$OUTCOME\" != success ]]; then\n  jq -n '{scanner_family:\"OpenSSF Scorecard\",status:\"OPERATIONAL_FAILURE\"\
         ,reason:\"Native Scorecard execution or source identity validation failed\"}' > scorecard-status.json\n\
         fi"
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: openssf-scorecard
@@ -794,7 +795,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'openssf-scorecard') }}
   scanner-4-complexity:
     name: Radon + Xenon (Code Complexity)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
     - name: Checkout
@@ -840,7 +841,7 @@ jobs:
         \ \\\n  --max-modules B \\\n  --max-absolute C \\\n  backend/ 2>&1 | tee xenon-results.txt || true\n"
     - name: Upload radon-reports as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: radon-reports
         path: 'radon-cc.json
@@ -859,7 +860,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'complexity') }}
   scanner-4-dead-code:
     name: Vulture (Dead Code Detection)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
     - name: Checkout
@@ -890,7 +891,7 @@ jobs:
         \ summary\nvulture backend/ --min-confidence 80 || true\n"
     - name: Upload vulture-results as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: vulture-results
         path: vulture-results.txt
@@ -905,7 +906,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'dead-code') }}
   scanner-4-test-coverage:
     name: Coverage.py (Test Coverage)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
     - name: Checkout
@@ -946,7 +947,7 @@ jobs:
         '
     - name: Upload coverage-reports as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: coverage-reports
         path: 'backend/coverage.xml
@@ -965,7 +966,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'test-coverage') }}
   scanner-7-schemathesis-fuzz:
     name: Schemathesis API Fuzzer
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     services:
       postgres:
@@ -1009,7 +1010,7 @@ jobs:
         --source "$GITHUB_WORKSPACE"
     - name: Upload schemathesis-report as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: schemathesis-report
         path: 'fuzzing-results.xml
@@ -1019,7 +1020,7 @@ jobs:
         retention-days: 7
     - name: Upload fuzzing-findings as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: fuzzing-findings
         path: fuzzing-normalized/
@@ -1034,7 +1035,7 @@ jobs:
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'schemathesis-fuzz') }}
   scanner-7-atheris-state-machine:
     name: Atheris (Bounded Decision-State Fuzzing)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
     - name: Checkout exact workflow target
@@ -1081,7 +1082,7 @@ jobs:
         \ \\\n  > atheris-status.json\n"
     - name: Upload atheris-state-fuzzing as artifact
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: atheris-state-fuzzing
         path: 'atheris-status.json
@@ -1103,7 +1104,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'ext-github-security-advisories') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -1120,7 +1121,7 @@ jobs:
         TARGET_JSON: ${{ inputs.target }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
       run: python -m scripts.code_analysis.extension_runner ext-github-security-advisories
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: ext-github-security-advisories
@@ -1132,7 +1133,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'github-actions-security') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -1160,7 +1161,7 @@ jobs:
     - name: Record completed zizmor evidence
       run: printf '%s\n' '{"scanner_family":"zizmor","status":"COMPLETED","reason":"Native SARIF retained for the
         exact revision.","scanner_version":"1.31.1"}' > zizmor-status.json
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: github-actions-security
@@ -1174,7 +1175,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-js') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
       contents: read
@@ -1202,7 +1203,7 @@ jobs:
     - name: Record completed njsscan evidence
       run: printf '%s\n' '{"scanner_family":"njsscan","status":"COMPLETED","reason":"Native SARIF retained for the
         exact revision.","scanner_version":"1.0.1"}' > njsscan-status.json
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: owasp-js
@@ -1216,7 +1217,7 @@ jobs:
     needs:
     - identity
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-iac-secrets') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
       contents: read
@@ -1240,7 +1241,7 @@ jobs:
     - name: Record completed redacted TruffleHog evidence
       run: printf '%s\n' '{"scanner_family":"TruffleHog","status":"COMPLETED","reason":"Redacted SARIF retained
         for the exact revision.","scanner_version":"3.99.7"}' > owasp-iac-status.json
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       if: always()
       with:
         name: owasp-iac-secrets
@@ -1275,7 +1276,7 @@ jobs:
     - community-owasp-js
     - community-owasp-iac-secrets
     if: ${{ always() && needs.identity.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -1303,7 +1304,7 @@ jobs:
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         REQUEST_ID: ${{ inputs.request_id }}
       run: python -m scripts.code_analysis.source_identity --assemble
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: hosted-report-${{ github.run_id }}-${{ github.run_attempt }}
         path: .hosted/report/

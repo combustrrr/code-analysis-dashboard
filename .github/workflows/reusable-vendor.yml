@@ -29,7 +29,7 @@ jobs:
   source-snapshot:
     if: ${{ contains(fromJSON(inputs.target).requested_channels, 'snyk') || contains(fromJSON(inputs.target).requested_channels, 'sonarqube-cloud') }}
     name: Prepare credentialless source snapshot
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -42,7 +42,7 @@ jobs:
           persist-credentials: false
       - name: Package source without checkout metadata
         run: tar -C .source --exclude=.git -czf source-snapshot.tgz .
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: source-snapshot-${{ inputs.request_id }}
           path: source-snapshot.tgz
@@ -52,7 +52,7 @@ jobs:
   snyk:
     if: ${{ contains(fromJSON(inputs.target).requested_channels, 'snyk') }}
     name: Isolated Snyk evidence
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: source-snapshot
     permissions:
@@ -60,7 +60,7 @@ jobs:
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: source-snapshot-${{ inputs.request_id }}
           path: .snapshot
@@ -88,7 +88,7 @@ jobs:
       - name: Record Snyk unavailable status
         if: env.SNYK_TOKEN == ''
         run: printf '%s\n' '{"schema_version":"1","scanner_family":"Snyk","status":"NOT_CONFIGURED","reason":"SNYK_TOKEN is not configured"}' > snyk-status.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: vendor-snyk-${{ inputs.request_id }}
@@ -102,7 +102,7 @@ jobs:
   sonar:
     if: ${{ contains(fromJSON(inputs.target).requested_channels, 'sonarqube-cloud') }}
     name: Isolated SonarQube evidence
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: source-snapshot
     permissions:
@@ -111,7 +111,7 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
     steps:
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: source-snapshot-${{ inputs.request_id }}
           path: .snapshot
@@ -171,7 +171,7 @@ jobs:
             --branch "${{ fromJSON(inputs.target).branch }}" \
             --sonar-branch "${{ fromJSON(inputs.target).branch }}" \
             --commit "${{ fromJSON(inputs.target).head_sha }}"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: vendor-sonar-${{ inputs.request_id }}
@@ -184,7 +184,7 @@ jobs:
   coderabbit:
     name: Isolated CodeRabbit evidence
     if: ${{ contains(fromJSON(inputs.target).requested_channels, 'coderabbit-ai-advisory') && fromJSON(inputs.target).pr_context.number != null }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN || github.token }}
@@ -208,7 +208,7 @@ jobs:
             --base-sha "${{ fromJSON(inputs.target).pr_context.base_sha }}" \
             --base-branch "${{ fromJSON(inputs.target).pr_context.base_branch }}" \
             --output-dir coderabbit-evidence
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: vendor-coderabbit-${{ inputs.request_id }}

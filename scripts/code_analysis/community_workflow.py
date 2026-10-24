@@ -36,7 +36,7 @@ def scanner_jobs():
         "name": "GitHub Actions security (zizmor)",
         "needs": ["identity"],
         "if": "${{ contains(fromJSON(needs.identity.outputs.jobs), 'github-actions-security') }}",
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "timeout-minutes": 20,
         "permissions": {"contents": "read"},
         "steps": common + [
@@ -55,7 +55,7 @@ def scanner_jobs():
         "name": "OWASP JavaScript security (njsscan)",
         "needs": ["identity"],
         "if": "${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-js') }}",
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "timeout-minutes": 25,
         "permissions": {"contents": "read"},
         "steps": common + [
@@ -80,7 +80,7 @@ def scanner_jobs():
         "name": "OWASP IaC secrets (TruffleHog)",
         "needs": ["identity"],
         "if": "${{ contains(fromJSON(needs.identity.outputs.jobs), 'owasp-iac-secrets') }}",
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "timeout-minutes": 25,
         "permissions": {"contents": "read"},
         "steps": common + [

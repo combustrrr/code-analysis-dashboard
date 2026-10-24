@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   identity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       jobs: ${{ steps.identity.outputs.jobs }}

@@ -21,7 +21,7 @@ concurrency:
 jobs:
   codeql:
     name: CodeQL (Semantic SAST)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       actions: read
@@ -47,7 +47,7 @@ jobs:
         sparse-checkout: .github/codeql
         sparse-checkout-cone-mode: false
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         languages: ${{ matrix.language }}
         queries: +security-extended,security-and-quality
@@ -57,13 +57,14 @@ jobs:
       run: "echo \"Python \u2014 autobuild skipped, using source\""
     - name: Autobuild (TypeScript/React)
       if: matrix.language == 'javascript-typescript'
-      uses: github/codeql-action/autobuild@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/autobuild@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         category: /language:${{ matrix.language }}
         output: codeql-output
-        upload: false
+        upload: never
+        upload-database: false
     - name: Canonicalize CodeQL SARIF artifact
       shell: bash
       env:
@@ -73,7 +74,7 @@ jobs:
         fi\ncp \"${sarif_files[0]}\" \"codeql-${CODEQL_LANGUAGE}.sarif\"\n"
     - name: Upload SARIF to GitHub Security tab
       if: success()
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: codeql-${{ matrix.language }}.sarif
         category: codeql-${{ matrix.language }}
@@ -87,7 +88,7 @@ jobs:
         }/codeql-${{ matrix.language }}-sarif --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
   semgrep:
     name: Semgrep (Pattern Analysis)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -127,7 +128,7 @@ jobs:
     - name: Upload SARIF to GitHub Security tab
       if: always()
       continue-on-error: true
-      uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
       with:
         sarif_file: semgrep-normalized/normalized.sarif
         category: semgrep

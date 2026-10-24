@@ -15,7 +15,7 @@ jobs:
     if: "(github.actor == 'coderabbitai[bot]' || github.actor == 'coderabbitai') && ((github.event_name == 'pull_request_review'\
       \ &&\n  github.event.pull_request.head.repo.full_name == github.repository) ||\n (github.event_name == 'issue_comment'\
       \ && github.event.issue.pull_request &&\n  contains(github.event.comment.body, 'Review finished')))"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     concurrency:
       group: coderabbit-evidence-${{ github.event.pull_request.head.sha || github.event.issue.number }}
