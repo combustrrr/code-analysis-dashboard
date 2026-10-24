@@ -19,7 +19,11 @@ test.describe('production shell',()=>{
   await expect(page.getByLabel('Target revision')).toHaveCount(0);
   await expect(page.getByRole('link',{name:'Run analysis'})).toHaveCount(1);
   await expect(page.getByRole('tab',{name:/Overview/})).toHaveAttribute('aria-selected','true');
-  await expect(page.getByText('Reported issues',{exact:true})).toBeVisible();
+  await expect(page.getByText('CURRENT REVIEW OBJECTIVE',{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:/Validate critical findings|Triage high-severity findings|Close the scanner coverage gaps|Review the leading evidence clusters/})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Where should the review focus?'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Investigation plan'})).toBeVisible();
+  await expect(page.getByRole('button',{name:/Review critical findings|Review high findings|Review all issues/})).toBeVisible();
   await expect(page.locator('.overview-chart')).toHaveCount(5);
   await expect(page.getByLabel('Finding counts by severity')).toBeVisible();
   await expect(page.getByLabel('Finding counts by scanner')).toBeVisible();
@@ -105,7 +109,9 @@ test.describe('production shell',()=>{
 
  test('theme persists and mobile navigation remains bounded',async({page},testInfo)=>{
   await page.goto(PROJECT);
+  await expect(page.getByText('CURRENT REVIEW OBJECTIVE',{exact:true})).toBeVisible();
   await page.screenshot({path:testInfo.outputPath('desktop-dark.png'),fullPage:true});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.locator('.shell-actions').getByText('Light',{exact:true}).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   await page.screenshot({path:testInfo.outputPath('desktop-light.png'),fullPage:true});
