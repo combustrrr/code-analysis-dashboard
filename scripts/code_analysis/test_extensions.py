@@ -31,6 +31,8 @@ class ExtensionTests(unittest.TestCase):
 
     def test_zero_failure_malformed_and_mixed_revision_are_distinct(self):
         self.assertEqual(self.ingest()[1]['ext-example']['status'], 'COMPLETED')
+        self.envelope.update(status='COMPLETED_OPTIONAL', reason='No optional observations found')
+        self.assertEqual(self.ingest()[1]['ext-example']['status'], 'COMPLETED_OPTIONAL')
         self.envelope.update(status='OPERATIONAL_FAILURE', reason='Unavailable vendor access')
         self.assertEqual(self.ingest()[1]['ext-example']['status'], 'OPERATIONAL_FAILURE')
         for key, value in [('source_sha', 'b'*40), ('producer_run_id', '124'), ('target_id', 'foreign')]:
@@ -101,6 +103,13 @@ class ExtensionTests(unittest.TestCase):
         self.assertEqual(result['preferred_branch'], 'develop')
         self.assertEqual(result['scanner_extensions'], [])
         self.assertEqual(template['source_repository'], 'ARYDESTROYER/Kavach-AgenticSOC')
+
+    def test_extension_runner_verifies_materialized_tooling_not_caller_sha(self):
+        from scripts.code_analysis import extension_runner
+        with patch.object(extension_runner.subprocess, 'check_output', return_value='b' * 40 + '\n') as check:
+            self.assertEqual(extension_runner.checked_out_tooling_sha(self.root), 'b' * 40)
+        check.assert_called_once_with(
+            ['git', '-C', str(self.root), 'rev-parse', 'HEAD'], text=True)
 
 
 if __name__ == '__main__':

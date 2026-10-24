@@ -99,6 +99,7 @@ class ScannerUpdateTests(unittest.TestCase):
                           'status': 'COMPLETED', 'reason': '', 'findings': []})
             with patch.object(runner, '__file__', str(root/'scripts/code_analysis/extension_runner.py')), \
                     patch.dict(os.environ, TARGET_JSON=json.dumps(identity), GITHUB_RUN_ID='1', TOOLING_SHA='b'*40, GITHUB_SHA='b'*40), \
+                    patch.object(runner, 'checked_out_tooling_sha', return_value='b'*40), \
                     patch.object(runner.subprocess, 'run', return_value=SimpleNamespace(returncode=0)):
                 runner.run('ext-example')
             result = hosted.load(root/'.extension-output/ext-example.channel-evidence')

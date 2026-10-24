@@ -9,7 +9,7 @@ from pathlib import Path
 from scripts.code_analysis.hosted import safe_file
 
 CLASSES = {'code', 'security', 'dependencies', 'infrastructure', 'reliability'}
-STATUSES = {'COMPLETED', 'POLICY_FINDINGS', 'OPERATIONAL_FAILURE', 'NOT_AVAILABLE', 'NOT_APPLICABLE'}
+STATUSES = {'COMPLETED', 'COMPLETED_OPTIONAL', 'POLICY_FINDINGS', 'OPERATIONAL_FAILURE', 'NOT_AVAILABLE', 'NOT_APPLICABLE'}
 
 
 def registry(config: dict) -> list[dict]:

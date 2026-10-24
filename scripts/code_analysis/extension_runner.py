@@ -12,6 +12,13 @@ from scripts.code_analysis.extensions import registry
 from scripts.code_analysis.hosted import load, write
 
 
+def checked_out_tooling_sha(root: Path) -> str:
+    """Return the immutable revision actually materialized for trusted tooling."""
+    return subprocess.check_output(
+        ['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True
+    ).strip()
+
+
 def run(channel: str) -> None:
     root = Path(__file__).resolve().parents[2]
     row = next(r for r in registry(load(root / 'config/code-analysis/service.json')) if r['channel'] == channel)
@@ -33,7 +40,7 @@ def run(channel: str) -> None:
         adapter = (root / row['adapter']).resolve()
         if not adapter.is_relative_to(root) or not adapter.is_file():
             raise ValueError('Missing trusted adapter')
-        if os.environ['TOOLING_SHA'] != os.environ['GITHUB_SHA']:
+        if os.environ['TOOLING_SHA'] != checked_out_tooling_sha(root):
             raise ValueError('Tooling identity mismatch')
         command = [sys.executable, '-I', str(adapter), '--request', str(request), '--output', str(result)]
         if row['mode'] == 'source':
