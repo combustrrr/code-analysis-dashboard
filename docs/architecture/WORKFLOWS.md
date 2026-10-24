@@ -37,7 +37,7 @@ Source-executing jobs receive neither vendor nor publication credentials.
 | `06-canary-validation.yml` | Canary-source changes | Validates scanner rule coverage |
 | `13-scanner-updates.yml` | Daily; manual | Reconciles scanner dependency pins |
 | `14-scanner-compatibility.yml` | Pull request; manual | Validates scanner and workflow compatibility |
-| `15-tooling-rollout.yml` | Main tooling change; daily; manual | Proposes an immutable tooling-pin promotion |
+| `15-tooling-rollout.yml` | Main tooling change; daily; manual | Proposes an immutable tooling-pin promotion and waits boundedly for its exact-head check |
 | `pages.yml` | Main UI change; manual | Builds and deploys GitHub Pages |
 | `worker-deploy.yml` | Main Worker change; pull request | Validates and deploys the Worker |
 | `execution-cutover.yml` | Manual | Protected queue/reset cutover procedure |

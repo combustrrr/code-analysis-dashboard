@@ -41,4 +41,20 @@ jobs:
       - name: Reconcile protected rollout PR
         env:
           GH_TOKEN: ${{ secrets.SCANNER_UPDATE_TOKEN }}
-        run: python -m scripts.code_analysis.promote_tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="tooling-rollout/${GITHUB_SHA}"
+          # The first pass creates or inspects the narrowly scoped promotion PR.
+          # Keep this one workflow alive for its exact-head compatibility check
+          # instead of spawning a second workflow_run reconciliation.
+          for attempt in $(seq 1 36); do
+            python -m scripts.code_analysis.promote_tooling
+            open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$branch" --json number --jq 'length')
+            if [[ "$open" == 0 ]]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'The protected tooling rollout did not become mergeable within six minutes.' >&2
+          exit 1
