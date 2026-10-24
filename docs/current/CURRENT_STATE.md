@@ -473,3 +473,19 @@ The production `WorkspaceApp` JavaScript chunk fell from approximately 792 KB to
 59 KB uncompressed in the verified local build. The public landing-page split,
 GitHub authorization boundary, report provenance, dark/light themes, responsive
 navigation, and keyboard-visible controls remain intact.
+
+## 2026-10-24 sign-in return and Projects startup
+
+The production GitHub sign-in endpoint redirects to GitHub's authorization page with
+dual PKCE, a fixed Worker callback, encrypted state, and no requested OAuth scopes.
+The browser retains the requested same-origin hash route and restores `#/projects`
+only after the one-time exchange and collaborator check succeed. The authenticated
+browser suite verifies the exact return route, revoked access, removed projects,
+callback cleanup, and memory-only session handling.
+
+Repository-mode builds no longer wait for `/api/public/config` before enabling sign-in;
+the known access requirement is applied immediately while the public configuration is
+refreshed in parallel. Entry fonts now contain only the Latin subsets used by the UI.
+In the local production build this reduced entry CSS from 42.18 KB to 19.47 KB and its
+gzip size from 16.33 KB to 4.48 KB. The pre-deployment public Lighthouse baseline was
+95 Performance, 2.1 s FCP, 2.5 s LCP, and 194 KiB transferred.

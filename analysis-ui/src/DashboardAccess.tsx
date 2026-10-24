@@ -5,7 +5,9 @@ import {isWorkspaceRoute,routeHash} from './appRoutes';
 
 export function DashboardAccess({children,publicFallback}:{children:(auth?:ReturnType<typeof useLaunchAuth>)=>ReactNode;publicFallback?:(auth:ReturnType<typeof useLaunchAuth>,accessError?:string,accessPending?:boolean,workspaceRequested?:boolean)=>ReactNode}) {
  const auth=useLaunchAuth(applicationEndpoint);
- const [required,setRequired]=useState<boolean>();
+ // Repository deployments are known to require GitHub access at build time.
+ // Start OAuth immediately instead of blocking first paint on a config round trip.
+ const [required,setRequired]=useState<boolean|undefined>(()=>import.meta.env.VITE_APPLICATION_MODE==='repositories'?true:undefined);
  const [verified,setVerified]=useState<string>();
  const [error,setError]=useState('');
  const [workspaceRequested,setWorkspaceRequested]=useState(()=>isWorkspaceRoute()||Boolean(pendingAuthDestination()?.includes('#/')));

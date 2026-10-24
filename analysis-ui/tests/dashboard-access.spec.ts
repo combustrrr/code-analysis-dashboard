@@ -20,6 +20,7 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  await expect(page.getByText('Coverage across current reports')).toBeVisible();
  await expect(page.getByText(/Only approved GitHub collaborators can access this workspace/)).toBeVisible();
  await expect(page.getByRole('button',{name:'Sign in with GitHub'})).toHaveCount(2);
+ await expect(page.locator('.landing-actions').getByRole('button',{name:'Sign in with GitHub'})).toBeEnabled();
  await page.getByRole('link',{name:'Learn how evidence is protected'}).click();
  await expect(page).toHaveURL(/#method$/);
  await expect(page.getByRole('heading',{name:/Evidence answers questions that a status badge cannot/})).toBeVisible();
@@ -290,6 +291,7 @@ test('authorization restores the exact requested repository route',async({page,c
   await page.getByRole('button',{name:'Review evidence'}).click();
   await expect(page.getByLabel('Selected analysis revision')).toBeVisible();
   await expect.poll(()=>new URL(page.url()).hash).toBe(destination);
+  await expect.poll(()=>requestOrder.includes('manifest')).toBe(true);
   expect(requestOrder.indexOf('session')).toBeLessThan(requestOrder.indexOf('projects'));
   expect(requestOrder.indexOf('projects')).toBeLessThan(requestOrder.indexOf('manifest'));
  });
