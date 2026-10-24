@@ -1,7 +1,8 @@
 # Code Analysis Dashboard contributor instructions
 
-This repository owns the external code-analysis service. Read docs/HANDOFF.md, README.md and
-docs/MIGRATION.md before changing deployment wiring.
+This repository owns the external code-analysis service. Read
+docs/architecture/SYSTEM_OVERVIEW.md, README.md, and docs/MIGRATION.md before changing
+deployment wiring.
 
 - Record material operational changes in the relevant `docs/current/` or `docs/operations/` guide.
 - Do not copy product backend/webui runtime files here. Check out the configured

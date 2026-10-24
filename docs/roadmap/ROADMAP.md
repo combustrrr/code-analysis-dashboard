@@ -2,7 +2,7 @@
 
 This document outlines planned improvements to scale the dashboard, increase security coverage, and mitigate CI/CD resource bottlenecks.
 
-## Current status (2026-10-02)
+## Current boundary
 
 The Kavach-focused service is deployed with GitHub Actions for scanner execution,
 Cloudflare Workers for authentication/API delivery, and Cloudflare R2 for temporary

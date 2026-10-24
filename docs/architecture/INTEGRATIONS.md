@@ -3,7 +3,9 @@ title: Scanner and repository integrations
 description: Connect another scanner or repository to the static analysis dashboard.
 ---
 
-> Historical implementation/reference material. For the deployed 2026-09-11 architecture, access, launch flow and remaining blockers, read the [current handoff](../HANDOFF.md). Superseded hosting and activation instructions below are not current rollout instructions.
+> Historical implementation/reference material. For the deployed architecture, read the
+> [system overview](SYSTEM_OVERVIEW.md). Superseded hosting and activation instructions
+> below are not current rollout instructions.
 
 # Scanner and repository integrations
 
@@ -234,35 +236,25 @@ workflow isolation, unchanged original workflow generation, configuration agreem
 and prevention of accidental overwrite. A new instance still needs a live branch/PR
 acceptance run before its scanner coverage can be called operational.
 
-## Scanner access and Python resolver repair (2026-09-09)
+## Scanner access constraints
 
 For adding independent channels and maintaining pinned scanner versions, see
 [Scanner maintenance](../operations/SCANNER-MAINTENANCE.md).
 
-Sonar's native API explicitly denies non-main-branch data for the current organization.
-Both configured tokens authenticate, main-project issues are readable, and a Browse
-grant succeeded. This is distinct from a missing/invalid token. The exact-source probe
-now uses the same derived branch as the scanner. Sonar documents an OSS plan with
-branch support; existing organization migration is not automated here and the service
-does not delete organizations or purchase subscriptions.
+Provider authentication does not guarantee that every branch, feature, or result is
+available. Entitlement, quota, and repository permissions remain explicit channel
+statuses and must never be translated to zero findings.
 
-Snyk's quota warning alone does not establish execution failure. Retained npm scans
-and a local exact-manifest CLI check completed while displaying that warning. The
-failed Python resolver needs its staged sibling modules on Python's import path.
-The inspection bootstrap permits only the temporary Snyk resolver directory outside
-the source checkout, preserving isolated startup and metadata-only dependencies.
-Node and Python use an explicit shared staging root. The vendor-only
-`12-scanner-diagnostics.yml` workflow accepts the same exact-source inputs and
-retains evidence without publishing a target report. Its green job conclusion is
-not completion evidence: inspect `snyk-status.json` and every manifest's SARIF.
-Each required manifest still needs valid SARIF; failures are not suppressed.
+The vendor-only `12-scanner-diagnostics.yml` workflow accepts the same exact-source
+inputs and retains diagnostic evidence without publishing a target report. A successful
+job conclusion is not scanner-completion evidence; inspect the channel status and native
+result contract. Required manifest failures remain explicit.
 
-Upstream secret-protection controls require upstream-authorized credentials; the
-fork owner's account has read-only upstream access. A token with only fork permissions
-cannot observe upstream settings. CodeRabbit requires an actual reviewed upstream PR
- head; a branch scan does not manufacture review evidence.
+Upstream security controls require upstream-authorized credentials. Credentials scoped
+only to a fork cannot establish upstream posture. PR-only scanners require a real,
+selected pull request; branch analysis does not manufacture review evidence.
 
-## CodeRabbit evidence boundary (2026-10-10)
+## CodeRabbit evidence boundary
 
 The collector accepts only the selected PR's exact same-repository base and head
 identity; fork PRs are rejected. Reviews and comments use a ten-page bound, and

@@ -16,3 +16,7 @@ Runbooks and maintenance procedures for the deployed service.
 
 Never log credentials, source secrets, raw findings, or session contents. Preserve
 exact source SHA, target, workflow run, attempt, and tooling provenance.
+
+Every new runbook must state prerequisites, exact scope, safe actions or commands,
+expected results, failure handling, rollback, and post-change verification. Architectural
+rationale belongs in an [ADR](../decisions/README.md), not inside a procedure.

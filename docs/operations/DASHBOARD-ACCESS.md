@@ -61,7 +61,7 @@ GitHub Pages serves the generic static sign-in shell, which contains no live fin
 Private artifact hosting remains a separate prerequisite to claiming Trust Lab-only
 confidentiality.
 
-Verified baseline: owner login is confirmed. Production-mode browser tests cover
-login, logout and revoked access; live anonymous project-integration returns 401.
-A second collaborator live test is deferred by the owner. See the
-[current handoff](../HANDOFF.md) for deployment evidence.
+Current acceptance: owner login is confirmed. Production-mode browser tests cover login,
+logout, and revoked access; anonymous project-integration access is denied. A second
+collaborator live test is deferred by the owner. See
+[production readiness](PRODUCTION_READINESS.md) for acceptance evidence.

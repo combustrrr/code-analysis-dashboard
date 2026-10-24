@@ -1,6 +1,6 @@
 # Upstream Synchronization Inspection Boundary
 
-Status: unsupported by the current service architecture (2026-10-09).
+Status: unsupported by the current service architecture.
 
 ## What Was Inspected
 

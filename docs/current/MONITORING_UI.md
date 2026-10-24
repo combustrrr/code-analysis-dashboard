@@ -85,6 +85,6 @@ the replacement manifest is committed. Scheduled reconciliation recovers accepte
 requests but never starts scans from discovered refs. Source-executing jobs receive no
 vendor/publication credentials, and no findings, comments, checks, SARIF, commits, or PRs
 are written to any source. GitHub Actions artifacts in the public service repository
-remain publicly accessible outside the signed-in dashboard. See
-[architecture](../architecture/SERVICE_ARCHITECTURE.md) and [handoff](../HANDOFF.md) for
-deployment boundaries and verification status.
+remain publicly accessible outside the signed-in dashboard. See the
+[system architecture](../architecture/SYSTEM_OVERVIEW.md) and
+[production readiness](../operations/PRODUCTION_READINESS.md) for boundaries and verification status.

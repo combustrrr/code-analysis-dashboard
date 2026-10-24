@@ -5,24 +5,16 @@
 > best-effort coordinator wake after durable admission. This code is not production
 > state until the big-bang cutover runbook has been executed and commissioned.
 
-The configured-source implementation described below was deployed on 2026-10-16. The
-Worker, workflows, and Pages rollout order and versions are recorded in
-[HANDOFF.md](../HANDOFF.md). No production source-analysis scan was triggered during
-deployment; use the source report provenance to verify any later scan independently.
-
 This runbook covers the three public source targets configured on the fixed analysis host:
 
-| Target | Branch to select | Read-only inspection baseline (2026-10-13) | Detected code/dependency surfaces |
-|---|---|---|---|
-| [`ARYDESTROYER/Kavach-AgenticSOC`](https://github.com/ARYDESTROYER/Kavach-AgenticSOC) | `Testing` | `db8d9357e4300763be9b558d073fb23b3d7702bd` | Python and TypeScript/JavaScript; `backend/`, `webui/`, `updater/`; Python requirements, npm lockfile, and shipping Dockerfiles |
-| [`combustrrr/code-analysis-dashboard`](https://github.com/combustrrr/code-analysis-dashboard) | `main` | `239ef8627b99a49768900cf9cc0195d5cbb16068` | Python and TypeScript/JavaScript; `scripts/code_analysis/`, `analysis-ui/`; `.ci/requirements.txt` and `analysis-ui/package-lock.json`; its only Dockerfile is a scanner canary fixture |
-| [`combustrrr/Agentic-Kibana`](https://github.com/combustrrr/Agentic-Kibana) | `Testing` | Not inventoried in this baseline | Python and TypeScript/JavaScript; `backend/`, `webui/`; backend and web UI dependency manifests |
+| Target | Branch to select | Detected code/dependency surfaces |
+|---|---|---|
+| [`ARYDESTROYER/Kavach-AgenticSOC`](https://github.com/ARYDESTROYER/Kavach-AgenticSOC) | `Testing` | Python and TypeScript/JavaScript; `backend/`, `webui/`, `updater/`; Python requirements, npm lockfile, and shipping Dockerfiles |
+| [`combustrrr/code-analysis-dashboard`](https://github.com/combustrrr/code-analysis-dashboard) | `main` | Python and TypeScript/JavaScript; `scripts/code_analysis/`, `analysis-ui/`; `.ci/requirements.txt` and `analysis-ui/package-lock.json`; its only Dockerfile is a scanner canary fixture |
+| [`combustrrr/Agentic-Kibana`](https://github.com/combustrrr/Agentic-Kibana) | `Testing` | Python and TypeScript/JavaScript; `backend/`, `webui/`; backend and web UI dependency manifests |
 
-The branch names move. Each request resolves and records the actual full source SHA;
-the table SHAs are reproducibility anchors for the read-only repository inventory, not
-permanent branch pins. GitHub tree/language/branch metadata was read with GET-only API
-calls. No scanner run, workflow dispatch, clone on the operator machine, push, or target
-repository write was performed as part of this implementation.
+Branch names move. Each request resolves and records the actual full source SHA before
+execution; the configured branch is not treated as a permanent revision pin.
 
 ## Run an analysis
 

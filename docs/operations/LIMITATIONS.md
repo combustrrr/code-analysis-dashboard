@@ -88,4 +88,4 @@ Free or public-provider plans are shared quotas, not reserved capacity. Worker
 requests/logs, GitHub Actions/API limits, R2/KV storage and lifecycle rules, and
 scanner/vendor free-tier limits can affect availability and completeness. No
 provider credit, paid upgrade, external installation, or live result is implied
-unless separately recorded in the current handoff with exact evidence.
+unless separately recorded in production readiness or a change record with exact evidence.

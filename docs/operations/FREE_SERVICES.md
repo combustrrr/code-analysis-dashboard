@@ -1,9 +1,8 @@
 # Free services for this dashboard
 
-Decision reviewed 2026-09-12 using the [Ossium directory](https://ossium.in/oss-perks)
-and primary provider documentation. Directory listings are discovery leads, not
-proof that this account has an entitlement. No subscription or credit plan was
-activated by this change.
+The [Ossium directory](https://ossium.in/oss-perks) and primary provider documentation
+are discovery sources, not proof that this account has an entitlement. The service does
+not assume that a subscription, credit, or paid plan is active.
 
 ## In use
 

@@ -153,4 +153,4 @@ Current reports are served through the Worker/R2 path and require the
 independent `REPORT_ACCESS=collaborators` policy. Public GitHub Releases and Actions
 artifacts may still expose scanner outputs; this is not complete Trust Lab-only
 confidentiality. Owner login and launch are verified; a second collaborator live login
-remains deliberately deferred. See [handoff](../HANDOFF.md).
+remains deliberately deferred. See [production readiness](../operations/PRODUCTION_READINESS.md).

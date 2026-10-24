@@ -1,7 +1,8 @@
 # Acceptance and remaining limitations
 
-The [handoff](../HANDOFF.md) is the current deployment/evidence record. The UI/API
-rollout is deployed; full scanner acceptance is not claimed.
+This document records deployment acceptance and remaining limitations. The UI/API rollout
+is deployed; full scanner acceptance is not claimed. Stable boundaries are defined by the
+[system architecture](../architecture/SYSTEM_OVERVIEW.md).
 
 Verified: product/service separation, current-release storage, exact producer/source
 provenance, login/launch/report round trip, no-source-write behavior for all three
@@ -24,7 +25,7 @@ bypasses are authorized.
 
 Dashboard login does not privatize the public GitHub Release assets. Keep scanner
 secret redaction and source/script credential isolation intact. See
-[access](DASHBOARD-ACCESS.md) and [architecture](../architecture/SERVICE_ARCHITECTURE.md).
+[access](DASHBOARD-ACCESS.md) and [architecture](../architecture/SYSTEM_OVERVIEW.md).
 
 ## Smoke-test scope
 

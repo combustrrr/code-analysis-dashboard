@@ -3,11 +3,16 @@
 A standalone code-analysis application: lightweight React dashboard, Cloudflare
 authentication, GitHub Actions orchestration, scanner adapters, and current reports.
 
-Start with the [documentation index](docs/README.md), then read
-[docs/HANDOFF.md](docs/HANDOFF.md). Current operational guides are grouped under
+Start with the [documentation index](docs/README.md), then read the
+[system architecture](docs/architecture/SYSTEM_OVERVIEW.md). Operational guides are grouped under
 the [current](docs/current/README.md), [architecture](docs/architecture/README.md),
 [operations](docs/operations/README.md), and [governance](docs/governance/README.md)
 indexes.
+
+The authoritative system map is
+[docs/architecture/SYSTEM_OVERVIEW.md](docs/architecture/SYSTEM_OVERVIEW.md), and
+consequential engineering choices are recorded in
+[docs/decisions/](docs/decisions/README.md).
 
 ## Project layout
 

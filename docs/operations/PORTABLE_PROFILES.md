@@ -61,5 +61,5 @@ read-only source proves another layout; it does not prove a second App installat
 Current registry: service-self, read-only Kavach upstream, and read-only Agentic-Kibana
 are the only configured targets. Project selection reads this trusted registry and
 never provisions a target or dispatches a scan. New profiles use the adopted service
-tooling pin; do not copy a historical pin without checking the execution profile. See
-the [handoff](../HANDOFF.md).
+tooling pin; do not copy a historical pin without checking the execution profile. See the
+[system architecture](../architecture/SYSTEM_OVERVIEW.md) for the ownership boundary.
