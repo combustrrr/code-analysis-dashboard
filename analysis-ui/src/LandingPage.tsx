@@ -1,11 +1,10 @@
 import type {useLaunchAuth} from './useLaunchAuth';
 import {AppearanceToggle} from './Appearance';
 import './landing.css';
+import './landing-footer.css';
 import './brand-landing.css';
 import './auth.css';
 import './landing-controls.css';
-import trustLabLogo from './assets/trustlab-logo.jpg';
-import mphasisLogo from './assets/mphasis-logo.jpg';
 import {InstitutionalLockup} from './InstitutionalLockup';
 
 type Auth=ReturnType<typeof useLaunchAuth>;
@@ -40,6 +39,6 @@ export function LandingPage({auth,onStart,accessError,accessPending=false,worksp
   <section className="landing-proof" aria-label="Product capabilities"><div><strong>3</strong><span>trusted repositories<br/>in one evidence register</span></div><div><strong>Parallel</strong><span>scanner channels run<br/>independently</span></div><div><strong>Immutable</strong><span>every report records<br/>its source and tooling</span></div></section>
   <section className="method-section" id="method"><header><span className="landing-kicker">From commit to defensible report</span><h2>Evidence answers questions that a status badge cannot.</h2><p>Each stage preserves the context that engineers, reviewers, and program owners need to verify a result without reconstructing the analysis.</p></header><div className="method-grid"><article><span className="method-number">01</span><Glyph>⑂</Glyph><h3>Record the source</h3><p>When analysis begins, the report records the repository, branch, immutable SHA, profile, tooling revision, and requesting user.</p><b>Repository → immutable revision</b></article><article><span className="method-number">02</span><Glyph>◎</Glyph><h3>Run scanners independently</h3><p>Scanner channels run at the same time. Missing, failed, and deferred coverage remains visible in the final report.</p><b>Scanner runs → explicit coverage</b></article><article><span className="method-number">03</span><Glyph>▣</Glyph><h3>Publish a verifiable report</h3><p>The report retains its findings, workflow run, attempt, channel evidence, and publication time.</p><b>Evidence → reviewable report</b></article></div></section>
   <section className="assurance-section"><div className="assurance-copy"><span className="landing-kicker">Designed for careful review</span><h2>Review the evidence instead of tracking jobs through a queue.</h2><p>Start with the latest report. Confirm the exact revision and coverage, then run another analysis only when the evidence must be updated.</p><button type="button" className="landing-button landing-button-primary" onClick={primaryAction} disabled={disabled}>{signedIn?'Review project evidence':'Open the workspace'} →</button></div><div className="assurance-list"><div><Glyph>✓</Glyph><span><strong>Complete history</strong><small>Each report identifies its source, tooling, workflow, attempt, and publication.</small></span></div><div><Glyph>●</Glyph><span><strong>Isolated credentials</strong><small>Scanner jobs cannot publish reports or access vendor credentials.</small></span></div><div><Glyph>◎</Glyph><span><strong>Visible limitations</strong><small>Incomplete scanner results remain visible beside successful evidence.</small></span></div></div></section>
-  <footer className="landing-footer"><div><span className="landing-footer-mark"><Glyph>⌁</Glyph></span><span><strong>Code Analysis</strong><small>Traceable evidence for trusted projects</small></span></div><div className="landing-partner-lockup"><img src={trustLabLogo} width="480" height="300" alt="IIT Bombay Trust Lab"/><span>×</span><img src={mphasisLogo} width="465" height="145" alt="Mphasis"/></div><span>Read-only analysis · GitHub-controlled access</span></footer>
+  <footer className="landing-footer"><div className="landing-footer-copy"><strong>Code Analysis</strong><span>Traceable evidence for trusted projects</span></div><span className="landing-footer-policy">Read-only analysis <i aria-hidden="true"/> GitHub-controlled access</span></footer>
  </div></main>;
 }
