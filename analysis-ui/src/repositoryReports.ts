@@ -1,12 +1,13 @@
 // Read current repository-owned reports without bundling data into the UI build.
 const manifests = new Map<string, {at:number; value:any}>();
+const manifestRequests = new Map<string, Promise<any>>();
 const shards = new Map<string, Promise<Record<string, unknown>>>();
 export const applicationEndpoint = import.meta.env.VITE_LAUNCH_ENDPOINT as string | undefined;
 const fixtureBuild = import.meta.env.MODE === 'fixtures';
-export function refreshRepositoryReports(){manifests.clear();shards.clear();}
+export function refreshRepositoryReports(){manifests.clear();manifestRequests.clear();shards.clear();}
 let reportBearer: string | undefined;
 export function setReportSession(token?:string) {
- if(token!==reportBearer){manifests.clear();shards.clear();reportBearer=token;}
+ if(token!==reportBearer){manifests.clear();manifestRequests.clear();shards.clear();reportBearer=token;}
 }
 export async function reportFetch(path:string,init:RequestInit={}) {
  const headers=new Headers(init.headers);
@@ -31,7 +32,15 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
   const query=new URLSearchParams({repository:repository!,project_id:project!});
   const key=query.toString();
  let entry=manifests.get(key);
- if(!entry||Date.now()-entry.at>60000){const value=await (await response(base+'manifest?'+query,signal)).json();entry={at:Date.now(),value};manifests.set(key,entry);if(manifests.size>10)manifests.delete(manifests.keys().next().value!);}
+ if(!entry||Date.now()-entry.at>60000){
+  signal?.throwIfAborted();
+  let request=manifestRequests.get(key);
+  if(!request){
+   request=(async()=>{const value=await (await response(base+'manifest?'+query)).json();return value;})();
+   manifestRequests.set(key,request);request.finally(()=>{if(manifestRequests.get(key)===request)manifestRequests.delete(key);}).catch(()=>{});
+  }
+  const value=await request;signal?.throwIfAborted();entry={at:Date.now(),value};manifests.set(key,entry);if(manifests.size>10)manifests.delete(manifests.keys().next().value!);
+ }
   const manifest=entry.value;
   const targetPath=(t:any)=>`repository-reports/${t.id}/${t.collected_run}`;
   if(path==='data/index.json')return {...manifest,launch_endpoint:applicationEndpoint,publishing_repository:repository,repository_assets:true,

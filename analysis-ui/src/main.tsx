@@ -12,12 +12,15 @@ import {LandingPage} from './LandingPage';
 import {isWorkspaceRoute, parseAppRoute, routeHash} from './appRoutes';
 import type {useLaunchAuth} from './useLaunchAuth';
 
-const WorkspaceApp=lazy(()=>import('./WorkspaceApp').then(module=>({default:module.WorkspaceApp})));
+const loadWorkspaceApp=()=>import('./WorkspaceApp');
+const WorkspaceApp=lazy(()=>loadWorkspaceApp().then(module=>({default:module.WorkspaceApp})));
 const loadProjectsApp=()=>import('./ProjectsApp');
 const ProjectsApp=lazy(()=>loadProjectsApp().then(module=>({default:module.ProjectsApp})));
 type Auth=ReturnType<typeof useLaunchAuth>;
 
-if(parseAppRoute().kind==='projects')void loadProjectsApp();
+const initialRoute=parseAppRoute();
+if(initialRoute.kind==='projects')void loadProjectsApp();
+else if(isWorkspaceRoute())void loadWorkspaceApp();
 
 function openWorkspace(){
  try{sessionStorage.setItem('analysis-workspace-requested','true');}catch{}

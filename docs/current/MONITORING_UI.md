@@ -88,3 +88,9 @@ are written to any source. GitHub Actions artifacts in the public service reposi
 remain publicly accessible outside the signed-in dashboard. See the
 [system architecture](../architecture/SYSTEM_OVERVIEW.md) and
 [production readiness](../operations/PRODUCTION_READINESS.md) for boundaries and verification status.
+
+Deep project links begin fetching the lazy workspace bundle while authorization is
+verified. Concurrent report consumers share one in-flight manifest read per project;
+the completed manifest keeps its 60-second browser cache. Report assets still require
+the authorized session and retain their compressed-byte length and SHA-256 integrity
+checks before decompression and parsing.
