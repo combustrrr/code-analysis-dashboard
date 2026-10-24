@@ -117,8 +117,7 @@ export async function repositoryApi(request, env, session, helpers) {
   }
 
   async function context(permission = 'pull') {
-    const repository = await executionRepository(permission);
-    const appToken = await serviceToken();
+    const [repository, appToken] = await Promise.all([executionRepository(permission), serviceToken()]);
     if (!appToken) throw new Failure(503, 'The central GitHub App installation is unavailable.', 'service_installation_unavailable');
     const file = await github(`repos/${repository.full_name}/contents/${CONFIG}?ref=${encodeURIComponent(repository.default_branch)}`, appToken);
     let configuration;
@@ -195,14 +194,15 @@ export async function repositoryApi(request, env, session, helpers) {
     // Keep the read-only register fast; launch and revision endpoints still verify
     // the live source identity before accepting an immutable SHA.
     const projectsInRegistry = configuration.projects.map(project => configuredProject(configuration, project.id));
-    const checkedAt=new Date().toISOString(),activeByProject=new Map();
-    try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();for(const row of payload.requests||[]){if(!['preparing','analyzing'].includes(row.status))continue;const key=String(row.intent?.project_id||''),existing=activeByProject.get(key);if(!existing||row.status==='analyzing')activeByProject.set(key,row);}}}catch{}
+    const checkedAt=new Date().toISOString();
+    const activeByProjectPromise=(async()=>{const activeByProject=new Map();try{const response=await queue('/queue/recent',{});if(response.ok){const payload=await response.json();for(const row of payload.requests||[]){if(!['preparing','analyzing'].includes(row.status))continue;const key=String(row.intent?.project_id||''),existing=activeByProject.get(key);if(!existing||row.status==='analyzing')activeByProject.set(key,row);}}}catch{}return activeByProject;})();
     const projects=await Promise.all(projectsInRegistry.map(async project => {
       let current_report=null,current_overlay=null,reportAttention=null,publicationError=false;
       const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
+      const manifestPromise=publicReports(new Request(reportUrl),env).catch(()=>null);
+      const [activeByProject,response]=await Promise.all([activeByProjectPromise,manifestPromise]);
       try {
-        const response=await publicReports(new Request(reportUrl),env);
-        if(response.ok){const manifest=await response.json(),target=canonicalReportTarget(manifest),overlay=manifest.current_overlay;publicationError=Boolean(manifest.publication_error);const state=registryReportState(target);current_report=state.report;reportAttention=state.attention;if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
+        if(response?.ok){const manifest=await response.json(),target=canonicalReportTarget(manifest),overlay=manifest.current_overlay;publicationError=Boolean(manifest.publication_error);const state=registryReportState(target);current_report=state.report;reportAttention=state.attention;if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
       } catch {}
       const active=activeByProject.get(String(project.id));let lifecycle='Ready',attention_reason=null;
       if(active)lifecycle=active.status==='analyzing'?'Analyzing':'Preparing';

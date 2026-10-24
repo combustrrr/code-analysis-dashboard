@@ -78,9 +78,17 @@ const protectedReportResponse = async (request, env) => {
   headers.set('Cache-Control', 'private, no-store');
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 };
-async function viewer(env, token, {dashboard = restricted(env), reports = false} = {}) {
-  const user = await github('user', token);
-  if ((dashboard || reports) && !await isCollaborator(env,user.login)) throw new Failure(403, 'This GitHub account is not authorized to view these reports.', 'viewer_not_authorized');
+async function viewer(env, token, {dashboard = restricted(env), reports = false, expectedLogin} = {}) {
+  const needsAccess = dashboard || reports;
+  // Established sessions already carry the GitHub login captured during OAuth.
+  // Recheck both the token identity and current collaborator membership, but do
+  // those independent network calls together instead of serially.
+  const [user, collaborator] = await Promise.all([
+    github('user', token),
+    needsAccess && expectedLogin ? isCollaborator(env, expectedLogin) : Promise.resolve(undefined),
+  ]);
+  if (expectedLogin && user.login?.toLowerCase() !== expectedLogin.toLowerCase()) throw new Failure(401, 'Sign in again; the session identity changed.', 'session_invalid');
+  if (needsAccess && !(expectedLogin ? collaborator : await isCollaborator(env,user.login))) throw new Failure(403, 'This GitHub account is not authorized to view these reports.', 'viewer_not_authorized');
   return user;
 }
 const json = (value, status = 200, extra = {}) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json', ...extra } });
@@ -296,7 +304,7 @@ async function route(request, env) {
   const sessionRow=await storedSession.json(),grant=await unseal(sessionRow.grant,env.SESSION_KEY,'grant');
   const session={token:grant.token,user_id:sessionRow.user_id,login:sessionRow.login,handle};
   if (restricted(env) || url.pathname === '/api/session' || (reportPath(url.pathname) && privateReports(env))) {
-    const user = await viewer(env, session.token, { dashboard: restricted(env), reports: reportPath(url.pathname) && privateReports(env) || (url.pathname === '/api/session' && privateReports(env)) });
+    const user = await viewer(env, session.token, { dashboard: restricted(env), reports: reportPath(url.pathname) && privateReports(env) || (url.pathname === '/api/session' && privateReports(env)), expectedLogin: session.login });
     if(user.id!==session.user_id)throw new Failure(401,'Sign in again; the session identity changed.','session_invalid');
     if (request.method === 'GET' && url.pathname === '/api/session') {const repo=await access(env,session.token,'pull');return json({login:user.login,user_id:user.id,role:repo.permissions?.admin?'admin':repo.permissions?.push?'write':'read',capabilities:{read:true,write:!!repo.permissions?.push,admin:!!repo.permissions?.admin}});}
   }

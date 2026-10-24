@@ -489,3 +489,11 @@ refreshed in parallel. Entry fonts now contain only the Latin subsets used by th
 In the local production build this reduced entry CSS from 42.18 KB to 19.47 KB and its
 gzip size from 16.33 KB to 4.48 KB. The pre-deployment public Lighthouse baseline was
 95 Performance, 2.1 s FCP, 2.5 s LCP, and 194 KiB transferred.
+
+The Worker still revalidates the GitHub token identity and current collaborator access
+for protected requests. For established sessions those independent checks now run in
+parallel, and a login mismatch fails the session closed. Project-register loading also
+starts installation-token resolution alongside execution-repository verification, then
+loads active queue state alongside all project report manifests. These latency changes
+do not cache authorization, relax revocation, serialize project evidence, or change the
+immutable target registry.
