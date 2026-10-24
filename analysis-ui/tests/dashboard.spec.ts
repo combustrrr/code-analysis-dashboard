@@ -70,11 +70,17 @@ test.describe('production shell',()=>{
   await page.goto(PROJECT+'/report');
   await expect(page.getByRole('heading',{name:'Downloadable reports'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Complete issues report'})).toBeVisible();
-  await expect(page.getByRole('button',{name:'Download issues PDF'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Download complete PDF'})).toBeVisible();
+  await expect(page.getByText('Build a filtered issues report',{exact:true})).toBeVisible();
+  await page.getByLabel('Report severity').selectOption('HIGH');
+  await expect(page.getByRole('button',{name:'Download filtered PDF'})).toBeEnabled();
+  const filteredDownload=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Download filtered PDF'}).click();
+  expect((await filteredDownload).suggestedFilename()).toMatch(/Agentic-Kibana-2c38720d0b68-filtered\.pdf$/);
   await expect(page.getByRole('heading',{name:'Highest-severity findings'})).toHaveCount(0);
   await expect(page.getByText('Channel coverage',{exact:true})).toHaveCount(0);
   const download=page.waitForEvent('download');
-  await page.getByRole('button',{name:'Download issues PDF'}).click();
+  await page.getByRole('button',{name:'Download complete PDF'}).click();
   expect((await download).suggestedFilename()).toMatch(/Agentic-Kibana-2c38720d0b68-complete\.pdf$/);
  });
 

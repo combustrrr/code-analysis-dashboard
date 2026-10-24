@@ -35,7 +35,8 @@ The screen is optimized for review and export: severity colors, coverage status 
 responsive tables, and high-contrast light/dark themes are provided by the Threat Report
 view. PDF output is generated locally from the already fetched, authenticated report JSON;
 it does not call a PDF service or refetch evidence. Complete export always contains every
-retained finding. Filtered export freezes the active query, severity, category, and guidance
+retained finding. Filtered export freezes the active query, severity, category, scanner,
+rule, file, directory, source location, and guidance
 filters at click time and is unavailable until at least one filter is active.
 
 PDF files identify the exact source SHA, analysis, report, tooling, catalog, generator,

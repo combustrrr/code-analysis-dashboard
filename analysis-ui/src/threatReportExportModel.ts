@@ -18,7 +18,7 @@ export type ThreatReportData = {
   truncated?: boolean; truncation_notice?: string; truncation_reason?: string; findings_retained?: number; findings_omitted?: number;
 };
 
-export type ReportFilterSnapshot = { query: string; severity: string; category: string; guidance: string };
+export type ReportFilterSnapshot = { query?: string; severity?: string; category?: string; guidance?: string; scanner?: string; rule?: string; file?: string; directory?: string; location?: string };
 export type ExportScope = 'complete' | 'filtered';
 export type PdfExportModel = {
   report: ThreatReportData; findings: ThreatFinding[]; scope: ExportScope; filters: ReportFilterSnapshot;
@@ -26,15 +26,22 @@ export type PdfExportModel = {
 };
 
 export function hasActiveFilters(filters: ReportFilterSnapshot): boolean {
-  return Object.values(filters).some(value => value.trim().length > 0);
+  return Object.values(filters).some(value => String(value||'').trim().length > 0);
 }
 
 export function filterThreatFindings(findings: ThreatFinding[], filters: ReportFilterSnapshot): ThreatFinding[] {
-  const needle = filters.query.trim().toLowerCase();
+  const needle = (filters.query||'').trim().toLowerCase();
+  const directory=(file:string)=>file.includes('/')?file.slice(0,file.lastIndexOf('/')):'(root)';
+  const location=(finding:ThreatFinding)=>finding.file&&finding.line>0?`${finding.file}#L${finding.line}`:'';
   return findings.filter(finding =>
     (!filters.severity || finding.severity === filters.severity) &&
     (!filters.category || finding.category === filters.category) &&
     (!filters.guidance || finding.guidance_source === filters.guidance) &&
+    (!filters.scanner || finding.scanners.includes(filters.scanner)) &&
+    (!filters.rule || finding.rule === filters.rule) &&
+    (!filters.file || finding.file === filters.file) &&
+    (!filters.directory || directory(finding.file) === filters.directory) &&
+    (!filters.location || (filters.location === 'located' ? !!location(finding) : filters.location === 'unlocated' ? !location(finding) : location(finding) === filters.location)) &&
     (!needle || `${finding.title} ${finding.message} ${finding.file} ${finding.rule} ${finding.scanners.join(' ')}`.toLowerCase().includes(needle))
   );
 }

@@ -23,6 +23,8 @@ describe('threat report export model', () => {
     expect(sourceLocationUrl(report, report.findings[0])).toBe(`https://github.com/owner/repo/blob/${'a'.repeat(40)}/src/a%20b.ts#L12`);
     expect(safeExportBaseName(report, 'complete')).toBe(`repo-${'a'.repeat(12)}-complete`);
     expect(filterThreatFindings(report.findings, { query: '', severity: 'LOW', category: '', guidance: '' })).toHaveLength(0);
+    expect(filterThreatFindings(report.findings, { scanner: 'scanner', rule: 'rule', file: 'src/a b.ts', directory: 'src', location: 'src/a b.ts#L12' })).toHaveLength(1);
+    expect(filterThreatFindings(report.findings, { location: 'unlocated' })).toHaveLength(0);
   });
 
   test('keeps every selected finding in one PDF model', () => {
