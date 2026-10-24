@@ -18,4 +18,3 @@ values, or private report data.
 The repository does not currently declare an open-source license. Selecting a
 license is an owner decision because it changes downstream rights; add a
 recognized `LICENSE` file only after that decision is explicit.
-

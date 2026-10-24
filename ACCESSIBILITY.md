@@ -30,4 +30,3 @@ Open an accessibility issue using the repository issue form. Describe the page,
 task, browser, assistive technology, and the result you expected. Do not include
 private report data or credentials. If the barrier prevents private security
 reporting, use the repository owner's private GitHub contact route.
-

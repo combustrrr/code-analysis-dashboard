@@ -31,4 +31,3 @@ reviewed as promptly and confidentially as practical.
 
 This policy applies in repository spaces and when someone is officially
 representing this project in another public space.
-

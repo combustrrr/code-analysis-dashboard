@@ -52,4 +52,3 @@ body:
           required: true
         - label: This is not a privately reportable security vulnerability.
           required: true
-

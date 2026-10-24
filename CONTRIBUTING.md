@@ -55,4 +55,3 @@ By contributing, you confirm that you have the right to submit the contribution
 under the repository's applicable terms. This repository currently has no
 declared open-source license; contribution does not itself grant additional
 rights to reuse the project.
-

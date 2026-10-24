@@ -28,4 +28,3 @@ body:
       options:
         - label: I removed credentials, detected secret values, and private report data.
           required: true
-

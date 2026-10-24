@@ -4,7 +4,7 @@ Describe the user-visible or operational outcome.
 
 ## Changes
 
-- 
+-
 
 ## Verification
 
@@ -33,4 +33,3 @@ List exact commands and results:
 - [ ] Deployment/cutover effects and rollback considerations are described below.
 
 Known limitations and rollout notes:
-

@@ -36,4 +36,3 @@ The dashboard is an external, read-only analysis service. Scanner jobs operate
 on immutable source snapshots and must not receive vendor or publication
 credentials. Reports must preserve provenance and must never expose credential
 values or detected secret values.
-
