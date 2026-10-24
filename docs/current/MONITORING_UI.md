@@ -19,13 +19,13 @@ identifiers.
    shows compact readiness, active work, source/analyzed SHA, and timestamps. Opening a
    project or browsing revisions is read-only.
 2. Authorized collaborators use **Fast analysis** to repeat their most recent revision and
-   scanner selection for that project. With no usable history it selects the latest preferred-
-   branch SHA and every approved scanner. **Configure analysis** accepts a full 40-character
+   recompute every scanner available for that exact target. With no usable history it selects
+   the latest preferred-branch SHA. **Configure analysis** accepts a full 40-character
    commit SHA or any available branch or open pull request. Independent scanner lanes run
    concurrently; Fast analysis does not impose serial execution.
    Branch and open-PR selection, including drafts, is available as a fallback.
    Configured analysis then chooses scanner producer groups.
-   Portable channels are selected by default; vendor lanes are opt-in. Shared producer
+   Every available channel is selected by default; vendor lanes require explicit confirmation. Shared producer
    groups must be selected together. Disabled channels explain whether they are deferred,
    unavailable, not applicable, or require setup. CodeRabbit is available only for an
    open PR.

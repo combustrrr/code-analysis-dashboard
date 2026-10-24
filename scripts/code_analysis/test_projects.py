@@ -60,6 +60,12 @@ class ProjectTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Native feedback must remain disabled'):
             validate(doc)
 
+    def test_fast_analysis_cannot_define_a_reduced_scanner_subset(self):
+        doc = config()
+        doc['projects'][0]['fast_scanners'] = ['semgrep']
+        with self.assertRaisesRegex(ValueError, 'every available enabled scanner'):
+            validate(doc)
+
     def test_rename_preserves_project_namespace(self):
         original = config()
         renamed = copy.deepcopy(original)

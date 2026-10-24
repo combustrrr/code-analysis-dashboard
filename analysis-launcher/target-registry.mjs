@@ -21,6 +21,7 @@ export function validateTargetRegistry(configuration, repository) {
       project.source_repository.full_name?.toLowerCase() === expected.repository.toLowerCase() &&
       project.relationship === expected.relationship &&
       project.preferred_branch === expected.branch &&
+      !Object.hasOwn(project, 'fast_scanners') &&
       project.native_feedback_enabled === expected.native_feedback;
   });
 }

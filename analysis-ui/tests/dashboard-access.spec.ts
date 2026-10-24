@@ -232,15 +232,17 @@ test('repository deep links open the authenticated workspace with a shared theme
    await expect(page.getByRole('button',{name:'Review evidence'})).toBeVisible();
  await expect(page.locator('.shell-user')).toContainText('developer');
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
- await page.getByText('Dark',{exact:true}).click();
+ await page.locator('.shell-header').getByRole('link',{name:'Settings'}).click();
+ await page.locator('.settings-control-card').getByText('Dark',{exact:true}).click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
  await page.setViewportSize({width:390,height:844});
  const mobileLayout=await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,overflowing:[...document.querySelectorAll('body *')].map(element=>({element:element.tagName+'.'+(element as HTMLElement).className?.toString().replaceAll(' ',' .'),right:Math.round(element.getBoundingClientRect().right)})).filter(item=>item.right>innerWidth+1).slice(0,8)}));
  expect(mobileLayout.scrollWidth,JSON.stringify(mobileLayout.overflowing)).toBeLessThanOrEqual(390);
-  const workspaceLockup=page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'}).first();
-  await expect(workspaceLockup).toBeVisible();
+  await expect(page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'})).toHaveCount(0);
+  const projectRegister=page.locator('.shell-header').getByRole('link',{name:'Project register'});
+  await expect(projectRegister).toBeVisible();
   await expect(page.locator('.shell-header')).not.toContainText('Evidence workspace');
-  await workspaceLockup.click();
+  await projectRegister.click();
   await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
 });
 
@@ -418,7 +420,7 @@ test('authorized user follows one repository project from selection through publ
     await page.locator('.settings-rail a[href*="section=provenance"]').click();
     await expect(page.locator('.provenance-boundary')).toContainText('Needs attention');
     await expect(page.locator('.provenance-boundary')).not.toContainText('partial');
-    await page.getByRole('link',{name:'Back to Projects'}).click();
+    await page.locator('.shell-header').getByRole('link',{name:'Project register'}).click();
     await page.locator('.project-record').filter({hasText:source}).getByRole('button',{name:'Review evidence'}).click();
      await expect(page).toHaveURL(new RegExp(`#/projects/${project}`));
     await expect(page.getByRole('heading',{name:'Separate PR review overlay · #7'})).toBeVisible();
@@ -439,7 +441,7 @@ test('authorized user follows one repository project from selection through publ
   expect(launches).toBe(0);
   await page.getByRole('link',{name:'Run analysis'}).click();
   await page.getByRole('button',{name:/Fast analysis/}).click();
-  await page.getByRole('button',{name:'Repeat last analysis'}).click();
+  await page.getByRole('button',{name:'Analyze with all scanners'}).click();
  await expect(page.locator('.ant-alert-title').getByText('Analyzing',{exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Building the first reviewable report'})).toBeVisible();
  await expect(page.getByText('This project has no reviewable report yet.')).toBeVisible();

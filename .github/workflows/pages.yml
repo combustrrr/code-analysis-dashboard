@@ -44,7 +44,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mapfile -t previous_runs < <(gh run list --workflow pages.yml --branch main --status success --limit 2 --json databaseId --jq '.[].databaseId')
+          # A browser tab can keep an older entry chunk in memory across several rapid
+          # releases. Retain a bounded history so its lazy imports remain available.
+          mapfile -t previous_runs < <(gh run list --workflow pages.yml --branch main --status success --limit 20 --json databaseId --jq '.[].databaseId')
           if [ "${#previous_runs[@]}" -eq 0 ]; then
             echo "No preceding successful Pages deployment is available."
             exit 0
@@ -64,7 +66,7 @@ jobs:
               cp -n "$site/assets/"* analysis-ui/dist/assets/
             fi
           done
-          echo "Retained assets from the two preceding deployments for cached clients." >> "$GITHUB_STEP_SUMMARY"
+          echo "Retained assets from up to twenty preceding deployments for cached clients." >> "$GITHUB_STEP_SUMMARY"
       - name: Retain publication metrics
         if: always()
         run: |

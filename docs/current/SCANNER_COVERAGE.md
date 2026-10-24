@@ -6,6 +6,12 @@ remain explicit: CodeRabbit requires an open pull request, while repository
 secret-protection posture requires a separately provisioned read-only security
 credential and is never granted to a source-executing job.
 
+Fast analysis remembers only the user's last revision selection. It recomputes
+the complete selectable channel set at launch time, so an older request that used
+fewer scanners cannot suppress a scanner that is now ready. Configure analysis
+also starts with every available scanner selected, but permits an explicit narrower
+selection after the user reviews the channel list.
+
 The `ext-github-security-advisories` lane inventories published repository
 security advisories through GitHub's public, read-only REST endpoint. It uses no
 credential, checks out only trusted dashboard tooling, and is enabled for all

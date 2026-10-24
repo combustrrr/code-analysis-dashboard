@@ -2,10 +2,32 @@
 import os
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "deployment"))
 from register_github_app import _find_npx, _find_openssl
+
+
+class FakePath:
+    """Minimal path implementation for platform-independent Windows-path tests."""
+
+    existing: set[str] = set()
+
+    def __init__(self, value):
+        self.value = str(value).replace("\\", "/")
+
+    @classmethod
+    def home(cls):
+        return cls("C:/Users/test")
+
+    def __truediv__(self, part):
+        return type(self)(f"{self.value}/{part}")
+
+    def exists(self):
+        return self.value in self.existing
+
+    def __str__(self):
+        return self.value
 
 
 class TestFindNpx:
@@ -43,59 +65,37 @@ class TestFindOpenSSL:
         assert result == "/usr/bin/openssl"
 
     @patch("shutil.which")
-    @patch("pathlib.Path")
-    def test_finds_openssl_in_git_for_windows(self, mock_path_class, mock_which):
+    @patch("register_github_app.Path", FakePath)
+    def test_finds_openssl_in_git_for_windows(self, mock_which):
         mock_which.return_value = None
         git_path = "C:/Program Files/Git/usr/bin/openssl.exe"
-        # Create mock Path instances for each candidate
-        mock_candidates = []
-        for candidate_str in [
-            git_path,
-            "C:/Program Files (x86)/Git/usr/bin/openssl.exe",
-            "C:/Users/test/scoop/apps/openssl/current/bin/openssl.exe",
-            "C:/OpenSSL-Win64/bin/openssl.exe",
-            "C:/OpenSSL-Win32/bin/openssl.exe",
-        ]:
-            mock_path = MagicMock()
-            mock_path.__str__ = lambda self, s=candidate_str: s
-            mock_path.exists.return_value = (candidate_str == git_path)
-            mock_candidates.append(mock_path)
-        mock_path_class.side_effect = mock_candidates
-        mock_path_class.home.return_value = Path("C:/Users/test")
-
-        with patch("sys.platform", "win32"):
-            result = _find_openssl()
+        FakePath.existing = {git_path}
+        try:
+            with patch("sys.platform", "win32"):
+                result = _find_openssl()
+        finally:
+            FakePath.existing = set()
         # Normalize path separators for comparison
         assert os.path.normpath(result) == os.path.normpath(git_path)
 
     @patch("shutil.which")
-    @patch("pathlib.Path")
-    def test_finds_openssl_in_scoop(self, mock_path_class, mock_which):
+    @patch("register_github_app.Path", FakePath)
+    def test_finds_openssl_in_scoop(self, mock_which):
         mock_which.return_value = None
         scoop_path = "C:/Users/test/scoop/apps/openssl/current/bin/openssl.exe"
-        mock_candidates = []
-        for candidate_str in [
-            "C:/Program Files/Git/usr/bin/openssl.exe",
-            "C:/Program Files (x86)/Git/usr/bin/openssl.exe",
-            scoop_path,
-            "C:/OpenSSL-Win64/bin/openssl.exe",
-            "C:/OpenSSL-Win32/bin/openssl.exe",
-        ]:
-            mock_path = MagicMock()
-            mock_path.__str__ = lambda self, s=candidate_str: s
-            mock_path.exists.return_value = (candidate_str == scoop_path)
-            mock_candidates.append(mock_path)
-        mock_path_class.side_effect = mock_candidates
-        mock_path_class.home.return_value = Path("C:/Users/test")
-
-        with patch("sys.platform", "win32"):
-            result = _find_openssl()
+        FakePath.existing = {scoop_path}
+        try:
+            with patch("sys.platform", "win32"):
+                result = _find_openssl()
+        finally:
+            FakePath.existing = set()
         assert result is not None
         assert "openssl.exe" in result
 
     @patch("shutil.which", return_value=None)
-    @patch("pathlib.Path.exists", return_value=False)
-    def test_returns_none_when_not_found(self, mock_exists, mock_which):
+    @patch("register_github_app.Path", FakePath)
+    def test_returns_none_when_not_found(self, mock_which):
+        FakePath.existing = set()
         with patch("sys.platform", "win32"):
             result = _find_openssl()
         assert result is None
