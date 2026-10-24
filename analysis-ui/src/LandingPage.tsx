@@ -2,6 +2,7 @@ import type {useLaunchAuth} from './useLaunchAuth';
 import {AppearanceToggle} from './Appearance';
 import './landing.css';
 import './landing-footer.css';
+import './landing-dossier.css';
 import './brand-landing.css';
 import './auth.css';
 import './landing-controls.css';

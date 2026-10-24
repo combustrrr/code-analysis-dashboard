@@ -1,0 +1,65 @@
+/* Keep the evidence register beside the thesis on standard desktop screens. */
+@media (min-width: 1181px) {
+  .landing-hero {
+    grid-template-columns: minmax(0, 1.08fr) minmax(440px, 0.92fr);
+    gap: clamp(36px, 4vw, 64px);
+    min-height: 690px;
+    padding-top: 82px;
+  }
+
+  .analysis-dossier {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.dossier-columns {
+  grid-template-columns: minmax(135px, 1fr) 100px 68px;
+  padding-right: 20px;
+  padding-left: 54px;
+}
+
+.dossier-row {
+  grid-template-columns: 24px minmax(135px, 1fr) 100px 68px;
+  gap: 10px;
+  padding-right: 20px;
+  padding-left: 20px;
+}
+
+.dossier-row code,
+.dossier-coverage {
+  white-space: nowrap;
+}
+
+.analysis-dossier footer {
+  align-items: center;
+}
+
+.analysis-dossier footer > span:last-child {
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .dossier-row {
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .analysis-dossier header {
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .analysis-dossier footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .analysis-dossier footer > span:last-child {
+    text-align: left;
+  }
+}
