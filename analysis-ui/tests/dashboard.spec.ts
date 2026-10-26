@@ -124,7 +124,8 @@ test.describe('production shell',()=>{
   await expect(page.locator('.shell-header').getByText('Light',{exact:true})).toHaveCount(0);
   await expect(page.getByLabel('Open navigation')).toHaveCount(0);
   await page.locator('.shell-header').getByRole('link',{name:'Settings'}).click();
-  await expect(page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'})).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/settings\?section=general&project=1278177697$/);
+  await expect(page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'})).toBeVisible();
   await page.locator('.settings-control-card').getByText('Light',{exact:true}).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   await page.screenshot({path:testInfo.outputPath('desktop-light.png'),fullPage:true});

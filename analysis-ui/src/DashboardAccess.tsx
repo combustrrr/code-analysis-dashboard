@@ -19,8 +19,10 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
   let active=true;const token=auth.session.token;
   const verify=async(recheck=false)=>{try{if(recheck||!auth.verified)await auth.api('session');if(active){setReportSession(token);setVerified(token);setError('');}}catch(e){if(active){setReportSession(undefined);setVerified(undefined);setError(e instanceof Error?e.message:'GitHub access could not be verified.');restoreAuthDestination();auth.signOut();}}};
   const denied=()=>{setReportSession(undefined);setVerified(undefined);setError('Access expired or was revoked. Sign in with an authorized GitHub account.');auth.signOut();};
-  void verify();const timer=window.setInterval(()=>{if(!document.hidden)void verify(true);},15000);window.addEventListener('analysis-access-denied',denied);
-  return()=>{active=false;clearInterval(timer);window.removeEventListener('analysis-access-denied',denied);setReportSession(undefined);};
+  let lastVerified=Date.now();
+  const recheck=()=>{if(!document.hidden&&Date.now()-lastVerified>=5*60*1000){lastVerified=Date.now();void verify(true);}};
+  void verify();const timer=window.setInterval(recheck,5*60*1000);document.addEventListener('visibilitychange',recheck);window.addEventListener('focus',recheck);window.addEventListener('analysis-access-denied',denied);
+  return()=>{active=false;clearInterval(timer);document.removeEventListener('visibilitychange',recheck);window.removeEventListener('focus',recheck);window.removeEventListener('analysis-access-denied',denied);setReportSession(undefined);};
  },[required,auth.session?.token,auth.verified]);
  useEffect(()=>{if(!auth.session||verified!==auth.session.token)return;try{const restored=restoreAuthDestination();if(sessionStorage.getItem('analysis-workspace-requested')==='true'){sessionStorage.removeItem('analysis-workspace-requested');if(!isWorkspaceRoute())location.hash=routeHash({kind:'projects'});setWorkspaceRequested(true);}else if(restored)setWorkspaceRequested(isWorkspaceRoute());}catch{}},[auth.session?.token,verified]);
  if(!applicationEndpoint)return children(auth.available?auth:undefined);

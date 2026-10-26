@@ -33,6 +33,8 @@ type Activity = {
   completeness?: string;
   error?: string;
   message?: string;
+  publication_status?: string;
+  failed_channels?: string[];
   channel_progress?: {channel:string;status:string;reason?:string;evidence_reused?:boolean;last_attempt_status?:string}[];
   producer?: { run_id?: number; url: string; attempt: number; status: string; conclusion?: string | null };
   checked_at?: string;
@@ -124,7 +126,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const type = phase === 'published' || phase === 'reused' ? 'success' : phase === 'failed' || phase === 'cancelled_cutover' ? 'error' : phase === 'superseded' ? 'warning' : 'info';
   const title = phase ? phaseCopy[phase] || 'Analysis in progress' : error ? 'Could not refresh the analysis status' : auth.session ? 'Checking analysis status…' : 'Sign in to resume tracking this analysis';
   const previousReportNote = phase === 'published' || phase === 'reused'
-    ? `Results are ready${activity?.analyzed_sha ? ` for commit ${activity.analyzed_sha.slice(0, 12)}` : ''}. Opening the report now.`
+    ? `Results are ready${activity?.analyzed_sha ? ` for commit ${activity.analyzed_sha.slice(0, 12)}` : ''}${activity?.failed_channels?.length ? ` with ${activity.failed_channels.length} scanner limitation${activity.failed_channels.length===1?'':'s'}` : activity?.completeness==='partial' ? ' with incomplete scanner evidence' : ''}. Opening the report now.`
     : request.previousReport && request.previousAnalyzedSha
     ? `The currently displayed report is for ${request.previousTargetLabel || 'the previously selected target'}${request.previousAnalyzedSha ? ` at commit ${request.previousAnalyzedSha.slice(0, 12)}` : ''}${request.previousGeneratedAt ? `, published ${new Date(request.previousGeneratedAt).toLocaleString()}` : ''}. It will remain visible until this request publishes.`
     : 'This project has no reviewable report yet. The first report will open here after publication.';
@@ -136,7 +138,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
   const percent=progress.length>0?Math.round((finished/progress.length)*100):(terminal?100:8);
   const journeyStep=analysisStage(status);
   const primaryIssue=phase==='failed'||phase==='cancelled_cutover'?plainAnalysisIssue(activity?.error||activity?.message):'';
-  const stages=['Choose','Preparing','Analyzing','Preparing report','Ready'];
+  const stages=['Choose','Preparing','Analyzing','Preparing report',status==='Needs attention'?'Needs attention':'Ready'];
 
   return <Alert
     className="project-run-tracker"

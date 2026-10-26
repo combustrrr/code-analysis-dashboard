@@ -40,6 +40,22 @@ test('channel progress follows selected lanes and shared producers',()=>{
   assert.deepEqual(progress.map(value=>value.status),['in_progress','success','success','queued']);
 });
 
+test('active queue activity includes live GitHub channel progress',async()=>{
+  const source=CONFIGURED_TARGETS[0],requestId='99999999-9999-4999-8999-999999999999',runId=42;
+  const h=helpers({overrides:{[`repos/${EXECUTION_REPOSITORY}/actions/runs/${runId}/attempts/1`]:{id:runId,status:'in_progress',conclusion:null}}});
+  h.queue=async path=>path==='/queue/status'?json({request_id:requestId,status:'analyzing',attempts:1,workflow_run_id:runId,workflow_run_attempt:1,intent:{project_id:source.id,source_sha:'b'.repeat(40),requested_channels:['semgrep','snyk']}},200):json({error:'not_found'},404);
+  h.pages=async path=>path.includes(`/actions/runs/${runId}/jobs`)?[
+    {name:'Source scanners / Semgrep scanner',status:'completed',conclusion:'success'},
+    {name:'vendor / Isolated Snyk evidence',status:'in_progress',conclusion:null},
+  ]:[];
+  const response=await repositoryApi(get(`/api/project-activity?project_id=${source.id}&request_id=${requestId}`),env,session,h);
+  const result=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(result.phase,'analyzing');
+  assert.equal(result.producer.run_id,runId);
+  assert.deepEqual(result.channel_progress.map(value=>[value.channel,value.status]),[['semgrep','success'],['snyk','in_progress']]);
+});
+
 test('project register never treats empty or revisionless scanner evidence as ready',()=>{
   const empty=registryReportState({status:'complete',checked_at:'2026-10-10T00:00:00Z',channel_statuses:[]});
   assert.equal(empty.report.scanner_summary.total,0);
@@ -52,6 +68,8 @@ test('project register never treats empty or revisionless scanner evidence as re
   const deferred=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),channel_statuses:[{channel:'semgrep',status:'COMPLETED'},{channel:'snyk',status:'DEFERRED'}]});
   assert.equal(deferred.attention,null);
   assert.deepEqual(deferred.report.scanner_summary,{completed:1,total:2,incomplete:0,not_run:1});
+  const timestamps=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),generated_at:'2026-10-24T00:00:00Z',report_generation_timestamp:'2026-10-26T07:00:00Z',checked_at:'2026-10-26T07:01:00Z',channel_statuses:[{channel:'semgrep',status:'COMPLETED'}]});
+  assert.equal(timestamps.report.generated_at,'2026-10-26T07:00:00Z');
 });
 
 test('pull-only collaborators can list and launch from the exact fixed target registry',async()=>{

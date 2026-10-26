@@ -4,6 +4,7 @@ import {MAX_GITHUB_READ_RETRIES, sleep, retryAfterMs, secondaryRateLimit, transi
 import {EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID, validateTargetRegistry} from './target-registry.mjs';
 const apiCache=new Map();
 const projectConfigCache=new Map();
+const GITHUB_METADATA_CACHE_MS=5*60*1000;
 // Public reports are resolved through verified public repositories and managed releases.
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 export function repositoryStoragePrefix(repository) {
@@ -13,10 +14,9 @@ export function repositoryStoragePrefix(repository) {
 export function reportStorageKey(repository, project, asset) {
   const base = `${repositoryStoragePrefix(repository)}/analysis-current-${project}`;
   return asset ? `${base}/${asset}` : `${base}.json`;
-}// Current reports must be republished within this age budget (24h default;
-// repository reconciliation republishes hourly). Manifests without a
-// verifiable publication timestamp fail closed.
-const DEFAULT_REPORT_AGE_MS = 24 * 60 * 60 * 1000;
+}// Report age is review guidance, not a validity boundary. Immutable evidence
+// remains reviewable until a validated replacement is published.
+const DEFAULT_REPORT_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 class ReportFailure extends Error {
   constructor(message, status = 502, code = 'report_unavailable') { super(message); this.status = status; this.code = code; }
 }
@@ -24,6 +24,11 @@ function publicationTime(manifest) {
   const stamp = manifest.checked_at || manifest.report_storage_history?.slice(-1)[0]?.at;
   const time = typeof stamp === 'string' ? Date.parse(stamp) : NaN;
   return Number.isFinite(time) ? time : null;
+}
+function reportFreshness(manifest, staleAfterMs) {
+  const published=publicationTime(manifest);
+  const age=published===null?null:Math.max(0,Date.now()-published);
+  return {status:published===null?'unknown':age>staleAfterMs?'older':'current',published_at:published===null?null:new Date(published).toISOString(),age_ms:age,stale_after_ms:staleAfterMs};
 }
 export function canonicalReportTarget(manifest) {
   if (!manifest || !Array.isArray(manifest.targets)) return null;
@@ -51,7 +56,7 @@ export async function publicReports(request,env) {
       const secondary = await secondaryRateLimit(response);
       if (response.ok) {
         const value=await response.json();
-        if(JSON.stringify(value).length<100000){apiCache.set(key,{value,until:Date.now()+30000});if(apiCache.size>32)apiCache.delete(apiCache.keys().next().value);}
+        if(JSON.stringify(value).length<100000){apiCache.set(key,{value,until:Date.now()+GITHUB_METADATA_CACHE_MS});if(apiCache.size>32)apiCache.delete(apiCache.keys().next().value);}
         return value;
       }
       if (secondary || transientReadStatus(response.status)) {
@@ -77,7 +82,7 @@ export async function publicReports(request,env) {
     const file = await github(`repos/${repository}/contents/.github/code-analysis/projects.json?ref=${encodeURIComponent(repo.default_branch)}`);
     const config = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g,'')),c=>c.charCodeAt(0))));
     if(config.execution_repository?.id!==repo.id || !Array.isArray(config.projects) || (env.APPLICATION_MODE === 'repositories' && !validateTargetRegistry(config,repo))) throw new Error('Project configuration identity mismatch.');
-    projectConfigCache.set(cacheKey,{value:config,until:Date.now()+30000});
+    projectConfigCache.set(cacheKey,{value:config,until:Date.now()+GITHUB_METADATA_CACHE_MS});
     return config;
   }
   try {
@@ -93,16 +98,9 @@ export async function publicReports(request,env) {
     if (!manifestObj) throw new ReportFailure('Report not found in storage.', 502, 'report_not_found');
     const manifest = await manifestObj.json();
     if(manifest.schema_version !== 'analysis-current-v1' || manifest.project_id !== project || manifest.analysis_repository?.toLowerCase() !== repo.full_name.toLowerCase()) throw new ReportFailure('Report identity could not be verified.', 502, 'report_identity');
-    // Freshness/expiry: never serve a stale or undated manifest as the current report.
-    const maxAge = resolveLimit(env.MAX_REPORT_AGE_MS, DEFAULT_REPORT_AGE_MS);
-    const published = publicationTime(manifest);
-    if (published === null || Date.now() - published > maxAge) {
-      const reason = published === null
-        ? 'Current report freshness cannot be verified; rerun analysis to republish the manifest.'
-        : 'Current report has expired; rerun analysis to publish a fresh report.';
-      return Response.json({error:reason, expired:true, checked_at:manifest.checked_at||null}, {status:410, headers:{'Cache-Control':'no-store'}});
-    }
-    if(url.pathname.endsWith('/manifest')) return Response.json(manifest,{headers:{'Cache-Control':'public, max-age=60'}});
+    const staleAfter = resolveLimit(env.REPORT_STALE_AFTER_MS || env.MAX_REPORT_AGE_MS, DEFAULT_REPORT_STALE_AFTER_MS);
+    const freshness=reportFreshness(manifest,staleAfter);
+    if(url.pathname.endsWith('/manifest')) return Response.json({...manifest,report_freshness:freshness},{headers:{'Cache-Control':'public, max-age=300'}});
 
     if(url.pathname.endsWith('/threat-report')) {
       const targetId=url.searchParams.get('target_id');

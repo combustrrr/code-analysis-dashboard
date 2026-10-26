@@ -198,8 +198,11 @@ jobs:
         run: |
           set -euo pipefail
           status=published
-          if [[ "$VENDOR_RESULT" == failure || "$PORTABLE_RESULT" == failure || "$CONFIGURED_RESULT" == failure || "$PUBLISH_RESULT" != success ]]; then status=failed; fi
+          # Individual scanner lanes may fail while the evidence collector still
+          # validates and publishes an explicit partial report. Publication is
+          # the request-level outcome; lane results remain report limitations.
+          if [[ "$PUBLISH_RESULT" != success ]]; then status=failed; fi
           curl --fail --silent --show-error --request POST \
             --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
-            --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"status\":\"${status}\",\"result\":{\"run_id\":${GITHUB_RUN_ID},\"run_attempt\":${GITHUB_RUN_ATTEMPT}}}" \
+            --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"status\":\"${status}\",\"result\":{\"run_id\":${GITHUB_RUN_ID},\"run_attempt\":${GITHUB_RUN_ATTEMPT},\"publication_status\":\"${PUBLISH_RESULT}\",\"scanner_lanes\":{\"vendor\":\"${VENDOR_RESULT}\",\"portable\":\"${PORTABLE_RESULT}\",\"configured\":\"${CONFIGURED_RESULT}\"}}}" \
             "${WORKER_URL}/api/internal/queue/complete"

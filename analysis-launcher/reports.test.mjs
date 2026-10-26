@@ -75,7 +75,7 @@ test('persistent token rejection fails closed with an actionable classified erro
     assert.equal(repoCalls,2);
   } finally {globalThis.fetch=original;}
 });
-test('expired or undated manifests are never served as current',async()=>{
+test('older or undated immutable manifests remain reviewable with explicit freshness',async()=>{
   const original=globalThis.fetch;
   globalThis.fetch=async url=>{
     if(String(url).endsWith('/repos/owner/freshness'))return Response.json({id:88,full_name:'owner/freshness',private:false,default_branch:'main'});
@@ -93,27 +93,28 @@ test('expired or undated manifests are never served as current',async()=>{
     // History-only publication timestamps also prove freshness.
     manifest={schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/freshness',report_storage_history:[{at:new Date().toISOString(),compressed_bytes:10}],targets:[]};
     assert.equal((await publicReports(new Request(url),tokenEnv)).status,200);
-    // Manifests older than the age budget expire.
+    // Older manifests remain valid evidence and carry separate freshness guidance.
     manifest={schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/freshness',checked_at:new Date(Date.now()-25*60*60*1000).toISOString(),targets:[]};
-    const expired=await publicReports(new Request(url),tokenEnv);
-    assert.equal(expired.status,410);
-    const expiredBody=await expired.json();
-    assert.equal(expiredBody.expired,true);
-    assert.match(expiredBody.error,/expired/);
-    // Manifests without any verifiable publication timestamp fail closed.
+    const older=await publicReports(new Request(url),tokenEnv);
+    assert.equal(older.status,200);
+    assert.equal((await older.json()).report_freshness.status,'older');
+    // Missing timestamps make age unknown without hiding immutable evidence.
     manifest={schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/freshness',targets:[]};
     const undated=await publicReports(new Request(url),tokenEnv);
-    assert.equal(undated.status,410);
-    assert.match((await undated.json()).error,/freshness/);
-    // The configured age budget is honored.
+    assert.equal(undated.status,200);
+    assert.equal((await undated.json()).report_freshness.status,'unknown');
+    // The configured age budget changes the guidance, not validity.
     manifest={schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/freshness',checked_at:new Date(Date.now()-2*60*60*1000).toISOString(),targets:[]};
-    assert.equal((await publicReports(new Request(url),{...tokenEnv,MAX_REPORT_AGE_MS:'3600000'})).status,410);
+    const configuredOlder=await publicReports(new Request(url),{...tokenEnv,REPORT_STALE_AFTER_MS:'3600000'});
+    assert.equal(configuredOlder.status,200);
+    assert.equal((await configuredOlder.json()).report_freshness.status,'older');
     manifest={schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/freshness',checked_at:new Date(Date.now()-60*60*1000).toISOString(),targets:[]};
-    assert.equal((await publicReports(new Request(url),{...tokenEnv,MAX_REPORT_AGE_MS:'7200000'})).status,200);
-    // Expired manifests also gate assets and threat reports.
+    const configuredCurrent=await publicReports(new Request(url),{...tokenEnv,REPORT_STALE_AFTER_MS:'7200000'});
+    assert.equal((await configuredCurrent.json()).report_freshness.status,'current');
+    // Older manifests continue to authorize their content-addressed assets.
     const assetUrl=new URL(url);assetUrl.pathname='/api/public/asset';assetUrl.searchParams.set('asset','analysis-'+'a'.repeat(64)+'.json.gz');
     manifest={schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/freshness',checked_at:new Date(Date.now()-25*60*60*1000).toISOString(),targets:[]};
-    assert.equal((await publicReports(new Request(assetUrl),tokenEnv)).status,410);
+    assert.equal((await publicReports(new Request(assetUrl),tokenEnv)).status,404);
   } finally {globalThis.fetch=original;}
 });
 test('report project IDs must exist in the current execution configuration',async()=>{

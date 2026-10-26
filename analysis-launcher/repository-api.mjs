@@ -18,7 +18,7 @@ export function registryReportState(target) {
   const incomplete=channels.filter(value=>!COMPLETED_REPORT_STATUSES.has(value.status)&&!['NOT_SELECTED','DEFERRED'].includes(value.status));
   const notRun=channels.filter(value=>['NOT_SELECTED','DEFERRED'].includes(value.status)).length;
   const revision=target.analyzed_sha||target.head_sha;
-  const report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.generated_at||target.checked_at||null,status:target.report_status||target.status,scanner_summary:{completed,total:channels.length,incomplete:incomplete.length,not_run:notRun},limitations:incomplete.slice(0,3).map(value=>({channel:value.channel||value.name||'Scanner',status:value.status||'Unavailable',reason:String(value.reason||'Evidence is incomplete.').slice(0,180)}))};
+  const report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.report_generation_timestamp||target.checked_at||target.generated_at||null,status:target.report_status||target.status,scanner_summary:{completed,total:channels.length,incomplete:incomplete.length,not_run:notRun},limitations:incomplete.slice(0,3).map(value=>({channel:value.channel||value.name||'Scanner',status:value.status||'Unavailable',reason:String(value.reason||'Evidence is incomplete.').slice(0,180)}))};
   if(!SHA.test(revision||''))return {report,attention:'The current report does not identify an immutable source revision. Run analysis to publish verifiable evidence.'};
   if(channels.length===0)return {report,attention:'The current report contains no scanner results. Run analysis to publish scanner evidence.'};
   if(report.status==='partial'||incomplete.length>0)return {report,attention:'The current report contains incomplete scanner evidence.'};
@@ -202,7 +202,7 @@ export async function repositoryApi(request, env, session, helpers) {
       const manifestPromise=publicReports(new Request(reportUrl),env).catch(()=>null);
       const [activeByProject,response]=await Promise.all([activeByProjectPromise,manifestPromise]);
       try {
-        if(response?.ok){const manifest=await response.json(),target=canonicalReportTarget(manifest),overlay=manifest.current_overlay;publicationError=Boolean(manifest.publication_error);const state=registryReportState(target);current_report=state.report;reportAttention=state.attention;if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
+        if(response?.ok){const manifest=await response.json(),target=canonicalReportTarget(manifest),overlay=manifest.current_overlay;publicationError=Boolean(manifest.publication_error);const state=registryReportState(target);current_report=state.report?{...state.report,freshness:manifest.report_freshness||null}:null;reportAttention=state.attention;if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
       } catch {}
       const active=activeByProject.get(String(project.id));let lifecycle='Ready',attention_reason=null;
       if(active)lifecycle=active.status==='analyzing'?'Analyzing':'Preparing';
@@ -333,16 +333,48 @@ export async function repositoryApi(request, env, session, helpers) {
 
     const id = url.searchParams.get('request_id');
     if (!/^[a-f0-9-]{36}$/.test(id || '')) throw new Failure(400, 'Choose a project and request.', 'invalid_request');
+    const activityFromQueue=async state=>{
+      const queuedResult=state.result||{};
+      const result={phase:state.status,request_id:id,attempts:state.attempts,source_sha:state.intent?.source_sha,requested_channels:state.intent?.requested_channels||[],checked_at:new Date().toISOString(),...queuedResult};
+      const runId=state.workflow_run_id||queuedResult.run_id;
+      const runAttempt=state.workflow_run_attempt||queuedResult.run_attempt||1;
+      if(runId){
+        try{
+          const [run,producerJobs]=await Promise.all([
+            github(`repos/${repository.full_name}/actions/runs/${runId}/attempts/${runAttempt}`,appToken),
+            pages(`repos/${repository.full_name}/actions/runs/${runId}/jobs?filter=latest`,'jobs',appToken),
+          ]);
+          result.producer={run_id:runId,attempt:runAttempt,status:run.status,conclusion:run.conclusion,url:`https://github.com/${repository.full_name}/actions/runs/${runId}/attempts/${runAttempt}`};
+          result.channel_progress=channelProgress(state.intent?.requested_channels,producerJobs,run.status);
+          result.failed_channels=result.channel_progress.filter(value=>value.status==='failure').map(value=>value.channel);
+          if(['preparing','analyzing'].includes(state.status))result.phase=run.status==='completed'?'publishing':state.status;
+        }catch{}
+      }
+      const publicationSucceeded=queuedResult.publication_status==='success';
+      if(state.status==='published')result.phase='publishing';
+      if(state.status==='failed'&&publicationSucceeded)result.phase='publishing';
+      if(state.status==='failed'){
+        const lanes=queuedResult.scanner_lanes||{};
+        const failedLanes=Object.entries(lanes).filter(([,value])=>value==='failure').map(([name])=>name);
+        result.error=queuedResult.reason||(queuedResult.publication_status&&queuedResult.publication_status!=='success'?'The report could not be published. The previous report remains available.':failedLanes.length?`Analysis stopped before publication after these scanner lanes failed: ${failedLanes.join(', ')}.`:'The analysis stopped before a report was published.');
+      }
+      return result;
+    };
+    let queuedState;
     const queued=await queue('/queue/status',{request_id:id});
-    if(queued.ok){const state=await queued.json();if(['preparing','analyzing','failed','published','superseded','cancelled_cutover'].includes(state.status))return json({phase:state.status,request_id:id,attempts:state.attempts,checked_at:new Date().toISOString(),...(state.result||{})},state.status==='preparing'?202:200);}
+    if(queued.ok){queuedState=await queued.json();if(['preparing','analyzing'].includes(queuedState.status)){const activity=await activityFromQueue(queuedState);return json(activity,activity.phase==='preparing'?202:200,{'Cache-Control':'private, max-age=5'});}}
     const reportUrl = new URL('/api/public/manifest', url);
     reportUrl.search = new URLSearchParams({repository:repository.full_name,project_id:project.id});
     const response = await publicReports(new Request(reportUrl), env);
-    if (!response.ok) return json({phase:'preparing',request_id:id,checked_at:new Date().toISOString(),publication_status:'unavailable'},202);
+    if (!response.ok){if(queuedState)return json(await activityFromQueue(queuedState),queuedState.status==='preparing'?202:200);return json({phase:'preparing',request_id:id,checked_at:new Date().toISOString(),publication_status:'unavailable'},202);}
     const manifest = await response.json();
     const receipt = manifest.requests?.find(row => row.request_id === id);
     const canonical = canonicalReportTarget(manifest);
-    if (receipt&&['published','reused','failed','superseded'].includes(receipt.status)) return json({phase:receipt.status,target_id:receipt.target_id||manifest.current_target_id,overlay_id:receipt.overlay_id||null,source_sha:receipt.head_sha,request_id:id,requested_channels:receipt.requested_channels,channel_progress:(receipt.channel_statuses||[]).map(value=>({...value,status:String(value.status||'unknown').toLowerCase()})),checked_at:new Date().toISOString()});
+    if (receipt&&['published','reused','failed','superseded'].includes(receipt.status)) {
+      const progress=(receipt.channel_statuses||[]).map(value=>({...value,status:String(value.status||'unknown').toLowerCase()}));
+      const failedChannels=progress.filter(value=>['failed','failure'].includes(value.status)).map(value=>value.channel);
+      return json({phase:receipt.status,target_id:receipt.target_id||manifest.current_target_id,overlay_id:receipt.overlay_id||null,source_sha:receipt.head_sha,request_id:id,requested_channels:receipt.requested_channels,channel_progress:progress,failed_channels:failedChannels,publication_status:['published','reused'].includes(receipt.status)?'success':receipt.publication_status||'unavailable',completeness:canonical?.report_status||canonical?.status||null,error:receipt.status==='failed'?(receipt.error||receipt.message||receipt.reason||'The analysis stopped before a report was published.'):undefined,checked_at:new Date().toISOString()});
+    }
     const canonicalForRequest=canonical&&(canonical.client_request_id===id||canonical.request_id===id)?canonical:null;
     let row = receipt ? {...canonicalForRequest,...receipt,id:canonicalForRequest?.id||receipt.target_id,head_sha:receipt.head_sha,analyzed_sha:canonicalForRequest?.analyzed_sha,report_status:canonicalForRequest?.report_status} : canonicalForRequest;
     if (!row) {
@@ -350,7 +382,7 @@ export async function repositoryApi(request, env, session, helpers) {
       if (recent && canonical && recent.analyzed_sha === canonical.analyzed_sha && recent.original_target_id === canonical.original_target_id) row = {...canonical,...recent};
       else if (recent) return json({phase:'superseded',source_sha:recent.head_sha,request_id:id,checked_at:new Date().toISOString()});
     }
-    if (!row) return json({phase:'preparing',request_id:id,checked_at:new Date().toISOString()});
+    if (!row){if(queuedState)return json(await activityFromQueue(queuedState),queuedState.status==='preparing'?202:200);return json({phase:'preparing',request_id:id,checked_at:new Date().toISOString()});}
     const result = {request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'preparing',checked_at:new Date().toISOString()};
     if (row.scan_run_id) {
       const run = await github(`repos/${repository.full_name}/actions/runs/${row.scan_run_id}/attempts/${row.run_attempt}`, appToken);

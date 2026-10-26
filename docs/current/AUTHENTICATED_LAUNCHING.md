@@ -71,6 +71,29 @@ The coordinator heartbeat renews the fenced lease once per minute and exits when
 completion invalidates that lease, so a published Actions run should not remain visibly active
 for more than one renewal interval solely because of its heartbeat job.
 
+## Report and completion semantics
+
+- A request is **Ready** when its validated report was published. Individual scanner
+  failures remain explicit channel limitations and do not turn a successfully published
+  partial report into a failed request.
+- A request is **Needs attention** at the request level when publication did not finish,
+  the request was cancelled, or no reviewable report was produced. Activity responses
+  retain publication state, failed channels, and the coordinator run when known.
+- Published immutable reports remain reviewable until a validated replacement is
+  committed. Report age is returned separately as `current`, `older`, or `unknown`; age
+  does not invalidate otherwise verifiable evidence.
+- Publication labels use `report_generation_timestamp`. The separate `generated_at`
+  value remains the source-analysis timestamp in report provenance and must not make a
+  newly published same-revision report appear old.
+- Project identity and preferred branch come from the trusted project registry, not from
+  report availability. Fast analysis therefore remains usable before the first report and
+  while an existing report is older.
+- While analysis is active, the activity API combines durable queue state with current
+  coordinator jobs so the UI can show parallel channel progress.
+- Project register, project review, and settings use one authenticated application shell.
+  Opening Settings from a project preserves that project ID so configuration and
+  provenance do not silently switch to the first registry entry.
+
 ## Dashboard sign-in and report visibility
 
 GitHub sign-in is a same-tab redirect. The Worker validates OAuth state and PKCE,

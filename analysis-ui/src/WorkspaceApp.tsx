@@ -26,7 +26,9 @@ type Index = { report_storage?: {compressed_bytes:number}; publishing_repository
 type Finding = { id: string; severity: string; category?: string; message: string; file: string; line: number; scanners: string[]; rules: string[]; observation_count?: number; scanner_family_count?: number; page: number };
 type Detail = Finding & { origins: { scanner_family: string; rule: string; file: string; start_line: number; raw_artifact: string; observation_id: string }[]; source: string | null; source_start: number; source_url: string | null };
 type Channel = { channel: string; name: string; class: string; status: string; findings: number | null; observation_count: number; reason: string; workflow: string };
-type Report = { tooling_sha?: string; producer_run_attempt?: number; analyzed_sha: string; generated_at: string; status: string; finding_count: number; observation_count: number; channels: Channel[]; severities: Record<string, number>; producer_runs: { id: string; url: string }[]; publication_gate: { satisfied: boolean } };
+type Report = { tooling_sha?: string; producer_run_attempt?: number; analyzed_sha: string; generated_at: string; report_generation_timestamp?: string; status: string; finding_count: number; observation_count: number; channels: Channel[]; severities: Record<string, number>; producer_runs: { id: string; url: string }[]; publication_gate: { satisfied: boolean } };
+type RegistryProject = {id:string;source_repository:string;preferred_branch:string;current_report?:{analyzed_sha?:string;generated_at?:string}|null};
+type Registry = {can_launch:boolean;can_configure:boolean;projects:RegistryProject[]};
 type PrOverlay = {overlay_key:string;head_sha:string;checked_at:string;pr_context:{number:number;title?:string;draft?:boolean;head_repository:string;head_branch:string;base_repository:string;base_branch:string;base_sha:string};channel:{status:string;reason?:string};advisories:{stable_id?:string;severity?:string;message?:string;title?:string;file?:string;start_line?:number}[]};
 const states: Record<string, string> = { current: 'Up to date', partial: 'Partial analysis', queued: 'Queued', scanning: 'Running scanners', running: 'Running scanners', collecting: 'Collecting results', publishing: 'Publishing report', stale: 'Newer revision pending', failed: 'Analysis failed', temporarily_unavailable: 'Temporarily unavailable', NOT_AVAILABLE: 'Unavailable', NOT_APPLICABLE: 'Not assessed', DEFERRED: 'Not assessed' };
 const ranks: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4, UNKNOWN: 5 };
@@ -93,6 +95,7 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
   const [lastRefresh, setLastRefresh] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [hostAccess,setHostAccess]=useState<{can_launch:boolean;can_configure:boolean}>({can_launch:false,can_configure:false});
+  const [registryProjects,setRegistryProjects]=useState<RegistryProject[]>([]);
   useEffect(()=>{const refresh=()=>setRefreshTick(t=>t+1);window.addEventListener('analysis-report-published',refresh);return()=>window.removeEventListener('analysis-report-published',refresh);},[]);
   const [directory, setDirectory] = useState('');
   const [rule,setRule]=useState(''); const [file,setFile]=useState(''); const [locationFilter,setLocationFilter]=useState(''); const [overlap,setOverlap]=useState('');
@@ -108,7 +111,7 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
       const change = () => setRoute(route());
       let timer: number | undefined;
       if (r.repository && r.project) {
-        refresh(); timer = window.setInterval(refresh, 60000);
+        refresh(); timer = window.setInterval(refresh, 5*60*1000);
       } else if (r.tab === 'repositories' && !r.repository && !applicationEndpoint) {
         json<Index>('data/index.json', c.signal).then(value => { if (sequence === refreshSequence.current) { setIndex(value); setError(''); } }).catch(e => { if (e.name !== 'AbortError' && sequence === refreshSequence.current) { setIndex(undefined); setError(e.message); } });
       } else {
@@ -131,10 +134,18 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
   useEffect(()=>{
     let active=true;
     setHostAccess({can_launch:false,can_configure:false});
+    setRegistryProjects([]);
     if(!launchAuth.session)return;
-    launchAuth.api<{can_launch:boolean;can_configure:boolean}>('projects').then(value=>{if(active)setHostAccess(value);}).catch(()=>{});
+    const prefetched=launchAuth.session.registry as Registry|undefined;
+    if(prefetched?.projects?.some(project=>typeof project.source_repository==='string'&&typeof project.preferred_branch==='string')){
+      setHostAccess({can_launch:prefetched.can_launch,can_configure:prefetched.can_configure});
+      setRegistryProjects(prefetched.projects);
+      return;
+    }
+    launchAuth.api<Registry>('projects').then(value=>{if(active){setHostAccess(value);setRegistryProjects(value.projects||[]);}}).catch(()=>{});
     return()=>{active=false;};
   },[launchAuth.session?.token]);
+  const registryProject=registryProjects.find(project=>String(project.id)===String(r.project));
   const target = index?.targets.find(t => t.id === r.target) || (!r.target ? index?.targets.find(t => t.kind === 'branch' && t.branch === index.preferred_branch) || index?.targets[0] : undefined);
   useEffect(() => {
     if (r.tab === 'repositories' && !r.repository) {
@@ -223,9 +234,9 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
       return null;
     }
     return <ConfigProvider><AppShell auth={viewerAuth} status={projectRunTrackers.length ? projectRunTrackers : undefined}>
-     {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
+     {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={registryProject?.preferred_branch||index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
     <main className="project-workspace">
-      {(report||!activeProjectRun)&&<RevisionRibbon repository={index?.source_repository||target?.repository||'Configured project'} target={target} targets={index?.targets||[]} fresh={fresh} statusLabel={states[target?.lifecycle_status||target?.status||'']||target?.status||'Unavailable'} coverage={report?`${completed} of ${report.channels.length}`:'Unavailable'} published={report?.generated_at} onTarget={value=>navigate(value,['issues','coverage','report'].includes(r.tab)?r.tab as ProjectView:'overview')}/>}
+      {(report||!activeProjectRun)&&<RevisionRibbon repository={registryProject?.source_repository||index?.source_repository||target?.repository||'Configured project'} target={target} targets={index?.targets||[]} fresh={fresh} statusLabel={states[target?.lifecycle_status||target?.status||'']||target?.status||'Unavailable'} coverage={report?`${completed} of ${report.channels.length}`:'Unavailable'} published={report?.report_generation_timestamp||registryProject?.current_report?.generated_at} onTarget={value=>navigate(value,['issues','coverage','report'].includes(r.tab)?r.tab as ProjectView:'overview')}/>}
       {(report||!activeProjectRun)&&<div className="project-context-actions"><span>Reports checked {date(lastRefresh)}</span><Button size="small" loading={refreshing} onClick={() => { refreshRepositoryReports(); setRefreshing(true); setRefreshTick(t => t + 1); message.loading({ content: 'Checking for a new report…', key: 'refresh', duration: 1.2 }); }}>{refreshing ? 'Refreshing…' : 'Refresh results'}</Button><a href={routeHash({kind:'settings',section:'provenance',projectId:r.project})}>Full provenance</a></div>}
        {r.tab!=='run'&&!activeProjectRun&&<section className="analysis-entry"><div><span className="eyebrow">NEW EVIDENCE</span><h2>Run analysis</h2><p>Repeat your last selection with Fast analysis, or configure a branch, pull request, exact commit, and scanner coverage.</p></div><Button type="primary" href={routeHash({kind:'project-run',projectId:r.project})} disabled={!mayLaunch}>Run analysis</Button></section>}
        {index?.current_overlay&&<section className="panel pr-overlay" aria-label="Current pull request review overlay">

@@ -26,8 +26,9 @@ export function ProjectLauncher({auth,repository,project,preferredBranch,canLaun
  const [vendorConfirmed,setVendorConfirmed]=useState(false);
  const [error,setError]=useState('');
  const key=useRef('');
- useEffect(()=>{if(!auth.session)return;let active=true;Promise.all([auth.api<Inventory>(`project-targets?project_id=${project}`),auth.api<{channels:Channel[]}>(`project-readiness?project_id=${project}`)]).then(([targets,ready])=>{if(active){setInventory(targets);setReadiness(ready.channels);setChannels(ready.channels.filter(c=>c.selectable).map(c=>c.id));}}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:String(reason));});return()=>{active=false;};},[auth.session?.token,project]);
- const choices=preview?.channels||readiness;
+ useEffect(()=>{if(!auth.session)return;let active=true;Promise.all([auth.api<Inventory>(`project-targets?project_id=${project}`),auth.api<{channels:Channel[]}>(`project-readiness?project_id=${project}`)]).then(([targets,ready])=>{if(active){setInventory(targets);setReadiness(ready.channels);setChannels(ready.channels.filter(c=>c.default_selected&&c.selectable).map(c=>c.id));}}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:String(reason));});return()=>{active=false;};},[auth.session?.token,project]);
+ useEffect(()=>{if(kind!=='pr')setChannels(current=>current.filter(id=>id!=='coderabbit-ai-advisory'));},[kind]);
+ const choices=preview?.channels||readiness.map(channel=>channel.id==='coderabbit-ai-advisory'&&kind!=='pr'?{...channel,status:'NOT_APPLICABLE',reason:'CodeRabbit review evidence requires an open pull request.',default_selected:false,selectable:false}:channel);
  const grouped=useMemo(()=>{const groups=new Map<string,Channel[]>();choices.forEach(channel=>groups.set(channel.group,[...(groups.get(channel.group)||[]),channel]));return [...groups.entries()];},[choices]);
  const selection=ref?{kind,ref:kind==='commit'?ref.toLowerCase():ref} as Selection:undefined;
  const validRevision=!!selection&&(kind!=='commit'||/^[a-f0-9]{40}$/i.test(ref));

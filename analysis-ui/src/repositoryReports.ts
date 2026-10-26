@@ -9,6 +9,7 @@ const manifestRequests = new Map<string, Promise<RepositoryManifest>>();
 const shards = new Map<string, Promise<Record<string, unknown>>>();
 export const applicationEndpoint = import.meta.env.VITE_LAUNCH_ENDPOINT as string | undefined;
 const fixtureBuild = import.meta.env.MODE === 'fixtures';
+const MANIFEST_CACHE_MS=5*60*1000;
 export function refreshRepositoryReports(){manifests.clear();manifestRequests.clear();shards.clear();}
 let reportBearer: string | undefined;
 export function setReportSession(token?:string) {
@@ -37,7 +38,7 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
   const query=new URLSearchParams({repository:repository!,project_id:project!});
   const key=query.toString();
  let entry=manifests.get(key);
- if(!entry||Date.now()-entry.at>60000){
+ if(!entry||Date.now()-entry.at>MANIFEST_CACHE_MS){
   signal?.throwIfAborted();
   let request=manifestRequests.get(key);
   if(!request){
