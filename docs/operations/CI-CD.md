@@ -38,7 +38,9 @@ can merge.
 Pages builds the application without report assets and retains the current asset list
 from up to twenty preceding successful deployments. This bounded compatibility window
 keeps lazy-loaded chunks available to browser tabs that still hold a recently cached
-application shell. Worker deployment runs tests, deployment validation,
+application shell. Historical artifacts can expire or be removed independently; the
+retention step records and skips those unavailable runs instead of blocking publication
+of the newly validated application. Worker deployment runs tests, deployment validation,
 and a Wrangler dry run before the production job. Tooling changes pass compatibility
 tests and are adopted through an exact-head promotion instead of being executed directly
 from an unvalidated commit.

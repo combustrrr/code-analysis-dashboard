@@ -55,7 +55,14 @@ jobs:
             download="$RUNNER_TEMP/previous-pages-$index"
             site="$RUNNER_TEMP/previous-site-$index"
             mkdir -p "$download" "$site"
-            gh run download "${previous_runs[$index]}" --name github-pages --dir "$download"
+            if ! gh run download "${previous_runs[$index]}" --name github-pages --dir "$download"; then
+              echo "Historical Pages artifact is unavailable for run ${previous_runs[$index]}; continuing with the remaining bounded history." >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            if [ ! -f "$download/artifact.tar" ]; then
+              echo "Historical Pages artifact archive is missing for run ${previous_runs[$index]}; continuing." >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
             tar -xf "$download/artifact.tar" -C "$site"
             if [ -f "$site/current-assets.txt" ]; then
               while IFS= read -r asset; do
