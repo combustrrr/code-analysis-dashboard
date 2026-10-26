@@ -46,6 +46,12 @@ loads reports only after `/api/session` verification, polls access while visible
 clears in-memory reports on sign-out or denial. Refreshing and opening a new tab
 requires sign-in again.
 
+Only explicit `session_invalid` and `viewer_not_authorized` responses clear the
+in-memory session. A GitHub API, App installation, report asset, rate-limit, or Worker
+availability error remains an operation-specific error and must not be translated into
+"access revoked." A transient periodic `/api/session` failure leaves an already verified
+session active and is retried later; initial verification still fails closed.
+
 `DASHBOARD_ACCESS` and `REPORT_ACCESS` are independent. The current deployment uses
 `DASHBOARD_ACCESS=collaborators` and `REPORT_ACCESS=collaborators`. Report API access
 defaults to collaborator-only and remains protected if dashboard sign-in is later

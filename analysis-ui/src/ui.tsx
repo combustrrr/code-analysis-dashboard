@@ -22,7 +22,13 @@ export function Alert({type='info',title,message:legacyTitle,description,showIco
 
 type Option={value?:string|number;label:ReactNode;disabled?:boolean;options?:Option[]};
 export type SelectProps={options?:Option[];value?:string|number;onChange?:(value:any)=>void;placeholder?:string;className?:string;style?:CSSProperties;[key:string]:unknown};
-export function Select({options=[],value,onChange,placeholder,className,style,...rest}:SelectProps){
+export function Select({options=[],value,onChange,placeholder,className,style,showSearch,...rest}:SelectProps){
+ const listId=React.useId();
+ const flat=options.flatMap(option=>option.options||[option]);
+ const selected=flat.find(option=>String(option.value)===String(value??''));
+ const [text,setText]=useState(()=>selected?String(selected.label):'');
+ useEffect(()=>setText(selected?String(selected.label):''),[value,selected?.label]);
+ if(showSearch){return <span className={cx('ant-select','ant-select-searchable',className)} style={style}><input {...rest as React.InputHTMLAttributes<HTMLInputElement>} className="ant-select-selector" role="combobox" aria-autocomplete="list" list={listId} placeholder={placeholder} value={text} onChange={event=>{const next=event.target.value;setText(next);const match=flat.find(option=>!option.disabled&&String(option.label)===next);if(match)onChange?.(match.value);}}/><datalist id={listId}>{flat.filter(option=>!option.disabled).map(option=><option key={String(option.value)} value={String(option.label)}/>)}</datalist></span>}
  return <span className={cx('ant-select',className)} style={style}><select {...rest as React.SelectHTMLAttributes<HTMLSelectElement>} className="ant-select-selector" value={value??''} onChange={event=>onChange?.(event.target.value)}>{placeholder&&value==null?<option value="" disabled>{placeholder}</option>:null}{options.map((option,index)=>option.options?<optgroup key={String(option.label??index)} label={String(option.label)}>{option.options.map(child=><option key={String(child.value)} value={child.value} disabled={child.disabled}>{child.label}</option>)}</optgroup>:<option key={String(option.value)} value={option.value} disabled={option.disabled}>{option.label}</option>)}</select></span>;
 }
 
@@ -70,8 +76,8 @@ export function Pagination({current=1,pageSize=10,total=0,onChange,showTotal,cla
 
 export function Descriptions({items=[],column=1,bordered,className}:Loose){return <dl className={cx('ant-descriptions',bordered&&'ant-descriptions-bordered',className)} style={{gridTemplateColumns:`repeat(${Number(column)||1},minmax(0,1fr))`}}>{(items as {key:React.Key;label:ReactNode;children:ReactNode}[]).map(item=><div className="ant-descriptions-row" key={item.key}><dt className="ant-descriptions-item-label">{item.label}</dt><dd className="ant-descriptions-item-content">{item.children}</dd></div>)}</dl>}
 
-type TabItem={key:string;label:ReactNode;children?:ReactNode};
-export function Tabs({items=[],activeKey,onChange,className}:{items?:TabItem[];activeKey?:string;onChange?:(key:string)=>void;className?:string;[key:string]:any}){const selected=activeKey??items[0]?.key;return <div className={cx('ant-tabs',className)}><div className="ant-tabs-nav" role="tablist"><div className="ant-tabs-nav-list">{items.map(tab=><button type="button" role="tab" aria-selected={tab.key===selected} className={cx('ant-tabs-tab',tab.key===selected&&'ant-tabs-tab-active')} key={tab.key} onClick={()=>onChange?.(tab.key)}>{tab.label}</button>)}</div></div><div className="ant-tabs-content">{items.find(tab=>tab.key===selected)?.children}</div></div>}
+type TabItem={key:string;label:ReactNode;children?:ReactNode;disabled?:boolean};
+export function Tabs({items=[],activeKey,onChange,className}:{items?:TabItem[];activeKey?:string;onChange?:(key:string)=>void;className?:string;[key:string]:any}){const selected=activeKey??items[0]?.key;return <div className={cx('ant-tabs',className)}><div className="ant-tabs-nav" role="tablist"><div className="ant-tabs-nav-list">{items.map(tab=><button type="button" role="tab" disabled={tab.disabled} aria-selected={tab.key===selected} className={cx('ant-tabs-tab',tab.key===selected&&'ant-tabs-tab-active')} key={tab.key} onClick={()=>onChange?.(tab.key)}>{tab.label}</button>)}</div></div><div className="ant-tabs-content">{items.find(tab=>tab.key===selected)?.children}</div></div>}
 
 export function Steps({items=[],current=0,className}:Loose){return <div className={cx('ant-steps',className)}>{(items as {title:ReactNode;description?:ReactNode}[]).map((item,index)=><div className={cx('ant-steps-item',index<Number(current)&&'ant-steps-item-finish',index===Number(current)&&'ant-steps-item-process')} key={index}><span>{index<Number(current)?'✓':index+1}</span><div><strong className="ant-steps-item-title">{item.title}</strong>{item.description&&<p className="ant-steps-item-description">{item.description}</p>}</div></div>)}</div>}
 

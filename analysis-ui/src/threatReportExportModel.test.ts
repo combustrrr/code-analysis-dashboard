@@ -33,4 +33,22 @@ describe('threat report export model', () => {
     expect(model.findings).toHaveLength(251);
     expect(model.exportedAt).toBe('2026-10-20T01:00:00Z');
   });
+
+  test('includes findings from every selected file path', () => {
+    const findings=[report.findings[0],{...report.findings[0],finding_id:'f-2',file:'src/b.ts'},{...report.findings[0],finding_id:'f-3',file:'src/c.ts'}];
+    expect(filterThreatFindings(findings,{files:['src/a b.ts','src/b.ts']}).map(finding=>finding.finding_id)).toEqual(['f-1','f-2']);
+    expect(hasActiveFilters({files:[]})).toBe(false);
+    expect(hasActiveFilters({files:['src/a b.ts']})).toBe(true);
+  });
+
+  test('uses OR within a filter and AND across filter dimensions', () => {
+    const findings=[
+      report.findings[0],
+      {...report.findings[0],finding_id:'f-2',severity:'MEDIUM',file:'src/b.ts',scanners:['other']},
+      {...report.findings[0],finding_id:'f-3',severity:'LOW',file:'test/c.ts',scanners:['scanner']},
+    ];
+    expect(filterThreatFindings(findings,{severity:['HIGH','MEDIUM']})).toHaveLength(2);
+    expect(filterThreatFindings(findings,{scanner:['scanner','other']})).toHaveLength(3);
+    expect(filterThreatFindings(findings,{severity:['HIGH','MEDIUM'],files:['src/b.ts','test/c.ts']})).toEqual([findings[1]]);
+  });
 });

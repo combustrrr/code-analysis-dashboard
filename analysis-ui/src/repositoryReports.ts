@@ -7,19 +7,22 @@ type RepositoryManifest={targets:ManifestTarget[];current_overlay?:ManifestTarge
 const manifests = new Map<string, {at:number; value:RepositoryManifest}>();
 const manifestRequests = new Map<string, Promise<RepositoryManifest>>();
 const shards = new Map<string, Promise<Record<string, unknown>>>();
+let cacheGeneration=0;
 export const applicationEndpoint = import.meta.env.VITE_LAUNCH_ENDPOINT as string | undefined;
 const fixtureBuild = import.meta.env.MODE === 'fixtures';
-const MANIFEST_CACHE_MS=5*60*1000;
-export function refreshRepositoryReports(){manifests.clear();manifestRequests.clear();shards.clear();}
+const MANIFEST_CACHE_MS=60*1000;
+export function refreshRepositoryReports(){cacheGeneration++;manifests.clear();manifestRequests.clear();shards.clear();}
 let reportBearer: string | undefined;
 export function setReportSession(token?:string) {
- if(token!==reportBearer){manifests.clear();manifestRequests.clear();shards.clear();reportBearer=token;}
+ if(token!==reportBearer){refreshRepositoryReports();reportBearer=token;}
 }
 export async function reportFetch(path:string,init:RequestInit={}) {
  const headers=new Headers(init.headers);
  if(reportBearer && applicationEndpoint && new URL(path,location.href).origin===new URL(applicationEndpoint).origin)headers.set('Authorization','Bearer '+reportBearer);
  const response=await fetch(path,{...init,headers,cache:'no-store'});
- if(reportBearer && [401,403].includes(response.status))window.dispatchEvent(new Event('analysis-access-denied'));
+ if(reportBearer && [401,403].includes(response.status)){
+  try{const failure=await response.clone().json() as {code?:string};if(['session_invalid','viewer_not_authorized'].includes(failure.code||''))window.dispatchEvent(new Event('analysis-access-denied'));}catch{}
+ }
  return response;
 }
 function selection() {const route=parseAppRoute();return 'projectId' in route&&route.kind!=='settings'?{repository:import.meta.env.VITE_DEFAULT_EXECUTION_REPOSITORY||'combustrrr/code-analysis-dashboard',project:route.projectId,target:route.kind==='project'?route.target||null:null}:{repository:null,project:null,target:null};}
@@ -40,12 +43,12 @@ export async function repositoryJson<T>(path:string,signal?:AbortSignal):Promise
  let entry=manifests.get(key);
  if(!entry||Date.now()-entry.at>MANIFEST_CACHE_MS){
   signal?.throwIfAborted();
-  let request=manifestRequests.get(key);
+  let request=manifestRequests.get(key);const started=cacheGeneration;
   if(!request){
    request=(async()=>await (await response(base+'manifest?'+query)).json() as RepositoryManifest)();
    manifestRequests.set(key,request);request.finally(()=>{if(manifestRequests.get(key)===request)manifestRequests.delete(key);}).catch(()=>{});
   }
-  const value=await request;signal?.throwIfAborted();entry={at:Date.now(),value};manifests.set(key,entry);if(manifests.size>10)manifests.delete(manifests.keys().next().value!);
+  const value=await request;signal?.throwIfAborted();entry={at:Date.now(),value};if(started===cacheGeneration)manifests.set(key,entry);if(manifests.size>10)manifests.delete(manifests.keys().next().value!);
  }
   const manifest=entry.value;
   const targetPath=(t:ManifestTarget)=>`repository-reports/${t.id}/${t.collected_run}`;

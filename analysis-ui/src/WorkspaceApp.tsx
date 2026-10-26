@@ -1,5 +1,5 @@
-import { refreshRepositoryReports } from './repositoryReports';
 import {getProjectRegistry} from './projectRegistry';
+import {EVIDENCE_REFRESH_EVENT,invalidateEvidenceCaches} from './evidenceRefresh';
 import { applicationEndpoint, repositoryJson } from './repositoryReports';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Collapse, ConfigProvider, Drawer, Empty, Grid, Input, Progress, Select, Space, Table, Tabs, Tag, message } from './ui';
@@ -12,10 +12,11 @@ import './workspace.css';
 import { useLaunchAuth } from './useLaunchAuth';
 import { safeGithubUrl } from './safeUrls';
 import type { ProjectRunRequest } from './ProjectRunTracker';
-import {parseAppRoute,routeHash,type IssueRouteFilters,type ProjectView} from './appRoutes';
+import {navigateAppHash,parseAppRoute,routeHash,type IssueRouteFilters,type ProjectView} from './appRoutes';
 import {AppShell} from './AppShell';
 import {displayFindingMessage,displayRuleId,isCompleteChannelStatus,plainAnalysisIssue} from './analysisPresentation';
 import {RevisionRibbon} from './RevisionRibbon';
+import {MultiValuePicker} from './PathMultiPicker';
 
 const ProjectLauncher=React.lazy(()=>import('./ProjectLauncher').then(module=>({default:module.ProjectLauncher})));
 const ProjectRunTracker=React.lazy(()=>import('./ProjectRunTracker').then(module=>({default:module.ProjectRunTracker})));
@@ -28,7 +29,7 @@ type Finding = { id: string; severity: string; category?: string; message: strin
 type Detail = Finding & { origins: { scanner_family: string; rule: string; file: string; start_line: number; raw_artifact: string; observation_id: string }[]; source: string | null; source_start: number; source_url: string | null };
 type Channel = { channel: string; name: string; class: string; status: string; findings: number | null; observation_count: number; reason: string; workflow: string };
 type Report = { tooling_sha?: string; producer_run_attempt?: number; analyzed_sha: string; generated_at: string; report_generation_timestamp?: string; status: string; finding_count: number; observation_count: number; channels: Channel[]; severities: Record<string, number>; producer_runs: { id: string; url: string }[]; publication_gate: { satisfied: boolean } };
-type RegistryProject = {id:string;source_repository:string;preferred_branch:string;current_report?:{analyzed_sha?:string;generated_at?:string}|null};
+type RegistryProject = {id:string;source_repository:string;preferred_branch:string;preferred_branch_head_sha?:string|null;current_report?:{analyzed_sha?:string;generated_at?:string;status?:string}|null};
 type Registry = {can_launch:boolean;can_configure:boolean;projects:RegistryProject[]};
 type PrOverlay = {overlay_key:string;head_sha:string;checked_at:string;pr_context:{number:number;title?:string;draft?:boolean;head_repository:string;head_branch:string;base_repository:string;base_branch:string;base_sha:string};channel:{status:string;reason?:string};advisories:{stable_id?:string;severity?:string;message?:string;title?:string;file?:string;start_line?:number}[]};
 const states: Record<string, string> = { current: 'Up to date', partial: 'Partial analysis', queued: 'Queued', scanning: 'Running scanners', running: 'Running scanners', collecting: 'Collecting results', publishing: 'Publishing report', stale: 'Newer revision pending', failed: 'Analysis failed', temporarily_unavailable: 'Temporarily unavailable', NOT_AVAILABLE: 'Unavailable', NOT_APPLICABLE: 'Not assessed', DEFERRED: 'Not assessed' };
@@ -42,11 +43,12 @@ function isRepositoryAvailabilityError(value: string) { return /retired|unsuppor
 const PROJECT_RUNS_STORAGE_KEY = 'analysis-project-runs';
 const ACTIVE_PROJECT_RUN_PHASES = new Set(['preparing', 'queued', 'running', 'scanning', 'analyzing', 'collecting', 'publishing']);
 function readProjectRuns(): ProjectRunRequest[] { try { const value = JSON.parse(sessionStorage.getItem(PROJECT_RUNS_STORAGE_KEY) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } }
-function navigate(target: string, tab: ProjectView, issue = '',filters?:IssueRouteFilters) { const current = route(); if(!current.project)return;location.hash=routeHash({kind:'project',projectId:current.project,target:target||undefined,view:tab,issue:issue||undefined,filters}); }
+function navigate(target: string, tab: ProjectView, issue = '',filters?:IssueRouteFilters) { const current = route(); if(!current.project)return;navigateAppHash(routeHash({kind:'project',projectId:current.project,target:target||undefined,view:tab,issue:issue||undefined,filters}),{preserveScroll:true}); }
 function date(s?: string) { return s ? new Date(s).toLocaleString() : 'Unavailable'; }
 const colors: Record<string, string> = { CRITICAL: 'red', HIGH: 'volcano', MEDIUM: 'gold', LOW: 'blue', INFO: 'default', current: 'green', partial: 'orange', failed: 'red', scanning: 'blue', COMPLETED: 'green', CONFIGURED_COMPLETE: 'green', POLICY_FINDINGS: 'orange', NOT_AVAILABLE: 'orange', FAILED: 'red' };
 function Badge({ value }: { value: string }) { return <Tag className={`status-tag status-${value}`} color={colors[value]}>{states[value] || value.replaceAll('_', ' ')}</Tag>; }
 function directoryOf(file: string) { return file.includes('/') ? file.slice(0, file.lastIndexOf('/')) : '(root)'; }
+function filterValues(value?:string|string[]) { return Array.isArray(value)?value:value?[value]:[]; }
 type Relation = { label: string; reason: string; findings: Finding[] };
 const chartColors = ['#D91668', '#D94F63', '#D89A3D', '#5B7DD1', '#28B8D3', '#7D9BC3'];
 function DonutChart({ values, label, center, onSelect }: { values: { label: string; value: number; color?: string }[]; label: string; center: string; onSelect?:(label:string)=>void }) {
@@ -97,14 +99,14 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
   const [refreshing, setRefreshing] = useState(false);
   const [hostAccess,setHostAccess]=useState<{can_launch:boolean;can_configure:boolean}>({can_launch:false,can_configure:false});
   const [registryProjects,setRegistryProjects]=useState<RegistryProject[]>([]);
-  useEffect(()=>{const refresh=()=>setRefreshTick(t=>t+1);window.addEventListener('analysis-report-published',refresh);return()=>window.removeEventListener('analysis-report-published',refresh);},[]);
-  const [directory, setDirectory] = useState('');
-  const [rule,setRule]=useState(''); const [file,setFile]=useState(''); const [locationFilter,setLocationFilter]=useState(''); const [overlap,setOverlap]=useState('');
+  useEffect(()=>{const refresh=()=>setRefreshTick(t=>t+1);window.addEventListener(EVIDENCE_REFRESH_EVENT,refresh);return()=>window.removeEventListener(EVIDENCE_REFRESH_EVENT,refresh);},[]);
+  const [selectedDirectories, setSelectedDirectories] = useState<string[]>([]);
+  const [selectedRules,setSelectedRules]=useState<string[]>([]); const [files,setFiles]=useState<string[]>([]); const [locationFilter,setLocationFilter]=useState(''); const [overlap,setOverlap]=useState('');
    const [index, setIndex] = useState<Index>(); const [error, setError] = useState(''); const [r, setRoute] = useState(route());
    const [currentOverlay,setCurrentOverlay]=useState<PrOverlay>(); const [overlayError,setOverlayError]=useState('');
    const refreshSequence = useRef(0);
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
-  const [query, setQuery] = useState(''); const [severity, setSeverity] = useState(''); const [category,setCategory]=useState(''); const [scanner, setScanner] = useState(''); const [groupBy, setGroupBy] = useState('none'); const [moreFilters,setMoreFilters]=useState(false); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState(''); const [selectedSeverities, setSelectedSeverities] = useState<string[]>([]); const [selectedCategories,setSelectedCategories]=useState<string[]>([]); const [selectedScanners, setSelectedScanners] = useState<string[]>([]); const [groupBy, setGroupBy] = useState('none'); const [moreFilters,setMoreFilters]=useState(false); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
     useEffect(() => {
       const sequence = ++refreshSequence.current;
       const c = new AbortController();
@@ -137,11 +139,15 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
     setHostAccess({can_launch:false,can_configure:false});
     setRegistryProjects([]);
     if(!launchAuth.session)return;
-    getProjectRegistry<Registry>(launchAuth).then(value=>{if(active){setHostAccess(value);setRegistryProjects(value.projects||[]);}}).catch(()=>{});
-    return()=>{active=false;};
+    const load=(force=false)=>getProjectRegistry<Registry>(launchAuth,force).then(value=>{if(active){setHostAccess(value);setRegistryProjects(value.projects||[]);}}).catch(()=>{});
+    const visible=()=>{if(document.visibilityState==='visible')void load(true);};
+    void load();document.addEventListener('visibilitychange',visible);window.addEventListener(EVIDENCE_REFRESH_EVENT,visible);
+    return()=>{active=false;document.removeEventListener('visibilitychange',visible);window.removeEventListener(EVIDENCE_REFRESH_EVENT,visible);};
   },[launchAuth.session?.token]);
   const registryProject=registryProjects.find(project=>String(project.id)===String(r.project));
-  const target = index?.targets.find(t => t.id === r.target) || (!r.target ? index?.targets.find(t => t.kind === 'branch' && t.branch === index.preferred_branch) || index?.targets[0] : undefined);
+  const newestTarget=index?.targets.find(t => t.kind === 'branch' && t.branch === index.preferred_branch) || index?.targets[0];
+  const target = index?.targets.find(t => t.id === r.target) || newestTarget;
+  useEffect(()=>{if(r.target&&index&&!index.targets.some(item=>item.id===r.target)&&newestTarget)navigate(newestTarget.id,['issues','coverage','report'].includes(r.tab)?r.tab as ProjectView:'overview');},[r.target,r.tab,index,newestTarget?.id]);
   useEffect(() => {
     if (r.tab === 'repositories' && !r.repository) {
       try { sessionStorage.removeItem('analysis-workspace-requested'); } catch {}
@@ -160,7 +166,7 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
       previousAnalyzedSha: request.previousAnalyzedSha || report?.analyzed_sha,
       previousGeneratedAt: request.previousGeneratedAt || report?.generated_at,
     };
-    persistProjectRuns([...projectRunsRef.current.filter(item => item.request_id !== run.request_id), run]);
+    persistProjectRuns([...projectRunsRef.current.filter(item => item.project !== run.project), run]);
   };
   const updateProjectRunPhase = (requestId: string, phase: string) => {
     const current = projectRunsRef.current;
@@ -169,10 +175,11 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
   };
   const dismissProjectRun = (requestId: string) => persistProjectRuns(projectRunsRef.current.filter(item => item.request_id !== requestId));
   const openProjectRunReport = (request: ProjectRunRequest, targetId: string) => {
-    location.hash = routeHash({kind:'project',projectId:request.project,target:targetId,view:'report'});
+    navigateAppHash(routeHash({kind:'project',projectId:request.project,target:targetId,view:'report'}));
   };
-  const projectRunTrackers = projectRuns.filter(request => request.project === r.project).map(request => <ProjectRunTracker key={request.request_id} auth={launchAuth} request={request} onPhase={updateProjectRunPhase} onDismiss={() => dismissProjectRun(request.request_id)} onOpenReport={id => openProjectRunReport(request, id)}/>);
-  const activeProjectRun = projectRuns.find(request => request.repository === r.repository && request.project === r.project && (!request.phase || ACTIVE_PROJECT_RUN_PHASES.has(request.phase)));
+  const authoritativeProjectRun = projectRuns.filter(request => request.project === r.project).sort((a,b)=>Date.parse(b.submittedAt)-Date.parse(a.submittedAt))[0];
+  const projectRunTrackers = authoritativeProjectRun?[<ProjectRunTracker key={authoritativeProjectRun.request_id} auth={launchAuth} request={authoritativeProjectRun} onPhase={updateProjectRunPhase} onDismiss={() => dismissProjectRun(authoritativeProjectRun.request_id)} onOpenReport={id => openProjectRunReport(authoritativeProjectRun, id)}/>]:[];
+  const activeProjectRun = authoritativeProjectRun&&(!authoritativeProjectRun.phase||ACTIVE_PROJECT_RUN_PHASES.has(authoritativeProjectRun.phase))?authoritativeProjectRun:undefined;
   useEffect(() => { setReport(undefined); setFindings([]); setDetail(undefined); setSource([]); setPage(0); setError(''); setLoading(false); if (!target?.report) return;
     const c = new AbortController(); setLoading(true); Promise.all([json<Report>(`data/${target.report}/report.json`, c.signal), json<Finding[]>(`data/${target.report}/findings.json`, c.signal)]).then(([a, b]) => { setReport(a); setFindings(b); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort();
   }, [target?.id, target?.report]);
@@ -180,9 +187,9 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
     json<Detail[]>(`data/${target.report}/details/${f.page}.json`, c.signal).then(async rows => { const d = rows.find(d => d.id === f.id); setDetail(d); if (d?.source) setSource(await json<string[]>(`data/${target.report}/${d.source}`, c.signal)); }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }); return () => c.abort();
   }, [r.issue, findings, target?.report]);
   const locationOf=(finding:Finding)=>finding.file&&finding.line>0?`${finding.file}#L${finding.line}`:'';
-  const filtered = useMemo(() => findings.filter(f => (!directory || (f.file.includes('/') ? f.file.slice(0, f.file.lastIndexOf('/')) : '(root)') === directory) && (!rule || f.rules.includes(rule)) && (!file || f.file === file) && (!locationFilter || (locationFilter === 'located' ? !!locationOf(f) : locationFilter === 'unlocated' ? !locationOf(f) : locationOf(f) === locationFilter)) && (!overlap || (overlap === 'multiple' ? new Set(f.scanners).size > 1 : new Set(f.scanners).size === 1)) && (!severity || f.severity === severity) && (!category||(f.category||'Uncategorized')===category) && (!scanner || f.scanners.includes(scanner)) && `${f.message} ${f.file} ${f.category||''} ${f.rules.join(' ')} ${f.scanners.join(' ')}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => (ranks[a.severity] ?? 9) - (ranks[b.severity] ?? 9) || a.file.localeCompare(b.file)), [findings, query, severity, category, scanner, directory, rule, file, locationFilter, overlap]);
+  const filtered = useMemo(() => findings.filter(f => (!selectedDirectories.length || selectedDirectories.includes(directoryOf(f.file))) && (!selectedRules.length || f.rules.some(rule=>selectedRules.includes(rule))) && (!files.length || files.includes(f.file)) && (!locationFilter || (locationFilter === 'located' ? !!locationOf(f) : locationFilter === 'unlocated' ? !locationOf(f) : locationOf(f) === locationFilter)) && (!overlap || (overlap === 'multiple' ? new Set(f.scanners).size > 1 : new Set(f.scanners).size === 1)) && (!selectedSeverities.length || selectedSeverities.includes(f.severity)) && (!selectedCategories.length||selectedCategories.includes(f.category||'Uncategorized')) && (!selectedScanners.length || f.scanners.some(scanner=>selectedScanners.includes(scanner))) && `${f.message} ${f.file} ${f.category||''} ${f.rules.join(' ')} ${f.scanners.join(' ')}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => (ranks[a.severity] ?? 9) - (ranks[b.severity] ?? 9) || a.file.localeCompare(b.file)), [findings, query, selectedSeverities, selectedCategories, selectedScanners, selectedDirectories, selectedRules, files, locationFilter, overlap]);
   const issueOptions = useMemo(()=>({rules:[...new Set(findings.flatMap(f=>f.rules))].sort(),categories:[...new Set(findings.map(f=>f.category||'Uncategorized'))].sort(),files:[...new Set(findings.map(f=>f.file).filter(Boolean))].sort(),directories:[...new Set(findings.map(f=>directoryOf(f.file)))].sort(),locations:[...new Set(findings.map(locationOf).filter(Boolean))].sort()}),[findings]);
-  const resetFilters=()=>{setQuery('');setSeverity('');setCategory('');setScanner('');setDirectory('');setRule('');setFile('');setLocationFilter('');setOverlap('');setGroupBy('none');setPage(0);};
+  const resetFilters=()=>{setQuery('');setSelectedSeverities([]);setSelectedCategories([]);setSelectedScanners([]);setSelectedDirectories([]);setSelectedRules([]);setFiles([]);setLocationFilter('');setOverlap('');setGroupBy('none');setPage(0);};
   useEffect(resetFilters,[r.repository,r.project,target?.id]);
   const grouped = useMemo(() => {
     if (groupBy === 'none') return [] as [string, Finding[]][];
@@ -190,8 +197,8 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
     filtered.forEach(f => { const key = groupBy === 'rule' ? f.rules[0] || 'No rule' : groupBy === 'scanner' ? f.scanners[0] || 'No scanner' : groupBy === 'file' ? f.file || 'No file' : groupBy==='category'?f.category||'Uncategorized':directoryOf(f.file); groups.set(key, [...(groups.get(key) || []), f]); });
     return [...groups].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
   }, [filtered, groupBy]);
-  useEffect(() => setPage(0), [query, severity, category, scanner, directory, rule, file, locationFilter, overlap]);
-  useEffect(()=>{if(r.tab!=='issues')return;const filters=r.filters||{};setQuery(filters.query||'');setSeverity(filters.severity||'');setCategory(filters.category||'');setScanner(filters.scanner||'');setRule(filters.rule||'');setFile(filters.file||'');setDirectory(filters.directory||'');setLocationFilter(filters.location||'');setOverlap(filters.overlap||'');setGroupBy(filters.group||'none');},[r.tab,r.filters]);
+  useEffect(() => setPage(0), [query, selectedSeverities, selectedCategories, selectedScanners, selectedDirectories, selectedRules, files, locationFilter, overlap]);
+  useEffect(()=>{if(r.tab!=='issues')return;const filters=r.filters||{};setQuery(filters.query||'');setSelectedSeverities(filterValues(filters.severity));setSelectedCategories(filterValues(filters.category));setSelectedScanners(filterValues(filters.scanner));setSelectedRules(filterValues(filters.rule));setFiles(filters.files||[]);setSelectedDirectories(filterValues(filters.directory));setLocationFilter(filters.location||'');setOverlap(filters.overlap||'');setGroupBy(filters.group||'none');},[r.tab,r.filters]);
   const directories = useMemo(() => {
     const counts = new Map<string, number>();
     findings.forEach(f => { const dir = f.file.includes('/') ? f.file.slice(0, f.file.lastIndexOf('/')) : '(root)'; counts.set(dir, (counts.get(dir) || 0) + 1); });
@@ -215,15 +222,15 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
     const close = (e: KeyboardEvent) => { if (e.key === 'Escape') navigate(target?.id || '', 'issues'); };
     window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close);
   }, [r.issue, screens.lg, target?.id]);
-  const fresh = !!report && report.analyzed_sha === target?.head_sha;
+  const fresh = !!report && !!registryProject?.preferred_branch_head_sha && report.analyzed_sha === registryProject.preferred_branch_head_sha;
   const coverageLimitations=report?.channels.filter(c=>!isCompleteChannelStatus(c.status))||[];
   const completed = report ? report.channels.length-coverageLimitations.length : 0;
   const criticalCount=report?.severities.CRITICAL||0;const highCount=report?.severities.HIGH||0;
   const incompleteCount=coverageLimitations.length;
   const locatedCount=findings.filter(f=>f.file&&f.line).length;
   const reviewObjective=criticalCount?'Validate critical findings before making a release decision.':highCount?'Triage high-severity findings and confirm whether they are reachable in production.':incompleteCount?'Close the scanner coverage gaps before treating this review as complete.':'Review the leading evidence clusters and record the engineering decision.';
-  const issueRoute=(filters:IssueRouteFilters={},issue='')=>{if(!target)return;location.hash=routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:issue||undefined,filters});};
-  useEffect(()=>{if(r.tab!=='issues'||!target)return;const timer=window.setTimeout(()=>{const filters={query,severity,category,scanner,rule,file,directory,location:locationFilter,overlap,group:groupBy==='none'?'':groupBy};const next=routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:r.issue||undefined,filters});if(location.hash!==next)history.replaceState(null,'',next);},50);return()=>window.clearTimeout(timer);},[r.tab,r.project,r.issue,target?.id,query,severity,category,scanner,rule,file,directory,locationFilter,overlap,groupBy]);
+  const issueRoute=(filters:IssueRouteFilters={},issue='')=>{if(!target)return;navigateAppHash(routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:issue||undefined,filters}),{preserveScroll:true});};
+  useEffect(()=>{if(r.tab!=='issues'||!target)return;const timer=window.setTimeout(()=>{const filters={query,severity:selectedSeverities,category:selectedCategories,scanner:selectedScanners,rule:selectedRules,files,directory:selectedDirectories,location:locationFilter,overlap,group:groupBy==='none'?'':groupBy};const next=routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:r.issue||undefined,filters});if(location.hash!==next)history.replaceState(null,'',next);},50);return()=>window.clearTimeout(timer);},[r.tab,r.project,r.issue,target?.id,query,selectedSeverities,selectedCategories,selectedScanners,selectedRules,files,selectedDirectories,locationFilter,overlap,groupBy]);
     if (!r.repository) {
       if(r.tab==='settings')return <ConfigProvider><AppShell auth={viewerAuth}><Settings auth={launchAuth} onRun={projectId=>location.hash=routeHash({kind:'project-run',projectId})}/></AppShell></ConfigProvider>;
       return null;
@@ -231,8 +238,8 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
     return <ConfigProvider><AppShell auth={viewerAuth} status={projectRunTrackers.length ? projectRunTrackers : undefined}>
      {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={registryProject?.preferred_branch||index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
     <main className="project-workspace">
-      {(report||!activeProjectRun)&&<RevisionRibbon repository={registryProject?.source_repository||index?.source_repository||target?.repository||'Configured project'} target={target} targets={index?.targets||[]} fresh={fresh} statusLabel={states[target?.lifecycle_status||target?.status||'']||target?.status||'Unavailable'} coverage={report?`${completed} of ${report.channels.length}`:'Unavailable'} published={report?.report_generation_timestamp||registryProject?.current_report?.generated_at} onTarget={value=>navigate(value,['issues','coverage','report'].includes(r.tab)?r.tab as ProjectView:'overview')}/>}
-      {(report||!activeProjectRun)&&<div className="project-context-actions"><span>Reports checked {date(lastRefresh)}</span><Button size="small" loading={refreshing} onClick={() => { refreshRepositoryReports(); setRefreshing(true); setRefreshTick(t => t + 1); message.loading({ content: 'Checking for a new report…', key: 'refresh', duration: 1.2 }); }}>{refreshing ? 'Refreshing…' : 'Refresh results'}</Button><a href={routeHash({kind:'settings',section:'provenance',projectId:r.project})}>Full provenance</a></div>}
+      {(report||!activeProjectRun)&&<RevisionRibbon repository={registryProject?.source_repository||index?.source_repository||target?.repository||'Configured project'} target={target} targets={index?.targets||[]} fresh={fresh} statusLabel={report?(report.status==='partial'?'Partial':'Published'):'Unavailable'} coverage={report?`${completed} of ${report.channels.length}`:'Unavailable'} published={report?.report_generation_timestamp||report?.generated_at} repositoryHead={registryProject?.preferred_branch_head_sha||undefined} publishedRevision={report?.analyzed_sha} onTarget={value=>navigate(value,['issues','coverage','report'].includes(r.tab)?r.tab as ProjectView:'overview')}/>}
+      {(report||!activeProjectRun)&&<div className="project-context-actions"><span>Reports checked {date(lastRefresh)}</span><Button size="small" loading={refreshing} onClick={() => { setRefreshing(true); invalidateEvidenceCaches(); message.loading({ content: 'Checking for a new report…', key: 'refresh', duration: 1.2 }); }}>{refreshing ? 'Refreshing…' : 'Refresh results'}</Button><a href={routeHash({kind:'settings',section:'provenance',projectId:r.project})}>Full provenance</a></div>}
        {r.tab!=='run'&&!activeProjectRun&&<section className="analysis-entry"><div><span className="eyebrow">NEW EVIDENCE</span><h2>Run analysis</h2><p>Repeat your last selection with Fast analysis, or configure a branch, pull request, exact commit, and scanner coverage.</p></div><Button type="primary" href={routeHash({kind:'project-run',projectId:r.project})} disabled={!mayLaunch}>Run analysis</Button></section>}
        {index?.current_overlay&&<section className="panel pr-overlay" aria-label="Current pull request review overlay">
          <div className="pr-overlay-heading"><div><h2>Separate PR review overlay · #{index.current_overlay.pr_context.number}</h2><p>This CodeRabbit evidence is stored separately and is not part of the canonical source-only report.</p></div><Tag color="purple">{index.current_overlay.channel.status.replaceAll('_',' ')}</Tag></div>
@@ -247,7 +254,7 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
          return <Alert showIcon type={isNoCurrent ? 'info' : 'error'} title={isRepositoryUnavailable ? 'Project unavailable' : isNoCurrent ? 'No report yet' : 'Report needs attention'} description={<>{guidance}{!isNoCurrent&&<Collapse ghost size="small" className="run-technical-details" items={[{key:'details',label:'Technical details',children:<p>{desc}</p>}]} />}</>}/>;
       })()}
        {report && (target?.status === 'failed' || !fresh || report.status === 'partial') && <Alert showIcon type="warning" title={target?.status === 'failed' ? 'Showing last successful report' : !fresh ? 'Newer head awaiting analysis' : 'Analysis is incomplete'} description={target?.status === 'failed' ? `The newer analysis failed. These findings belong to commit ${report.analyzed_sha} and are retained as the last successful report; inspect the failure above before treating them as current.` : !fresh ? 'These findings belong to the older analyzed commit shown above.' : `Available findings are shown. Coverage limitations: ${coverageLimitations.map(c=>c.name).join(', ') || 'see Coverage for evidence details'}. Open Coverage for each channel status and limitation.`}/>}
-        {(report||!activeProjectRun)&&<Tabs className="project-navigation" activeKey={r.tab==='run'?'overview':r.tab} onChange={tab=>navigate(target?.id||'',tab as ProjectView)} items={[{key:'overview',label:'Overview'},{key:'issues',label:`Issues${report?` (${report.finding_count.toLocaleString()})`:''}`},{key:'coverage',label:'Coverage'},{key:'report',label:'Reports'}]}/>}
+        {(report||!activeProjectRun)&&<Tabs className="project-navigation" activeKey={r.tab==='run'?'overview':r.tab} onChange={tab=>navigate(target?.id||'',tab as ProjectView)} items={[{key:'overview',label:'Overview'},{key:'issues',label:`Issues${report?` (${report.finding_count.toLocaleString()})`:''}`,disabled:!report},{key:'coverage',label:'Coverage',disabled:!report},{key:'report',label:'Reports',disabled:!report}]}/>}
         {r.tab==='coverage'&&report?<CoverageWorkspace report={report}/>:r.tab==='report'&&report&&target?<ReportWorkspace target={target}/>:!report?(activeProjectRun?<section className="awaiting-first-report" role="status"><span className="eyebrow">ANALYSIS IN PROGRESS</span><h2>Building the first reviewable report</h2><p>Scanner results will appear here after they are collected and published for <code>{activeProjectRun.target_sha?.slice(0,12)||activeProjectRun.ref}</code>.</p><small>No empty or previous report is being presented as current evidence.</small></section>:<div className="empty" role="status"><Empty description={loading?'Loading the selected report...':r.target&&!target?'Target no longer active':'No report available yet. Run analysis to publish the first report.'}/></div>):<>
         {r.tab === 'overview' && <>
           <section className="overview-brief" aria-labelledby="overview-objective">
@@ -272,16 +279,15 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
             <dl className="issues-summary" aria-label="Current finding scope"><div><dt>In view</dt><dd>{filtered.length.toLocaleString()}</dd></div><div><dt>Critical</dt><dd>{filtered.filter(f=>f.severity==='CRITICAL').length.toLocaleString()}</dd></div><div className="summary-correlation"><dt>Multiple scanners</dt><dd>{filtered.filter(f=>f.scanners.length>1).length.toLocaleString()}</dd></div><div><dt>Missing location</dt><dd>{filtered.filter(f=>!f.file||!f.line).length.toLocaleString()}</dd></div></dl>
           </section>
           <div className="issues-guidance"><strong>How to read this evidence</strong><span>One finding may contain observations from several scanners. That overlap strengthens the evidence trail, but it does not by itself prove impact or a common root cause.</span></div>
-          {directory && <Tag className="active-filter-tag" closable onClose={() => setDirectory('')}>Directory: {directory}</Tag>}
           <div className="filters"><Input aria-label="Search issues" prefix={<SearchOutlined/>} placeholder="Search message, file, rule, or scanner" allowClear value={query} onChange={e => setQuery(e.target.value)}/>
-            <Select aria-label="Severity" value={severity} onChange={setSeverity} options={[{ value: '', label: 'All severities' }, ...Object.keys(ranks).map(s => ({ value: s, label: s }))]}/>
-            <Select aria-label="Category" showSearch optionFilterProp="label" value={category} onChange={setCategory} options={[{value:'',label:'All categories'},...issueOptions.categories.map(value=>({value,label:value}))]}/>
-            <Select aria-label="Scanner" showSearch optionFilterProp="label" value={scanner} onChange={setScanner} options={[{ value: '', label: 'All scanners' }, ...[...new Set(findings.flatMap(f => f.scanners))].sort().map(s => ({ value: s, label: s }))]}/>
+            <MultiValuePicker label="Severities" itemName="severity" options={Object.keys(ranks)} value={selectedSeverities} onChange={setSelectedSeverities}/>
+            <MultiValuePicker label="Categories" itemName="category" options={issueOptions.categories} value={selectedCategories} onChange={setSelectedCategories}/>
+            <MultiValuePicker label="Scanners" itemName="scanner" options={[...new Set(findings.flatMap(f => f.scanners))].sort()} value={selectedScanners} onChange={setSelectedScanners}/>
             <Select className="location-filter" aria-label="Location" showSearch optionFilterProp="label" value={locationFilter} onChange={setLocationFilter} options={[{value:'',label:'All locations'},{value:'located',label:'Any file and line'},{value:'unlocated',label:'Missing file or line'},...issueOptions.locations.map(value=>({value,label:value.replace('#L',':')}))]}/>
             <Button aria-expanded={moreFilters} onClick={()=>setMoreFilters(value=>!value)}>{moreFilters?'Fewer filters':'More filters'}</Button>
-            {moreFilters&&<><Select aria-label="Rule" showSearch optionFilterProp="label" value={rule} onChange={setRule} options={[{value:'',label:'All rules'},...issueOptions.rules.map(value=>({value,label:value}))]}/>
-            <Select aria-label="File" showSearch optionFilterProp="label" value={file} onChange={setFile} options={[{value:'',label:'All files'},...issueOptions.files.map(value=>({value,label:value}))]}/>
-            <Select aria-label="Directory" showSearch optionFilterProp="label" value={directory} onChange={setDirectory} options={[{value:'',label:'All directories'},...issueOptions.directories.map(value=>({value,label:value}))]}/>
+            {moreFilters&&<><MultiValuePicker label="Rules" itemName="rule" options={issueOptions.rules} value={selectedRules} onChange={setSelectedRules}/>
+            <MultiValuePicker label="Files" itemName="file" searchPlaceholder="Search repository paths" options={issueOptions.files} value={files} onChange={setFiles}/>
+            <MultiValuePicker label="Directories" itemName="directory" options={issueOptions.directories} value={selectedDirectories} onChange={setSelectedDirectories}/>
             <Select aria-label="Scanner overlap" value={overlap} onChange={setOverlap} options={[{value:'',label:'Any scanner support'},{value:'multiple',label:'Multiple scanners'},{value:'single',label:'Single scanner'}]}/></>}
             <Button onClick={resetFilters}>Clear filters</Button>
             <Select aria-label="Group issues" value={groupBy} onChange={setGroupBy} options={[{ value: 'none', label: 'No grouping' }, {value:'category',label:'Group by category'}, { value: 'rule', label: 'Group by rule' }, { value: 'file', label: 'Group by file' }, { value: 'directory', label: 'Group by directory' }, { value: 'scanner', label: 'Group by scanner' }]}/>

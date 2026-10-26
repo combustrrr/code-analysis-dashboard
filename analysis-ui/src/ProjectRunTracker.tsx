@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Collapse, Progress } from './ui';
 import type { useLaunchAuth } from './useLaunchAuth';
-import { refreshRepositoryReports } from './repositoryReports';
-import {refreshProjectRegistry} from './projectRegistry';
+import {invalidateEvidenceCaches} from './evidenceRefresh';
 import {analysisStage,analysisStatus,plainAnalysisIssue} from './analysisPresentation';
 
 type Auth = ReturnType<typeof useLaunchAuth>;
@@ -83,9 +82,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
       onPhaseRef.current(request.request_id, result.phase);
       if ((result.phase === 'published' || result.phase === 'reused') && publishedRequest.current !== request.request_id) {
         publishedRequest.current = request.request_id;
-        refreshRepositoryReports();
-        refreshProjectRegistry();
-        window.dispatchEvent(new Event('analysis-report-published'));
+        invalidateEvidenceCaches();
         if (result.target_id && window.location.hash.includes(`/projects/${request.project}`) && openedRequest.current !== request.request_id) {
           openedRequest.current = request.request_id;
           window.setTimeout(() => onOpenReportRef.current(result.target_id!), 1500);

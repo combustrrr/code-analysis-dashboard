@@ -1,5 +1,6 @@
 export type ProjectView='overview'|'issues'|'coverage'|'report';
-export type IssueRouteFilters={query?:string;severity?:string;category?:string;scanner?:string;rule?:string;file?:string;directory?:string;location?:string;overlap?:string;group?:string};
+type MultiFilter=string|string[];
+export type IssueRouteFilters={query?:string;severity?:MultiFilter;category?:MultiFilter;scanner?:MultiFilter;rule?:MultiFilter;files?:string[];directory?:MultiFilter;location?:string;overlap?:string;group?:string};
 export type SettingsSection='general'|'projects'|'connections'|'provenance';
 export type AppRoute=
  |{kind:'landing'}
@@ -23,7 +24,9 @@ export function parseAppRoute(hash=location.hash):AppRoute{
  if(projectId){
   if(parts[2]==='run')return{kind:'project-run',projectId};
   const view:ProjectView=parts[2]==='issues'?'issues':parts[2]==='coverage'?'coverage':parts[2]==='report'?'report':'overview';
-  const filters=view==='issues'?{query:clean(params.get('q')),severity:clean(params.get('severity')),category:clean(params.get('category')),scanner:clean(params.get('scanner')),rule:clean(params.get('rule')),file:clean(params.get('file')),directory:clean(params.get('directory')),location:clean(params.get('location')),overlap:clean(params.get('overlap')),group:clean(params.get('group'))}:undefined;
+  const many=(name:string)=>{const values=params.getAll(name).map(value=>value.trim()).filter(Boolean);return values.length>1?values:values[0];};
+  const files=params.getAll('file').map(value=>value.trim()).filter(Boolean);
+  const filters=view==='issues'?{query:clean(params.get('q')),severity:many('severity'),category:many('category'),scanner:many('scanner'),rule:many('rule'),files:files.length?files:undefined,directory:many('directory'),location:clean(params.get('location')),overlap:clean(params.get('overlap')),group:clean(params.get('group'))}:undefined;
   return{kind:'project',projectId,view,target:clean(params.get('target')),issue:view==='issues'?clean(params.get('issue')):undefined,filters};
  }
  return{kind:'projects'};
@@ -33,8 +36,19 @@ export function routeHash(route:AppRoute){
  if(route.kind==='landing')return'#';if(route.kind==='projects')return'#/projects';
  if(route.kind==='settings'){const params=new URLSearchParams({section:route.section});if(route.projectId)params.set('project',route.projectId);return`#/settings?${params}`;}
  if(route.kind==='project-run')return`#/projects/${encodeURIComponent(route.projectId)}/run`;
- const suffix=route.view==='overview'?'':`/${route.view}`;const params=new URLSearchParams();if(route.target)params.set('target',route.target);if(route.issue)params.set('issue',route.issue);if(route.view==='issues'&&route.filters){const names:Record<string,string>={query:'q',severity:'severity',category:'category',scanner:'scanner',rule:'rule',file:'file',directory:'directory',location:'location',overlap:'overlap',group:'group'};Object.entries(route.filters).forEach(([key,value])=>{if(value)params.set(names[key]||key,value);});}
+ const suffix=route.view==='overview'?'':`/${route.view}`;const params=new URLSearchParams();if(route.target)params.set('target',route.target);if(route.issue)params.set('issue',route.issue);if(route.view==='issues'&&route.filters){const names:Record<string,string>={query:'q',severity:'severity',category:'category',scanner:'scanner',rule:'rule',files:'file',directory:'directory',location:'location',overlap:'overlap',group:'group'};Object.entries(route.filters).forEach(([key,value])=>{const name=names[key]||key;if(Array.isArray(value))value.forEach(item=>params.append(name,item));else if(value)params.set(name,String(value));});}
  return`#/projects/${encodeURIComponent(route.projectId)}${suffix}${params.size?'?'+params:''}`;
+}
+
+export function navigateAppHash(nextHash:string,{preserveScroll=false,replace=false}:{preserveScroll?:boolean;replace?:boolean}={}){
+ const x=window.scrollX,y=window.scrollY;
+ if(location.hash===nextHash)return;
+ history[replace?'replaceState':'pushState'](null,'',nextHash);
+ window.dispatchEvent(new Event('hashchange'));
+ if(preserveScroll){
+  const restore=()=>window.scrollTo(x,y);
+  restore();requestAnimationFrame(()=>{restore();requestAnimationFrame(restore);});
+ }
 }
 
 export function isWorkspaceRoute(hash=location.hash){return parseAppRoute(hash).kind!=='landing';}

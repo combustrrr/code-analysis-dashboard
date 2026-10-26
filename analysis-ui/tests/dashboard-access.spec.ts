@@ -148,6 +148,29 @@ test('a revoked workspace API request clears the session immediately',async({pag
   expect(reportRequests).toBe(0);
  });
 
+test('an upstream report authorization failure does not revoke a valid dashboard session',async({page,context})=>{
+ test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+ const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+ await context.route('https://launcher.example/**',async route=>{
+  const url=new URL(route.request().url());
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true,require_report_login:true}});
+  if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
+  if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'stable-session',login:'developer'}});
+  if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
+  if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,current_report:{status:'complete',analyzed_sha:'a'.repeat(40),generated_at:'2026-10-26T00:00:00Z',scanner_summary:{completed:1,total:1,incomplete:0}}}]}});
+  if(url.pathname==='/api/public/manifest')return route.fulfill({headers,status:401,json:{code:'github_unauthorized',error:'GitHub could not authorize this report request.'}});
+  if(url.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
+  throw new Error(`Unexpected request ${url.pathname}`);
+ });
+ await page.goto('/#/projects');
+ await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
+ await page.getByRole('button',{name:'Review evidence'}).click();
+ await expect(page.getByText('Report needs attention')).toBeVisible();
+ await expect(page.locator('.shell-user')).toContainText('developer');
+ await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toHaveCount(0);
+});
+
 test('a mismatched target registry is shown as an error, not an empty project list',async({page,context})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};

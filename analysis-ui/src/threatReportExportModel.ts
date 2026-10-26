@@ -18,7 +18,8 @@ export type ThreatReportData = {
   truncated?: boolean; truncation_notice?: string; truncation_reason?: string; findings_retained?: number; findings_omitted?: number;
 };
 
-export type ReportFilterSnapshot = { query?: string; severity?: string; category?: string; guidance?: string; scanner?: string; rule?: string; file?: string; directory?: string; location?: string };
+type MultiReportFilter=string|string[];
+export type ReportFilterSnapshot = { query?: string; severity?: MultiReportFilter; category?: MultiReportFilter; guidance?: MultiReportFilter; scanner?: MultiReportFilter; rule?: MultiReportFilter; file?: string; files?: string[]; directory?: MultiReportFilter; location?: string };
 export type ExportScope = 'complete' | 'filtered';
 export type PdfExportModel = {
   report: ThreatReportData; findings: ThreatFinding[]; scope: ExportScope; filters: ReportFilterSnapshot;
@@ -26,21 +27,24 @@ export type PdfExportModel = {
 };
 
 export function hasActiveFilters(filters: ReportFilterSnapshot): boolean {
-  return Object.values(filters).some(value => String(value||'').trim().length > 0);
+  return Object.values(filters).some(value => Array.isArray(value)?value.length>0:String(value||'').trim().length > 0);
 }
 
 export function filterThreatFindings(findings: ThreatFinding[], filters: ReportFilterSnapshot): ThreatFinding[] {
   const needle = (filters.query||'').trim().toLowerCase();
   const directory=(file:string)=>file.includes('/')?file.slice(0,file.lastIndexOf('/')):'(root)';
   const location=(finding:ThreatFinding)=>finding.file&&finding.line>0?`${finding.file}#L${finding.line}`:'';
+  const selected=(filter:MultiReportFilter|undefined,value:string)=>!filter||(Array.isArray(filter)?!filter.length||filter.includes(value):filter===value);
+  const scanners=Array.isArray(filters.scanner)?filters.scanner:filters.scanner?[filters.scanner]:[];
   return findings.filter(finding =>
-    (!filters.severity || finding.severity === filters.severity) &&
-    (!filters.category || finding.category === filters.category) &&
-    (!filters.guidance || finding.guidance_source === filters.guidance) &&
-    (!filters.scanner || finding.scanners.includes(filters.scanner)) &&
-    (!filters.rule || finding.rule === filters.rule) &&
+    selected(filters.severity,finding.severity) &&
+    selected(filters.category,finding.category) &&
+    selected(filters.guidance,finding.guidance_source) &&
+    (!scanners.length || finding.scanners.some(scanner=>scanners.includes(scanner))) &&
+    selected(filters.rule,finding.rule) &&
     (!filters.file || finding.file === filters.file) &&
-    (!filters.directory || directory(finding.file) === filters.directory) &&
+    (!filters.files?.length || filters.files.includes(finding.file)) &&
+    selected(filters.directory,directory(finding.file)) &&
     (!filters.location || (filters.location === 'located' ? !!location(finding) : filters.location === 'unlocated' ? !location(finding) : location(finding) === filters.location)) &&
     (!needle || `${finding.title} ${finding.message} ${finding.file} ${finding.rule} ${finding.scanners.join(' ')}`.toLowerCase().includes(needle))
   );

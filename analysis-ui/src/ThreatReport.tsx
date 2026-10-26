@@ -2,8 +2,9 @@ import { Alert, Button, Card, Empty, Input, Select, Space, Tag } from './ui';
 import { DownloadOutlined, FilePdfOutlined } from './icons';
 import { useEffect, useState } from 'react';
 import { refreshRepositoryReports, repositoryJson } from './repositoryReports';
-import { parseAppRoute, routeHash } from './appRoutes';
+import { navigateAppHash, parseAppRoute, routeHash } from './appRoutes';
 import { filterThreatFindings, hasActiveFilters, type ExportScope, type ReportFilterSnapshot, type ThreatReportData } from './threatReportExportModel';
+import {MultiValuePicker} from './PathMultiPicker';
 
 export type { ThreatFinding, ThreatReportData } from './threatReportExportModel';
 
@@ -41,7 +42,7 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
 
   if (error) {
     const detail = error.toLowerCase(); const expired = detail.includes('expired') || detail.includes('freshness'); const missing = detail.includes('not found') || detail.includes('unavailable');
-    return <Alert showIcon type="warning" title={expired ? 'Report expired' : missing ? 'Report temporarily unavailable' : 'Report could not be retrieved'} description={<>{error} <Space><Button type="link" onClick={() => { refreshRepositoryReports(); setRetry(value => value + 1); }}>Refresh report</Button><Button type="link" onClick={() => { const route = parseAppRoute(); if (route.kind === 'project') location.hash = routeHash({ kind: 'project', projectId: route.projectId, view: 'overview', target: route.target }); }}>Return to overview</Button></Space></>} />;
+    return <Alert showIcon type="warning" title={expired ? 'Report expired' : missing ? 'Report temporarily unavailable' : 'Report could not be retrieved'} description={<>{error} <Space><Button type="link" onClick={() => { refreshRepositoryReports(); setRetry(value => value + 1); }}>Refresh report</Button><Button type="link" onClick={() => { const route = parseAppRoute(); if (route.kind === 'project') navigateAppHash(routeHash({ kind: 'project', projectId: route.projectId, view: 'overview', target: route.target }),{preserveScroll:true}); }}>Return to overview</Button></Space></>} />;
   }
   if (!report) return <div className="empty" role="status"><Empty description="Loading report downloads…" /></div>;
 
@@ -59,7 +60,9 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
   const selected=filterThreatFindings(report.findings,filters),active=hasActiveFilters(filters);
   const values=(items:string[])=>[...new Set(items.filter(Boolean))].sort().map(value=>({value,label:value}));
   const locations=values(report.findings.map(f=>f.file&&f.line>0?`${f.file}#L${f.line}`:''));
+  const directories=values(report.findings.map(f=>f.file.includes('/')?f.file.slice(0,f.file.lastIndexOf('/')):'(root)'));
   const setFilter=(key:keyof ReportFilterSnapshot,value:string)=>setFilters(current=>({...current,[key]:value}));
+  const selectedValues=(value?:string|string[])=>Array.isArray(value)?value:value?[value]:[];
 
   return <section className="report-download-center" aria-label="Report downloads">
     {exportError && <Alert showIcon type="error" title="PDF export failed" description={`${exportError} JSON and Markdown downloads remain available.`} />}
@@ -82,11 +85,12 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
       <p>Select the evidence scope to include. The PDF records these filters, the selected finding count, and the immutable report identity.</p>
       <div className="report-export-filters">
         <Input aria-label="Report search" placeholder="Search title, message, file, rule, or scanner" allowClear value={filters.query} onChange={event=>setFilter('query',event.target.value)}/>
-        <Select aria-label="Report severity" value={filters.severity||''} onChange={value=>setFilter('severity',value)} options={[{value:'',label:'All severities'},...values(report.findings.map(f=>f.severity))]}/>
-        <Select aria-label="Report category" showSearch optionFilterProp="label" value={filters.category||''} onChange={value=>setFilter('category',value)} options={[{value:'',label:'All categories'},...values(report.findings.map(f=>f.category))]}/>
-        <Select aria-label="Report scanner" showSearch optionFilterProp="label" value={filters.scanner||''} onChange={value=>setFilter('scanner',value)} options={[{value:'',label:'All scanners'},...values(report.findings.flatMap(f=>f.scanners))]}/>
-        <Select aria-label="Report rule" showSearch optionFilterProp="label" value={filters.rule||''} onChange={value=>setFilter('rule',value)} options={[{value:'',label:'All rules'},...values(report.findings.map(f=>f.rule))]}/>
-        <Select aria-label="Report file" showSearch optionFilterProp="label" value={filters.file||''} onChange={value=>setFilter('file',value)} options={[{value:'',label:'All files'},...values(report.findings.map(f=>f.file))]}/>
+        <MultiValuePicker label="Report severities" itemName="severity" options={values(report.findings.map(f=>f.severity)).map(option=>String(option.value))} value={selectedValues(filters.severity)} onChange={severity=>setFilters(current=>({...current,severity}))}/>
+        <MultiValuePicker label="Report categories" itemName="category" options={values(report.findings.map(f=>f.category)).map(option=>String(option.value))} value={selectedValues(filters.category)} onChange={category=>setFilters(current=>({...current,category}))}/>
+        <MultiValuePicker label="Report scanners" itemName="scanner" options={values(report.findings.flatMap(f=>f.scanners)).map(option=>String(option.value))} value={selectedValues(filters.scanner)} onChange={scanner=>setFilters(current=>({...current,scanner}))}/>
+        <MultiValuePicker label="Report rules" itemName="rule" options={values(report.findings.map(f=>f.rule)).map(option=>String(option.value))} value={selectedValues(filters.rule)} onChange={rule=>setFilters(current=>({...current,rule}))}/>
+        <MultiValuePicker label="Report files" itemName="file" searchPlaceholder="Search repository paths" options={values(report.findings.map(f=>f.file)).map(option=>String(option.value))} value={filters.files||[]} onChange={files=>setFilters(current=>({...current,file:undefined,files}))}/>
+        <MultiValuePicker label="Report directories" itemName="directory" options={directories.map(option=>String(option.value))} value={selectedValues(filters.directory)} onChange={directory=>setFilters(current=>({...current,directory}))}/>
         <Select aria-label="Report location" showSearch optionFilterProp="label" value={filters.location||''} onChange={value=>setFilter('location',value)} options={[{value:'',label:'All locations'},{value:'located',label:'Any file and line'},{value:'unlocated',label:'Missing file or line'},...locations.map(option=>({...option,label:option.label.replace('#L',':')}))]}/>
       </div>
       <div className="report-filter-actions"><strong>{selected.length.toLocaleString()} of {report.findings.length.toLocaleString()} findings selected</strong><Space wrap><Button onClick={()=>setFilters({})} disabled={!active}>Clear report filters</Button><Button type="primary" icon={<FilePdfOutlined/>} loading={exporting} disabled={!active||!selected.length} onClick={()=>exportPdf('filtered')}>Download filtered PDF</Button></Space></div>
@@ -96,6 +100,6 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
       <p>Use these source artifacts for audit, automation, or offline review.</p>
       <Space wrap><Button icon={<DownloadOutlined />} onClick={() => download('threat-report.json', JSON.stringify(report, null, 2), 'application/json')}>Download JSON</Button><Button icon={<DownloadOutlined />} disabled={!markdown} loading={!markdown} onClick={() => download('threat-report.md', markdown, 'text/markdown')}>Download Markdown</Button></Space>
     </Card>
-    <p className="report-investigation-link">Need to search, filter, or inspect source evidence? <Button type="link" onClick={() => { const route = parseAppRoute(); if (route.kind === 'project') location.hash = routeHash({ kind: 'project', projectId: route.projectId, view: 'issues', target: route.target }); }}>Open Issues</Button></p>
+    <p className="report-investigation-link">Need to search, filter, or inspect source evidence? <Button type="link" onClick={() => { const route = parseAppRoute(); if (route.kind === 'project') navigateAppHash(routeHash({ kind: 'project', projectId: route.projectId, view: 'issues', target: route.target }),{preserveScroll:true}); }}>Open Issues</Button></p>
   </section>;
 }

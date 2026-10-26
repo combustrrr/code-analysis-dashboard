@@ -14,7 +14,7 @@ identifiers.
    Its compact summary shows active analyses,
    projects needing attention, and the last refresh; each of the three cards shows
    repository relationship, preferred branch, one of the four public lifecycle states,
-   current SHA, evidence age, channel coverage, limitations, and Review evidence plus
+   immutable published SHA, live preferred-branch head, publication time, channel coverage, limitations, and Review evidence plus
    Configure analysis or View progress actions. There is no Activity route or API.
 2. Select one of the three configured source projects. The project overview distinguishes
    the current source-only report from an optional separately retained PR overlay and
@@ -47,6 +47,9 @@ identifiers.
    `DEFERRED`, failures, and validated completion are separate states. Same-SHA results
    replace only successfully validated selected-channel evidence; failed attempts do not
    erase the previous valid evidence.
+   Only the newest accepted request is tracked for a project. If its retained producer
+   identity does not match, the obsolete tracker becomes terminal **Superseded** instead
+   of polling indefinitely or appearing beside the authoritative request.
 5. The source-only report remains one current report per configured repository. A new SHA
    replaces it only after the first valid channel result; preparing/analyzing work and failures
    preserve the prior report and its SHA. PR review evidence is stored in a separate
@@ -62,10 +65,13 @@ identifiers.
    the accompanying names, including deferred and not-applicable channels. Display labels
    remove runner-local prefixes and Markdown URL syntax while filters and evidence retain
    the exact underlying scanner values. No invented quality score or proven-root-cause claim.
-4. Issues combines text, severity, category, scanner, rule, file, directory, source-location
-   and scanner-overlap filters. Selectors are searchable where useful. Clear filters
+4. Issues combines text, severity, category, scanner, rule, multiple exact file paths, directory, source-location
+   and scanner-overlap filters. Severity, category, scanner, rule, file, and directory selectors accept multiple
+   values. Values within one selector use OR semantics; separate selectors combine with AND semantics. Selectors are searchable where useful. Clear filters
    resets the selection; overview shortcuts clear unrelated filters. Group by rule,
-   scanner, category, file, directory, or an exact searchable `file:line` location. Location also supports
+   scanner, category, file, directory, or an exact searchable `file:line` location. The file picker supports
+   searching and retaining several paths at once; repeated `file` URL parameters preserve that scope in shared links.
+   The filtered PDF uses the same multi-value selection rules and records every selected value in its frozen filter provenance. Location also supports
    all located findings and missing-location evidence. Filters remain in the project URL. Open an issue for explanation, source line highlighting,
    immutable GitHub links, reporting scanners, applied rules, scanner-family and retained-observation counts, supporting observations,
    and related evidence. Shared rules/locations mean
@@ -95,8 +101,22 @@ remain publicly accessible outside the signed-in dashboard. See the
 [system architecture](../architecture/SYSTEM_OVERVIEW.md) and
 [production readiness](../operations/PRODUCTION_READINESS.md) for boundaries and verification status.
 
+The Projects register refreshes its registry at most once per minute while visible and
+immediately when the tab becomes visible. Publication invalidates both the registry and
+report-manifest caches through one refresh signal. Report validity is independent of
+repository freshness: a partial report remains reviewable at its immutable published
+revision while a different preferred-branch head is shown as **Newer revision awaiting
+analysis**. Revision, coverage, publication time, and report status are always read from
+the same canonical report object.
+
 Deep project links begin fetching the lazy workspace bundle while authorization is
 verified. Concurrent report consumers share one in-flight manifest read per project;
 the completed manifest keeps its 60-second browser cache. Report assets still require
 the authorized session and retain their compressed-byte length and SHA-256 integrity
 checks before decompression and parsing.
+
+In-workspace tab, finding, and evidence-filter routes use history navigation while
+preserving the reader's viewport. They do not assign `location.hash` directly, because
+native hash navigation scrolls the document before the replacement view is committed.
+The live analysis tracker also opts out of browser scroll anchoring so polling updates
+cannot pull the report away from the evidence currently being reviewed.

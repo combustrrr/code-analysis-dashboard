@@ -422,7 +422,13 @@ class PublicationCompletenessTests(unittest.TestCase):
             'source_repository': 'owner/source', 'client_request_id': f'request-{i}',
             'requested_channels':['semgrep'],
         } for i in range(12)]
-        state = {'project_id': '1', 'last_request_id': 'request-7', 'targets': rows}
+        # Simulate discovery replacing the request-labelled row with its stable
+        # branch identity before publication. The accepted receipt must still
+        # select the matching immutable SHA/run rather than the newest row.
+        rows[7].pop('client_request_id')
+        state = {'project_id': '1', 'last_request_id': 'request-7', 'targets': rows,
+                 'requests': [{'request_id':'request-7','head_sha':rows[7]['head_sha'],
+                               'scan_run_id':rows[7]['scan_run_id'],'status':'published'}]}
 
         def collect(_config, row, destination):
             destination.mkdir(parents=True, exist_ok=True)
@@ -436,7 +442,7 @@ class PublicationCompletenessTests(unittest.TestCase):
                     'producer_runs': [{'id': str(row['scan_run_id'])}]}
 
         with patch('scripts.code_analysis.repository_service.github.collect', side_effect=collect), \
-                patch('scripts.code_analysis.repository_service.github.discover', side_effect=[[row] for row in rows]), \
+                patch('scripts.code_analysis.repository_service.github.discover', return_value=rows), \
                 patch('scripts.code_analysis.repository_service.github.cf_api'), \
                 patch('scripts.code_analysis.repository_service.accept', return_value=True), \
                 patch('scripts.code_analysis.repository_service.release_manifest.read', return_value={}), \

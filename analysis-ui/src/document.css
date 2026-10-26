@@ -10,6 +10,17 @@ body {
   margin: 0;
 }
 
+/* Icons occur in the authenticated shell before its lazy route stylesheet is
+   available. Keep their intrinsic SVG size from producing a large header
+   flash while that route chunk is loading. */
+svg.ui-icon {
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+  vertical-align: -0.16em;
+}
+
 .landing-page .dossier-live {
   padding-inline: 0;
   border: 0;

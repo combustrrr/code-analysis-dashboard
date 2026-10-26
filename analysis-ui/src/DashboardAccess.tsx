@@ -1,5 +1,5 @@
 import {useEffect,useState,type ReactNode} from 'react';
-import {pendingAuthDestination,restoreAuthDestination,useLaunchAuth} from './useLaunchAuth';
+import {DashboardApiError,pendingAuthDestination,restoreAuthDestination,useLaunchAuth} from './useLaunchAuth';
 import {applicationEndpoint,setReportSession} from './repositoryReports';
 import {isWorkspaceRoute,routeHash} from './appRoutes';
 
@@ -17,7 +17,7 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
  useEffect(()=>{const update=()=>setWorkspaceRequested(isWorkspaceRoute());window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
  useEffect(()=>{setVerified(undefined);setReportSession(undefined);if(!required||!auth.session)return;
   let active=true;const token=auth.session.token;
-  const verify=async(recheck=false)=>{try{if(recheck||!auth.verified)await auth.api('session');if(active){setReportSession(token);setVerified(token);setError('');}}catch(e){if(active){setReportSession(undefined);setVerified(undefined);setError(e instanceof Error?e.message:'GitHub access could not be verified.');restoreAuthDestination();auth.signOut();}}};
+  const verify=async(recheck=false)=>{try{if(recheck||!auth.verified)await auth.api('session');if(active){setReportSession(token);setVerified(token);setError('');}}catch(e){if(!active)return;const revoked=e instanceof DashboardApiError&&['session_invalid','viewer_not_authorized'].includes(e.code||'');if(revoked){setReportSession(undefined);setVerified(undefined);setError(e.message);restoreAuthDestination();auth.signOut();}else if(!recheck){setReportSession(undefined);setVerified(undefined);setError(e instanceof Error?e.message:'GitHub access could not be verified.');}else{setError('Access verification is temporarily unavailable. Your session remains active while the service retries.');}}};
   const denied=()=>{setReportSession(undefined);setVerified(undefined);setError('Access expired or was revoked. Sign in with an authorized GitHub account.');auth.signOut();};
   let lastVerified=Date.now();
   const recheck=()=>{if(!document.hidden&&Date.now()-lastVerified>=5*60*1000){lastVerified=Date.now();void verify(true);}};

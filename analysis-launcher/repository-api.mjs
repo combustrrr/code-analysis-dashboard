@@ -7,6 +7,7 @@ const CONFIG = '.github/code-analysis/projects.json';
 const SHA = /^[a-f0-9]{40}$/i;
 const DIGEST = /^[a-f0-9]{64}$/i;
 const COMPLETED_REPORT_STATUSES = new Set(['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE']);
+const branchHeadCache = new Map();
 
 const stable = value => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value);
 const orderedRequests = assets => (assets||[]).filter(asset=>asset.name?.startsWith('request-')&&asset.name.endsWith('.json')).sort((left,right)=>String(left.created_at||'').localeCompare(String(right.created_at||''))||Number(left.id||0)-Number(right.id||0));
@@ -189,7 +190,7 @@ export async function repositoryApi(request, env, session, helpers) {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/projects') {
-    const {repository, configuration} = await context();
+    const {repository, configuration, appToken} = await context();
     // The reviewed registry already pins public repository names and numeric IDs.
     // Keep the read-only register fast; launch and revision endpoints still verify
     // the live source identity before accepting an immutable SHA.
@@ -200,7 +201,10 @@ export async function repositoryApi(request, env, session, helpers) {
       let current_report=null,current_overlay=null,reportAttention=null,publicationError=false;
       const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:project.id});
       const manifestPromise=publicReports(new Request(reportUrl),env).catch(()=>null);
-      const [activeByProject,response]=await Promise.all([activeByProjectPromise,manifestPromise]);
+      const headKey=`${project.source_repository.full_name}:${project.preferred_branch}`;
+      const cachedHead=branchHeadCache.get(headKey);
+      const headPromise=cachedHead&&Date.now()-cachedHead.at<60000?Promise.resolve(cachedHead.sha):github(`repos/${project.source_repository.full_name}/branches/${encodeURIComponent(project.preferred_branch)}`,appToken).then(value=>{const sha=value?.commit?.sha||null;branchHeadCache.set(headKey,{at:Date.now(),sha});return sha;}).catch(()=>cachedHead?.sha||null);
+      const [activeByProject,response,preferredBranchHeadSha]=await Promise.all([activeByProjectPromise,manifestPromise,headPromise]);
       try {
         if(response?.ok){const manifest=await response.json(),target=canonicalReportTarget(manifest),overlay=manifest.current_overlay;publicationError=Boolean(manifest.publication_error);const state=registryReportState(target);current_report=state.report?{...state.report,freshness:manifest.report_freshness||null}:null;reportAttention=state.attention;if(overlay?.status==='complete')current_overlay={overlay_key:overlay.overlay_key,status:overlay.status,head_sha:overlay.head_sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel};}
       } catch {}
@@ -209,7 +213,7 @@ export async function repositoryApi(request, env, session, helpers) {
       else if(publicationError){lifecycle='Needs attention';attention_reason='The latest report could not be published. Review the project evidence before relying on it.';}
       else if(!current_report||reportAttention){lifecycle='Needs attention';attention_reason=reportAttention||'No current report is available. Run analysis to create the first evidence set.';}
       const choices=scannerChoices(project),selectable=choices.filter(channel=>channel.selectable);
-      return {id:String(project.id),source_repository:project.source_repository.full_name,source_repository_id:project.source_repository.id,relationship:project.relationship,preferred_branch:project.preferred_branch,native_feedback_enabled:false,readiness_summary:{profile_mode:project.profile.mode,configured_channels:project.enabled_scanners.length,selectable_channels:selectable.length,vendor_channels:selectable.filter(channel=>channel.mode==='vendor').length,deferred_channels:choices.filter(channel=>channel.status==='DEFERRED').length,unavailable_channels:choices.filter(channel=>['NOT_AVAILABLE','SETUP_REQUIRED'].includes(channel.status)).length},lifecycle,attention_reason,active_analysis:active?{request_id:active.request_id,status:active.status,target_sha:active.intent?.target_sha||active.intent?.source_sha||null,created_at:active.created_at}:null,current_report,current_overlay};
+      return {id:String(project.id),source_repository:project.source_repository.full_name,source_repository_id:project.source_repository.id,relationship:project.relationship,preferred_branch:project.preferred_branch,preferred_branch_head_sha:preferredBranchHeadSha,native_feedback_enabled:false,readiness_summary:{profile_mode:project.profile.mode,configured_channels:project.enabled_scanners.length,selectable_channels:selectable.length,vendor_channels:selectable.filter(channel=>channel.mode==='vendor').length,deferred_channels:choices.filter(channel=>channel.status==='DEFERRED').length,unavailable_channels:choices.filter(channel=>['NOT_AVAILABLE','SETUP_REQUIRED'].includes(channel.status)).length},lifecycle,attention_reason,active_analysis:active?{request_id:active.request_id,status:active.status,target_sha:active.intent?.target_sha||active.intent?.source_sha||null,created_at:active.created_at}:null,current_report,current_overlay};
     }));
     const summary={projects:projects.length,preparing:projects.filter(value=>value.lifecycle==='Preparing').length,analyzing:projects.filter(value=>value.lifecycle==='Analyzing').length,needs_attention:projects.filter(value=>value.lifecycle==='Needs attention').length};
     return json({
@@ -386,7 +390,11 @@ export async function repositoryApi(request, env, session, helpers) {
     const result = {request_id:id,target_id:row.id,source_sha:row.head_sha,analyzed_sha:row.analyzed_sha,phase:'preparing',checked_at:new Date().toISOString()};
     if (row.scan_run_id) {
       const run = await github(`repos/${repository.full_name}/actions/runs/${row.scan_run_id}/attempts/${row.run_attempt}`, appToken);
-      if (run.head_sha !== row.execution_sha) throw new Failure(409, 'Producer revision does not match the request.', 'producer_mismatch');
+      if (run.head_sha !== row.execution_sha) return json({
+        phase:'superseded', request_id:id, source_sha:row.head_sha,
+        error:'A newer analysis replaced this request. Tracking has stopped for the obsolete producer.',
+        terminal_reason:'producer_mismatch', checked_at:new Date().toISOString(),
+      },200,{'Cache-Control':'private, max-age=30'});
       result.producer = {run_id:row.scan_run_id,attempt:row.run_attempt,status:run.status,conclusion:run.conclusion,url:`https://github.com/${repository.full_name}/actions/runs/${row.scan_run_id}/attempts/${row.run_attempt}`};
       const producerJobs=await pages(`repos/${repository.full_name}/actions/runs/${row.scan_run_id}/jobs?filter=latest`,'jobs',appToken);
       const progress=new Map((row.channel_statuses||[]).map(value=>[value.channel,{...value,status:String(value.status||'unknown').toLowerCase()}]));

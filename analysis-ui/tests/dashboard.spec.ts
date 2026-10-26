@@ -12,6 +12,18 @@ test.describe('production shell',()=>{
   await expect(page).toHaveURL(/#\/not-a-route$/);
  });
 
+ test('authenticated header icons remain compact and cannot expand the shell',async({page})=>{
+  await page.goto('/#/projects');
+  await expect(page.getByRole('heading',{name:'Projects',level:1})).toBeVisible();
+  const geometry=await page.evaluate(()=>({
+   header:document.querySelector('.shell-header')?.getBoundingClientRect().height||0,
+   icons:[...document.querySelectorAll('.shell-header .ui-icon')].map(icon=>icon.getBoundingClientRect().width),
+  }));
+  expect(geometry.header).toBeLessThanOrEqual(100);
+  expect(geometry.icons.length).toBeGreaterThan(0);
+  expect(Math.max(...geometry.icons)).toBeLessThanOrEqual(20);
+ });
+
  test('project overview keeps one explicit run action and immutable revision context',async({page})=>{
   await page.goto(PROJECT);
   await expect(page.getByLabel('Selected analysis revision')).toContainText('Agentic-Kibana');
@@ -35,8 +47,13 @@ test.describe('production shell',()=>{
   await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();
   await expect(page.getByText('How to read this evidence')).toBeVisible();
   await expect(page.getByText(/scanner.*support.*finding/i).first()).toBeVisible();
+  await page.getByLabel('Severities',{exact:true}).click();
+  const severityOptions=page.getByLabel('Severities options').getByRole('option');
+  await severityOptions.first().click();
+  await severityOptions.first().click();
+  await expect.poll(async()=>new URL(page.url()).hash.match(/severity=/g)?.length||0).toBe(2);
   await expect(page.getByLabel('Location',{exact:true})).toBeVisible();
-  await page.getByLabel('Location',{exact:true}).selectOption('located');
+  await page.getByLabel('Location',{exact:true}).fill('Any file and line');
   await expect(page).toHaveURL(/location=located/);
   await page.getByLabel('Search issues').fill('CVE-2026-42561');
   await expect(page).toHaveURL(/q=CVE-2026-42561/);
@@ -45,7 +62,13 @@ test.describe('production shell',()=>{
   await expect(page).toHaveURL(/group=rule/);
   await expect(page.getByText(/finding/).first()).toBeVisible();
   await page.getByRole('button',{name:'More filters'}).click();
-  await expect(page.getByLabel('File',{exact:true})).toBeVisible();
+  await page.getByLabel('Files',{exact:true}).click();
+  const pathOptions=page.getByLabel('Files options').getByRole('option');
+  await expect(pathOptions.first()).toBeVisible();
+  await pathOptions.first().click();
+  await pathOptions.first().click();
+  await expect(page.getByLabel('Files selected values')).toContainText('Clear files');
+  await expect.poll(async()=>new URL(page.url()).hash.match(/file=/g)?.length||0).toBe(2);
   await page.getByRole('button',{name:'Clear filters',exact:true}).click();
   await page.getByLabel('Group issues').selectOption('none');
   await page.locator('.issue-link').first().click();
@@ -54,6 +77,18 @@ test.describe('production shell',()=>{
   await expect(page.getByRole('link',{name:'Open code on GitHub'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Code at the reported location'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Why this was reported'})).toBeVisible();
+ });
+
+ test('in-workspace route changes preserve the reading position',async({page})=>{
+  await page.goto(PROJECT);
+  await expect(page.getByRole('heading',{name:'Investigation plan'})).toBeVisible();
+  await page.evaluate(()=>window.scrollTo(0,900));
+  const before=await page.evaluate(()=>window.scrollY);
+  await page.getByRole('tab',{name:/Issues/}).evaluate((element:HTMLElement)=>element.click());
+  await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();
+  await page.waitForTimeout(100);
+  const after=await page.evaluate(()=>window.scrollY);
+  expect(after).toBeGreaterThan(before-100);
  });
 
  test('coverage keeps scanner outcomes separate from downloadable reports',async({page})=>{
@@ -72,7 +107,8 @@ test.describe('production shell',()=>{
   await expect(page.getByRole('heading',{name:'Complete issues report'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Download complete PDF'})).toBeVisible();
   await expect(page.getByText('Build a filtered issues report',{exact:true})).toBeVisible();
-  await page.getByLabel('Report severity').selectOption('HIGH');
+  await page.getByLabel('Report severities',{exact:true}).click();
+  await page.getByLabel('Report severities options').getByRole('option',{name:'HIGH'}).click();
   await expect(page.getByRole('button',{name:'Download filtered PDF'})).toBeEnabled();
   const filteredDownload=page.waitForEvent('download');
   await page.getByRole('button',{name:'Download filtered PDF'}).click();

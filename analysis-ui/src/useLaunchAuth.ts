@@ -5,6 +5,10 @@ const RETURN_KEY = 'analysis-auth-return';
 const ENDPOINT_KEY = 'analysis-auth-endpoint';
 const SIGNED_IN_HOME = '#/projects';
 type ProjectRegistry = { execution_repository: { id: number; full_name: string }; projects: Array<{ id: string | number }>; [key:string]: unknown };
+export class DashboardApiError extends Error {
+  status:number;code?:string;
+  constructor(message:string,status:number,code?:string){super(message);this.name='DashboardApiError';this.status=status;this.code=code;}
+}
 
 function randomVerifier() {
   return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
@@ -179,12 +183,12 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
     const result = await response.json();
     if (!response.ok) {
       const authFailure = ['viewer_not_authorized','session_invalid','exchange_invalid','exchange_expired','exchange_store_unavailable','oauth_exchange_failed','oauth_state_mismatch'].includes(result.code || '');
-      if (response.status === 401 || ['viewer_not_authorized','session_invalid'].includes(result.code || '')) {
+      if (['viewer_not_authorized','session_invalid'].includes(result.code || '')) {
         setSession(undefined);
         setVerified(false);
         window.dispatchEvent(new Event('analysis-access-denied'));
       }
-      throw new Error(authFailure ? friendlyAuthError(result.code) : typeof result.error === 'string' ? result.error : `Dashboard request failed (${response.status}).`);
+      throw new DashboardApiError(authFailure ? friendlyAuthError(result.code) : typeof result.error === 'string' ? result.error : `Dashboard request failed (${response.status}).`,response.status,result.code);
     }
     return result as T;
   }, [origin, session]);

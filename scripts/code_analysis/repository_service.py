@@ -491,8 +491,19 @@ def report_publication(config, state, report_release, document=None):
                  and entry.get('analyzed_sha') == entry.get('head_sha')
                  and entry.get('documents') and entry.get('assets')]
         requested_id = state.get('last_request_id')
+        # Publication identity is owned by the accepted request receipt.  A
+        # discovery row can retain an older canonical target id, so resolve the
+        # replacement through both the request id and its immutable SHA/run.
+        requested_receipt = next((row for row in reversed(requests)
+                                  if row.get('request_id') == requested_id), None)
         requested = next((entry for entry in valid
-                          if requested_id and requested_id in {entry.get('client_request_id'), entry.get('request_id')}), None)
+                          if requested_id and (
+                              requested_id in {entry.get('client_request_id'), entry.get('request_id')}
+                              or (requested_receipt
+                                  and entry.get('head_sha') == requested_receipt.get('head_sha')
+                                  and (not requested_receipt.get('scan_run_id')
+                                       or entry.get('scan_run_id') == requested_receipt.get('scan_run_id')))
+                          )), None)
 
         def newest(entry):
             return (entry.get('report_generation_timestamp') or entry.get('generated_at') or
