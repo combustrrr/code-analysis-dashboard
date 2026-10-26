@@ -184,9 +184,7 @@ export function useLaunchAuth(endpoint?: string, enabled = true) {
     if (!response.ok) {
       const authFailure = ['viewer_not_authorized','session_invalid','exchange_invalid','exchange_expired','exchange_store_unavailable','oauth_exchange_failed','oauth_state_mismatch'].includes(result.code || '');
       if (['viewer_not_authorized','session_invalid'].includes(result.code || '')) {
-        setSession(undefined);
-        setVerified(false);
-        window.dispatchEvent(new Event('analysis-access-denied'));
+        window.dispatchEvent(new CustomEvent('analysis-access-denied',{detail:{code:result.code}}));
       }
       throw new DashboardApiError(authFailure ? friendlyAuthError(result.code) : typeof result.error === 'string' ? result.error : `Dashboard request failed (${response.status}).`,response.status,result.code);
     }

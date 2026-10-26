@@ -21,7 +21,7 @@ export async function reportFetch(path:string,init:RequestInit={}) {
  if(reportBearer && applicationEndpoint && new URL(path,location.href).origin===new URL(applicationEndpoint).origin)headers.set('Authorization','Bearer '+reportBearer);
  const response=await fetch(path,{...init,headers,cache:'no-store'});
  if(reportBearer && [401,403].includes(response.status)){
-  try{const failure=await response.clone().json() as {code?:string};if(['session_invalid','viewer_not_authorized'].includes(failure.code||''))window.dispatchEvent(new Event('analysis-access-denied'));}catch{}
+  try{const failure=await response.clone().json() as {code?:string};if(['session_invalid','viewer_not_authorized'].includes(failure.code||''))window.dispatchEvent(new CustomEvent('analysis-access-denied',{detail:{code:failure.code}}));}catch{}
  }
  return response;
 }

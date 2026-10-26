@@ -46,8 +46,10 @@ loads reports only after `/api/session` verification, polls access while visible
 clears in-memory reports on sign-out or denial. Refreshing and opening a new tab
 requires sign-in again.
 
-Only explicit `session_invalid` and `viewer_not_authorized` responses clear the
-in-memory session. A GitHub API, App installation, report asset, rate-limit, or Worker
+Only an authoritative `/api/session` response with `session_invalid` or
+`viewer_not_authorized` clears the in-memory session. The UI confirms the session after
+another protected endpoint returns either code, so one stale or transient endpoint
+response cannot revoke the OAuth grant or create a sign-in loop. A GitHub API, App installation, report asset, rate-limit, or Worker
 availability error remains an operation-specific error and must not be translated into
 "access revoked." A transient periodic `/api/session` failure leaves an already verified
 session active and is retried later; initial verification still fails closed.
