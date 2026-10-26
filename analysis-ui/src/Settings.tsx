@@ -6,6 +6,7 @@ import {AppearanceToggle} from './Appearance';
 import {applicationEndpoint} from './repositoryReports';
 import {parseAppRoute,routeHash,type SettingsSection} from './appRoutes';
 import type {useLaunchAuth} from './useLaunchAuth';
+import {cachedProjectRegistry,getProjectRegistry} from './projectRegistry';
 import './settings.css';
 
 type Auth=ReturnType<typeof useLaunchAuth>;
@@ -39,8 +40,8 @@ function SectionIntro({eyebrow,title,children}:{eyebrow:string;title:string;chil
 
 export function Settings({auth,onRun}:{auth:Auth;onRun:(projectId:string)=>void}){
  const current=parseAppRoute();const route=current.kind==='settings'?current:{kind:'settings' as const,section:'general' as const};
- const [registry,setRegistry]=useState<Registry>();const [error,setError]=useState('');
- useEffect(()=>{let active=true;setError('');auth.api<Registry>('projects').then(value=>{if(active)setRegistry(value)}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:'Settings are unavailable.')});return()=>{active=false}},[auth.session?.token]);
+ const [registry,setRegistry]=useState<Registry|undefined>(()=>cachedProjectRegistry<Registry>(auth));const [error,setError]=useState('');
+ useEffect(()=>{let active=true;setError('');getProjectRegistry<Registry>(auth).then(value=>{if(active)setRegistry(value)}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:'Settings are unavailable.')});return()=>{active=false}},[auth.session?.token]);
  const selected=useMemo(()=>registry?.projects.find(project=>project.id===route.projectId)||registry?.projects[0],[registry,route.projectId]);
  const navigate=(section:SettingsSection,projectId=selected?.id)=>{location.hash=routeHash({kind:'settings',section,projectId})};
  const projectControl=registry&&registry.projects.length>0&&<label className="settings-project-picker"><span>Project context</span><Select aria-label="Settings project" value={selected?.id} options={registry.projects.map(project=>({value:project.id,label:project.source_repository}))} onChange={projectId=>navigate(route.section,projectId)}/></label>;
@@ -49,7 +50,7 @@ export function Settings({auth,onRun}:{auth:Auth;onRun:(projectId:string)=>void}
   <SectionIntro eyebrow="Workspace overview" title="Preferences and access">Review the settings that apply to this browser and your current GitHub session.</SectionIntro>
   <div className="settings-overview-grid">
    <article className="settings-control-card"><div><span className="settings-card-label">Appearance</span><h3>Choose your workspace theme</h3><p>Dark mode is the default. Your choice is stored only in this browser and does not affect other collaborators.</p></div><AppearanceToggle/></article>
-   <article className="settings-control-card"><div><span className="settings-card-label">Account</span><h3>{auth.session?.login?`Signed in as @${auth.session.login}`:'GitHub session unavailable'}</h3><p>{auth.session?'Your account is authorized to review this evidence workspace.':'Sign in again to review workspace evidence.'}</p></div>{auth.session&&<Button danger onClick={auth.signOut}>Sign out</Button>}</article>
+   <article className="settings-control-card"><div><span className="settings-card-label">Account</span><h3>{auth.session?.login?`Signed in as @${auth.session.login}`:'GitHub session unavailable'}</h3><p>{auth.session?'Your account is authorized to review this evidence workspace.':'Sign in again to review workspace evidence.'}</p></div>{auth.session&&<Button className="settings-account-signout" danger onClick={auth.signOut}>Sign out</Button>}</article>
   </div>
   <article className="settings-snapshot" aria-label="Workspace snapshot"><header><div><span className="settings-card-label">Workspace snapshot</span><h3>Current access and configuration</h3></div><Tag color="blue">Read only</Tag></header><dl><div><dt>Trusted projects</dt><dd>{registry?.projects.length??'—'}</dd></div><div><dt>Run analyses</dt><dd>{registry?registry.can_launch?'Allowed':'Not allowed':'—'}</dd></div><div><dt>Change registry</dt><dd>{registry?registry.can_configure?'Through GitHub':'Administrator only':'—'}</dd></div><div><dt>Execution host</dt><dd><code>{registry?.execution_repository.full_name||'Loading'}</code></dd></div></dl></article>
  </section>;

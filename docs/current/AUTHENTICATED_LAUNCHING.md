@@ -93,6 +93,9 @@ for more than one renewal interval solely because of its heartbeat job.
 - Project register, project review, and settings use one authenticated application shell.
   Opening Settings from a project preserves that project ID so configuration and
   provenance do not silently switch to the first registry entry.
+- Those authenticated surfaces share one token-scoped project-registry request and a
+  five-minute cache. A successful publication invalidates the snapshot so updated
+  lifecycle and coverage state can be fetched without route-by-route duplication.
 
 ## Dashboard sign-in and report visibility
 

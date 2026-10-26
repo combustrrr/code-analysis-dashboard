@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 import type {useLaunchAuth} from './useLaunchAuth';
 import {routeHash} from './appRoutes';
+import {cachedProjectRegistry,getProjectRegistry} from './projectRegistry';
 
 type Lifecycle='Preparing'|'Analyzing'|'Ready'|'Needs attention';
 type DisplayLifecycle='Preparing'|'Analyzing'|'Ready'|'Needs attention';
@@ -9,14 +10,13 @@ export type ConfiguredProject={id:string;source_repository:string;source_reposit
 type Registry={checked_at?:string;summary?:{projects:number;preparing:number;analyzing:number;needs_attention:number};execution_repository:{id:number;full_name:string};can_launch:boolean;can_configure:boolean;projects:ConfiguredProject[]};
 type Auth=ReturnType<typeof useLaunchAuth>;
 
-let registryToken='',registryValue:Registry|undefined,registryRequest:Promise<Registry>|undefined;
 const shortSha=(value?:string|null)=>value?value.slice(0,12):'Not available';
 const date=(value?:string|null)=>value?new Date(value).toLocaleString(undefined,{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'Not published';
 const lifecycle=(project:ConfiguredProject):DisplayLifecycle=>project.lifecycle==='Preparing'?'Preparing':project.lifecycle||(project.active_analysis?.status==='analyzing'?'Analyzing':project.active_analysis?'Preparing':project.current_report?'Ready':'Needs attention');
 
 function useRegistry(auth:Auth){
- const token=auth.session?.token||'',prefetched=auth.session?.registry as Registry|undefined;const [registry,setRegistry]=useState<Registry|undefined>(()=>token===registryToken?registryValue:prefetched);const [loading,setLoading]=useState(false);const [error,setError]=useState('');
- useEffect(()=>{let active=true;setError('');if(!auth.session){setLoading(false);return;}if(token!==registryToken){registryToken=token;registryValue=prefetched;registryRequest=undefined;setRegistry(prefetched);}if(registryValue){setRegistry(registryValue);setLoading(false);return;}setLoading(true);registryRequest||=auth.api<Registry>('projects');registryRequest.then(value=>{registryValue=value;if(active){setRegistry(value);setError('');}}).catch(reason=>{registryRequest=undefined;if(active)setError(reason instanceof Error?reason.message:'Configured projects are unavailable.');}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[token,prefetched]);
+ const token=auth.session?.token||'';const [registry,setRegistry]=useState<Registry|undefined>(()=>cachedProjectRegistry<Registry>(auth));const [loading,setLoading]=useState(false);const [error,setError]=useState('');
+ useEffect(()=>{let active=true;setError('');if(!auth.session){setRegistry(undefined);setLoading(false);return;}const cached=cachedProjectRegistry<Registry>(auth);if(cached)setRegistry(cached);setLoading(!cached);getProjectRegistry<Registry>(auth).then(value=>{if(active){setRegistry(value);setError('');}}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:'Configured projects are unavailable.');}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[token]);
  return{registry,loading,error};
 }
 

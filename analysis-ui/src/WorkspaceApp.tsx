@@ -1,4 +1,5 @@
 import { refreshRepositoryReports } from './repositoryReports';
+import {getProjectRegistry} from './projectRegistry';
 import { applicationEndpoint, repositoryJson } from './repositoryReports';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Collapse, ConfigProvider, Drawer, Empty, Grid, Input, Progress, Select, Space, Table, Tabs, Tag, message } from './ui';
@@ -136,13 +137,7 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
     setHostAccess({can_launch:false,can_configure:false});
     setRegistryProjects([]);
     if(!launchAuth.session)return;
-    const prefetched=launchAuth.session.registry as Registry|undefined;
-    if(prefetched?.projects?.some(project=>typeof project.source_repository==='string'&&typeof project.preferred_branch==='string')){
-      setHostAccess({can_launch:prefetched.can_launch,can_configure:prefetched.can_configure});
-      setRegistryProjects(prefetched.projects);
-      return;
-    }
-    launchAuth.api<Registry>('projects').then(value=>{if(active){setHostAccess(value);setRegistryProjects(value.projects||[]);}}).catch(()=>{});
+    getProjectRegistry<Registry>(launchAuth).then(value=>{if(active){setHostAccess(value);setRegistryProjects(value.projects||[]);}}).catch(()=>{});
     return()=>{active=false;};
   },[launchAuth.session?.token]);
   const registryProject=registryProjects.find(project=>String(project.id)===String(r.project));

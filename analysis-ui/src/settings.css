@@ -27,3 +27,5 @@
 .readiness-groups .ant-collapse-content-box{padding:0 4px 12px!important}
 .readiness-groups ul{margin-top:0}
 @media(max-width:640px){.settings-panel{min-height:0}.settings-project-context{align-items:stretch;justify-content:stretch;padding:14px 16px}.settings-project-context .settings-project-picker{width:100%}.readiness-summary{grid-template-columns:1fr 1fr}}
+.settings-account-signout{display:none!important}
+@media(max-width:980px){.settings-account-signout{display:inline-flex!important}}
