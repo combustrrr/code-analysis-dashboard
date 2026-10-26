@@ -15,9 +15,14 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  await expect(page.locator('.landing-nav')).not.toContainText('Evidence workspace');
  await expect(page.getByRole('heading',{name:'Know exactly what was scanned. Prove what the analysis found.'})).toBeVisible();
  await expect(page.locator('.landing-copy > p').first()).toBeVisible();
+ const rootLanding=await page.evaluate(()=>{const wrap=document.querySelector('.landing-wrap')!.getBoundingClientRect();const hero=getComputedStyle(document.querySelector('.landing-hero')!);return{left:Math.round(wrap.left),width:Math.round(wrap.width),columns:hero.gridTemplateColumns};});
+ await page.goto('/#/projects/1267340546');
+ await expect(page.getByRole('heading',{name:'Know exactly what was scanned. Prove what the analysis found.'})).toBeVisible();
+ const deepLinkLanding=await page.evaluate(()=>{const wrap=document.querySelector('.landing-wrap')!.getBoundingClientRect();const hero=getComputedStyle(document.querySelector('.landing-hero')!);return{left:Math.round(wrap.left),width:Math.round(wrap.width),columns:hero.gridTemplateColumns};});
+ expect(deepLinkLanding).toEqual(rootLanding);
  await page.getByText('Light',{exact:true}).click();
  await expect(page.locator('.landing-copy > p').first()).toBeVisible();
- await expect(page.getByText('Coverage across current reports')).toBeVisible();
+ await expect(page.locator('.landing-proof')).toContainText('Parallel');
  await expect(page.getByText(/Only approved GitHub collaborators can access this workspace/)).toBeVisible();
  await expect(page.getByRole('button',{name:'Sign in with GitHub'})).toHaveCount(2);
  await expect(page.locator('.landing-actions').getByRole('button',{name:'Sign in with GitHub'})).toBeEnabled();
