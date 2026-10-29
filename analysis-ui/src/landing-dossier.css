@@ -1,38 +1,53 @@
-/* Keep the evidence register beside the thesis on standard desktop screens. */
-@media (min-width: 1181px) {
-  .landing-hero {
-    grid-template-columns: minmax(0, 1.08fr) minmax(440px, 0.92fr);
-    gap: clamp(36px, 4vw, 64px);
-    min-height: 690px;
-    padding-top: 82px;
-  }
-
-  .analysis-dossier {
-    width: 100%;
-    max-width: none;
-  }
+.analysis-dossier {
+  container: register / inline-size;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .dossier-columns {
-  grid-template-columns: minmax(135px, 1fr) 100px 68px;
-  padding-right: 20px;
-  padding-left: 54px;
+  grid-template-columns: minmax(0, 1fr) minmax(18ch, max-content);
+  padding-inline: 54px 20px;
 }
 
 .dossier-row {
-  grid-template-columns: 24px minmax(135px, 1fr) 100px 68px;
+  grid-template-columns: 24px minmax(0, 1fr) minmax(18ch, max-content);
   gap: 10px;
-  padding-right: 20px;
-  padding-left: 20px;
+  min-height: 66px;
+  padding: 14px 20px;
 }
 
-.dossier-row code,
+.dossier-project {
+  min-width: 0;
+}
+
+.dossier-project strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .dossier-coverage {
   white-space: nowrap;
 }
 
+.dossier-empty {
+  display: grid;
+  gap: 5px;
+  min-height: 110px;
+  place-content: center;
+  padding: 20px;
+  color: var(--land-muted);
+  text-align: center;
+}
+
+.dossier-empty strong {
+  color: var(--land-ink);
+}
+
 .analysis-dossier footer {
   align-items: center;
+  padding-block: 12px;
 }
 
 .analysis-dossier footer > span:last-child {
@@ -41,22 +56,27 @@
   white-space: nowrap;
 }
 
-@media (max-width: 760px) {
-  .dossier-row {
-    grid-template-columns: 24px minmax(0, 1fr) auto;
+@container register (max-width: 520px) {
+  .dossier-columns {
+    display: none;
   }
 }
 
-@media (max-width: 520px) {
+@container register (max-width: 430px) {
   .analysis-dossier header {
     align-items: flex-start;
-    gap: 14px;
+    gap: 12px;
+  }
+
+  .dossier-row {
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    padding-inline: 16px;
   }
 
   .analysis-dossier footer {
     align-items: flex-start;
     flex-direction: column;
-    gap: 8px;
+    gap: 7px;
   }
 
   .analysis-dossier footer > span:last-child {

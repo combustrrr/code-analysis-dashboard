@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
+import AxeBuilder from '@axe-core/playwright';
 test('public welcome page explains the evidence workflow at desktop and mobile widths',async({page,context})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  await context.route('https://launcher.example/api/public/config',route=>route.fulfill({status:503,contentType:'application/json',body:'{}'}));
@@ -26,16 +27,72 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  await expect(page.getByText(/Only approved GitHub collaborators can access this workspace/)).toBeVisible();
  await expect(page.getByRole('button',{name:'Sign in with GitHub'})).toHaveCount(2);
  await expect(page.locator('.landing-actions').getByRole('button',{name:'Sign in with GitHub'})).toBeEnabled();
+ await page.setViewportSize({width:1536,height:720});
+ const compactDossier=await page.locator('.analysis-dossier').boundingBox();
+ expect(compactDossier).not.toBeNull();
+ expect(compactDossier!.y+compactDossier!.height).toBeLessThanOrEqual(720);
+ await expect(page.locator('.dossier-row')).toHaveCount(3);
+ const firstName=page.locator('.dossier-project strong').first();
+ await firstName.evaluate(element=>{element.textContent='A very long configured repository name that deliberately exceeds sixty characters for clamping';});
+ expect(await firstName.evaluate(element=>getComputedStyle(element).webkitLineClamp)).toBe('2');
+ for(const evidence of await page.locator('.dossier-coverage').all()){
+  expect(await evidence.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
+ }
  await page.setViewportSize({width:1254,height:790});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(1254);
  const dossierBox=await page.locator('.analysis-dossier').boundingBox();
  expect(dossierBox).not.toBeNull();expect(dossierBox!.x).toBeGreaterThanOrEqual(0);expect(dossierBox!.x+dossierBox!.width).toBeLessThanOrEqual(1254);
- await page.getByRole('link',{name:'Learn how evidence is protected'}).click();
+ await page.getByRole('link',{name:/evidence (is protected|works)/i}).click();
  await expect(page).toHaveURL(/#method$/);
  await expect(page.getByRole('heading',{name:/Evidence answers questions that a status badge cannot/})).toBeVisible();
  await page.setViewportSize({width:390,height:844});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
  await expect(page.getByRole('link',{name:'Trust Lab and Mphasis code analysis workspace'})).toBeVisible();
+});
+
+test('public landing remains accessible and visually stable across target viewports',async({page})=>{
+ test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+ test.setTimeout(90_000);
+ await page.emulateMedia({reducedMotion:'reduce'});
+ const viewports=[
+  {name:'desktop-dark',width:1920,height:1080,theme:'Dark'},
+  {name:'desktop-light',width:1536,height:720,theme:'Light'},
+  {name:'laptop-dark',width:1366,height:768,theme:'Dark'},
+  {name:'tablet-dark',width:768,height:1024,theme:'Dark'},
+  {name:'mobile-dark',width:390,height:844,theme:'Dark'},
+ ];
+ for(const viewport of viewports){
+  await page.setViewportSize({width:viewport.width,height:viewport.height});
+  await page.goto('/');
+  await page.evaluate(theme=>{localStorage.setItem('analysis-theme',theme.toLowerCase());location.reload();},viewport.theme);
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(()=>document.fonts.ready);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+  await expect(page).toHaveScreenshot(`landing-${viewport.name}.png`,{fullPage:true,animations:'disabled',maxDiffPixelRatio:.002});
+ }
+ await page.setViewportSize({width:1536,height:720});
+ await page.goto('/');
+ await page.evaluate(()=>{localStorage.setItem('analysis-theme','dark');location.reload();});
+ await page.waitForLoadState('networkidle');
+ const accessibility=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+ expect(accessibility.violations).toEqual([]);
+});
+
+test('public landing controls respond within the interaction budget',async({page})=>{
+ test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+ await page.goto('/');
+ const themeDuration=await page.evaluate(()=>{
+  const button=document.querySelector<HTMLButtonElement>('[data-theme-value="light"]')!;
+  const started=performance.now();button.click();return performance.now()-started;
+ });
+ expect(themeDuration).toBeLessThanOrEqual(100);
+ await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+ const action=await page.evaluate(()=>{
+  const button=document.querySelector<HTMLButtonElement>('.landing-actions [data-sign-in]')!;
+  const started=performance.now();button.click();return{duration:performance.now()-started,disabled:button.disabled};
+ });
+ expect(action.duration).toBeLessThanOrEqual(100);
+ expect(action.disabled).toBe(true);
 });
 
 test('GitHub sign-in explains the secure exchange and access verification stages',async({page,context})=>{

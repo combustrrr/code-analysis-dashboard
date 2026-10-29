@@ -3,6 +3,7 @@ export default defineConfig(({ mode }) => {
   const accessTest = Boolean(process.env.TEST_DASHBOARD_ACCESS);
   return {
     base: './',
+    build: { manifest: true },
     publicDir: mode === 'fixtures' && !accessTest ? 'public' : 'public-static',
     define: accessTest ? {
       'import.meta.env.VITE_APPLICATION_MODE': JSON.stringify('repositories'),

@@ -82,6 +82,11 @@ jobs:
           VITE_DEFAULT_EXECUTION_REPOSITORY: combustrrr/code-analysis-dashboard
           VITE_DEFAULT_PROJECT_ID: '1360051890'
         run: npm run build
+      - name: Verify landing performance budgets
+        env:
+          VITE_APPLICATION_MODE: repositories
+          VITE_LAUNCH_ENDPOINT: https://code-analysis-launcher.icsarthak9.workers.dev
+        run: npm run test:lighthouse
 
   ci:
     name: CI

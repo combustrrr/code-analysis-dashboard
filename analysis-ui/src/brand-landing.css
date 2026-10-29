@@ -10,6 +10,18 @@
   border-color: #d91668;
 }
 
+.landing-page .landing-button-primary {
+  color: #fff;
+  background: #d91668;
+  border-color: #d91668;
+}
+
+.landing-page .landing-button-primary:hover {
+  color: #fff;
+  background: #b80f58;
+  border-color: #b80f58;
+}
+
 .landing-page .ant-btn-primary:hover {
   color: #fff !important;
   background: #b80f58 !important;
@@ -32,6 +44,12 @@
 }
 
 :root[data-theme="light"] .landing-page .ant-btn-primary {
+  color: #fff;
+  background: #b80f58;
+  border-color: #b80f58;
+}
+
+:root[data-theme="light"] .landing-page .landing-button-primary {
   color: #fff;
   background: #b80f58;
   border-color: #b80f58;

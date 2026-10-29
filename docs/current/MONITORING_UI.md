@@ -120,3 +120,11 @@ preserving the reader's viewport. They do not assign `location.hash` directly, b
 native hash navigation scrolls the document before the replacement view is committed.
 The live analysis tracker also opts out of browser scroll anchoring so polling updates
 cannot pull the report away from the evidence currently being reviewed.
+
+## Public landing bootstrap
+
+The unauthenticated root page uses a lightweight public entry so the landing page can
+render without loading React or authenticated workspace modules. OAuth callbacks and
+workspace hashes dynamically load the existing React application; authentication,
+session verification, and registry access remain owned by that application. The UI
+build enforces initial landing JavaScript, CSS, and font budgets from the Vite manifest.
