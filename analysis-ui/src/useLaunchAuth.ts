@@ -1,204 +1,47 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {useCallback,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import {AUTH_ENDPOINT_KEY,beginGitHubSignIn,clearPendingAuth,clearSessionHandle,pendingAuthValid,pendingEndpoint,readPendingAuth,readSessionHandle,safeReturnRoute,writeSessionHandle} from './authClient';
+import {decodeAuthError,decodeBootstrap,type AuthBootstrap,type AuthError,type ProjectRegistry} from './authContract';
+import {parseAppRoute,routeHash} from './appRoutes';
 
-const VERIFIER_KEY = 'analysis-auth-verifier';
-const RETURN_KEY = 'analysis-auth-return';
-const ENDPOINT_KEY = 'analysis-auth-endpoint';
-const SIGNED_IN_HOME = '#/projects';
-type ProjectRegistry = { execution_repository: { id: number; full_name: string }; projects: Array<{ id: string | number }>; [key:string]: unknown };
-export class DashboardApiError extends Error {
-  status:number;code?:string;
-  constructor(message:string,status:number,code?:string){super(message);this.name='DashboardApiError';this.status=status;this.code=code;}
+export class DashboardApiError extends Error{status:number;code?:string;action?:string;constructor(message:string,status:number,code?:string,action?:string){super(message);this.name='DashboardApiError';this.status=status;this.code=code;this.action=action;}}
+export type AuthState=|{status:'anonymous'}|{status:'redirecting';returnRoute:string;startedAt:number}|{status:'confirming';exchangeCode:string}|{status:'restoring';sessionHandle:string}|{status:'authenticated';session:Session;registry?:ProjectRegistry}|{status:'recoverable_error';error:AuthError}|{status:'unauthorized';reason:'not_collaborator'|'identity_changed'};
+type Session={token:string;login:string;user_id?:number;role?:string;capabilities?:{read:boolean;write:boolean;admin:boolean};registry?:ProjectRegistry};
+const SIGNED_IN_HOME=routeHash({kind:'projects'});
+
+export function pendingAuthDestination(){return readPendingAuth()?.returnRoute;}
+export function restoreAuthDestination(){const pending=readPendingAuth();if(!pending)return false;const target=safeReturnRoute(pending.returnRoute);clearPendingAuth();history.replaceState(null,'',location.pathname+location.search+target);window.dispatchEvent(new Event('hashchange'));return true;}
+function friendly(error:AuthError){if(error.code==='viewer_not_authorized'||error.code==='not_authorized')return'This GitHub account needs collaborator access from the repository owner.';if(error.code==='cancelled')return'GitHub sign-in was cancelled. Retry when you are ready.';if(error.code==='AUTH_TIMEOUT'||error.code==='exchange_expired')return'Sign-in timed out. Please try again.';if(error.code==='github_rate_limited')return'GitHub is temporarily limiting access checks. Retry shortly.';if(error.code==='github_unavailable')return'GitHub is experiencing delays. Retry shortly.';if(['exchange_invalid','exchange_store_unavailable','oauth_exchange_failed','AUTH_UNAVAILABLE'].includes(error.code))return'GitHub sign-in was interrupted. Start sign-in again.';return error.message||'GitHub sign-in was interrupted. Start sign-in again.';}
+function validEndpoint(endpoint?:string){try{const value=new URL(endpoint||pendingEndpoint()||'');return value.protocol==='https:'&&value.pathname==='/'&&!value.search&&!value.hash&&!value.username&&!value.password?value.origin:undefined}catch{return undefined}}
+function projectAllowed(route:string,registry?:ProjectRegistry){const parsed=parseAppRoute(route);if(parsed.kind==='project'||parsed.kind==='project-run')return Boolean(registry?.projects.some(project=>String(project.id)===parsed.projectId));return parsed.kind!=='landing';}
+async function bootstrapFor(origin:string,handle:string,legacyLogin=''){
+ const headers={Authorization:`Bearer ${handle}`},response=await fetch(`${origin}/api/bootstrap`,{cache:'no-store',credentials:'omit',headers}),value:unknown=await response.json().catch(()=>({}));
+ if(response.ok)return decodeBootstrap(value);
+ if(response.status!==404)throw Object.assign(new Error(),{authError:decodeAuthError(value,response.status)});
+ return legacyBootstrapFor(origin,handle,legacyLogin);
+}
+async function legacyBootstrapFor(origin:string,handle:string,legacyLogin=''){
+ const headers={Authorization:`Bearer ${handle}`},[sessionResponse,registryResponse]=await Promise.all([fetch(`${origin}/api/session`,{cache:'no-store',credentials:'omit',headers}),fetch(`${origin}/api/projects`,{cache:'no-store',credentials:'omit',headers})]),sessionValue=await sessionResponse.json().catch(()=>({})) as {login?:string;user_id?:number;role?:'read'|'write'|'admin';capabilities?:{read:boolean;write:boolean;admin:boolean}},registryValue=await registryResponse.json().catch(()=>({}));
+ if(!sessionResponse.ok)throw Object.assign(new Error(),{authError:decodeAuthError(sessionValue,sessionResponse.status)});if(!registryResponse.ok)throw Object.assign(new Error(),{authError:decodeAuthError(registryValue,registryResponse.status)});
+ return decodeBootstrap({schema_version:'auth-bootstrap-v1',session:{handle,login:sessionValue.login||legacyLogin,user_id:sessionValue.user_id??0,role:sessionValue.role||'read',capabilities:sessionValue.capabilities||{read:true,write:false,admin:false},verified_at:new Date().toISOString()},registry:registryValue});
 }
 
-function randomVerifier() {
-  return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
-    .replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-}
+export function useLaunchAuth(endpoint?:string,enabled=true){
+ const origin=enabled?validEndpoint(endpoint):undefined,callback=new URLSearchParams(location.hash.slice(1)),callbackCode=callback.get('analysis_auth'),callbackError=callback.get('analysis_auth_error'),storedHandle=readSessionHandle();
+ const initial:AuthState=callbackCode?{status:'confirming',exchangeCode:callbackCode}:callbackError?{status:'recoverable_error',error:{code:callbackError,message:'GitHub sign-in was interrupted.',recoverable:true,action:'SIGN_IN'}}:storedHandle?{status:'restoring',sessionHandle:storedHandle}:{status:'anonymous'};
+ const [state,setState]=useState<AuthState>(initial),handled=useRef(false),session=state.status==='authenticated'?state.session:undefined,pending=['redirecting','confirming','restoring'].includes(state.status),stage=state.status==='redirecting'?'redirecting':state.status==='restoring'?'verifying':state.status==='confirming'?'exchanging':'idle',error=state.status==='recoverable_error'?friendly(state.error):state.status==='unauthorized'?'This GitHub account needs collaborator access from the repository owner.':'';
+ const accept=useCallback((bootstrap:AuthBootstrap,pendingRoute?:string)=>{try{writeSessionHandle(bootstrap.session.handle)}catch{}const route=safeReturnRoute(pendingRoute||SIGNED_IN_HOME),destination=projectAllowed(route,bootstrap.registry)?route:SIGNED_IN_HOME;clearPendingAuth();setState({status:'authenticated',session:{token:bootstrap.session.handle,login:bootstrap.session.login,user_id:bootstrap.session.user_id,role:bootstrap.session.role,capabilities:bootstrap.session.capabilities,registry:bootstrap.registry},registry:bootstrap.registry});if(location.hash!==destination){history.replaceState(null,'',location.pathname+location.search+destination);window.dispatchEvent(new Event('hashchange'));}},[]);
 
-async function challengeFor(verifier: string) {
-  return btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))))
-    .replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-}
+ useLayoutEffect(()=>{
+  if(!origin||handled.current)return;handled.current=true;const pendingTransaction=readPendingAuth();if(callbackCode||callbackError)history.replaceState(null,'',location.pathname+location.search);
+  if(callbackError){clearPendingAuth();setState({status:'recoverable_error',error:{code:callbackError,message:'GitHub sign-in was interrupted.',recoverable:true,action:'SIGN_IN'}});return;}
+  const exchange=async()=>{if(!callbackCode)return;if(!pendingTransaction||!pendingAuthValid(pendingTransaction,origin)){clearPendingAuth();setState({status:'recoverable_error',error:{code:'AUTH_TIMEOUT',message:'Sign-in timed out. Please try again.',recoverable:true,action:'SIGN_IN'}});return;}setState({status:'confirming',exchangeCode:callbackCode});try{const response=await fetch(`${origin}/api/auth/redeem`,{method:'POST',cache:'no-store',credentials:'omit',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:callbackCode,verifier:pendingTransaction.verifier})}),value:unknown=await response.json().catch(()=>({}));if(!response.ok)throw Object.assign(new Error(),{authError:decodeAuthError(value,response.status)});try{accept(decodeBootstrap(value),pendingTransaction.returnRoute);return}catch{}const legacy=value as {token?:string;login?:string};if(typeof legacy.token!=='string'||typeof legacy.login!=='string')throw new Error('The authentication response is incompatible. Retry sign-in.');accept(await legacyBootstrapFor(origin,legacy.token,legacy.login),pendingTransaction.returnRoute);}catch(reason){const authError=(reason as {authError?:AuthError}).authError||{code:'AUTH_UNAVAILABLE',message:reason instanceof Error?reason.message:'GitHub sign-in was interrupted.',recoverable:true,action:'RETRY' as const};if(authError.action==='SIGN_OUT')clearSessionHandle();setState(authError.code==='viewer_not_authorized'?{status:'unauthorized',reason:'not_collaborator'}:{status:'recoverable_error',error:authError});}};
+  const restore=async()=>{if(callbackCode||callbackError||!storedHandle)return;setState({status:'restoring',sessionHandle:storedHandle});try{accept(await bootstrapFor(origin,storedHandle),location.hash);}catch(reason){const authError=(reason as {authError?:AuthError}).authError||{code:'AUTH_UNAVAILABLE',message:'Workspace access is temporarily unavailable.',recoverable:true,action:'RETRY' as const};if(authError.action==='SIGN_OUT'){clearSessionHandle();setState({status:'unauthorized',reason:authError.code==='session_identity_changed'?'identity_changed':'not_collaborator'});}else setState({status:'recoverable_error',error:authError});}};
+  void exchange();void restore();
+ },[origin,accept]);
 
-export function pendingAuthDestination() {
-  try { return sessionStorage.getItem(RETURN_KEY) || undefined; } catch { return undefined; }
-}
-function pendingAuthEndpoint() { try { return sessionStorage.getItem(ENDPOINT_KEY) || undefined; } catch { return undefined; } }
-
-export function restoreAuthDestination() {
-  try {
-    const destination = sessionStorage.getItem(RETURN_KEY);
-    if (!destination) return false;
-    const target = new URL(destination, location.origin);
-    if (target.origin !== location.origin || target.username || target.password) return false;
-    sessionStorage.removeItem(RETURN_KEY);
-    history.replaceState(null, '', target.pathname + target.search + target.hash);
-    window.dispatchEvent(new Event('hashchange'));
-    return true;
-  } catch { return false; }
-}
-
-function friendlyAuthError(code?: string) {
-  if (code === 'viewer_not_authorized' || code === 'not_authorized') return 'This GitHub account is not authorized yet. Ask a dashboard maintainer to invite your account to combustrrr/code-analysis-dashboard, accept the invitation, then retry.';
-  if (code === 'cancelled') return 'GitHub sign-in was cancelled. Retry when you are ready.';
-  return 'The GitHub sign-in expired or was interrupted. Start sign-in again.';
-}
-
-export function useLaunchAuth(endpoint?: string, enabled = true) {
-  const [session, setSession] = useState<{ token: string; login: string; registry?: ProjectRegistry }>();
-  const [error, setError] = useState('');
-  const [verified, setVerified] = useState(false);
-  const [pending, setPending] = useState(() => {
-    const params = new URLSearchParams(location.hash.slice(1));
-    return params.has('analysis_auth') || params.has('analysis_auth_error');
-  });
-  const [stage, setStage] = useState<'idle' | 'redirecting' | 'exchanging' | 'verifying'>(() => {
-    const params = new URLSearchParams(location.hash.slice(1));
-    return params.has('analysis_auth') || params.has('analysis_auth_error') ? 'exchanging' : 'idle';
-  });
-  const handledCallback = useRef(false);
-  const origin = enabled ? (() => { try { const u = new URL(endpoint || pendingAuthEndpoint() || ''); return u.protocol === 'https:' && u.pathname === '/' && !u.search && !u.hash && !u.username && !u.password ? u.origin : undefined; } catch { return undefined; } })() : undefined;
-
-  useLayoutEffect(() => {
-    setSession(undefined);
-    if (!origin || handledCallback.current) return;
-    const params = new URLSearchParams(location.hash.slice(1));
-    const code = params.get('analysis_auth');
-    const callbackError = params.get('analysis_auth_error');
-    if (!code && !callbackError) return;
-    handledCallback.current = true;
-    history.replaceState(null, '', location.pathname + location.search);
-
-    const fail = (message: string) => {
-      try { sessionStorage.removeItem(VERIFIER_KEY); } catch {}
-      setError(message);
-      setPending(false);
-      setStage('idle');
-    };
-
-    if (callbackError) {
-      fail(friendlyAuthError(callbackError));
-      return;
-    }
-    let verifier: string | null = null;
-    try { verifier = sessionStorage.getItem(VERIFIER_KEY); } catch {}
-    if (!verifier) {
-      fail(friendlyAuthError('exchange_invalid'));
-      return;
-    }
-    void fetch(`${origin}/api/auth/redeem`, {
-      method: 'POST', cache: 'no-store', credentials: 'omit',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, verifier }),
-    }).then(async response => {
-      try { sessionStorage.removeItem(VERIFIER_KEY); } catch {}
-      let result: { token?: string; login?: string; code?: string } = {};
-      try { result = await response.json(); } catch {}
-      if (!response.ok || typeof result.token !== 'string' || typeof result.login !== 'string') throw new Error(friendlyAuthError(result.code));
-      setStage('verifying');
-      const destination = pendingAuthDestination();
-      let requestedProject: { repository: string | null; id: string } | undefined;
-      let workspaceDestination = false;
-      if (destination) {
-        try {
-          const target = new URL(destination, location.origin);
-          const rawHash = target.hash.slice(1);
-          const modern = rawHash.startsWith('/') ? rawHash.slice(1) : '';
-          const [modernPath, modernQuery = ''] = modern.split('?', 2);
-          const modernParts = modernPath.split('/').filter(Boolean);
-          const parameters = new URLSearchParams(modern ? modernQuery : rawHash);
-          const project = modernParts[0] === 'projects' && /^\d+$/.test(modernParts[1] || '') ? modernParts[1] : parameters.get('project');
-          workspaceDestination = target.origin === location.origin && modernParts[0] === 'projects';
-          if (target.origin === location.origin && project) requestedProject = { repository: parameters.get('repository'), id: project };
-        } catch {}
-      }
-      const authHeaders={Authorization:`Bearer ${result.token}`};
-      const verificationPromise=fetch(`${origin}/api/session`,{cache:'no-store',credentials:'omit',headers:authHeaders});
-      const registryPromise=workspaceDestination?fetch(`${origin}/api/projects`,{cache:'no-store',credentials:'omit',headers:authHeaders}).catch(()=>null):undefined;
-      const [verification,registryResponse]=await Promise.all([verificationPromise,registryPromise]);
-      let verificationResult: { code?: string } = {};
-      try { verificationResult = await verification.json(); } catch {}
-      if (!verification.ok) throw new Error(friendlyAuthError(verificationResult.code));
-      let registry: ProjectRegistry | undefined;
-      if (registryResponse) {
-        if (!registryResponse.ok) {
-          let failure: {code?:string}={};try{failure=await registryResponse.json();}catch{}
-          if(registryResponse.status===401||registryResponse.status===403)throw new Error(friendlyAuthError(failure.code));
-          if(requestedProject)throw new Error('Configured projects could not be verified. Retry sign-in.');
-        } else {
-          let candidate: Partial<ProjectRegistry> = {};
-          try { candidate = await registryResponse.json(); } catch {}
-          if (!Number.isSafeInteger(candidate.execution_repository?.id) || !candidate.execution_repository?.full_name || !Array.isArray(candidate.projects)) {
-            throw new Error('The configured project registry could not be verified. Retry sign-in.');
-          }
-          registry = candidate as ProjectRegistry;
-        }
-      }
-      if (requestedProject) {
-        if (!registry) throw new Error('Configured projects could not be verified. Check your connection and retry.');
-        const repositoryMismatch = requestedProject.repository != null
-          && requestedProject.repository.toLowerCase() !== registry.execution_repository.full_name.toLowerCase();
-        if (repositoryMismatch || !registry.projects.some(value => String(value.id) === requestedProject.id)) {
-          try { sessionStorage.removeItem(RETURN_KEY); } catch {}
-          throw new Error('The requested project is no longer configured. Retry sign-in and choose a current project.');
-        }
-      }
-      setSession({ token: result.token, login: result.login, registry });
-      setVerified(true);
-      setError('');
-      setPending(false);
-      setStage('idle');
-      restoreAuthDestination();
-    }).catch(reason => fail(reason instanceof Error ? reason.message : friendlyAuthError())).finally(() => {
-      try { sessionStorage.removeItem(VERIFIER_KEY); } catch {}
-    });
-  }, [origin]);
-
-  const signIn = useCallback(() => {
-    if (!origin || pending) return;
-    setPending(true);
-    setStage('redirecting');
-    void (async () => {
-      try {
-        const verifier = randomVerifier();
-        const challenge = await challengeFor(verifier);
-        // Authentication always enters through the project register. A project may
-        // only be opened after the user has seen and selected it from that registry.
-        sessionStorage.setItem(RETURN_KEY, location.pathname + location.search + SIGNED_IN_HOME);
-        sessionStorage.setItem(VERIFIER_KEY, verifier);
-        sessionStorage.setItem(ENDPOINT_KEY, origin);
-        setError('');
-        location.assign(`${origin}/auth/login?challenge=${encodeURIComponent(challenge)}`);
-      } catch {
-        setError(friendlyAuthError());
-        setPending(false);
-        setStage('idle');
-      }
-    })();
-  }, [origin, pending]);
-
-  const api = useCallback(async function api<T>(path: string, body?: unknown, extraHeaders: Record<string,string> = {}): Promise<T> {
-    if (!origin || !session) throw new Error('Sign in to view dashboard data.');
-    const response = await fetch(`${origin}/api/${path}`, { method: body ? 'POST' : 'GET', cache: 'no-store', credentials: 'omit',
-      headers: { Authorization: `Bearer ${session.token}`, ...(body ? { 'Content-Type': 'application/json' } : {}), ...extraHeaders }, ...(body ? { body: JSON.stringify(body) } : {}) });
-    const result = await response.json();
-    if (!response.ok) {
-      const authFailure = ['viewer_not_authorized','session_invalid','exchange_invalid','exchange_expired','exchange_store_unavailable','oauth_exchange_failed','oauth_state_mismatch'].includes(result.code || '');
-      if (['viewer_not_authorized','session_invalid'].includes(result.code || '')) {
-        window.dispatchEvent(new CustomEvent('analysis-access-denied',{detail:{code:result.code}}));
-      }
-      throw new DashboardApiError(authFailure ? friendlyAuthError(result.code) : typeof result.error === 'string' ? result.error : `Dashboard request failed (${response.status}).`,response.status,result.code);
-    }
-    return result as T;
-  }, [origin, session]);
-  const signOut = useCallback(() => {
-    const handle = session?.token;
-    setSession(undefined);
-    setVerified(false);
-    setPending(false);
-    setStage('idle');
-    setError('');
-    try { sessionStorage.removeItem(VERIFIER_KEY); sessionStorage.removeItem(RETURN_KEY); sessionStorage.removeItem(ENDPOINT_KEY); } catch {}
-    if (origin && handle) void fetch(`${origin}/api/logout`, { method:'POST', cache:'no-store', credentials:'omit', headers:{Authorization:`Bearer ${handle}`}}).catch(()=>{});
-  }, [origin, session]);
-  return useMemo(() => ({ available: !!origin, session, verified, pending, stage, error, signIn, signOut, api }), [origin, session, verified, pending, stage, error, signIn, signOut, api]);
+ const signIn=useCallback(()=>{if(!origin||pending)return;const returnRoute=safeReturnRoute(location.hash);setState({status:'redirecting',returnRoute,startedAt:Date.now()});void beginGitHubSignIn(origin).catch(()=>setState({status:'recoverable_error',error:{code:'AUTH_UNAVAILABLE',message:'GitHub sign-in could not start.',recoverable:true,action:'RETRY'}}));},[origin,pending]);
+ const api=useCallback(async function api<T>(path:string,body?:unknown,extraHeaders:Record<string,string>={}):Promise<T>{if(!origin||!session)throw new Error('Sign in to view dashboard data.');const response=await fetch(`${origin}/api/${path}`,{method:body?'POST':'GET',cache:'no-store',credentials:'omit',headers:{Authorization:`Bearer ${session.token}`,...(body?{'Content-Type':'application/json'}:{}),...extraHeaders},...(body?{body:JSON.stringify(body)}:{})}),result=await response.json();if(!response.ok){const authError=decodeAuthError(result,response.status);if(authError.action==='SIGN_OUT')window.dispatchEvent(new CustomEvent('analysis-access-denied',{detail:{code:authError.code}}));throw new DashboardApiError(friendly(authError),response.status,authError.code,authError.action);}return result as T;},[origin,session]);
+ const signOut=useCallback(()=>{const handle=session?.token||readSessionHandle();clearSessionHandle();clearPendingAuth();try{sessionStorage.removeItem(AUTH_ENDPOINT_KEY)}catch{}setState({status:'anonymous'});if(origin&&handle)void fetch(`${origin}/api/auth/logout`,{method:'POST',cache:'no-store',credentials:'omit',headers:{Authorization:`Bearer ${handle}`}}).catch(()=>{});},[origin,session]);
+ const retry=useCallback(()=>{if(readSessionHandle()){location.reload();return;}signIn();},[signIn]);
+ return useMemo(()=>({available:!!origin,state,session,verified:state.status==='authenticated',pending,stage,error,signIn,retry,signOut,api}),[origin,state,session,pending,stage,error,signIn,retry,signOut,api]);
 }

@@ -1,5 +1,5 @@
 import {emitDiagnostic} from './diagnostics.mjs';
-import {isCollaborator} from './viewer-access.mjs';
+import {verifyCollaborator,ViewerAccessError} from './viewer-access.mjs';
 import { reportToken } from './github-app.mjs';
 import { publicReports } from './reports.mjs';
 import { applicationApi } from './application.mjs';
@@ -7,12 +7,14 @@ import {readBody, BodyLimitError, resolveLimit, DEFAULT_LIMITS} from './request-
 import {MAX_GITHUB_READ_RETRIES, sleep, retryAfterMs, secondaryRateLimit, transientReadStatus} from './github-retry.mjs';
 import {AuthExchangeStore} from './auth-exchange.mjs';
 import {EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID} from './target-registry.mjs';
+import {authErrorDocument,authRoutePaths,authorizationFresh,bootstrapDocument} from './auth-routes.mjs';
 // Credential boundary: this Worker calls GitHub APIs only; it never runs source code.
 const encoder = new TextEncoder();
 const b64 = bytes => btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 const bytes = value => Uint8Array.from(atob(value.replaceAll('-', '+').replaceAll('_', '/')), c => c.charCodeAt(0));
 const random = () => b64(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async value => b64(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value))));
+const authorizationChecks=new Map();
 export async function seal(value, secret) {
   const key = await crypto.subtle.importKey('raw', bytes(secret), 'AES-GCM', false, ['encrypt']);
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -39,10 +41,10 @@ async function github(path, token, init = {}) {
   if (!read) throw new Failure(405, 'GitHub repository writes are disabled for this service.', 'github_write_disabled');
   let response, secondary=false;
   for (let attempt = 0; ; attempt++) {
-    response = await fetch(`https://api.github.com/${path}`, { ...init, headers: {
+    try { response = await fetch(`https://api.github.com/${path}`, { ...init, signal:init.signal||AbortSignal.timeout(4000), headers: {
       Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'code-analysis-launcher', Authorization: `Bearer ${token}`, ...init.headers,
-    } });
+    } }); } catch { throw new Failure(503,'GitHub did not respond before the authorization timeout.','github_unavailable'); }
     secondary = await secondaryRateLimit(response);
     if (!read || attempt >= MAX_GITHUB_READ_RETRIES || (!transientReadStatus(response.status) && !secondary)) break;
     await sleep(retryAfterMs(response));
@@ -78,18 +80,18 @@ const protectedReportResponse = async (request, env) => {
   headers.set('Cache-Control', 'private, no-store');
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 };
-async function viewer(env, token, {dashboard = restricted(env), reports = false, expectedLogin} = {}) {
+async function viewer(env, token, {dashboard = restricted(env), reports = false, expectedLogin,etag} = {}) {
   const needsAccess = dashboard || reports;
   // Established sessions already carry the GitHub login captured during OAuth.
   // Recheck both the token identity and current collaborator membership, but do
   // those independent network calls together instead of serially.
-  const [user, collaborator] = await Promise.all([
-    github('user', token),
-    needsAccess && expectedLogin ? isCollaborator(env, expectedLogin) : Promise.resolve(undefined),
-  ]);
+  let user,collaborator;
+  try{[user, collaborator] = await Promise.all([github('user', token),needsAccess && expectedLogin ? verifyCollaborator(env, expectedLogin,undefined,etag) : Promise.resolve(undefined)]);}
+  catch(error){if(error instanceof ViewerAccessError)throw new Failure(error.status,error.message,error.code);throw error;}
   if (expectedLogin && user.login?.toLowerCase() !== expectedLogin.toLowerCase()) throw new Failure(401, 'Sign in again; the session identity changed.', 'session_invalid');
-  if (needsAccess && !(expectedLogin ? collaborator : await isCollaborator(env,user.login))) throw new Failure(403, 'This GitHub account is not authorized to view these reports.', 'viewer_not_authorized');
-  return user;
+  if(!expectedLogin&&needsAccess)collaborator=await verifyCollaborator(env,user.login);
+  if (needsAccess && !collaborator?.authorized) throw new Failure(403, 'This GitHub account is not authorized to view these reports.', 'viewer_not_authorized');
+  return{...user,collaborator_etag:collaborator?.etag};
 }
 const json = (value, status = 200, extra = {}) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json', ...extra } });
 const dashboardLocation = (env, fragment) => {
@@ -102,6 +104,22 @@ async function controlRequest(env, key, path, body) {
   if (!env.AUTH_EXCHANGES) throw new Failure(503, 'Sign-in exchange storage is unavailable.', 'exchange_store_unavailable');
   const stub = env.AUTH_EXCHANGES.get(env.AUTH_EXCHANGES.idFromName(key));
   return stub.fetch(new Request(`https://control${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+}
+const helpersFor=env=>({github,json,Failure,seal,unseal,pages,serviceToken:()=>reportToken(env,env.ANALYSIS_REPOSITORY,{contents:'read',actions:'read'}),wakeCoordinator:(requestId,sourceSha)=>wakeCoordinator(env,requestId,sourceSha),queue:async(path,body)=>controlRequest(env,'control-plane',path,body)});
+async function authorizeSessionUncached(env,session,row){
+ let user,repository;try{[user,repository]=await Promise.all([viewer(env,session.token,{dashboard:restricted(env),reports:privateReports(env),expectedLogin:session.login,etag:row.authorization?.etag}),access(env,session.token,'pull')]);}catch(error){if(error instanceof Failure&&['viewer_not_authorized','session_identity_changed'].includes(error.code||''))await controlRequest(env,'control-plane','/session/delete',{handle:session.handle});throw error;}
+ if(user.id!==session.user_id)throw new Failure(401,'Sign in again; the session identity changed.','session_identity_changed');
+ const role=repository.permissions?.admin?'admin':repository.permissions?.push?'write':'read',capabilities={read:true,write:!!repository.permissions?.push,admin:!!repository.permissions?.admin},verified_at=Date.now();
+ const cached=await controlRequest(env,'control-plane','/session/authorize',{handle:session.handle,user_id:user.id,login:user.login,repository_id:repository.id,role,capabilities,verified_at,etag:user.collaborator_etag||row.authorization?.etag});
+ if(!cached.ok)throw new Failure(503,'Workspace authorization could not be retained.','exchange_store_unavailable');
+ return{...row,authorization:{user_id:user.id,login:user.login,repository_id:repository.id,role,capabilities,verified_at,etag:user.collaborator_etag||row.authorization?.etag||null}};
+}
+async function authorizeSession(env,session,row){const key=session.handle;if(authorizationChecks.has(key))return authorizationChecks.get(key);const task=authorizeSessionUncached(env,session,row).finally(()=>authorizationChecks.delete(key));authorizationChecks.set(key,task);return task;}
+async function bootstrapSession(env,session,row){
+ const authorized=await authorizeSession(env,session,row),helpers=helpersFor(env),registryResponse=await applicationApi(new Request('https://worker/api/projects',{headers:{Authorization:`Bearer ${session.handle}`}}),env,session,helpers);
+ if(!registryResponse?.ok)throw new Failure(registryResponse?.status||503,'Configured projects could not be loaded.','target_registry_unavailable');
+ const registry=await registryResponse.json();
+ return bootstrapDocument(session.handle,authorized,{id:Number(env.ANALYSIS_REPOSITORY_ID||EXECUTION_REPOSITORY_ID),full_name:env.ANALYSIS_REPOSITORY},registry);
 }
 async function wakeCoordinator(env,requestId,sourceSha){
   const token=await reportToken(env,env.ANALYSIS_REPOSITORY,{actions:'write'});
@@ -288,12 +306,12 @@ async function route(request, env) {
     const exchanged=await result.json();
     const stored=await controlRequest(env,'control-plane','/session/get',{handle:exchanged.session_handle});
     if(!stored.ok)throw new Failure(503,'Sign-in could not be completed. Retry GitHub sign-in.','exchange_store_unavailable');
-    const metadata=await stored.json();
-    return json({token:exchanged.session_handle,login:metadata.login},200,{'Cache-Control':'no-store'});
+    const metadata=await stored.json(),grant=await unseal(metadata.grant,env.SESSION_KEY,'grant'),session={token:grant.token,user_id:metadata.user_id,login:metadata.login,handle:exchanged.session_handle};
+    return json(await bootstrapSession(env,session,metadata),200,{'Cache-Control':'no-store'});
   }
   const handle=(request.headers.get('Authorization')||'').replace(/^Bearer /,'');
   if(!/^[A-Za-z0-9_-]{43}$/.test(handle))throw new Failure(401,'Sign in again; the session is invalid or expired.','session_invalid');
-  if(request.method==='POST'&&url.pathname==='/api/logout'){
+  if(request.method==='POST'&&['/api/logout','/api/auth/logout'].includes(url.pathname)){
     const current=await controlRequest(env,'control-plane','/session/get',{handle});
     await controlRequest(env,'control-plane','/session/delete',{handle});
     if(current.ok){try{const stored=await current.json(),grant=await unseal(stored.grant,env.SESSION_KEY,'grant');await fetch('https://api.github.com/applications/'+env.GITHUB_CLIENT_ID+'/token',{method:'DELETE',headers:{Authorization:'Basic '+btoa(`${env.GITHUB_CLIENT_ID}:${env.GITHUB_CLIENT_SECRET}`),'Content-Type':'application/json'},body:JSON.stringify({access_token:grant.token})});}catch{}}
@@ -303,12 +321,12 @@ async function route(request, env) {
   if(!storedSession.ok)throw new Failure(401,'Sign in again; the session is invalid or expired.','session_invalid');
   const sessionRow=await storedSession.json(),grant=await unseal(sessionRow.grant,env.SESSION_KEY,'grant');
   const session={token:grant.token,user_id:sessionRow.user_id,login:sessionRow.login,handle};
+  if(request.method==='GET'&&url.pathname==='/api/bootstrap')return json(await bootstrapSession(env,session,sessionRow),200,{'Cache-Control':'no-store'});
   if (restricted(env) || url.pathname === '/api/session' || (reportPath(url.pathname) && privateReports(env))) {
-    const user = await viewer(env, session.token, { dashboard: restricted(env), reports: reportPath(url.pathname) && privateReports(env) || (url.pathname === '/api/session' && privateReports(env)), expectedLogin: session.login });
-    if(user.id!==session.user_id)throw new Failure(401,'Sign in again; the session identity changed.','session_invalid');
-    if (request.method === 'GET' && url.pathname === '/api/session') {const repo=await access(env,session.token,'pull');return json({login:user.login,user_id:user.id,role:repo.permissions?.admin?'admin':repo.permissions?.push?'write':'read',capabilities:{read:true,write:!!repo.permissions?.push,admin:!!repo.permissions?.admin}});}
+    const live=request.method!=='GET'||url.pathname==='/api/session',authorized=live||!authorizationFresh(sessionRow,Number(env.ANALYSIS_REPOSITORY_ID||EXECUTION_REPOSITORY_ID))?await authorizeSession(env,session,sessionRow):sessionRow;
+    if (request.method === 'GET' && url.pathname === '/api/session') {const value=authorized.authorization;return json({login:value.login,user_id:value.user_id,role:value.role,capabilities:value.capabilities,verified_at:new Date(value.verified_at).toISOString()});}
   }
-  const helpers = {github,json,Failure,seal,unseal,pages,serviceToken:()=>reportToken(env,env.ANALYSIS_REPOSITORY,{contents:'read',actions:'read'}),wakeCoordinator:(requestId,sourceSha)=>wakeCoordinator(env,requestId,sourceSha),queue:async(path,body)=>controlRequest(env,'control-plane',path,body)};
+  const helpers = helpersFor(env);
     if (reportPath(url.pathname)) {
       await access(env, session.token, 'pull');
       if (privateReports(env) && url.searchParams.has('project_id')) {
@@ -331,13 +349,15 @@ export default { async fetch(request, env) {
   try { response = await route(request, env); } catch (e) {
     const known = e instanceof Failure || e instanceof BodyLimitError;
     failureCode = known ? e.code : undefined;
-    response = json({ error: known ? e.message : 'Launcher unavailable. No successful launch has been confirmed; check GitHub Actions before retrying.', ...(failureCode ? { code: failureCode } : {}), request_id: requestId }, known ? e.status : 503);
+    const message=known?e.message:'Launcher unavailable. No successful launch has been confirmed; check GitHub Actions before retrying.',status=known?e.status:503,path=new URL(request.url).pathname;
+    response = authRoutePaths.has(path)||path==='/api/logout'?json({...authErrorDocument(failureCode||'launcher_unavailable',message,status,e.retryAfter),request_id:requestId},status):json({error:message,...(failureCode?{code:failureCode}:{}),request_id:requestId},status);
   }
   const headers = new Headers(response.headers);
   headers.set('X-Request-ID',requestId);
   emitDiagnostic(request,response.status,started,requestId,env,failureCode);
   const protectedReport = privateReports(env) && reportPath(new URL(request.url).pathname);
   if (restricted(env) || protectedReport || !new URL(request.url).pathname.startsWith('/api/public/')) headers.set('Cache-Control', restricted(env) || protectedReport ? 'private, no-store' : 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Frame-Options','DENY');headers.set('Content-Security-Policy',"frame-ancestors 'none'");headers.set('Strict-Transport-Security','max-age=31536000');
   if (request.headers.get('Origin') === env.DASHBOARD_ORIGIN) {
     headers.set('Access-Control-Allow-Origin', env.DASHBOARD_ORIGIN); headers.set('Vary', 'Origin');
     headers.set('Access-Control-Expose-Headers','X-Request-ID, Retry-After');

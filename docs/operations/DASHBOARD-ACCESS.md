@@ -41,18 +41,30 @@ Sign-in uses a same-tab GitHub redirect. OAuth state and PKCE remain validated b
 Worker. An authorized callback returns a two-minute exchange code to the fixed
 dashboard origin. A SQLite-backed Durable Object binds that code to a client verifier
 and transactionally consumes it once; the UI scrubs the code from the URL before
-redemption. The opaque session remains in React memory, never browser storage. The UI
-loads reports only after `/api/session` verification, polls access while visible, and
-clears in-memory reports on sign-out or denial. Refreshing and opening a new tab
-requires sign-in again.
+redemption. The GitHub grant remains sealed in the Worker. The browser stores only the
+opaque application handle in `sessionStorage`, so refresh restores the same tab through
+`GET /api/bootstrap` while a fresh tab requires GitHub sign-in. The bootstrap response
+uses `auth-bootstrap-v1` and atomically returns the verified identity, capabilities, and
+trusted project registry. Explicit logout calls `POST /api/auth/logout`, deletes the
+Durable Object session first, and then attempts GitHub grant revocation.
 
-Only an authoritative `/api/session` response with `session_invalid` or
+Successful collaborator and capability verification is cached in that session record
+for at most 60 seconds for protected reads. Bootstrap, periodic access checks, and every
+mutation verify GitHub live. A confirmed collaborator `404` or identity mismatch deletes
+the session. Rate limits, GitHub permission ambiguity, timeouts, and provider failures
+fail closed after the cache expires but retain the handle for a bounded retry; they are
+not translated into access revocation.
+
+Only an authoritative `/api/session` or `/api/bootstrap` response with `session_invalid` or
 `viewer_not_authorized` clears the in-memory session. The UI confirms the session after
 another protected endpoint returns either code, so one stale or transient endpoint
 response cannot revoke the OAuth grant or create a sign-in loop. A GitHub API, App installation, report asset, rate-limit, or Worker
 availability error remains an operation-specific error and must not be translated into
 "access revoked." A transient periodic `/api/session` failure leaves an already verified
-session active and is retried later; initial verification still fails closed.
+session active and is retried later; initial verification still fails closed. The Pages
+entry keeps scripts same-origin, forbids inline script attributes, and permits API
+connections only to the configured Worker. Inline styles remain allowed because the
+current React components use bounded style attributes for charts and layout.
 
 `DASHBOARD_ACCESS` and `REPORT_ACCESS` are independent. The current deployment uses
 `DASHBOARD_ACCESS=collaborators` and `REPORT_ACCESS=collaborators`. Report API access

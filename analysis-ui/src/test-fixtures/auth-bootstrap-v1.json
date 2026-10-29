@@ -1,0 +1,26 @@
+{
+  "schema_version": "auth-bootstrap-v1",
+  "session": {
+    "handle": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+    "login": "developer",
+    "user_id": 73,
+    "role": "write",
+    "capabilities": {
+      "read": true,
+      "write": true,
+      "admin": false
+    },
+    "verified_at": "2026-10-29T14:30:00Z"
+  },
+  "registry": {
+    "execution_repository": {
+      "id": 1360051890,
+      "full_name": "combustrrr/code-analysis-dashboard"
+    },
+    "projects": [
+      {
+        "id": "1360051890"
+      }
+    ]
+  }
+}

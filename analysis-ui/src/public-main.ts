@@ -9,12 +9,10 @@ import './landing-controls.css';
 import './institutional-lockup.css';
 import './landing-refinement.css';
 import {landingShell} from './landing-shell';
+import {beginGitHubSignIn,readSessionHandle} from './authClient';
 
-const VERIFIER_KEY = 'analysis-auth-verifier';
-const RETURN_KEY = 'analysis-auth-return';
-const ENDPOINT_KEY = 'analysis-auth-endpoint';
 const callback = new URLSearchParams(location.hash.slice(1));
-const needsApplication = location.hash.startsWith('#/') || callback.has('analysis_auth') || callback.has('analysis_auth_error');
+const needsApplication = location.hash.startsWith('#/') || callback.has('analysis_auth') || callback.has('analysis_auth_error') || Boolean(readSessionHandle());
 
 if (needsApplication) {
   void import('./main');
@@ -42,13 +40,7 @@ if (needsApplication) {
     setPending(true);
     announce('Opening GitHub. Continue securely to confirm your identity.');
     try {
-      const verifier = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-      const challenge = btoa(String.fromCharCode(...new Uint8Array(digest))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-      sessionStorage.setItem(RETURN_KEY, location.pathname + location.search + '#/projects');
-      sessionStorage.setItem(VERIFIER_KEY, verifier);
-      sessionStorage.setItem(ENDPOINT_KEY, endpoint);
-      location.assign(`${endpoint}/auth/login?challenge=${encodeURIComponent(challenge)}`);
+      await beginGitHubSignIn(endpoint);
     } catch {
       setPending(false);
       announce('GitHub sign-in could not start. Try again.', true);

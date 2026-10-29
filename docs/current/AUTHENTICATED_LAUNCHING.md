@@ -99,14 +99,29 @@ for more than one renewal interval solely because of its heartbeat job.
 
 ## Dashboard sign-in and report visibility
 
-GitHub sign-in is a same-tab redirect. The Worker validates OAuth state and PKCE,
-checks the immutable user ID and current collaborator membership on every protected
-request, then redirects to the configured
-dashboard base path with a short-lived exchange code. The UI removes that code from the
-URL before redeeming it. `AUTH_EXCHANGES` is a SQLite-backed Durable Object: redemption
-is transactionally single-use, bound to a verifier held temporarily in the current
-tab's `sessionStorage`, and expires after two minutes. The resulting opaque session is
-kept only in UI memory; reloads and new tabs require another sign-in.
+GitHub sign-in is a same-tab redirect. The Worker validates OAuth state and dual PKCE,
+checks the immutable user ID and current collaborator membership, then redirects to the
+configured dashboard base path with a short-lived exchange code. The UI removes that
+code from the URL before redeeming it. `AUTH_EXCHANGES` is a SQLite-backed Durable
+Object: redemption is transactionally single-use, bound to a verifier held temporarily
+in the current tab's `sessionStorage`, and expires after two minutes. The pending browser
+transaction and sealed Worker OAuth state expire after ten minutes.
+
+`POST /api/auth/redeem` returns the versioned `auth-bootstrap-v1` identity,
+capabilities, and trusted project registry in one response. The opaque application
+handle is retained in `sessionStorage`; `GET /api/bootstrap` restores the same tab after
+a refresh. A new tab has no handle and must sign in. Return hashes are parsed through
+the application's route contract and project IDs are checked against the trusted
+registry before restoration. `/api/session`, `/api/projects`, `/api/logout`, and the
+legacy redeem fields remain available during the bounded cached-asset compatibility
+window.
+
+Read-only requests may reuse a successful collaborator verification for 60 seconds.
+Bootstrap, periodic access polling, analysis launch, configuration changes, and every
+other mutation verify GitHub live. GitHub rate limits, ambiguous 403 responses, timeouts,
+and 5xx responses retain the session for retry; a confirmed collaborator 404 or identity
+change revokes it. `POST /api/auth/logout` deletes the durable session before attempting
+GitHub token revocation.
 
 Repository mode always requires current collaborator access for dashboard and project-registry APIs.
 Current collaborator access is sufficient to browse configured projects and explicitly

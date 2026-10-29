@@ -6,6 +6,8 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  await context.route('https://launcher.example/api/public/config',route=>route.fulfill({status:503,contentType:'application/json',body:'{}'}));
  await page.goto('/');
+ const csp=await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+ expect(csp).toContain("script-src 'self'");expect(csp).toContain("script-src-attr 'none'");expect(csp).toContain('connect-src \'self\' https://launcher.example');
  expect(await page.evaluate(()=>getComputedStyle(document.body).margin)).toBe('0px');
  expect(await page.locator('.dossier-live').evaluate(element=>getComputedStyle(element).borderTopWidth)).toBe('0px');
  expect(await page.locator('.dossier-live i').evaluate(element=>getComputedStyle(element).boxShadow)).toBe('none');
@@ -95,7 +97,7 @@ test('public landing controls respond within the interaction budget',async({page
  expect(action.disabled).toBe(true);
 });
 
-test('GitHub sign-in explains the secure exchange and access verification stages',async({page,context})=>{
+test('GitHub sign-in presents one stable confirmation state',async({page,context})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type'};
  let sessionStarted=0,projectsStarted=0,projectsRequests=0;
@@ -117,10 +119,11 @@ test('GitHub sign-in explains the secure exchange and access verification stages
   throw new Error(`Unexpected request ${url.pathname}`);
  });
  await page.goto('/#/projects');
+ const shellBounds=await page.locator('.landing-hero').evaluate(element=>{const rect=element.getBoundingClientRect();return{left:Math.round(rect.left),width:Math.round(rect.width)};});
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
- await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('Confirming your GitHub sign-in');
- await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('never sees your password');
- await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('Verifying workspace access');
+ await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('Confirming GitHub access');
+ await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('opaque, short-lived application session');
+ expect(await page.locator('.landing-hero').evaluate(element=>{const rect=element.getBoundingClientRect();return{left:Math.round(rect.left),width:Math.round(rect.width)};})).toEqual(shellBounds);
  await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
  expect(Math.abs(sessionStarted-projectsStarted)).toBeLessThan(100);expect(projectsRequests).toBe(1);
 });
@@ -137,7 +140,7 @@ test('view access requires login and clears on logout',async({page,context})=>{
     if(u.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
     if(u.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'opaque-session',login:'combustrrr'}});
   expect(route.request().headers().authorization).toBe('Bearer opaque-session');
-  if(u.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
+  if(['/api/logout','/api/auth/logout'].includes(u.pathname))return route.fulfill({headers,json:{ok:true}});
     if(u.pathname==='/api/session')return route.fulfill({headers,status:allowed?200:403,json:allowed?{login:'combustrrr'}:{error:'Account not authorized',code:'viewer_not_authorized'}});
   if(u.pathname==='/api/projects')return route.fulfill({headers,status:allowed?200:403,json:allowed?registry:{error:'Account not authorized',code:'viewer_not_authorized'}});
   if(u.pathname==='/api/public/manifest'){reports++;return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:'1278177697',targets:[]}});}
@@ -150,7 +153,7 @@ test('view access requires login and clears on logout',async({page,context})=>{
  await expect(page.getByRole('link',{name:/Run analysis/})).toBeVisible();expect(reports).toBe(0);
   await expect.poll(()=>page.evaluate(()=>performance.getEntriesByType('resource').map(entry=>entry.name).some(name=>name.includes('WorkspaceApp')))).toBe(false);
  await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.getByRole('link',{name:/Run analysis/})).toHaveCount(0);
-  allowed=false;await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();await expect(page.getByText(/Ask a dashboard maintainer to invite your account/)).toBeVisible();await expect(page.getByRole('link',{name:/Run analysis/})).toHaveCount(0);
+  allowed=false;await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();await expect(page.getByText(/needs collaborator access from the repository owner/)).toBeVisible();await expect(page.getByRole('link',{name:/Run analysis/})).toHaveCount(0);
  });
 
 test('cancellation and exchange failures stay on the public shell',async({page,context})=>{
@@ -174,13 +177,13 @@ test('cancellation and exchange failures stay on the public shell',async({page,c
   await page.goto('/#/projects');
   const signIn=page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/});
   await signIn.click();
-  await expect(page.getByText(/Ask a dashboard maintainer to invite your account/)).toBeVisible();
+  await expect(page.getByText(/needs collaborator access from the repository owner/)).toBeVisible();
   await expect(page.getByRole('heading',{name:'Projects'})).toHaveCount(0);
   await signIn.click();
   await expect(page.getByText('GitHub sign-in was cancelled. Retry when you are ready.')).toBeVisible();
   await expect(page.getByRole('heading',{name:'Projects'})).toHaveCount(0);
   await signIn.click();
- await expect(page.getByText('The GitHub sign-in expired or was interrupted. Start sign-in again.')).toBeVisible();
+ await expect(page.getByText('GitHub sign-in was interrupted. Start sign-in again.')).toBeVisible();
  await expect(page.getByText('private store diagnostic')).toHaveCount(0);
  expect(sessionChecks).toBe(0);expect(reportRequests).toBe(0);
 });
@@ -196,7 +199,7 @@ test('a revoked workspace API request clears the session immediately',async({pag
   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`} });
   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'revoked-session',login:'developer'}});
   expect(route.request().headers().authorization).toBe('Bearer revoked-session');
-  if(url.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
+  if(['/api/logout','/api/auth/logout'].includes(url.pathname))return route.fulfill({headers,json:{ok:true}});
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
   if(url.pathname==='/api/projects')return route.fulfill({headers,status:revoked?403:200,json:revoked?{code:'viewer_not_authorized'}:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[]}});
     reportRequests++;
@@ -205,7 +208,7 @@ test('a revoked workspace API request clears the session immediately',async({pag
    await page.goto('/#/projects');
   revoked=true;
    await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
-   await expect(page.getByText(/Ask a dashboard maintainer to invite your account/)).toBeVisible();
+   await expect(page.getByText(/needs collaborator access from the repository owner/)).toBeVisible();
   await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
   expect(reportRequests).toBe(0);
  });
@@ -223,7 +226,7 @@ test('a protected report denial is confirmed before revoking a valid dashboard s
   if(url.pathname==='/api/session'){sessionChecks++;return route.fulfill({headers,json:{login:'developer'}});}
   if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,current_report:{status:'complete',analyzed_sha:'a'.repeat(40),generated_at:'2026-10-26T00:00:00Z',scanner_summary:{completed:1,total:1,incomplete:0}}}]}});
   if(url.pathname==='/api/public/manifest')return route.fulfill({headers,status:403,json:{code:'viewer_not_authorized',error:'This report request could not confirm viewer access.'}});
-  if(url.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
+  if(['/api/logout','/api/auth/logout'].includes(url.pathname))return route.fulfill({headers,json:{ok:true}});
   throw new Error(`Unexpected request ${url.pathname}`);
  });
  await page.goto('/#/projects');
@@ -245,7 +248,7 @@ test('a mismatched target registry is shown as an error, not an empty project li
   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`} });
   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'registry-error-session',login:'developer'}});
-  if(url.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
+  if(['/api/logout','/api/auth/logout'].includes(url.pathname))return route.fulfill({headers,json:{ok:true}});
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
   if(url.pathname==='/api/projects')return route.fulfill({headers,status:503,json:{code:'target_registry_invalid',error:'The configured target registry does not match the approved project identities.'}});
   writes++;
@@ -253,8 +256,7 @@ test('a mismatched target registry is shown as an error, not an empty project li
  });
  await page.goto('/#/projects');
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
- await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
- await expect(page.getByRole('alert')).toContainText('Project evidence is unavailable');
+ await expect(page.getByRole('alert')).toContainText('configured target registry');
  await expect(page.getByText('No configured projects are available.')).toHaveCount(0);
   await expect(page.getByRole('button',{name:/Fast analysis/})).toHaveCount(0);
  expect(writes).toBe(0);
@@ -271,12 +273,12 @@ test('visible tabs recheck collaborator access and clear the session when revoke
   if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});
   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
   if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'visible-tab-session',login:'developer'}});
-  if(url.pathname==='/api/logout')return route.fulfill({headers,json:{ok:true}});
+  if(['/api/logout','/api/auth/logout'].includes(url.pathname))return route.fulfill({headers,json:{ok:true}});
    if(url.pathname==='/api/session'){
     sessionChecks++;
     return route.fulfill({headers,status:sessionChecks===1?200:403,json:sessionChecks===1?{login:'developer'}:{code:'viewer_not_authorized'}});
    }
-   if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
+   if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,current_report:{status:'partial'}}]}});
    if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:'combustrrr/code-analysis-dashboard',project_id:'1278177697',preferred_branch:'Testing',targets:[]}});
   throw new Error(`Unexpected request ${url.pathname}`);
  });
@@ -288,8 +290,8 @@ test('visible tabs recheck collaborator access and clear the session when revoke
    await expect(page.getByText('No report available yet. Run analysis to publish the first report.')).toBeVisible();
    await expect(page.locator('.analysis-entry .ant-btn-disabled')).toHaveText('Run analysis');
    expect(sessionChecks).toBe(1);
-  await page.clock.fastForward(15_000);
-  await expect(page.getByText(/Ask a dashboard maintainer to invite your account/)).toBeVisible();
+  await page.clock.fastForward(5*60_000+1);
+  await expect(page.getByText(/needs collaborator access from the repository owner/)).toBeVisible();
   await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
   expect(sessionChecks).toBe(2);
 });
@@ -305,7 +307,7 @@ test('repository deep links open the authenticated workspace with a shared theme
    if(url.pathname==='/api/auth/redeem')return route.fulfill({headers,json:{token:'workspace-session',login:'developer'}});
   expect(route.request().headers().authorization).toBe('Bearer workspace-session');
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
-    if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
+    if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,current_report:{status:'partial'}}]}});
   throw new Error(`Unexpected request ${url.pathname}`);
  });
  await page.goto('/#/projects');
@@ -359,7 +361,7 @@ test('workspace intent survives a transient hash reset while GitHub access is ch
   await expect(page).toHaveURL(/#\/projects$/);
  });
 
-test('authorization opens the project register instead of restoring a project route',async({page,context})=>{
+test('authorization restores a validated configured-project route',async({page,context})=>{
   test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
   const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
   const requestOrder:string[]=[];
@@ -382,8 +384,7 @@ test('authorization opens the project register instead of restoring a project ro
  });
  await page.goto('/#/projects/1278177697');
   await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
-  await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
-  await expect(page).toHaveURL(/#\/projects$/);
+  await expect(page).toHaveURL(/#\/projects\/1278177697$/);
   expect(requestOrder).toContain('session');
   expect(requestOrder).toContain('projects');
   expect(requestOrder).not.toContain('manifest');
@@ -415,10 +416,10 @@ test('a stale project URL falls back to the current project register after sign-
  expect(reportRequests).toBe(0);
 });
 
-test('reloads and new tabs require a fresh in-memory sign-in',async({page,context})=>{
+test('reload restores a tab session while a fresh tab requires GitHub sign-in',async({page,context})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
- let sessionChecks=0;
+ let sessionChecks=0,bootstrapChecks=0;const handle='m'.repeat(43),registry={execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]};
  await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -426,11 +427,12 @@ test('reloads and new tabs require a fresh in-memory sign-in',async({page,contex
   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
   if(url.pathname==='/api/auth/redeem'){
    const body=route.request().postDataJSON();expect(body.code).toBe('e'.repeat(43));expect(body.verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
-   return route.fulfill({headers,json:{token:'memory-only-session',login:'developer'}});
+   return route.fulfill({headers,json:{token:handle,login:'developer'}});
   }
-  expect(route.request().headers().authorization).toBe('Bearer memory-only-session');
+  expect(route.request().headers().authorization).toBe(`Bearer ${handle}`);
+  if(url.pathname==='/api/bootstrap'){bootstrapChecks++;return route.fulfill({headers,json:{schema_version:'auth-bootstrap-v1',session:{handle,login:'developer',user_id:73,role:'read',capabilities:{read:true,write:false,admin:false},verified_at:new Date().toISOString()},registry}});}
   if(url.pathname==='/api/session'){sessionChecks++;return route.fulfill({headers,json:{login:'developer'}});}
-   if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]}});
+   if(url.pathname==='/api/projects')return route.fulfill({headers,json:registry});
   throw new Error(`Unexpected request ${url.pathname}`);
  });
   await page.goto('/#/projects');
@@ -438,15 +440,26 @@ test('reloads and new tabs require a fresh in-memory sign-in',async({page,contex
    await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
  await expect(page).toHaveURL(/#\/projects$/);
  expect(page.url()).not.toContain('analysis_auth');
- expect(await page.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('memory-only-session');
- expect(await page.evaluate(()=>sessionStorage.getItem('analysis-auth-verifier'))).toBeNull();
+ expect(await page.evaluate(()=>sessionStorage.getItem('analysis-auth-session'))).toBe(handle);
+ expect(await page.evaluate(()=>sessionStorage.getItem('analysis-auth-pending'))).toBeNull();
  await page.reload();
- await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
- expect(sessionChecks).toBe(1);
+ await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
+ expect(sessionChecks).toBe(1);expect(bootstrapChecks).toBe(1);
  const anotherTab=await context.newPage();
  await anotherTab.goto('/#/projects');
  await expect(anotherTab.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
- expect(sessionChecks).toBe(1);
+ expect(sessionChecks).toBe(1);expect(bootstrapChecks).toBe(1);
+});
+
+test('GitHub rate-limit and permission ambiguity retain the tab session for retry',async({page,context})=>{
+ test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+ const handle='r'.repeat(43),headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+ await context.addInitScript(value=>sessionStorage.setItem('analysis-auth-session',value),handle);
+ await context.route('https://launcher.example/**',async route=>{const url=new URL(route.request().url());if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true}});if(url.pathname==='/api/bootstrap')return route.fulfill({status:429,headers:{...headers,'Retry-After':'60'},json:{error:{code:'github_rate_limited',message:'GitHub is temporarily limiting collaborator verification.',recoverable:true,action:'RETRY',retry_after_seconds:60},code:'github_rate_limited'} });throw new Error(`Unexpected request ${url.pathname}`);});
+ await page.goto('/#/projects');
+ await expect(page.getByText('GitHub is temporarily limiting access checks. Retry shortly.')).toBeVisible();
+ expect(await page.evaluate(()=>sessionStorage.getItem('analysis-auth-session'))).toBe(handle);
+ await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
 });
 
 test('authorized user follows one repository project from selection through publication',async({page,context})=>{
@@ -469,7 +482,7 @@ test('authorized user follows one repository project from selection through publ
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
      if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false,projects:[
       {id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Needs attention',readiness_summary:{profile_mode:'agentic-soc',configured_channels:26,selectable_channels:24,vendor_channels:3,deferred_channels:9,unavailable_channels:2},current_report:{status:'partial'}},
-     {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Preparing'},
+     {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Preparing',current_report:{status:'partial'}},
      {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:false,lifecycle:'Needs attention',attention_reason:'The current report contains no scanner results. Run analysis to publish scanner evidence.',readiness_summary:{profile_mode:'portable',configured_channels:24,selectable_channels:24,vendor_channels:2,deferred_channels:0,unavailable_channels:0},current_report:{status:'complete',generated_at:'2026-10-10T00:00:00Z',scanner_summary:{completed:0,total:0,incomplete:0}}},
     ]}});
    if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:project,checked_at:new Date().toISOString(),preferred_branch:'Testing',current_overlay:{schema_version:'analysis-pr-overlay-v1',overlay_key:'overlay-seven',status:'complete',head_sha:sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel,documents:{'pr-overlay.json':overlayAssetName},assets:{[overlayAssetName]:{sha256:createHash('sha256').update(compressedOverlay).digest('hex'),bytes:compressedOverlay.byteLength}}},targets:published?[{id:'published-target',label:'Testing',repository:source,source_repository:source,head_sha:sha,kind:'branch',branch:'Testing',checked_at:new Date().toISOString(),status:'partial',collected_run:43,documents:{'report.json':assetName,'findings.json':assetName},assets}]:[]}});
