@@ -72,6 +72,9 @@ project command. Frontend build, test, axe, and Lighthouse adapters resolve thei
 root, preview URL, and budgets from the selected trusted project entry rather than from a
 service-wide default profile. This keeps all three projects independently executable without
 allowing a browser-supplied path or command to cross the source boundary.
+Each frontend adapter passes the trusted project ID to that resolver. Preview-based adapters
+use the reviewed executable command directly, so they do not depend on an optional source
+package script being present. Adapter installs continue to disable package lifecycle scripts.
 The coordinator heartbeat renews the fenced lease once per minute and exits when terminal
 completion invalidates that lease, so a published Actions run should not remain visibly active
 for more than one renewal interval solely because of its heartbeat job.

@@ -39,6 +39,13 @@ class ScannerUpdateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             profile('../../untrusted')
 
+        for name in ('frontend_build.py', 'frontend_tests.py',
+                     'frontend_axe.py', 'frontend_lighthouse.py'):
+            adapter = Path('scripts/code_analysis/adapters') / name
+            source = adapter.read_text(encoding='utf-8')
+            self.assertIn("frontend(a.source, target['project_id'])", source,
+                          f'{name} must select the reviewed project profile')
+
     def test_zizmor_pin_is_stable_and_synchronized_across_generated_workflows(self):
         paths = (
             'config/code-analysis/workflow-templates/03-dependency-security.yml',

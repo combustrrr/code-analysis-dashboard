@@ -50,7 +50,7 @@
           "test"
         ],
         "frontend_build_command": ["npm", "run", "build:app"],
-        "frontend_preview_command": ["npm", "run", "preview", "--", "--host", "127.0.0.1", "--port", "4178"],
+        "frontend_preview_command": ["npx", "--no-install", "vite", "preview", "--host", "127.0.0.1", "--port", "4178"],
         "frontend_preview_url": "http://127.0.0.1:4178/",
         "frontend_lighthouse_budgets": {"performance": 0.9, "accessibility": 0.95, "lcp_ms": 2500, "cls": 0.1},
         "api_command": [
