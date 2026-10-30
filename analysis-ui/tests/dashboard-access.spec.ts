@@ -126,8 +126,13 @@ test('GitHub sign-in presents one stable confirmation state',async({page,context
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
  await expect(page.locator('.auth-transition-panel')).toContainText('Confirming GitHub access');
  await expect(page.locator('.auth-transition-panel')).toContainText('opaque, short-lived application session');
+ await expect(page.locator('.auth-transition-steps li')).toHaveCount(3);
+ await expect(page.locator('.auth-transition-steps .is-active')).toContainText('Verify access');
  await expect(page.locator('.landing-hero')).toHaveCount(0);
  await expect(page.locator('.auth-transition-panel')).toBeVisible();
+ const transitionBox=await page.locator('.auth-transition-panel').boundingBox();
+ expect(transitionBox).not.toBeNull();expect(transitionBox!.height).toBeLessThan(400);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
  await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
  expect(Math.abs(sessionStarted-projectsStarted)).toBeLessThan(100);expect(projectsRequests).toBe(1);
 });

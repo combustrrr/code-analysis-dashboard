@@ -12,13 +12,7 @@ import {landingProjects as projects} from './landingData';
 
 type Auth=ReturnType<typeof useLaunchAuth>;
 const Glyph=({children}:{children:string})=><span className="landing-glyph" aria-hidden="true">{children}</span>;
-
-function AuthJourney({stage}:{stage:Auth['stage']}){
- return <section className="auth-journey" role="status" aria-live="polite" aria-label="GitHub sign-in progress">
-  <div className="auth-journey-heading"><span className="auth-github-mark" aria-hidden="true">GH</span><div><strong>{stage==='redirecting'?'Opening GitHub':stage==='verifying'?'Opening your workspace':'Confirming GitHub access'}</strong><small>{stage==='redirecting'?'Continue securely on GitHub.':stage==='verifying'?'Your access has been confirmed.':'GitHub is confirming your identity and repository access.'}</small></div></div>
-  <p>GitHub handles your credentials. The dashboard receives only an opaque, short-lived application session.</p>
- </section>;
-}
+const AuthJourney=(_: {stage:Auth['stage']})=>null;
 
 export function LandingPage({auth,onStart,accessError,accessPending=false,workspaceRequested=false}:{auth:Auth;onStart:()=>void;accessError?:string;accessPending?:boolean;workspaceRequested?:boolean}){
  const signedIn=Boolean(auth.session)&&!accessError,checking=auth.pending||(workspaceRequested&&accessPending),primaryAction=signedIn?onStart:auth.signIn,primaryLabel=auth.pending?'Signing in…':checking?'Verifying access…':signedIn?'Open workspace':'Sign in with GitHub',disabled=checking||(!signedIn&&!auth.available);
