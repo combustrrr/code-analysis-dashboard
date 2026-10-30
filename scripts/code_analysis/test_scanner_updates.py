@@ -22,6 +22,7 @@ class ScannerUpdateTests(unittest.TestCase):
             self.assertEqual(rows[channel].get('secrets', {}), {})
             self.assertEqual(rows[channel]['class'], 'reliability')
         projects = json.loads(Path('.github/code-analysis/projects.json').read_text(encoding='utf-8'))['projects']
+        reviewed_agentic = service['profile']
         for project in projects:
             self.assertTrue(frontend_channels.issubset(set(project['enabled_scanners'])))
             profile = project['profile']
@@ -30,6 +31,12 @@ class ScannerUpdateTests(unittest.TestCase):
                         'frontend_build_command', 'frontend_preview_command'):
                 self.assertTrue(all(isinstance(item, str) and item for item in profile[key]))
             self.assertRegex(profile['frontend_preview_url'], r'^http://127\.0\.0\.1:[0-9]+/$')
+            if profile.get('mode') == 'agentic-soc':
+                self.assertEqual(
+                    {key: value for key, value in profile.items() if key != 'mode'},
+                    reviewed_agentic,
+                    'agentic-soc projects must match the reviewed reusable adapter',
+                )
 
     def test_frontend_adapters_resolve_the_selected_trusted_project_profile(self):
         from scripts.code_analysis.adapters.frontend_common import profile
