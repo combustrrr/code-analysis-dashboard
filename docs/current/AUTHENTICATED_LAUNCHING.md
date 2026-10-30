@@ -75,9 +75,9 @@ allowing a browser-supplied path or command to cross the source boundary.
 Each frontend adapter passes the trusted project ID to that resolver. Preview-based adapters
 use the reviewed executable command directly, so they do not depend on an optional source
 package script being present. Adapter installs continue to disable package lifecycle scripts.
-Reviewed coverage test commands have a 900-second subprocess bound. A timeout retains any
-coverage document already written and otherwise records explicit operationally incomplete
-coverage, allowing healthy sibling evidence to proceed to report publication.
+Reviewed Python coverage and JavaScript test commands have a 900-second subprocess bound.
+A coverage timeout retains any document already written; other timeouts record explicit
+operationally incomplete evidence, allowing healthy sibling evidence to proceed to publication.
 The coordinator heartbeat renews the fenced lease once per minute and exits when terminal
 completion invalidates that lease, so a published Actions run should not remain visibly active
 for more than one renewal interval solely because of its heartbeat job.

@@ -99,9 +99,17 @@ def main():
     try:
         result = subprocess.run(
             command, cwd=cwd, env=env, check=False,
-            timeout=900 if a.task == 'python-test' else None,
+            timeout=900 if a.task in ('python-test', 'javascript-test') else None,
         )
     except subprocess.TimeoutExpired:
+        if a.task == 'javascript-test':
+            write(root / 'typescript-test-status.json', {
+                'scanner_family': 'TypeScript',
+                'status': 'OPERATIONAL_FAILURE',
+                'test_exit_code': None,
+                'reason': 'JavaScript tests exceeded the trusted 900-second limit',
+            })
+            return
         if a.task != 'python-test':
             raise
         measured = (cwd / 'coverage.json').is_file()
