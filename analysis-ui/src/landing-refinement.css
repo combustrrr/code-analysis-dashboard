@@ -38,6 +38,20 @@
   font-size: 12px;
 }
 
+/* Keep the evidence register beside the thesis on laptop-sized viewports. */
+@media (min-width: 1041px) and (max-width: 1280px) {
+  .landing-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(430px, 1fr);
+    gap: 32px;
+    min-height: calc(100svh - 88px);
+    padding-block: 34px;
+  }
+
+  .landing-copy h1 {
+    font-size: clamp(42px, 4.6vw, 56px);
+  }
+}
+
 @font-face {
   font-family: 'Landing Sans Fallback';
   src: local('Arial');

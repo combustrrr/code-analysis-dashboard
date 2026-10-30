@@ -44,6 +44,10 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(1254);
  const dossierBox=await page.locator('.analysis-dossier').boundingBox();
  expect(dossierBox).not.toBeNull();expect(dossierBox!.x).toBeGreaterThanOrEqual(0);expect(dossierBox!.x+dossierBox!.width).toBeLessThanOrEqual(1254);
+ expect(await page.locator('.landing-hero').evaluate(element=>getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(2);
+ expect(dossierBox!.y+dossierBox!.height).toBeLessThanOrEqual(790);
+ const navActionBox=await page.locator('.landing-nav-cta').boundingBox();
+ expect(navActionBox).not.toBeNull();expect(navActionBox!.x+navActionBox!.width).toBeLessThanOrEqual(1254);
  await page.getByRole('link',{name:/how evidence is produced/i}).click();
  await expect(page).toHaveURL(/#method$/);
  await expect(page.getByRole('heading',{name:/A result is useful only when you can verify how it was produced/})).toBeVisible();
