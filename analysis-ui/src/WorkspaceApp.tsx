@@ -284,7 +284,7 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
     );
     if(awaitingManifest||awaitingTabEvidence)return <ConfigProvider><AppShell auth={viewerAuth}><main className="project-workspace project-workspace-loading" role="status" aria-label="Loading project evidence"><div className="workspace-project-skeleton" aria-hidden="true"><i/><i/><i/><i/></div></main></AppShell></ConfigProvider>;
     return <ConfigProvider><AppShell auth={viewerAuth}>
-     {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={registryProject?.preferred_branch||index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} close={()=>{location.hash=routeHash({kind:'project',projectId:r.project,view:'overview'});}} onSubmitted={handleProjectSubmitted}/>}
+     {r.tab==='run'&&r.repository&&r.project&&<ProjectLauncher auth={launchAuth} repository={r.repository} project={r.project} preferredBranch={registryProject?.preferred_branch||index?.preferred_branch} canLaunch={mayLaunch} active={!!activeProjectRun} close={()=>navigateAppHash(routeHash({kind:'project',projectId:r.project,view:'overview'}))} onSubmitted={handleProjectSubmitted}/>}
     <main className="project-workspace">
       {r.tab==='progress' ? <React.Suspense fallback={<div className="workspace-tab-loading" role="status">Opening analysis progress…</div>}><ProgressTab>{projectRunTrackers.length?projectRunTrackers:undefined}</ProgressTab></React.Suspense> : <>
       {authoritativeProjectRun&&<div className="background-run-poller" aria-hidden="true">{projectRunTrackers}</div>}

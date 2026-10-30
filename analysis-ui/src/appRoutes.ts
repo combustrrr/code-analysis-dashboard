@@ -53,7 +53,7 @@ export function navigateAppHash(nextHash:string,{preserveScroll=false,replace=fa
  if(preserveScroll){
   const restore=()=>window.scrollTo(x,y);
   restore();requestAnimationFrame(()=>{restore();requestAnimationFrame(restore);});
- }
+ }else window.scrollTo(0,0);
 }
 
 export function isWorkspaceRoute(hash=location.hash){return parseAppRoute(hash).kind!=='landing';}
