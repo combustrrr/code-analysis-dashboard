@@ -31,6 +31,14 @@ class ScannerUpdateTests(unittest.TestCase):
                 self.assertTrue(all(isinstance(item, str) and item for item in profile[key]))
             self.assertRegex(profile['frontend_preview_url'], r'^http://127\.0\.0\.1:[0-9]+/$')
 
+    def test_frontend_adapters_resolve_the_selected_trusted_project_profile(self):
+        from scripts.code_analysis.adapters.frontend_common import profile
+        projects = json.loads(Path('.github/code-analysis/projects.json').read_text(encoding='utf-8'))['projects']
+        for project in projects:
+            self.assertEqual(profile(project['id']), project['profile'])
+        with self.assertRaises(ValueError):
+            profile('../../untrusted')
+
     def test_zizmor_pin_is_stable_and_synchronized_across_generated_workflows(self):
         paths = (
             'config/code-analysis/workflow-templates/03-dependency-security.yml',

@@ -14,7 +14,7 @@ p.add_argument('--output', type=Path, required=True)
 p.add_argument('--source', type=Path, required=True)
 a = p.parse_args()
 target = json.loads(a.request.read_text(encoding='utf-8'))['target']
-ui, project_profile = frontend(a.source)
+ui, project_profile = frontend(a.source, target['project_id'])
 prepared = install(ui, project_profile)
 built = run(command(project_profile, 'frontend_build_command'), ui, 1200) if prepared.returncode == 0 else prepared
 audit = built

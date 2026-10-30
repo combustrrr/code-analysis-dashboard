@@ -239,6 +239,21 @@ def generate(config=None):
                 if 'with' in step:
                     step['with'] = {k: v.replace('.analysis-tooling', '${{ runner.temp }}/analysis-tooling') if isinstance(v, str) else v for k, v in step['with'].items()}
                 isolated.append(step)
+            if any('trusted_entry.py' in str(step.get('run', '')) for step in isolated):
+                setup_index = next((index for index, step in enumerate(isolated)
+                                    if str(step.get('uses', '')).startswith('actions/setup-python@')), None)
+                if setup_index is None:
+                    setup_index = next(index for index, step in enumerate(isolated)
+                                       if 'trusted_entry.py' in str(step.get('run', '')))
+                    isolated.insert(setup_index, {
+                        'name': 'Set up Python 3.11 for trusted analysis runtime',
+                        'uses': PYTHON,
+                        'with': {'python-version': '3.11'},
+                    })
+                isolated.insert(setup_index + 1, {
+                    'name': 'Install pinned trusted analysis runtime',
+                    'run': 'python -m pip install --requirement "$RUNNER_TEMP/analysis-tooling/.ci/requirements.txt"',
+                })
             if profile.get('mode') == 'portable' and name == 'codeql':
                 isolated = [s for s in isolated if not s.get('uses', '').startswith('github/codeql-action/autobuild@')]
                 for step in isolated:

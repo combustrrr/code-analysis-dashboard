@@ -11,16 +11,20 @@ from pathlib import Path
 TOOLING_ROOT = Path(__file__).resolve().parents[3]
 
 
-def profile() -> dict:
-    config = json.loads((TOOLING_ROOT / 'config/code-analysis/service.json').read_text(encoding='utf-8'))
-    value = config.get('profile')
+def profile(project_id: str) -> dict:
+    config = json.loads((TOOLING_ROOT / '.github/code-analysis/projects.json').read_text(encoding='utf-8'))
+    project = next((row for row in config.get('projects', [])
+                    if str(row.get('id')) == str(project_id)), None)
+    if not isinstance(project, dict):
+        raise ValueError('Trusted frontend project is unavailable')
+    value = project.get('profile')
     if not isinstance(value, dict):
         raise ValueError('Reviewed project profile is unavailable')
     return value
 
 
-def frontend(source: Path) -> tuple[Path, dict]:
-    value = profile()
+def frontend(source: Path, project_id: str) -> tuple[Path, dict]:
+    value = profile(project_id)
     root = value.get('javascript_root')
     if not isinstance(root, str) or not root or root.startswith(('/', '\\')) or '..' in Path(root).parts:
         raise ValueError('Reviewed frontend root is invalid')

@@ -238,6 +238,12 @@ jobs:
         node-version: '22'
         cache: npm
         cache-dependency-path: webui/package-lock.json
+    - name: Set up Python 3.11 for trusted analysis runtime
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.11'
+    - name: Install pinned trusted analysis runtime
+      run: python -m pip install --requirement "$RUNNER_TEMP/analysis-tooling/.ci/requirements.txt"
     - name: Install locked dependencies
       run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile javascript-install
         --source "$GITHUB_WORKSPACE"
@@ -930,6 +936,8 @@ jobs:
         python-version: '3.11'
         cache: pip
         cache-dependency-path: backend/requirements-dev.txt
+    - name: Install pinned trusted analysis runtime
+      run: python -m pip install --requirement "$RUNNER_TEMP/analysis-tooling/.ci/requirements.txt"
     - name: Install dependencies
       run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile python-install
         --source "$GITHUB_WORKSPACE"
@@ -1000,6 +1008,8 @@ jobs:
         python-version: '3.11'
         cache: pip
         cache-dependency-path: backend/requirements-dev.txt
+    - name: Install pinned trusted analysis runtime
+      run: python -m pip install --requirement "$RUNNER_TEMP/analysis-tooling/.ci/requirements.txt"
     - name: Install dependencies & Schemathesis
       run: 'python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile python-install
         --source "$GITHUB_WORKSPACE"

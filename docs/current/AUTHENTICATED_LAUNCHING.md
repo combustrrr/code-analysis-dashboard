@@ -67,6 +67,11 @@ Each project has one reviewed source-execution profile: `agentic-soc` channels a
 channels fan out together with separately isolated vendor lanes when the user selects all
 available channels. Deferred, setup-required, revision-inapplicable, and credential-withheld
 channels remain visible but are not counted as selectable or silently submitted.
+Profile-runner jobs install the pinned trusted tooling runtime before executing a reviewed
+project command. Frontend build, test, axe, and Lighthouse adapters resolve their commands,
+root, preview URL, and budgets from the selected trusted project entry rather than from a
+service-wide default profile. This keeps all three projects independently executable without
+allowing a browser-supplied path or command to cross the source boundary.
 The coordinator heartbeat renews the fenced lease once per minute and exits when terminal
 completion invalidates that lease, so a published Actions run should not remain visibly active
 for more than one renewal interval solely because of its heartbeat job.

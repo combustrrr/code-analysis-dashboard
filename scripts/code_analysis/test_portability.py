@@ -105,6 +105,18 @@ class PortabilityTests(unittest.TestCase):
     def test_current_workflow_is_unchanged(self):
         self.assertEqual(generate(), Path('.github/workflows/11-source-analysis.yml').read_text(encoding='utf-8'))
 
+    def test_trusted_profile_runner_installs_its_pinned_runtime(self):
+        jobs = yaml.safe_load(generate())['jobs']
+        for name in ('scanner-1-typescript-quality', 'scanner-4-test-coverage',
+                     'scanner-7-schemathesis-fuzz'):
+            steps = jobs[name]['steps']
+            runner = next(index for index, step in enumerate(steps)
+                          if 'trusted_entry.py' in str(step.get('run', '')))
+            runtime = next(index for index, step in enumerate(steps)
+                           if step.get('name') == 'Install pinned trusted analysis runtime')
+            self.assertLess(runtime, runner)
+            self.assertIn('$RUNNER_TEMP/analysis-tooling/.ci/requirements.txt', steps[runtime]['run'])
+
     def test_bundle_synchronizes_all_services_without_overwriting(self):
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory) / 'new'
