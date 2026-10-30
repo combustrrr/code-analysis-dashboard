@@ -47,10 +47,12 @@
         "javascript_test_command": [
           "npm",
           "run",
-          "test",
-          "--",
-          "--run"
+          "test"
         ],
+        "frontend_build_command": ["npm", "run", "build:app"],
+        "frontend_preview_command": ["npm", "run", "preview", "--", "--host", "127.0.0.1", "--port", "4178"],
+        "frontend_preview_url": "http://127.0.0.1:4178/",
+        "frontend_lighthouse_budgets": {"performance": 0.9, "accessibility": 0.95, "lcp_ms": 2500, "cls": 0.1},
         "api_command": [
           "python",
           "-m",
@@ -74,7 +76,11 @@
         "coderabbit-ai-advisory",
         "coverage",
         "eslint",
+        "ext-axe-accessibility",
+        "ext-frontend-build",
+        "ext-frontend-tests",
         "ext-github-security-advisories",
+        "ext-lighthouse-ui",
         "github-actions-security",
         "github-secret-protection-posture",
         "gitleaks",
@@ -149,10 +155,12 @@
         "javascript_test_command": [
           "npm",
           "run",
-          "test",
-          "--",
-          "--run"
+          "test"
         ],
+        "frontend_build_command": ["npm", "run", "build:app"],
+        "frontend_preview_command": ["npm", "run", "preview", "--", "--host", "127.0.0.1", "--port", "4178"],
+        "frontend_preview_url": "http://127.0.0.1:4178/",
+        "frontend_lighthouse_budgets": {"performance": 0.9, "accessibility": 0.95, "lcp_ms": 2500, "cls": 0.1},
         "api_command": [
           "python",
           "-m",
@@ -176,7 +184,11 @@
         "coderabbit-ai-advisory",
         "coverage",
         "eslint",
+        "ext-axe-accessibility",
+        "ext-frontend-build",
+        "ext-frontend-tests",
         "ext-github-security-advisories",
+        "ext-lighthouse-ui",
         "github-actions-security",
         "github-secret-protection-posture",
         "gitleaks",
@@ -225,6 +237,12 @@
         "mode": "portable",
         "python_root": "scripts/code_analysis",
         "javascript_root": "analysis-ui",
+        "javascript_install_command": ["npm", "ci", "--ignore-scripts"],
+        "javascript_test_command": ["npm", "run", "test:unit"],
+        "frontend_build_command": ["npm", "run", "build"],
+        "frontend_preview_command": ["npm", "run", "preview", "--", "--host", "127.0.0.1", "--port", "4178"],
+        "frontend_preview_url": "http://127.0.0.1:4178/",
+        "frontend_lighthouse_budgets": {"performance": 0.95, "accessibility": 1.0, "lcp_ms": 1200, "cls": 0.0},
         "commands": {
           "eslint": {
             "cwd": "analysis-ui",
@@ -320,6 +338,8 @@
         "coverage",
         "eslint",
         "ext-axe-accessibility",
+        "ext-frontend-build",
+        "ext-frontend-tests",
         "ext-github-security-advisories",
         "ext-lighthouse-ui",
         "github-actions-security",

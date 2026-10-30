@@ -1,15 +1,11 @@
-"""Run the reviewed axe/Playwright WCAG check against the anonymous dashboard shell."""
+"""Run a browser accessibility audit for the reviewed project frontend."""
 import argparse
 import json
-import os
-import subprocess
+import sys
 from pathlib import Path
 
-
-def run(command: list[str], cwd: Path, env: dict[str, str] | None = None, timeout: int = 900) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(command, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, timeout=timeout, check=False)
-
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from frontend_common import command, frontend, install, run, start_preview, stop_preview, write_result
 
 p = argparse.ArgumentParser()
 p.add_argument('--request', type=Path, required=True)
@@ -17,30 +13,29 @@ p.add_argument('--output', type=Path, required=True)
 p.add_argument('--source', type=Path, required=True)
 a = p.parse_args()
 target = json.loads(a.request.read_text(encoding='utf-8'))['target']
-ui = (a.source / 'analysis-ui').resolve()
-if not ui.is_relative_to(a.source.resolve()) or not (ui / 'package-lock.json').is_file():
-    raise ValueError('Reviewed analysis-ui project is unavailable')
-
-install = run(['npm', 'ci', '--ignore-scripts'], ui)
-browser = run(['npx', '--no-install', 'playwright', 'install', 'chromium'], ui) if install.returncode == 0 else install
-env = {**os.environ, 'TEST_DASHBOARD_ACCESS': '1', 'CI': 'true'}
-audit = run(['npx', '--no-install', 'playwright', 'test', 'tests/dashboard-access.spec.ts',
-             '--grep', 'public landing remains accessible', '--reporter=json'], ui, env) if browser.returncode == 0 else browser
-operational_failure = install.returncode != 0 or browser.returncode != 0
-findings = [] if audit.returncode == 0 or operational_failure else [{
+ui, project_profile = frontend(a.source)
+prepared = install(ui, project_profile)
+built = run(command(project_profile, 'frontend_build_command'), ui, 1200) if prepared.returncode == 0 else prepared
+audit = built
+preview = None
+if built.returncode == 0:
+    try:
+        preview = start_preview(ui, project_profile)
+        audit = run(['npx', '--yes', '@axe-core/cli@4.11.0',
+                     project_profile['frontend_preview_url'], '--exit'], ui, 600)
+    finally:
+        if preview is not None:
+            stop_preview(preview)
+operational = prepared.returncode != 0 or built.returncode != 0
+findings = [] if audit.returncode == 0 or operational else [{
     'rule_id': 'axe-wcag-2.1-aa',
-    'message': 'The reviewed axe browser check reported an accessibility violation or could not complete.',
+    'message': 'The reviewed frontend has accessibility findings in the automated browser audit.',
     'severity': 'MEDIUM',
-    'file': 'analysis-ui',
-    'start_line': 0,
+    'file': str(ui.relative_to(a.source)) + '/package.json',
+    'start_line': 1,
     'native_result_id': 'axe-browser-audit',
 }]
-result = {
-    'source_repository': target['source_repository'],
-    'source_sha': target['head_sha'],
-    'status': 'OPERATIONAL_FAILURE' if operational_failure else ('COMPLETED' if not findings else 'POLICY_FINDINGS'),
-    'reason': ('The reviewed browser runtime could not be prepared.' if operational_failure else
-               ('' if not findings else 'The axe WCAG 2.1 AA browser gate needs attention.')),
-    'findings': findings,
-}
-a.output.write_text(json.dumps(result, separators=(',', ':')), encoding='utf-8')
+write_result(a.output, target,
+             'OPERATIONAL_FAILURE' if operational else ('COMPLETED' if not findings else 'POLICY_FINDINGS'),
+             'The reviewed frontend could not be prepared for accessibility testing.' if operational else
+             ('' if not findings else 'The axe WCAG browser gate needs attention.'), findings)

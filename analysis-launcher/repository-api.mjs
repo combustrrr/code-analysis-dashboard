@@ -50,7 +50,7 @@ function requestIdFromKey(value) {
 function scannerChoices(project) {
   const portable = new Set(['semgrep','gitleaks','trivy','checkov','osv','snyk','sonarqube-cloud','openssf-scorecard','ext-github-security-advisories','github-secret-protection-posture','github-actions-security','owasp-js','owasp-iac-secrets','coderabbit-ai-advisory']);
   if (project.profile?.python_root) ['bandit','ruff','radon','xenon','vulture','codeql'].forEach(channel=>portable.add(channel));
-  if (project.profile?.javascript_root) ['eslint','typescript','codeql'].forEach(channel=>portable.add(channel));
+  if (project.profile?.javascript_root) ['eslint','typescript','codeql','ext-frontend-build','ext-frontend-tests','ext-axe-accessibility','ext-lighthouse-ui'].forEach(channel=>portable.add(channel));
   Object.keys(project.profile?.commands || {}).forEach(channel=>portable.add(channel));
   // The launch surface is a project-specific capability list, not the global
   // scanner catalog. Deferred catalog entries stay available to operators in

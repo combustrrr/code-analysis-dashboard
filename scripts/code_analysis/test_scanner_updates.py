@@ -9,24 +9,27 @@ from scripts.code_analysis import extensions
 
 
 class ScannerUpdateTests(unittest.TestCase):
-    def test_frontend_runtime_channels_are_registered_and_dashboard_scoped(self):
+    def test_frontend_runtime_channels_are_registered_for_every_frontend_project(self):
         service = json.loads(Path('config/code-analysis/service.json').read_text(encoding='utf-8'))
         rows = {row['channel']: row for row in extensions.registry(service)}
-        self.assertEqual(
-            set(rows).intersection({'ext-axe-accessibility', 'ext-lighthouse-ui'}),
-            {'ext-axe-accessibility', 'ext-lighthouse-ui'},
-        )
-        for channel in ('ext-axe-accessibility', 'ext-lighthouse-ui'):
+        frontend_channels = {
+            'ext-axe-accessibility', 'ext-frontend-build',
+            'ext-frontend-tests', 'ext-lighthouse-ui',
+        }
+        self.assertEqual(set(rows).intersection(frontend_channels), frontend_channels)
+        for channel in frontend_channels:
             self.assertEqual(rows[channel]['mode'], 'source')
             self.assertEqual(rows[channel].get('secrets', {}), {})
             self.assertEqual(rows[channel]['class'], 'reliability')
         projects = json.loads(Path('.github/code-analysis/projects.json').read_text(encoding='utf-8'))['projects']
-        enabled = {row['source_repository']['full_name']: set(row['enabled_scanners']) for row in projects}
-        self.assertTrue({'ext-axe-accessibility', 'ext-lighthouse-ui'}.issubset(
-            enabled['combustrrr/code-analysis-dashboard']))
-        self.assertTrue(all(not ({'ext-axe-accessibility', 'ext-lighthouse-ui'} & channels)
-                            for repository, channels in enabled.items()
-                            if repository != 'combustrrr/code-analysis-dashboard'))
+        for project in projects:
+            self.assertTrue(frontend_channels.issubset(set(project['enabled_scanners'])))
+            profile = project['profile']
+            self.assertTrue(profile['javascript_root'])
+            for key in ('javascript_install_command', 'javascript_test_command',
+                        'frontend_build_command', 'frontend_preview_command'):
+                self.assertTrue(all(isinstance(item, str) and item for item in profile[key]))
+            self.assertRegex(profile['frontend_preview_url'], r'^http://127\.0\.0\.1:[0-9]+/$')
 
     def test_zizmor_pin_is_stable_and_synchronized_across_generated_workflows(self):
         paths = (

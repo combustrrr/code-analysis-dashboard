@@ -17,6 +17,14 @@ source checkout. Review commands in Repositories > Edit configuration, preview
 the exact commit, then confirm. Installation and source code run with no vendor
 credentials or write tokens.
 
+Every configured frontend project also supplies reviewed install, test, production
+build, preview, and Lighthouse budget fields. Four source-mode channels consume
+those fields at the immutable selected revision: `ext-frontend-build`,
+`ext-frontend-tests`, `ext-axe-accessibility`, and `ext-lighthouse-ui`. They apply
+to every trusted project with a frontend root; the adapters do not assume a
+repository name or hard-code `analysis-ui`. Preview servers bind only to loopback,
+and these jobs receive no vendor or publication credentials.
+
 ```json
 {
   "mode": "portable",

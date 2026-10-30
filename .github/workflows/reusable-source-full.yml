@@ -1176,6 +1176,94 @@ jobs:
     permissions:
       contents: read
     if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'atheris-state-machine') }}
+  ext-frontend-build:
+    name: Frontend production build
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'ext-frontend-build') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: agentic-soc
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.11'
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run trusted scanner adapter
+      env:
+        TARGET_JSON: ${{ inputs.target }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        IS_REUSABLE_ANALYSIS: 'true'
+      run: python -m scripts.code_analysis.extension_runner ext-frontend-build
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      if: always()
+      with:
+        name: ext-frontend-build
+        path: .extension-output/ext-frontend-build.channel-evidence
+        retention-days: 7
+        if-no-files-found: error
+  ext-frontend-tests:
+    name: Frontend test suite
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'ext-frontend-tests') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: agentic-soc
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.11'
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run trusted scanner adapter
+      env:
+        TARGET_JSON: ${{ inputs.target }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        IS_REUSABLE_ANALYSIS: 'true'
+      run: python -m scripts.code_analysis.extension_runner ext-frontend-tests
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      if: always()
+      with:
+        name: ext-frontend-tests
+        path: .extension-output/ext-frontend-tests.channel-evidence
+        retention-days: 7
+        if-no-files-found: error
   ext-github-security-advisories:
     name: GitHub Security Advisories
     needs:
@@ -1467,6 +1555,8 @@ jobs:
     - scanner-4-test-coverage
     - scanner-7-schemathesis-fuzz
     - scanner-7-atheris-state-machine
+    - ext-frontend-build
+    - ext-frontend-tests
     - ext-github-security-advisories
     - ext-axe-accessibility
     - ext-lighthouse-ui

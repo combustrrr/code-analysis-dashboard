@@ -38,10 +38,17 @@
     "javascript_test_command": [
       "npm",
       "run",
-      "test",
-      "--",
-      "--run"
+      "test"
     ],
+    "frontend_build_command": ["npm", "run", "build:app"],
+    "frontend_preview_command": ["npm", "run", "preview", "--", "--host", "127.0.0.1", "--port", "4178"],
+    "frontend_preview_url": "http://127.0.0.1:4178/",
+    "frontend_lighthouse_budgets": {
+      "performance": 0.9,
+      "accessibility": 0.95,
+      "lcp_ms": 2500,
+      "cls": 0.1
+    },
     "api_command": [
       "python",
       "-m",
@@ -95,6 +102,26 @@
     "xenon"
   ],
   "scanner_extensions": [
+    {
+      "channel": "ext-frontend-build",
+      "name": "Frontend production build",
+      "class": "reliability",
+      "mode": "source",
+      "adapter": "scripts/code_analysis/adapters/frontend_build.py",
+      "timeout_minutes": 25,
+      "evidence_source": "DETERMINISTIC",
+      "sensitive": false
+    },
+    {
+      "channel": "ext-frontend-tests",
+      "name": "Frontend test suite",
+      "class": "reliability",
+      "mode": "source",
+      "adapter": "scripts/code_analysis/adapters/frontend_tests.py",
+      "timeout_minutes": 25,
+      "evidence_source": "DETERMINISTIC",
+      "sensitive": false
+    },
     {
       "channel": "ext-github-security-advisories",
       "name": "GitHub Security Advisories",
