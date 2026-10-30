@@ -96,7 +96,24 @@ def main():
     else:
         command = profile[{'python-test': 'python_test_command', 'javascript-install': 'javascript_install_command',
                            'javascript-test': 'javascript_test_command', 'api': 'api_command'}[a.task]]
-    result = subprocess.run(command, cwd=cwd, env=env, check=False)
+    try:
+        result = subprocess.run(
+            command, cwd=cwd, env=env, check=False,
+            timeout=900 if a.task == 'python-test' else None,
+        )
+    except subprocess.TimeoutExpired:
+        if a.task != 'python-test':
+            raise
+        measured = (cwd / 'coverage.json').is_file()
+        write(cwd / 'coverage-status.json', {
+            'schema_version': '1',
+            'scanner_family': 'Coverage.py',
+            'status': 'COMPLETED' if measured else 'OPERATIONAL_FAILURE',
+            'test_exit_code': None,
+            'reason': 'Tests exceeded the trusted 900-second limit; coverage output ' +
+                      ('retained' if measured else 'missing'),
+        })
+        return
     if a.task == 'python-test':
         measured = (cwd / 'coverage.json').is_file()
         write(cwd / 'coverage-status.json', {'schema_version': '1', 'scanner_family': 'Coverage.py',

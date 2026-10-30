@@ -252,6 +252,18 @@ class ReportTests(unittest.TestCase):
         self.assertNotIn('GH_TOKEN', run.call_args.kwargs['env'])
         self.assertNotIn('VENDOR_SECRET', run.call_args.kwargs['env'])
 
+    def test_python_profile_bounds_hanging_tests_and_records_missing_coverage(self):
+        from scripts.code_analysis import run_profile
+        (self.root / 'backend').mkdir()
+        timeout = run_profile.subprocess.TimeoutExpired('pytest', 900)
+        with patch('sys.argv', ['profile', 'python-test', '--source', str(self.root)]), \
+                patch.object(run_profile.subprocess, 'run', side_effect=timeout) as execute:
+            run_profile.main()
+        status = h.load(self.root / 'backend' / 'coverage-status.json')
+        self.assertEqual(status['status'], 'OPERATIONAL_FAILURE')
+        self.assertIn('900-second', status['reason'])
+        self.assertEqual(execute.call_args.kwargs['timeout'], 900)
+
     def test_api_profile_timeout_stops_source_process_and_records_failure(self):
         from scripts.code_analysis import run_profile
         (self.root / 'backend').mkdir()
