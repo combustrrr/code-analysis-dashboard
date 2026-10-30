@@ -127,7 +127,7 @@ async function wakeCoordinator(env,requestId,sourceSha){
   const response=await fetch(`https://api.github.com/repos/${env.ANALYSIS_REPOSITORY}/actions/workflows/code-analysis-coordinator.yml/dispatches`,{method:'POST',headers:{Accept:'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'code-analysis-launcher',Authorization:`Bearer ${token}`},body:JSON.stringify({ref:'main',inputs:{request_id:requestId,source_sha:sourceSha}})});
   if(response.status!==204)throw new Failure(503,'The analysis service could not start processing yet.','coordinator_wake_failed');
 }
-async function route(request, env) {
+async function route(request, env, executionContext) {
   const url = new URL(request.url);
   
   if (url.pathname.startsWith('/api/state/') || url.pathname.startsWith('/api/report/')) {
@@ -320,7 +320,7 @@ async function route(request, env) {
   const storedSession=await controlRequest(env,'control-plane','/session/get',{handle});
   if(!storedSession.ok)throw new Failure(401,'Sign in again; the session is invalid or expired.','session_invalid');
   const sessionRow=await storedSession.json(),grant=await unseal(sessionRow.grant,env.SESSION_KEY,'grant');
-  const session={token:grant.token,user_id:sessionRow.user_id,login:sessionRow.login,handle};
+  const session={token:grant.token,user_id:sessionRow.user_id,login:sessionRow.login,handle,capabilities:sessionRow.authorization?.capabilities||{read:true,write:false,admin:false}};
   if(request.method==='GET'&&url.pathname==='/api/bootstrap')return json(await bootstrapSession(env,session,sessionRow),200,{'Cache-Control':'no-store'});
   if (restricted(env) || url.pathname === '/api/session' || (reportPath(url.pathname) && privateReports(env))) {
     const live=request.method!=='GET'||url.pathname==='/api/session',authorized=live||!authorizationFresh(sessionRow,Number(env.ANALYSIS_REPOSITORY_ID||EXECUTION_REPOSITORY_ID))?await authorizeSession(env,session,sessionRow):sessionRow;
@@ -339,14 +339,14 @@ async function route(request, env) {
     }
     const report = await protectedReportResponse(request,env);
     if (report) return report;
-    const response = await applicationApi(request, env, session, helpers);
+    const response = await applicationApi(request, env, session, helpers, executionContext);
     if (response) return response;
   throw new Failure(404, 'Unknown application endpoint.', 'not_found');
 }
-export default { async fetch(request, env) {
+export default { async fetch(request, env, executionContext) {
   const started=Date.now();const requestId=crypto.randomUUID();
   let response; let failureCode;
-  try { response = await route(request, env); } catch (e) {
+  try { response = await route(request, env, executionContext); } catch (e) {
     const known = e instanceof Failure || e instanceof BodyLimitError;
     failureCode = known ? e.code : undefined;
     const message=known?e.message:'Launcher unavailable. No successful launch has been confirmed; check GitHub Actions before retrying.',status=known?e.status:503,path=new URL(request.url).pathname;
@@ -359,6 +359,7 @@ export default { async fetch(request, env) {
   const protectedReport = privateReports(env) && reportPath(new URL(request.url).pathname);
   if (restricted(env) || protectedReport || !new URL(request.url).pathname.startsWith('/api/public/')) headers.set('Cache-Control', restricted(env) || protectedReport ? 'private, no-store' : 'no-store'); headers.set('Referrer-Policy', 'no-referrer'); headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('X-Frame-Options','DENY');headers.set('Content-Security-Policy',"frame-ancestors 'none'");headers.set('Strict-Transport-Security','max-age=31536000');
+  headers.set('Permissions-Policy','accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()');
   if (request.headers.get('Origin') === env.DASHBOARD_ORIGIN) {
     headers.set('Access-Control-Allow-Origin', env.DASHBOARD_ORIGIN); headers.set('Vary', 'Origin');
     headers.set('Access-Control-Expose-Headers','X-Request-ID, Retry-After');

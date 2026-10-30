@@ -4,7 +4,7 @@ import {repositoryApi,channelProgress,cachedChannelsForSnapshot,registryReportSt
 import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID} from './target-registry.mjs';
 
 class Failure extends Error { constructor(status,message,code){super(message);this.status=status;this.code=code;} }
-const json=(value,status=200)=>new Response(JSON.stringify(value),{status});
+const json=(value,status=200,headers={})=>new Response(JSON.stringify(value),{status,headers});
 const env={APPLICATION_MODE:'repositories',ANALYSIS_REPOSITORY:EXECUTION_REPOSITORY,ANALYSIS_REPOSITORY_ID:String(EXECUTION_REPOSITORY_ID),MAX_LAUNCH_BYTES:2048};
 const config={schema_version:'analysis-projects-v1',execution_repository:{id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY},tooling_sha:'a'.repeat(40),projects:CONFIGURED_TARGETS.map(target=>({id:target.id,source_repository:{id:target.repository_id,full_name:target.repository,private:false},relationship:target.relationship,preferred_branch:target.branch,native_feedback_enabled:target.native_feedback,profile:{mode:'portable'},enabled_scanners:['semgrep','snyk'],deferred_channels:{},report_budget_bytes:900000000}))};
 const configBlob={content:Buffer.from(JSON.stringify(config)).toString('base64')};
@@ -26,7 +26,7 @@ function helpers({permissions,overrides={},wakeCoordinator,queueRecent=[]}={}) {
   return {calls,queueCalls,wakeCalls,Failure,json,github,serviceToken,pages:async()=>[],wakeCoordinator:async(...args)=>{wakeCalls.push(args);if(wakeCoordinator)return wakeCoordinator(...args);},queue:async(path,body)=>{queueCalls.push({path,body});if(path==='/queue/status')return json({error:'not_found'},404);if(path==='/queue/recent')return json({requests:queueRecent});return json({...body.request,intent:body.request,status:'preparing'},201);},seal:async value=>Buffer.from(JSON.stringify(value)).toString('base64url'),unseal:async value=>{const result=JSON.parse(Buffer.from(value,'base64url').toString());if(result.exp<=Date.now())throw new Error('expired');return result;}};
 }
 
-const session={token:'user-token'};
+const session={token:'user-token',handle:'a'.repeat(43),capabilities:{read:true,write:true,admin:false}};
 const get=(path)=>new Request(`https://worker.example${path}`);
 const post=(path,value)=>new Request(`https://worker.example${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});
 const postWithKey=(path,value,key)=>new Request(`https://worker.example${path}`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(value)});
@@ -129,6 +129,22 @@ test('read-only collaborators can inspect configured project readiness',async()=
   assert.equal(result.summary.selectable,2);
   assert.ok(result.channels.some(channel=>channel.channel==='semgrep'&&channel.status==='profile_declared'&&channel.last_observed===null));
   assert.ok(result.channels.every(channel=>channel.status!=='completed'));
+});
+
+test('project settings returns one sanitized aggregate and compatibility projections',async()=>{
+  const source=CONFIGURED_TARGETS[0],h=helpers({permissions:{pull:true,push:false,admin:false},overrides:{[`repos/${EXECUTION_REPOSITORY}/actions/workflows/code-analysis-coordinator.yml`]:{name:'Code analysis coordinator',state:'active'}}});
+  const response=await repositoryApi(get(`/api/project-settings?project_id=${source.id}`),env,session,h);
+  const result=await response.json();
+  assert.equal(response.status,200);assert.equal(result.schema_version,'project-settings-v1');assert.equal(result.project.id,source.id);assert.equal(result.execution.repository,EXECUTION_REPOSITORY);assert.equal(result.storage.storage_managed,true);assert.equal(result.provenance.status,'degraded');assert.equal(result.diagnostics.storage.code,'STORAGE_UNAVAILABLE');assert.ok(result.readiness.channels.every(channel=>['essential','extended','vendor'].includes(channel.tier)));assert.ok(!JSON.stringify(result).includes('user-token'));
+  assert.equal(h.queueCalls.filter(call=>call.path==='/rate/settings').length,1);
+  const legacy=await repositoryApi(get(`/api/project-integration?project_id=${source.id}`),env,session,h);
+  assert.equal(legacy.headers.get('Sunset'),'Sun, 31 Jan 2027 00:00:00 GMT');assert.equal((await legacy.json()).analysis_repository,EXECUTION_REPOSITORY);
+});
+
+test('project settings rejects unknown query fields and missing read capability',async()=>{
+  const source=CONFIGURED_TARGETS[0],h=helpers();
+  await assert.rejects(()=>repositoryApi(get(`/api/project-settings?project_id=${source.id}&cache_bust=true`),env,session,h),error=>error.status===400&&error.code==='invalid_request');
+  await assert.rejects(()=>repositoryApi(get(`/api/project-settings?project_id=${source.id}`),env,{...session,capabilities:{read:false,write:false,admin:false}},h),error=>error.status===403&&error.code==='settings_read_required');
 });
 
 test('read-only collaborators can preview an exact branch revision and trusted channel choices',async()=>{

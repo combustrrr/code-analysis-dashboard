@@ -11,7 +11,7 @@ export function AppShell({auth,children,status}:{auth?:Auth;children:ReactNode;s
  const projectId=route.kind==='project'||route.kind==='project-run'?route.projectId:route.kind==='settings'?route.projectId:undefined;
  const primaryLinks=<nav className="shell-links" aria-label="Workspace navigation">
   <a aria-label="Project register" className={active==='projects'?'active':''} aria-current={active==='projects'?'page':undefined} href={routeHash({kind:'projects'})}><FolderOpenOutlined/><span>Project register</span></a>
-  <a aria-label="Settings" className={active==='settings'?'active':''} aria-current={active==='settings'?'page':undefined} href={routeHash({kind:'settings',section:'general',projectId})}><SettingOutlined/><span>Settings</span></a>
+  <a aria-label="Settings" className={active==='settings'?'active':''} aria-current={active==='settings'?'page':undefined} href={routeHash({kind:'settings',section:'overview',projectId})}><SettingOutlined/><span>Settings</span></a>
  </nav>;
  return <div className={`application-shell${route.kind==='projects'?' projects-shell':''}`}>
   <header className="shell-header">

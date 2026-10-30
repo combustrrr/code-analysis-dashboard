@@ -364,6 +364,7 @@ textarea {
   --workspace-muted:#c5d0d5;
   --workspace-line:#465762;
 }
+:root[data-density=compact] .application-shell .ant-table-cell{padding-block:8px}:root[data-density=compact] .project-record{min-height:560px;padding-bottom:16px}:root[data-density=compact] .evidence-rail>div{min-height:60px;padding:10px}:root[data-density=compact] .settings-content-section{gap:16px;padding-block:24px}:root[data-motion=reduced] *,:root[data-motion=reduced] *:before,:root[data-motion=reduced] *:after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
 :root[data-theme="light"]{
   --workspace-ink:#101923;
   --workspace-muted:#3e4d56;

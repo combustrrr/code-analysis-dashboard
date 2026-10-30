@@ -2,6 +2,7 @@ const json=(value,status=200)=>Response.json(value,{status,headers:{'Cache-Contr
 const UUID=/^[0-9a-f-]{36}$/i,HANDLE=/^[A-Za-z0-9_-]{43}$/;
 const now=()=>Date.now(),LEASE_MS=30*60*1000,REQUEST_SCHEMA='analysis-request-v4',MAX_RECORDS=500;
 const LAUNCH_RATE_WINDOW_MS=60*1000,LAUNCH_RATE_LIMIT=3;
+const SETTINGS_RATE_WINDOW_MS=60*1000,SETTINGS_RATE_LIMIT=30;
 const emptyMeta=()=>({schema_version:'analysis-control-v4',next_acceptance:1,generation:1,paused:false,reset_notice:null});
 const active=row=>['preparing','analyzing'].includes(row?.status),analysisKey=intent=>`${intent.project_id}:${intent.source_sha}`;
 const terminal=value=>['completed','failed'].includes(value?.status);
@@ -17,6 +18,12 @@ export class AuthExchangeStore{
   if(path==='/session/get')return this.transact(async s=>{if(!HANDLE.test(body.handle||''))return json({error:'session_invalid'},401);const key=`session:${body.handle}`,row=await s.get(key),timestamp=now();if(!row||row.absolute_expires_at<=timestamp||(row.idle_expires_at||row.last_seen_at+1800000)<=timestamp){if(row)await s.delete(key);return json({error:'session_expired'},401);}row.last_seen_at=timestamp;row.idle_expires_at=Math.min(timestamp+1800000,row.absolute_expires_at);await s.put(key,row);return json(row);});
   if(path==='/session/authorize')return this.transact(async s=>{if(!HANDLE.test(body.handle||'')||!Number.isSafeInteger(body.user_id)||typeof body.login!=='string'||!Number.isSafeInteger(body.repository_id)||!['read','write','admin'].includes(body.role))return json({error:'invalid_request'},400);const key=`session:${body.handle}`,row=await s.get(key);if(!row)return json({error:'session_invalid'},401);row.authorization={user_id:body.user_id,login:body.login,repository_id:body.repository_id,role:body.role,capabilities:body.capabilities,verified_at:Number(body.verified_at)||now(),etag:typeof body.etag==='string'?body.etag:null};await s.put(key,row);return json({ok:true});});
   if(path==='/session/delete'){if(HANDLE.test(body.handle||''))await this.state.storage.delete(`session:${body.handle}`);return json({ok:true});}
+  if(path==='/rate/settings')return this.transact(async s=>{
+   if(!HANDLE.test(body.handle||''))return json({error:'session_invalid'},401);
+   const timestamp=now(),key=`rate:settings:${body.handle}`,recent=((await s.get(key))||[]).filter(value=>Number.isFinite(value)&&timestamp-value<SETTINGS_RATE_WINDOW_MS);
+   if(recent.length>=SETTINGS_RATE_LIMIT){const retry_after_seconds=Math.max(1,Math.ceil((recent[0]+SETTINGS_RATE_WINDOW_MS-timestamp)/1000));return json({error:'settings_rate_limited',retry_after_seconds},429);}
+   recent.push(timestamp);await s.put(key,recent);return json({ok:true,remaining:SETTINGS_RATE_LIMIT-recent.length});
+  });
   if(path==='/queue/admit')return this.transact(async s=>{
    const intent=body.request;if(!intent||intent.schema_version!==REQUEST_SCHEMA||!UUID.test(intent.request_id||'')||!UUID.test(intent.idempotency_key||'')||!/^[0-9a-f]{40}$/.test(intent.source_sha||'')||!Array.isArray(intent.requested_channels)||!intent.requested_channels.length)return json({error:'invalid_request'},400);
    const meta=(await s.get('queue:meta'))||emptyMeta();if(meta.paused)return json({error:'admission_paused',reset_notice:meta.reset_notice},503);

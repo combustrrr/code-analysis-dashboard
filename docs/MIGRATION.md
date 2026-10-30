@@ -67,9 +67,11 @@ the [system overview](architecture/SYSTEM_OVERVIEW.md), with acceptance evidence
 
 The authenticated information architecture uses `#/projects`, `#/projects/:projectId`,
 the project `issues`, `report`, and `run` routes, and the global
-`#/settings?section=<section>&project=<optional-id>` workspace. Legacy query hashes,
-`#/activity`, `#/dashboard`, project-scoped settings, and the old custom-run route are removed rather
-than normalized. Opening projects, changing navigation, filtering, refreshing, and
+`#/settings/<overview|projects|integrations|provenance>?project=<optional-id>` workspace.
+The former `#/settings?section=<section>&project=<optional-id>` shape is normalized with
+`history.replaceState` during the compatibility window. Other legacy query hashes,
+`#/activity`, `#/dashboard`, project-scoped settings, and the old custom-run route remain
+removed. Opening projects, changing navigation, filtering, refreshing, and
 downloading evidence never enqueue analysis. Only the explicit **Run analysis** action
 can create a request.
 

@@ -17,6 +17,7 @@ import {AppShell} from './AppShell';
 import {displayFindingMessage,displayRuleId,isCompleteChannelStatus,plainAnalysisIssue} from './analysisPresentation';
 import {RevisionRibbon} from './RevisionRibbon';
 import {MultiValuePicker} from './PathMultiPicker';
+import {useWorkspacePreferences,type DefaultIssueGrouping} from './Appearance';
 
 const ProjectLauncher=React.lazy(()=>import('./ProjectLauncher').then(module=>({default:module.ProjectLauncher})));
 const ProjectRunTracker=React.lazy(()=>import('./ProjectRunTracker').then(module=>({default:module.ProjectRunTracker})));
@@ -106,7 +107,8 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
    const [currentOverlay,setCurrentOverlay]=useState<PrOverlay>(); const [overlayError,setOverlayError]=useState('');
    const refreshSequence = useRef(0);
   const [report, setReport] = useState<Report>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
-  const [query, setQuery] = useState(''); const [selectedSeverities, setSelectedSeverities] = useState<string[]>([]); const [selectedCategories,setSelectedCategories]=useState<string[]>([]); const [selectedScanners, setSelectedScanners] = useState<string[]>([]); const [groupBy, setGroupBy] = useState('none'); const [moreFilters,setMoreFilters]=useState(false); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
+  const {issueGrouping}=useWorkspacePreferences();
+  const [query, setQuery] = useState(''); const [selectedSeverities, setSelectedSeverities] = useState<string[]>([]); const [selectedCategories,setSelectedCategories]=useState<string[]>([]); const [selectedScanners, setSelectedScanners] = useState<string[]>([]); const [groupBy, setGroupBy] = useState(issueGrouping); const [moreFilters,setMoreFilters]=useState(false); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
     useEffect(() => {
       const sequence = ++refreshSequence.current;
       const c = new AbortController();
@@ -191,7 +193,7 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
   const locationOf=(finding:Finding)=>finding.file&&finding.line>0?`${finding.file}#L${finding.line}`:'';
   const filtered = useMemo(() => findings.filter(f => (!selectedDirectories.length || selectedDirectories.includes(directoryOf(f.file))) && (!selectedRules.length || f.rules.some(rule=>selectedRules.includes(rule))) && (!files.length || files.includes(f.file)) && (!locationFilter || (locationFilter === 'located' ? !!locationOf(f) : locationFilter === 'unlocated' ? !locationOf(f) : locationOf(f) === locationFilter)) && (!overlap || (overlap === 'multiple' ? new Set(f.scanners).size > 1 : new Set(f.scanners).size === 1)) && (!selectedSeverities.length || selectedSeverities.includes(f.severity)) && (!selectedCategories.length||selectedCategories.includes(f.category||'Uncategorized')) && (!selectedScanners.length || f.scanners.some(scanner=>selectedScanners.includes(scanner))) && `${f.message} ${f.file} ${f.category||''} ${f.rules.join(' ')} ${f.scanners.join(' ')}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => (ranks[a.severity] ?? 9) - (ranks[b.severity] ?? 9) || a.file.localeCompare(b.file)), [findings, query, selectedSeverities, selectedCategories, selectedScanners, selectedDirectories, selectedRules, files, locationFilter, overlap]);
   const issueOptions = useMemo(()=>({rules:[...new Set(findings.flatMap(f=>f.rules))].sort(),categories:[...new Set(findings.map(f=>f.category||'Uncategorized'))].sort(),files:[...new Set(findings.map(f=>f.file).filter(Boolean))].sort(),directories:[...new Set(findings.map(f=>directoryOf(f.file)))].sort(),locations:[...new Set(findings.map(locationOf).filter(Boolean))].sort()}),[findings]);
-  const resetFilters=()=>{setQuery('');setSelectedSeverities([]);setSelectedCategories([]);setSelectedScanners([]);setSelectedDirectories([]);setSelectedRules([]);setFiles([]);setLocationFilter('');setOverlap('');setGroupBy('none');setPage(0);};
+  const resetFilters=()=>{setQuery('');setSelectedSeverities([]);setSelectedCategories([]);setSelectedScanners([]);setSelectedDirectories([]);setSelectedRules([]);setFiles([]);setLocationFilter('');setOverlap('');setGroupBy(issueGrouping);setPage(0);};
   useEffect(resetFilters,[r.repository,r.project,target?.id]);
   const grouped = useMemo(() => {
     if (groupBy === 'none') return [] as [string, Finding[]][];
@@ -200,7 +202,7 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
     return [...groups].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
   }, [filtered, groupBy]);
   useEffect(() => setPage(0), [query, selectedSeverities, selectedCategories, selectedScanners, selectedDirectories, selectedRules, files, locationFilter, overlap]);
-  useEffect(()=>{if(r.tab!=='issues')return;const filters=r.filters||{};setQuery(filters.query||'');setSelectedSeverities(filterValues(filters.severity));setSelectedCategories(filterValues(filters.category));setSelectedScanners(filterValues(filters.scanner));setSelectedRules(filterValues(filters.rule));setFiles(filters.files||[]);setSelectedDirectories(filterValues(filters.directory));setLocationFilter(filters.location||'');setOverlap(filters.overlap||'');setGroupBy(filters.group||'none');},[r.tab,r.filters]);
+  useEffect(()=>{if(r.tab!=='issues')return;const filters=r.filters||{};setQuery(filters.query||'');setSelectedSeverities(filterValues(filters.severity));setSelectedCategories(filterValues(filters.category));setSelectedScanners(filterValues(filters.scanner));setSelectedRules(filterValues(filters.rule));setFiles(filters.files||[]);setSelectedDirectories(filterValues(filters.directory));setLocationFilter(filters.location||'');setOverlap(filters.overlap||'');setGroupBy((filters.group as DefaultIssueGrouping)||issueGrouping);},[r.tab,r.filters,issueGrouping]);
   const directories = useMemo(() => {
     const counts = new Map<string, number>();
     findings.forEach(f => { const dir = f.file.includes('/') ? f.file.slice(0, f.file.lastIndexOf('/')) : '(root)'; counts.set(dir, (counts.get(dir) || 0) + 1); });

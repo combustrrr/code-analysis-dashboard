@@ -9,6 +9,9 @@ const DIGEST = /^[a-f0-9]{64}$/i;
 const COMPLETED_REPORT_STATUSES = new Set(['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE']);
 const branchHeadCache = new Map();
 const reportManifestCache = new Map();
+const settingsAggregateCache = new Map();
+const settingsAggregateFlights = new Map();
+const SETTINGS_FRESH_MS=60000,SETTINGS_STALE_MS=120000,SETTINGS_CACHE_LIMIT=32;
 
 const stable = value => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value);
 const orderedRequests = assets => (assets||[]).filter(asset=>asset.name?.startsWith('request-')&&asset.name.endsWith('.json')).sort((left,right)=>String(left.created_at||'').localeCompare(String(right.created_at||''))||Number(left.id||0)-Number(right.id||0));
@@ -90,7 +93,7 @@ export function cachedChannelsForSnapshot(snapshot, manifest) {
   return [...new Set(cached)];
 }
 
-export async function repositoryApi(request, env, session, helpers) {
+export async function repositoryApi(request, env, session, helpers, executionContext) {
   const {github,json,Failure,pages,serviceToken,seal,unseal,queue,wakeCoordinator} = helpers;
   const url = new URL(request.url);
   const token = session?.token;
@@ -143,6 +146,48 @@ export async function repositoryApi(request, env, session, helpers) {
     }
     catch { throw new Failure(503, 'The configured project profile is invalid.', 'project_profile_invalid'); }
     return project;
+  }
+
+  function providerDiagnostic(status,checked_at,latency_ms=null,code=null,message=null){return{status,latency_ms,checked_at,code,message};}
+  function safeProviderFailure(kind,error,checkedAt,latency){
+    const code=error?.code==='github_rate_limited'?'GITHUB_RATE_LIMITED':error?.code==='github_unavailable'?'GITHUB_UNAVAILABLE':kind==='github'?'GITHUB_WORKFLOW_UNAVAILABLE':'STORAGE_UNAVAILABLE';
+    const message=code==='GITHUB_RATE_LIMITED'?'GitHub is temporarily limiting workflow checks.':kind==='github'?'Workflow status is temporarily unavailable.':'Evidence storage is temporarily unavailable.';
+    return providerDiagnostic('unavailable',checkedAt,latency,code,message);
+  }
+  function settingsCachePut(key,value){settingsAggregateCache.delete(key);settingsAggregateCache.set(key,{at:Date.now(),value});while(settingsAggregateCache.size>SETTINGS_CACHE_LIMIT)settingsAggregateCache.delete(settingsAggregateCache.keys().next().value);}
+  function settingsChannels(project,target){
+    const observed=new Map((target?.channel_statuses||[]).map(value=>[value.channel,value]));
+    return scannerChoices(project).map(choice=>{
+      const last=observed.get(choice.id),observedStatus=String(last?.status||'').toUpperCase(),complete=COMPLETED_REPORT_STATUSES.has(observedStatus);
+      const status=choice.status==='DEFERRED'?'deferred':['SETUP_REQUIRED','NOT_AVAILABLE'].includes(choice.status)?'unavailable':last&&!complete?'needs_attention':'ready';
+      return{channel_id:choice.id,name:choice.id,tier:choice.mode==='vendor'?'vendor':choice.default_selected?'essential':'extended',mode:choice.mode,status,selectable:choice.selectable===true,version:null,reason:String(last?.reason||choice.reason||'').slice(0,240)||null};
+    });
+  }
+  async function buildProjectSettings(repository,configuration,appToken,project){
+    const checkedAt=new Date().toISOString(),workflowStarted=Date.now(),storageStarted=Date.now();
+    const reportUrl=new URL('/api/public/manifest',url);reportUrl.search=new URLSearchParams({repository:repository.full_name,project_id:String(project.id)});
+    const [workflowResult,manifestResult]=await Promise.allSettled([
+      github(`repos/${repository.full_name}/actions/workflows/code-analysis-coordinator.yml`,appToken),
+      publicReports(new Request(reportUrl),env).then(async response=>{if(response.status===404)return null;if(!response.ok)throw Object.assign(new Error('storage unavailable'),{code:'STORAGE_UNAVAILABLE'});return response.json();}),
+    ]);
+    const workflow=workflowResult.status==='fulfilled'?workflowResult.value:null,manifest=manifestResult.status==='fulfilled'?manifestResult.value:null,target=manifest?canonicalReportTarget(manifest):null;
+    const workflowDiagnostic=workflowResult.status==='fulfilled'?providerDiagnostic(workflow?.state==='active'?'healthy':'degraded',checkedAt,Date.now()-workflowStarted,workflow?.state==='active'?null:'GH_WORKFLOW_DISABLED',workflow?.state==='active'?null:'The analysis workflow is not active.'):safeProviderFailure('github',workflowResult.reason,checkedAt,Date.now()-workflowStarted);
+    const storageDiagnostic=manifestResult.status==='fulfilled'?providerDiagnostic(manifest?'healthy':'unconfigured',checkedAt,Date.now()-storageStarted,manifest?null:'REPORT_NOT_PUBLISHED',manifest?null:'No evidence report has been published for this project.'):safeProviderFailure('storage',manifestResult.reason,checkedAt,Date.now()-storageStarted);
+    const budget=Number.isFinite(Number(project.report_budget_bytes))&&Number(project.report_budget_bytes)>0?Number(project.report_budget_bytes):null,used=manifest&&Number.isFinite(Number(manifest?.metrics?.compressed_bytes))?Number(manifest.metrics.compressed_bytes):null;
+    const workflowBranch=repository.default_branch||'main',drift=[];
+    if(workflowBranch!==repository.default_branch)drift.push(`Workflow branch differs from the execution repository default branch.`);
+    if(workflow&&workflow.state!=='active')drift.push('The analysis workflow is not active.');
+    const sourceSha=target?.analyzed_sha||target?.head_sha||null,publishedAt=target?.report_generation_timestamp||target?.generated_at||target?.checked_at||null;
+    const runId=target?.workflow_run_id??target?.collected_run,runAttempt=target?.workflow_run_attempt??target?.run_attempt??target?.collected_attempt;
+    const payload={schema_version:'project-settings-v1',checked_at:checkedAt,freshness:{state:'fresh',age_seconds:0},project:{id:String(project.id),repository:project.source_repository.full_name,relationship:project.relationship==='connected'?'connected':'observer',branch:project.preferred_branch},execution:{repository_id:repository.id,repository:repository.full_name,workflow:'code-analysis-coordinator.yml',workflow_branch:workflowBranch,tooling_sha:SHA.test(configuration.tooling_sha||'')?configuration.tooling_sha:null,configuration_matches:drift.length===0,drift_reasons:drift},storage:{storage_managed:budget!==null,budget_bytes:budget,used_bytes:used,remaining_bytes:budget!==null&&used!==null?Math.max(0,budget-used):null,history_points:Array.isArray(manifest?.report_storage_history)?manifest.report_storage_history.length:0},readiness:{channels:settingsChannels(project,target)},provenance:{status:manifestResult.status==='rejected'?'degraded':manifest?'verified':'not_published',published_at:publishedAt,source_sha:SHA.test(sourceSha||'')?sourceSha:null,workflow_run_id:Number.isSafeInteger(Number(runId))?Number(runId):null,workflow_attempt:Number.isSafeInteger(Number(runAttempt))?Number(runAttempt):null},diagnostics:{github:workflowDiagnostic,storage:storageDiagnostic}};
+    return payload;
+  }
+  async function resolveProjectSettings(repository,configuration,appToken,project,{force=false}={}){
+    const key=`${repository.id}:${project.id}:${configuration.tooling_sha||'unknown'}`,cached=settingsAggregateCache.get(key),age=cached?Date.now()-cached.at:Infinity;
+    if(!force&&cached&&age<=SETTINGS_FRESH_MS)return{...cached.value,freshness:{state:'fresh',age_seconds:Math.floor(age/1000)}};
+    const refresh=()=>{if(settingsAggregateFlights.has(key))return settingsAggregateFlights.get(key);const flight=buildProjectSettings(repository,configuration,appToken,project).then(value=>{settingsCachePut(key,value);return value;}).finally(()=>settingsAggregateFlights.delete(key));settingsAggregateFlights.set(key,flight);return flight;};
+    if(!force&&cached&&age<=SETTINGS_STALE_MS){executionContext?.waitUntil?.(refresh());return{...cached.value,freshness:{state:'stale',age_seconds:Math.floor(age/1000)}};}
+    return refresh();
   }
 
   async function projectFor(configuration, id) {
@@ -310,9 +355,25 @@ export async function repositoryApi(request, env, session, helpers) {
     return json(snapshot);
   }
 
-  if (request.method === 'GET' && ['/api/project-readiness', '/api/project-integration', '/api/project-targets', '/api/project-activity'].includes(url.pathname)) {
+  if (request.method === 'GET' && ['/api/project-settings','/api/project-readiness', '/api/project-integration', '/api/project-targets', '/api/project-activity'].includes(url.pathname)) {
+    if(url.pathname==='/api/project-settings'&&[...url.searchParams.keys()].some(key=>!['project_id','refresh'].includes(key)))throw new Failure(400,'Project settings accepts only project_id and refresh.','invalid_request');
+    if(url.pathname==='/api/project-settings'&&!['',null,'1'].includes(url.searchParams.get('refresh')))throw new Failure(400,'Refresh must be 1 when provided.','invalid_request');
+    if(url.pathname==='/api/project-settings'&&session?.capabilities?.read!==true)throw new Failure(403,'Read access is required to inspect project settings.','settings_read_required');
     const {repository, configuration, appToken} = await context();
-    const {project, source} = await projectFor(configuration, url.searchParams.get('project_id'));
+    const project = configuredProject(configuration, url.searchParams.get('project_id'));
+    const source=url.pathname==='/api/project-settings'?{full_name:project.source_repository.full_name,id:project.source_repository.id}:(await projectFor(configuration,project.id)).source;
+
+    if(['/api/project-settings','/api/project-readiness','/api/project-integration'].includes(url.pathname)){
+      const limited=await queue('/rate/settings',{handle:session.handle});if(limited.status===429){const body=await limited.json();throw new Failure(429,'Too many settings checks. Wait before refreshing again.','settings_rate_limited',body.retry_after_seconds||60);}if(!limited.ok)throw new Failure(503,'Settings request limits are temporarily unavailable.','settings_unavailable');
+      const aggregate=await resolveProjectSettings(repository,configuration,appToken,project,{force:url.pathname==='/api/project-settings'&&url.searchParams.get('refresh')==='1'});
+      if(url.pathname==='/api/project-settings')return json(aggregate);
+      const compatibility={'Deprecation':'@1801353600','Sunset':'Sun, 31 Jan 2027 00:00:00 GMT','Link':'</api/project-settings>; rel="successor-version"'};
+      if(url.pathname==='/api/project-readiness'){
+        const channels=aggregate.readiness.channels.map(value=>({id:value.channel_id,channel:value.channel_id,mode:value.mode,status:value.status==='ready'?'profile_declared':value.status==='needs_attention'?'setup_required':value.status,reason:value.reason||'Declared in the trusted profile; completed evidence is still required.',selectable:value.selectable,default_selected:value.tier==='essential',last_observed:null}));
+        return json({project_id:project.id,preferred_branch:project.preferred_branch,profile_mode:project.profile.mode,tooling_sha:configuration.tooling_sha,summary:{selectable:channels.filter(value=>value.selectable).length,vendor:channels.filter(value=>value.selectable&&value.mode==='vendor').length,deferred:channels.filter(value=>value.status==='deferred').length,unavailable:channels.filter(value=>value.status==='unavailable').length,completed:0,needs_attention:channels.filter(value=>value.status==='setup_required').length},channels,checked_at:aggregate.checked_at},200,compatibility);
+      }
+      return json({source_repository:aggregate.project.repository,analysis_repository:aggregate.execution.repository,publishing_repository:aggregate.execution.repository,workflow_branch:aggregate.execution.workflow_branch,workflow_state:aggregate.diagnostics.github.status==='healthy'?'Code analysis coordinator: active':aggregate.diagnostics.github.message||'Workflow unavailable',configuration_matches:aggregate.execution.configuration_matches,ready:aggregate.execution.configuration_matches&&aggregate.diagnostics.github.status==='healthy',enabled_scanners:project.enabled_scanners,checked_at:aggregate.checked_at,report_budget_bytes:aggregate.storage.budget_bytes,report_storage:{compressed_bytes:aggregate.storage.used_bytes,remaining_bytes:aggregate.storage.remaining_bytes,history_points:aggregate.storage.history_points},storage_backend:'cloudflare-r2'},200,compatibility);
+    }
 
     if (url.pathname === '/api/project-readiness') {
       let observed=new Map(),observedAt=null;
