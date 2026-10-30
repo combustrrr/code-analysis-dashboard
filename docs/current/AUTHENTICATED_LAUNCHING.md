@@ -78,6 +78,9 @@ package script being present. Adapter installs continue to disable package lifec
 Reviewed Python coverage and JavaScript test commands have a 900-second subprocess bound.
 A coverage timeout retains any document already written; other timeouts record explicit
 operationally incomplete evidence, allowing healthy sibling evidence to proceed to publication.
+Before a coverage command starts, the runner removes coverage outputs already present in the
+source checkout. Only documents materialized by the current bounded command can satisfy the
+coverage channel; committed or otherwise stale source artifacts are never adopted as evidence.
 The coordinator heartbeat renews the fenced lease once per minute and exits when terminal
 completion invalidates that lease, so a published Actions run should not remain visibly active
 for more than one renewal interval solely because of its heartbeat job.

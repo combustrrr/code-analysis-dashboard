@@ -96,6 +96,11 @@ def main():
     else:
         command = profile[{'python-test': 'python_test_command', 'javascript-install': 'javascript_install_command',
                            'javascript-test': 'javascript_test_command', 'api': 'api_command'}[a.task]]
+    if a.task == 'python-test':
+        for name in ('coverage.json', 'coverage.xml', '.coverage'):
+            candidate = cwd / name
+            if candidate.is_file() or candidate.is_symlink():
+                candidate.unlink()
     try:
         result = subprocess.run(
             command, cwd=cwd, env=env, check=False,
