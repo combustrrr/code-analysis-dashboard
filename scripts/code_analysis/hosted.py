@@ -12,6 +12,7 @@ from urllib.parse import quote
 
 from scripts.code_analysis.dashboard import validate_snapshot
 from scripts.code_analysis.project_overview import build_project_overview
+from scripts.code_analysis.workspace_documents import build_workspace_documents
 from scripts.code_analysis.snapshot import COMPLETE_STATUSES
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -165,6 +166,8 @@ def build(snapshot: dict, identity: dict, output: Path, *, producer_repository: 
     write(output / "findings.json", index)
     write(output / "report.json", report)
     write(output / "project-overview.json", build_project_overview(report, index))
+    for name, value in build_workspace_documents(report, index).items():
+        write(output / name, value)
     return report
 
 

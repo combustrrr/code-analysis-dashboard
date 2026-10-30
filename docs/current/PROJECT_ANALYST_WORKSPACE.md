@@ -2,6 +2,8 @@
 
 The authenticated project workspace is a current-report command center. One verified report remains authoritative for each configured project. A newer analysis does not hide or replace that report while scanners are running.
 
+The visual hierarchy uses a compact management-dashboard grid without changing evidence semantics: the revision ribbon and analysis action form the command strip, tab navigation is a bounded segmented control, and Overview uses a responsive 12-column evidence grid. Severity, coverage, revision freshness, and investigation actions determine card emphasis; decorative business metrics are not introduced. Selected findings replace the list canvas with one full-width review surface so filters and an empty split column do not compete with source evidence.
+
 ## Routes and cutover
 
 - `#/projects/:projectId` opens Overview.
@@ -15,13 +17,21 @@ The authenticated project workspace is a current-report command center. One veri
 
 Publication retains `analysis-current-v1` and its content-addressed gzip assets. New publications also contain optional `project-overview.json` with schema `project-overview-v1`.
 
-1. The project shell loads the manifest and `report.json`.
-2. Overview loads `project-overview.json`. Older reports fall back to `findings.json`.
-3. Issues loads `findings.json` only when opened and builds immutable severity, category, scanner, rule, file, directory, location, overlap, ID, and search indices.
+1. The project shell loads only the manifest.
+2. Overview loads `project-overview.json` and derives its shell metrics from that compact document. It does not request `report.json`. Older reports fall back to `findings.json` plus `report.json` for compatibility.
+3. Issues loads `findings-catalog.json` and the first immutable 500-row `findings-pages/<page>.json` document. The analyst explicitly loads the remaining pages before report-wide search and filters become available, preventing an incomplete filter result from being presented as complete. Older reports fall back to `findings.json`.
 4. Issue detail loads its existing 100-finding detail page and then its separate source document when available.
-5. Coverage uses `report.json`; Reports loads export code only after navigation.
+5. Coverage loads the compact `coverage.json` channel projection. Older reports fall back to `report.json`. Reports uses the overview metadata and loads export code only after navigation.
 
-Issues mounts 50 table rows per page. Source excerpts are React text children, never HTML. GitHub links continue through the trusted URL helper and open with opener isolation.
+`project-overview.json`, `coverage.json`, `findings-catalog.json`, every findings page, every locator bucket, `report.json`, and `findings.json` have independent content-addressed gzip delivery boundaries. Deep-linked findings use one of 16 `finding-locators/<hex>.json` buckets to resolve the existing detail shard without downloading the complete catalog. Existing manifests remain valid, but they retain their original packing until the project is republished.
+
+Overview, Issues, Coverage, Reports, and contextual Progress each have a statically analyzable dynamic-import boundary. The production budget check fails if any tab stops being an independent lazy entry. Reports then loads the threat-report interface only when opened.
+
+PDF generation runs in a dedicated module Web Worker. The worker and jsPDF are absent from the landing, workspace shell, Overview, Issues, and Coverage dependency graphs and are requested only after an analyst starts a PDF export. It reports bounded progress through the existing polite live region, yields after each 20-finding batch, supports cancellation by terminating the worker, and returns only the completed Blob to the UI thread. Navigating away terminates an active export and no partial download is created.
+
+Issues mounts 50 table rows per page on larger screens and 20 evidence cards per page below 700px. Mobile cards replace compressed table columns, while the four workspace destinations use a two-by-two navigation control. Opening a mobile finding uses a full-viewport evidence sheet with an independently scrolling body and contained source-code overflow. Source excerpts are React text children, never HTML. GitHub links continue through the trusted URL helper and open with opener isolation.
+
+The Issues surface follows a read-only evidence-IDE model. The report list is a bounded issue queue with compact filters and scanner-support indicators. Opening a finding hides the queue controls and gives the inspector the full canvas. Source context uses an editor-like frame only to clarify immutable path and line provenance; it remains inert React text, exposes no editing or execution controls, and never introduces syntax parsing or HTML injection.
 
 ## Sanitized audit bundle
 

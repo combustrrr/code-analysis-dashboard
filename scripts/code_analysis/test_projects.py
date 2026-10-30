@@ -109,6 +109,22 @@ class AssetTests(unittest.TestCase):
         self.assertEqual(recovered, documents)
         self.assertEqual((manifest, assets), shard(documents, asset_limit=120))
 
+    def test_ui_loading_boundaries_are_separate_assets(self):
+        documents = {
+            'project-overview.json': {'schema_version': 'project-overview-v1', 'findings': {'total': 2}},
+            'report.json': {'schema_version': 'analysis-report-v1', 'channels': [1, 2]},
+            'findings.json': [{'id': 'one'}, {'id': 'two'}],
+            'details/0.json': [{'id': 'one'}],
+        }
+        manifest, assets = shard(documents)
+        references = manifest['documents']
+        self.assertNotEqual(references['project-overview.json'], references['report.json'])
+        self.assertNotEqual(references['project-overview.json'], references['findings.json'])
+        self.assertNotEqual(references['report.json'], references['findings.json'])
+        for path in ('project-overview.json', 'report.json', 'findings.json'):
+            self.assertEqual(set(verify_asset(references[path], assets[references[path]],
+                                              manifest['assets'][references[path]])), {path})
+
     def test_capacity_and_unsafe_paths_fail_before_publication(self):
         for docs, kwargs in [({'../escape.json': {}}, {}), 
  ({'a.json': {}}, {'asset_limit': 1})]:

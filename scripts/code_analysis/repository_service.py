@@ -16,6 +16,7 @@ from scripts.code_analysis.hosted import accept, analysis_key, now, reconcile
 from scripts.code_analysis.projects import service_config, validate
 from scripts.code_analysis.report_assets import shard, verify_asset
 from scripts.code_analysis.project_overview import build_project_overview
+from scripts.code_analysis.workspace_documents import build_workspace_documents
 from scripts.code_analysis.audit_bundle import build_audit_bundle
 
 WORKFLOW = '.github/workflows/code-analysis-coordinator.yml'
@@ -283,7 +284,7 @@ def merge_channel_documents(previous, incoming, selected_channels):
         findings.append(row)
         details[identity]={**detail,**row,'origins':[{key:origin.get(key) for key in ('scanner_family','rule','file','start_line','raw_artifact','observation_id')} for origin in origins]}
     findings.sort(key=lambda row:(row.get('severity',''),row.get('file',''),row.get('line',0),row['id']))
-    merged_documents={path:value for path,value in previous.items() if not (path.startswith('details/') or path in {'report.json','snapshot.json','findings.json','project-overview.json'})}
+    merged_documents={path:value for path,value in previous.items() if not (path.startswith('details/') or path.startswith('findings-pages/') or path.startswith('finding-locators/') or path in {'report.json','snapshot.json','findings.json','project-overview.json','coverage.json','findings-catalog.json'})}
     merged_documents.update({path:value for path,value in incoming.items() if path.startswith('source/')})
     for index,row in enumerate(findings):
         row['page']=index//100
@@ -297,6 +298,7 @@ def merge_channel_documents(previous, incoming, selected_channels):
             'channels':channels,'severities':severities,'status':'partial' if incomplete or selected-replace else 'complete'}
     merged_documents.update({'snapshot.json':snapshot,'report.json':report,'findings.json':findings,
                              'project-overview.json':build_project_overview(report,findings)})
+    merged_documents.update(build_workspace_documents(report, findings))
     return merged_documents,report
 
 
@@ -459,6 +461,7 @@ def report_publication(config, state, report_release, document=None):
                         raise ValueError('No selected scanner channel produced valid evidence; the previous current report is preserved')
                     documents['report.json']=report
                     documents['project-overview.json']=build_project_overview(report,documents.get('findings.json',[]))
+                    documents.update(build_workspace_documents(report, documents.get('findings.json',[])))
                     manifest, blobs = shard(documents)
                     pending.update(blobs)
                     export_name,export_data,export_meta=build_audit_bundle(report,documents.get('findings.json',[]),documents['project-overview.json'])

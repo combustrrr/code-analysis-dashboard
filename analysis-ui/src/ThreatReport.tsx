@@ -1,6 +1,6 @@
 import { Alert, Button, Card, Empty, Input, Select, Space, Tag } from './ui';
 import { DownloadOutlined, FilePdfOutlined } from './icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { refreshRepositoryReports, repositoryJson } from './repositoryReports';
 import { navigateAppHash, parseAppRoute, routeHash } from './appRoutes';
 import { filterThreatFindings, hasActiveFilters, type ExportScope, type ReportFilterSnapshot, type ThreatReportData } from './threatReportExportModel';
@@ -28,7 +28,9 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
   const [exporting, setExporting] = useState(false);
+  const [exportProgress,setExportProgress]=useState(0);
   const [exportError, setExportError] = useState('');
+  const pdfWorker=useRef<Worker|null>(null);
   const [filters,setFilters]=useState<ReportFilterSnapshot>({});
 
   useEffect(() => {
@@ -39,6 +41,7 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
     repositoryJson<string>(`data/${reportPath}/threat-report.md`, controller.signal).then(setMarkdown).catch(() => {});
     return () => controller.abort();
   }, [reportPath, retry]);
+  useEffect(()=>()=>pdfWorker.current?.terminate(),[]);
 
   if (error) {
     const detail = error.toLowerCase(); const expired = detail.includes('expired') || detail.includes('freshness'); const missing = detail.includes('not found') || detail.includes('unavailable');
@@ -47,15 +50,20 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
   if (!report) return <div className="empty" role="status"><Empty description="Loading report downloads…" /></div>;
 
   const exportPdf = async (scope:ExportScope) => {
-    setExporting(true); setExportError('');
-    try {
-      const { createThreatReportDownload } = await import('./ThreatReportPdf');
-      const result = await createThreatReportDownload(report, scope, filters);
-      downloadBlob(result.filename, result.blob);
-    } catch (cause) {
-      setExportError(cause instanceof Error ? cause.message : 'The PDF could not be generated. No partial download was created.');
-    } finally { setExporting(false); }
+    pdfWorker.current?.terminate();setExporting(true);setExportProgress(0);setExportError('');
+    const worker=new Worker(new URL('./ThreatReportPdf.worker.ts',import.meta.url),{type:'module'});pdfWorker.current=worker;
+    const id=crypto.randomUUID();
+    worker.onmessage=(event:MessageEvent<{id:string;type:'progress'|'complete'|'error';percent?:number;blob?:Blob;filename?:string;message?:string}>)=>{
+      if(event.data.id!==id)return;
+      if(event.data.type==='progress'){setExportProgress(event.data.percent||0);return;}
+      if(event.data.type==='complete'&&event.data.blob&&event.data.filename)downloadBlob(event.data.filename,event.data.blob);
+      if(event.data.type==='error')setExportError(event.data.message||'The PDF could not be generated. No partial download was created.');
+      worker.terminate();if(pdfWorker.current===worker)pdfWorker.current=null;setExporting(false);setExportProgress(0);
+    };
+    worker.onerror=()=>{setExportError('The PDF worker stopped unexpectedly. No partial download was created.');worker.terminate();if(pdfWorker.current===worker)pdfWorker.current=null;setExporting(false);setExportProgress(0);};
+    worker.postMessage({id,report,scope,filters});
   };
+  const cancelPdf=()=>{pdfWorker.current?.terminate();pdfWorker.current=null;setExporting(false);setExportProgress(0);setExportError('PDF generation was cancelled.');};
 
   const selected=filterThreatFindings(report.findings,filters),active=hasActiveFilters(filters);
   const values=(items:string[])=>[...new Set(items.filter(Boolean))].sort().map(value=>({value,label:value}));
@@ -70,7 +78,7 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
     <Card className="report-download-card">
       <div className="report-download-main">
         <div><span className="eyebrow">ISSUES REPORT · PDF</span><h3>Complete issues report</h3><p>A portable document containing all {report.findings.length.toLocaleString()} retained findings, source locations, scanner attribution, remediation guidance, limitations, and immutable provenance.</p></div>
-        <Button type="primary" icon={<FilePdfOutlined />} loading={exporting} onClick={()=>exportPdf('complete')}>{exporting ? 'Building PDF…' : 'Download complete PDF'}</Button>
+        <Space><Button type="primary" icon={<FilePdfOutlined />} loading={exporting} onClick={()=>exportPdf('complete')}>{exporting ? `Building PDF ${exportProgress}%` : 'Download complete PDF'}</Button>{exporting&&<Button onClick={cancelPdf}>Cancel</Button>}</Space>
       </div>
       <dl className="report-download-facts">
         <div><dt>Repository</dt><dd>{report.source_repository || 'Unavailable'}</dd></div>
@@ -93,7 +101,8 @@ export function ThreatReport({ reportPath, targetSha }: { reportPath: string; ta
         <MultiValuePicker label="Report directories" itemName="directory" options={directories.map(option=>String(option.value))} value={selectedValues(filters.directory)} onChange={directory=>setFilters(current=>({...current,directory}))}/>
         <Select aria-label="Report location" showSearch optionFilterProp="label" value={filters.location||''} onChange={value=>setFilter('location',value)} options={[{value:'',label:'All locations'},{value:'located',label:'Any file and line'},{value:'unlocated',label:'Missing file or line'},...locations.map(option=>({...option,label:option.label.replace('#L',':')}))]}/>
       </div>
-      <div className="report-filter-actions"><strong>{selected.length.toLocaleString()} of {report.findings.length.toLocaleString()} findings selected</strong><Space wrap><Button onClick={()=>setFilters({})} disabled={!active}>Clear report filters</Button><Button type="primary" icon={<FilePdfOutlined/>} loading={exporting} disabled={!active||!selected.length} onClick={()=>exportPdf('filtered')}>Download filtered PDF</Button></Space></div>
+      <div className="report-filter-actions"><strong>{selected.length.toLocaleString()} of {report.findings.length.toLocaleString()} findings selected</strong><Space wrap><Button onClick={()=>setFilters({})} disabled={!active}>Clear report filters</Button><Button type="primary" icon={<FilePdfOutlined/>} loading={exporting} disabled={!active||!selected.length} onClick={()=>exportPdf('filtered')}>Download filtered PDF</Button>{exporting&&<Button onClick={cancelPdf}>Cancel</Button>}</Space></div>
+      <span className="sr-only" aria-live="polite">{exporting?`PDF generation ${exportProgress} percent complete.`:exportError}</span>
       {!active&&<small>Choose at least one filter to create a scoped report. The complete PDF remains available above.</small>}
     </Card>
     <Card className="report-machine-exports" title="Machine-readable exports">

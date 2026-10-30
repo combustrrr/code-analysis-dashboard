@@ -394,6 +394,94 @@ jobs:
         path: .extension-output/ext-github-security-advisories.channel-evidence
         retention-days: 7
         if-no-files-found: error
+  ext-axe-accessibility:
+    name: axe WCAG browser audit
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'ext-axe-accessibility') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.11'
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run trusted scanner adapter
+      env:
+        TARGET_JSON: ${{ inputs.target }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        IS_REUSABLE_ANALYSIS: 'true'
+      run: python -m scripts.code_analysis.extension_runner ext-axe-accessibility
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      if: always()
+      with:
+        name: ext-axe-accessibility
+        path: .extension-output/ext-axe-accessibility.channel-evidence
+        retention-days: 7
+        if-no-files-found: error
+  ext-lighthouse-ui:
+    name: Lighthouse UI budgets
+    needs:
+    - identity
+    if: ${{ contains(fromJSON(needs.identity.outputs.jobs), 'ext-lighthouse-ui') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        ref: ${{ inputs.tooling_sha }}
+        persist-credentials: false
+        repository: combustrrr/code-analysis-dashboard
+    - name: Load reviewed execution project configuration
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        TARGET_JSON: ${{ inputs.target }}
+        EXPECTED_PROFILE: portable
+      run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: '3.11'
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: ${{ fromJSON(inputs.target).source_repository }}
+        ref: ${{ fromJSON(inputs.target).head_sha }}
+        path: .source
+        persist-credentials: false
+    - name: Run trusted scanner adapter
+      env:
+        TARGET_JSON: ${{ inputs.target }}
+        TOOLING_SHA: ${{ inputs.tooling_sha }}
+        IS_REUSABLE_ANALYSIS: 'true'
+      run: python -m scripts.code_analysis.extension_runner ext-lighthouse-ui
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      if: always()
+      with:
+        name: ext-lighthouse-ui
+        path: .extension-output/ext-lighthouse-ui.channel-evidence
+        retention-days: 7
+        if-no-files-found: error
   community-github-actions-security:
     name: GitHub Actions security (zizmor)
     needs:
@@ -974,6 +1062,8 @@ jobs:
     - scanner-3-checkov
     - scanner-3-openssf-scorecard
     - ext-github-security-advisories
+    - ext-axe-accessibility
+    - ext-lighthouse-ui
     - community-github-actions-security
     - community-owasp-js
     - community-owasp-iac-secrets

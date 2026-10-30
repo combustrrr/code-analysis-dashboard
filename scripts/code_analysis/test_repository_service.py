@@ -499,13 +499,16 @@ class PublicationCompletenessTests(unittest.TestCase):
                 patch('scripts.code_analysis.repository_service.github.cf_api', side_effect=upload), \
                 patch('scripts.code_analysis.repository_service.accept', return_value=True), \
                 patch('scripts.code_analysis.repository_service.release_manifest.read', return_value={}), \
-                patch('scripts.code_analysis.repository_service.release_manifest.write'):
+                patch('scripts.code_analysis.repository_service.release_manifest.write') as write:
             report_publication(config, state, 'analysis-current-1')
 
-        self.assertEqual(len(uploaded), 2)
         paths = [row[0] for row in uploaded]
-        self.assertTrue(any(re.match(r'^/api/report/repositories/owner/repo/analysis-current-1/analysis-[a-f0-9]{64}\.json\.gz$', path) for path in paths))
-        self.assertTrue(any(re.match(r'^/api/report/repositories/owner/repo/analysis-current-1/audit-[a-f0-9]{64}\.zip$', path) for path in paths))
+        report_assets=[path for path in paths if re.match(r'^/api/report/repositories/owner/repo/analysis-current-1/analysis-[a-f0-9]{64}\.json\.gz$', path)]
+        self.assertGreaterEqual(len(report_assets), 4)
+        self.assertEqual(sum(bool(re.match(r'^/api/report/repositories/owner/repo/analysis-current-1/audit-[a-f0-9]{64}\.zip$', path)) for path in paths),1)
+        target=write.call_args.args[2]['targets'][0]
+        references=target['documents']
+        self.assertEqual(len({references[name] for name in ('project-overview.json','report.json','findings.json')}),3)
 
     def test_reconciliation_preserves_partial_and_never_deletes_before_upload(self):
         old={'id':'one','head_sha':'a'*40,'analyzed_sha':'a'*40,'collected_run':'12-1','report_status':'partial','assets':{},'documents':{}}

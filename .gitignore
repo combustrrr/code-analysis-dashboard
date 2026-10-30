@@ -13,6 +13,8 @@ analysis-ui/public/data/
 analysis-ui/test-results/
 analysis-ui/playwright-report/
 analysis-ui/.lighthouseci/
+analysis-ui/.lighthouseci-routes/
+analysis-ui/.lighthouseci-routes-mobile/
 
 .verification/
 .superdesign/tmp/

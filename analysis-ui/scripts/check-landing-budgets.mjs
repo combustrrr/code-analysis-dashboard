@@ -1,4 +1,4 @@
-import {readFileSync} from 'node:fs';
+import {readFileSync,readdirSync} from 'node:fs';
 import {gzipSync} from 'node:zlib';
 
 const manifest=JSON.parse(readFileSync(new URL('../dist/.vite/manifest.json',import.meta.url),'utf8'));
@@ -28,4 +28,10 @@ const fontBytes=fontFiles.reduce((total,file)=>total+bytes(file).length,0);
 const budgets={jsGzip:50*1024,cssRaw:25*1024,cssGzip:7*1024,fontBytes:70*1024};
 const actual={jsGzip,cssRaw,cssGzip,fontBytes};
 for(const [name,limit] of Object.entries(budgets))if(actual[name]>limit)throw new Error(`${name} is ${actual[name]} bytes; budget is ${limit} bytes.`);
-console.log(JSON.stringify({entry:entry.file,jsFiles,cssFiles,fontFiles,...actual},null,2));
+const workspace=manifest['src/WorkspaceApp.tsx'];
+const expectedTabs=['OverviewTab','IssuesTab','CoverageTab','ReportsTab','ProgressTab'];
+for(const tab of expectedTabs){const key=`src/workspace-tabs/${tab}.tsx`;if(!manifest[key]?.isDynamicEntry||!workspace?.dynamicImports?.includes(key))throw new Error(`${tab} is not an independent lazy workspace chunk.`);}
+const workerFiles=readdirSync(new URL('../dist/assets/',import.meta.url)).filter(file=>/^ThreatReportPdf\.worker-.*\.js$/.test(file));
+if(workerFiles.length!==1)throw new Error(`Expected one request-lazy PDF Web Worker chunk; found ${workerFiles.length}.`);
+if(jsFiles.some(file=>workerFiles.some(worker=>file.endsWith(worker))))throw new Error('The PDF worker must not be part of the anonymous landing dependency graph.');
+console.log(JSON.stringify({entry:entry.file,jsFiles,cssFiles,fontFiles,workspaceTabs:expectedTabs,pdfWorker:workerFiles[0],...actual},null,2));

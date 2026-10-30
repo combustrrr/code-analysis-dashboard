@@ -9,6 +9,10 @@ from pathlib import PurePosixPath
 ASSET_LIMIT = 100_000_000
 DOCUMENT_UNPACKED_LIMIT = 64_000_000
 BATCH_UNPACKED_LIMIT = 64_000_000
+ISOLATED_DOCUMENTS = {
+    'project-overview.json', 'coverage.json', 'findings-catalog.json',
+    'report.json', 'findings.json',
+}
 
 
 def safe_path(name: str) -> bool:
@@ -55,6 +59,14 @@ def shard(documents: dict, *, asset_limit: int = 4_000_000) -> tuple[dict, dict]
         size=len(encode({path:value}))
         if size>asset_limit:
             raise ValueError('Report detail exceeds asset limit; paginate producer output')
+        # These documents have distinct UI loading boundaries. Keeping each in its
+        # own content-addressed object prevents an Overview request from downloading
+        # and parsing the much larger report or findings catalog.
+        if (path in ISOLATED_DOCUMENTS or path.startswith('findings-pages/')
+                or path.startswith('finding-locators/')):
+            emit(current);current={};estimated=0;unpacked=0
+            emit({path:value})
+            continue
         if current and (estimated + size > asset_limit or unpacked + raw_bytes > BATCH_UNPACKED_LIMIT):
             emit(current);current={};estimated=0;unpacked=0
         current[path]=value;estimated+=size;unpacked+=raw_bytes

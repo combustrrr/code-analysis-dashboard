@@ -104,6 +104,26 @@
       "timeout_minutes": 5,
       "evidence_source": "DETERMINISTIC",
       "sensitive": false
+    },
+    {
+      "channel": "ext-axe-accessibility",
+      "name": "axe WCAG browser audit",
+      "class": "reliability",
+      "mode": "source",
+      "adapter": "scripts/code_analysis/adapters/frontend_axe.py",
+      "timeout_minutes": 20,
+      "evidence_source": "DETERMINISTIC",
+      "sensitive": false
+    },
+    {
+      "channel": "ext-lighthouse-ui",
+      "name": "Lighthouse UI budgets",
+      "class": "reliability",
+      "mode": "source",
+      "adapter": "scripts/code_analysis/adapters/frontend_lighthouse.py",
+      "timeout_minutes": 25,
+      "evidence_source": "DETERMINISTIC",
+      "sensitive": false
     }
   ],
   "launch_endpoint": "https://code-analysis-launcher.icsarthak9.workers.dev"

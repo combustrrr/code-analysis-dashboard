@@ -1,6 +1,11 @@
-import {expect,test} from '@playwright/test';
+import {expect,test,type Page} from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const PROJECT='/#/projects/1278177697';
+async function expectAxeClean(page:Page){
+ const result=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+ expect(result.violations,JSON.stringify(result.violations,null,2)).toEqual([]);
+}
 
 test.describe('production shell',()=>{
  test('serves the configured favicon and modern routes only',async({page})=>{
@@ -24,6 +29,30 @@ test.describe('production shell',()=>{
   expect(Math.max(...geometry.icons)).toBeLessThanOrEqual(20);
  });
 
+ test('project register primary actions keep accessible text in the light theme',async({page})=>{
+  await page.goto('/#/projects');
+  await expect(page.getByRole('heading',{name:'Projects',level:1})).toBeVisible();
+  await page.evaluate(()=>document.documentElement.dataset.theme='light');
+  await page.evaluate(()=>{
+   const shell=document.createElement('div');
+   shell.className='projects-shell';
+   const actions=document.createElement('div');
+   actions.className='project-record-actions';
+   const link=document.createElement('a');
+   link.className='project-action project-action-primary';
+   link.href='#/projects/test/run';
+   link.textContent='Run analysis';
+   actions.append(link);
+   shell.append(actions);
+   document.body.append(shell);
+  });
+  const primaryAction=page.locator('.project-record-actions .project-action-primary').first();
+  await expect(primaryAction).toBeVisible();
+  await expect(primaryAction).toHaveCSS('color','rgb(255, 255, 255)');
+  await primaryAction.hover();
+  await expect(primaryAction).toHaveCSS('color','rgb(255, 255, 255)');
+ });
+
  test('project overview keeps one explicit run action and immutable revision context',async({page})=>{
   await page.goto(PROJECT);
   await expect(page.getByLabel('Selected analysis revision')).toContainText('Agentic-Kibana');
@@ -45,9 +74,11 @@ test.describe('production shell',()=>{
  test('issues support search, grouping, advanced filters, and evidence',async({page})=>{
   await page.goto(PROJECT+'/issues');
   await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();
+  await page.getByRole('button',{name:'Load complete catalog'}).click();
+  await expect(page.getByLabel('Search issues')).toBeVisible();
   await expect(page.getByText('How to read this evidence')).toBeVisible();
   await expect(page.getByText(/scanner.*support.*finding/i).first()).toBeVisible();
-  await page.getByLabel('Severities',{exact:true}).click();
+  await page.locator('.path-multi-picker summary').first().click();
   const severityOptions=page.getByLabel('Severities options').getByRole('option');
   await severityOptions.first().click();
   await severityOptions.first().click();
@@ -62,21 +93,88 @@ test.describe('production shell',()=>{
   await expect(page).toHaveURL(/group=rule/);
   await expect(page.getByText(/finding/).first()).toBeVisible();
   await page.getByRole('button',{name:'More filters'}).click();
-  await page.getByLabel('Files',{exact:true}).click();
+  await page.locator('.path-multi-picker summary').filter({hasText:/Choose files/i}).click();
   const pathOptions=page.getByLabel('Files options').getByRole('option');
   await expect(pathOptions.first()).toBeVisible();
   await pathOptions.first().click();
   await pathOptions.first().click();
   await expect(page.getByLabel('Files selected values')).toContainText('Clear files');
   await expect.poll(async()=>new URL(page.url()).hash.match(/file=/g)?.length||0).toBe(2);
+  await page.locator('.path-multi-picker summary').filter({hasText:/files selected/i}).click();
   await page.getByRole('button',{name:'Clear filters',exact:true}).click();
   await page.getByLabel('Group issues').selectOption('none');
   await page.locator('.issue-link').first().click();
+  await expect(page.locator('.filters')).toBeHidden();
+  await expect(page.getByRole('button',{name:'Back to findings'})).toBeVisible();
+  await expect.poll(async()=>page.locator('.evidence-panel').evaluate(element=>element.getBoundingClientRect().width/window.innerWidth)).toBeGreaterThan(.9);
   await expect(page.getByText('Reported by',{exact:true})).toBeVisible();
   await expect(page.getByText('Rules applied',{exact:true})).toBeVisible();
   await expect(page.getByRole('link',{name:'Open code on GitHub'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Code at the reported location'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Why this was reported'})).toBeVisible();
+ });
+
+ test('project status and issue content remain in intrinsic document flow',async({page})=>{
+  await page.goto(PROJECT+'/issues');
+  await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();
+  const geometry=await page.locator('.project-workspace').evaluate(workspace=>{
+   const banner=document.createElement('section');
+   banner.className='analysis-progress-banner';
+   banner.innerHTML='<div><strong>Dynamic analysis status</strong><small>Evidence remains available while scanners run.</small></div><a class="ant-btn">View progress</a>';
+   const following=workspace.firstElementChild as HTMLElement|null;
+   workspace.insertBefore(banner,following);
+   const bannerRect=banner.getBoundingClientRect();
+   const followingRect=following?.getBoundingClientRect();
+   return{
+    position:getComputedStyle(banner).position,
+    bannerBottom:bannerRect.bottom,
+    followingTop:followingRect?.top||0,
+    workspaceWidth:workspace.getBoundingClientRect().width,
+    viewportWidth:window.innerWidth,
+   };
+  });
+  expect(geometry.position).not.toBe('sticky');
+  expect(geometry.bannerBottom).toBeLessThanOrEqual(geometry.followingTop);
+  expect(geometry.workspaceWidth/geometry.viewportWidth).toBeGreaterThan(.9);
+ });
+
+ test('mobile issues use bounded evidence cards instead of compressed table columns',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto(PROJECT+'/issues');
+  await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();
+  await expect(page.locator('.issues-table .ant-table-thead')).toHaveCSS('position','absolute');
+  await expect(page.locator('.issues-table .ant-table-row')).toHaveCount(20);
+  const geometry=await page.evaluate(()=>({
+   documentWidth:document.documentElement.scrollWidth,
+   viewportWidth:window.innerWidth,
+   tabs:[...document.querySelectorAll('.project-navigation .ant-tabs-tab')].map(item=>item.getBoundingClientRect()),
+   firstRow:document.querySelector('.issues-table .ant-table-row')?.getBoundingClientRect(),
+  }));
+  expect(geometry.documentWidth).toBe(geometry.viewportWidth);
+  expect(geometry.tabs).toHaveLength(4);
+  expect(new Set(geometry.tabs.map(tab=>Math.round(tab.top))).size).toBe(2);
+  expect(geometry.firstRow?.width).toBeLessThanOrEqual(370);
+ });
+
+ test('mobile finding detail opens as a bounded full-screen evidence sheet',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto(PROJECT+'/issues');
+  await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();
+  await expect(page.locator('.issues-table .ant-table-row')).toHaveCount(20);
+  await page.locator('.issue-link').first().click();
+  const dialog=page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator(':scope > header')).toContainText('Issue detail');
+  await expect(dialog.getByRole('button',{name:'Close'})).toHaveCSS('min-height','44px');
+  const geometry=await dialog.evaluate(element=>{
+   const rect=element.getBoundingClientRect(),body=element.querySelector('.ant-drawer-body') as HTMLElement|null,source=element.querySelector('.source') as HTMLElement|null;
+   return{left:rect.left,right:rect.right,width:rect.width,viewport:window.innerWidth,bodyWidth:body?.clientWidth||0,bodyScrollWidth:body?.scrollWidth||0,sourceWidth:source?.clientWidth||0};
+  });
+  expect(geometry.left).toBe(0);
+  expect(geometry.right).toBe(geometry.viewport);
+  expect(geometry.width).toBe(geometry.viewport);
+  expect(geometry.bodyScrollWidth).toBeLessThanOrEqual(geometry.bodyWidth);
+  expect(geometry.sourceWidth).toBeLessThanOrEqual(geometry.bodyWidth);
  });
 
  test('in-workspace route changes preserve the reading position',async({page})=>{
@@ -87,8 +185,8 @@ test.describe('production shell',()=>{
   await page.getByRole('tab',{name:/Issues/}).evaluate((element:HTMLElement)=>element.click());
   await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();
   await page.waitForTimeout(100);
-  const after=await page.evaluate(()=>window.scrollY);
-  expect(after).toBeGreaterThan(before-100);
+  const {after,maximum}=await page.evaluate(()=>({after:window.scrollY,maximum:document.documentElement.scrollHeight-window.innerHeight}));
+  expect(after).toBeGreaterThanOrEqual(Math.min(before-100,maximum));
  });
 
  test('coverage keeps scanner outcomes separate from downloadable reports',async({page})=>{
@@ -107,7 +205,8 @@ test.describe('production shell',()=>{
   await expect(page.getByRole('heading',{name:'Complete issues report'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Download complete PDF'})).toBeVisible();
   await expect(page.getByText('Build a filtered issues report',{exact:true})).toBeVisible();
-  await page.getByLabel('Report severities',{exact:true}).click();
+  await expectAxeClean(page);
+  await page.locator('.report-export-filters .path-multi-picker summary').first().click();
   await page.getByLabel('Report severities options').getByRole('option',{name:'HIGH'}).click();
   await expect(page.getByRole('button',{name:'Download filtered PDF'})).toBeEnabled();
   const filteredDownload=page.waitForEvent('download');
@@ -118,6 +217,34 @@ test.describe('production shell',()=>{
   const download=page.waitForEvent('download');
   await page.getByRole('button',{name:'Download complete PDF'}).click();
   expect((await download).suggestedFilename()).toMatch(/Agentic-Kibana-2c38720d0b68-complete\.pdf$/);
+ });
+
+ test('every evidence workspace route passes automated WCAG checks',async({page})=>{
+  test.setTimeout(90_000);
+  await page.goto(PROJECT);
+  await expect(page.getByRole('heading',{name:'Where should the review focus?'})).toBeVisible();
+  await expectAxeClean(page);
+
+  await page.goto(PROJECT+'/issues');
+  await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();
+  await page.getByRole('button',{name:'Load complete catalog'}).click();
+  await expect(page.getByLabel('Search issues')).toBeVisible();
+  await expectAxeClean(page);
+
+  await page.goto(PROJECT+'/coverage');
+  await expect(page.getByRole('heading',{name:'Analysis channels'})).toBeVisible();
+  await expectAxeClean(page);
+
+  await page.goto(PROJECT+'/report');
+  await expect(page.getByRole('heading',{name:'Downloadable reports'})).toBeVisible();
+  await expectAxeClean(page);
+
+  await page.setViewportSize({width:390,height:844});
+  await page.goto(PROJECT+'/issues');
+  await expect(page.locator('.issue-link').first()).toBeVisible();
+  await page.locator('.issue-link').first().click();
+  await expect(page.getByRole('dialog',{name:'Issue detail'})).toBeVisible();
+  await expectAxeClean(page);
  });
 
  test('legacy activity URLs fall through to Projects and settings remains reachable',async({page})=>{

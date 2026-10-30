@@ -9,6 +9,25 @@ from scripts.code_analysis import extensions
 
 
 class ScannerUpdateTests(unittest.TestCase):
+    def test_frontend_runtime_channels_are_registered_and_dashboard_scoped(self):
+        service = json.loads(Path('config/code-analysis/service.json').read_text(encoding='utf-8'))
+        rows = {row['channel']: row for row in extensions.registry(service)}
+        self.assertEqual(
+            set(rows).intersection({'ext-axe-accessibility', 'ext-lighthouse-ui'}),
+            {'ext-axe-accessibility', 'ext-lighthouse-ui'},
+        )
+        for channel in ('ext-axe-accessibility', 'ext-lighthouse-ui'):
+            self.assertEqual(rows[channel]['mode'], 'source')
+            self.assertEqual(rows[channel].get('secrets', {}), {})
+            self.assertEqual(rows[channel]['class'], 'reliability')
+        projects = json.loads(Path('.github/code-analysis/projects.json').read_text(encoding='utf-8'))['projects']
+        enabled = {row['source_repository']['full_name']: set(row['enabled_scanners']) for row in projects}
+        self.assertTrue({'ext-axe-accessibility', 'ext-lighthouse-ui'}.issubset(
+            enabled['combustrrr/code-analysis-dashboard']))
+        self.assertTrue(all(not ({'ext-axe-accessibility', 'ext-lighthouse-ui'} & channels)
+                            for repository, channels in enabled.items()
+                            if repository != 'combustrrr/code-analysis-dashboard'))
+
     def test_zizmor_pin_is_stable_and_synchronized_across_generated_workflows(self):
         paths = (
             'config/code-analysis/workflow-templates/03-dependency-security.yml',

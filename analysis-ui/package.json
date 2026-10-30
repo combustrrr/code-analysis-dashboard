@@ -10,7 +10,9 @@
     "test": "playwright test",
     "test:unit": "vitest run --dir src",
     "check:landing-budgets": "node scripts/check-landing-budgets.mjs",
-    "test:lighthouse": "npx --yes @lhci/cli@0.15.1 autorun"
+    "test:lighthouse": "npx --yes @lhci/cli@0.15.1 autorun",
+    "test:lighthouse:routes:desktop": "npx --yes @lhci/cli@0.15.1 autorun --config=lighthouserc.routes.cjs",
+    "test:lighthouse:routes:mobile": "npx --yes @lhci/cli@0.15.1 autorun --config=lighthouserc.routes-mobile.cjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.7",

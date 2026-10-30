@@ -24,6 +24,13 @@ application commands are configuration; source repositories remain read-only.
 New scanner channels appear in Issues, Scanners, overview counts and provenance
 through the existing report contract. No frontend scanner-specific component is needed.
 
+The connected dashboard profile also runs two credentialless runtime UI channels at
+the selected immutable revision. `ext-axe-accessibility` executes the reviewed
+Playwright/axe WCAG 2.1 AA browser gate. `ext-lighthouse-ui` executes the reviewed
+production Lighthouse performance, accessibility, LCP, and CLS budgets. These
+channels report deterministic policy evidence; they do not treat a configured job
+or a successful build as proof that the UI checks passed.
+
 ## Add a scanner
 
 1. Implement a Python adapter under `scripts/code_analysis/adapters/` in the trusted

@@ -11,7 +11,7 @@ async function dataUrl(url: string): Promise<string> {
   const blob = await response.blob(); return await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(blob); });
 }
 
-function render(model: PdfExportModel, trustLogo: string, mphasisLogo: string): Blob {
+async function render(model: PdfExportModel, trustLogo: string, mphasisLogo: string, onProgress: (percent:number)=>void): Promise<Blob> {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
   const { report } = model, width = doc.internal.pageSize.getWidth(), margin = 44, contentWidth = width - margin * 2, bottom = 786; let y = 48;
   const addPage = () => { doc.addPage(); y = 48; }; const ensure = (height: number) => { if (y + height > bottom) addPage(); };
@@ -50,11 +50,18 @@ function render(model: PdfExportModel, trustLogo: string, mphasisLogo: string): 
   if(report.truncated||report.truncation_notice||report.findings_omitted) write(report.truncation_notice||report.truncation_reason||`${report.findings_omitted||'Some'} findings were omitted upstream.`,{bold:true,color:RED});
   section('Limitations and interpretation','Read these boundaries before making engineering or release decisions.'); (report.limitations.length?report.limitations:['No additional limitations were declared.']).forEach(item=>write(`- ${item}`,{indent:9,gap:3}));
   section('Immutable provenance','Identifiers bind this report to its source, analysis, tooling, and publication context.'); pair('Repository',report.source_repository||'Unavailable',true); pair('Revision',report.target_sha,true); pair('Target',report.ref||(report.pr?`Pull request #${report.pr}`:'Exact commit')); pair('Analysis ID',report.analysis_id||'Unavailable',true); pair('Report ID',report.report_id,true); pair('Tooling SHA',report.tooling_sha||'Unavailable',true); pair('Analyzed',report.analysis_timestamp||report.generated_at); pair('Published',report.report_generation_timestamp||report.generated_at); pair('PDF exported',model.exportedAt); pair('Catalog / generator',`${report.guidance_catalog_version} / ${report.generator_version}`,true); pair('Export scope',model.scope==='complete'?`All ${model.totalSelected} retained findings`:`${model.totalSelected} filtered findings from ${report.findings.length}`); if(model.scope==='filtered') pair('Frozen filters',Object.entries(model.filters).filter(([,v])=>Array.isArray(v)?v.length:Boolean(v)).map(([k,v])=>`${k}: ${Array.isArray(v)?v.join(', '):v}`).join(' / ')||'None');
-  section(`Detailed findings (${model.findings.length})`,'Source location, scanner attribution, explanation, impact, remediation, and workflow evidence.',true); if(!model.findings.length) write('No findings are included in this export scope.',{color:SLATE}); model.findings.forEach((item,index)=>finding(item,index+1));
+  section(`Detailed findings (${model.findings.length})`,'Source location, scanner attribution, explanation, impact, remediation, and workflow evidence.',true); if(!model.findings.length) write('No findings are included in this export scope.',{color:SLATE});
+  for(let index=0;index<model.findings.length;index++){
+    finding(model.findings[index],index+1);
+    if(index%20===19){onProgress(20+Math.round((index+1)/Math.max(1,model.findings.length)*70));await new Promise(resolve=>setTimeout(resolve,0));}
+  }
   const pages=doc.getNumberOfPages(); for(let page=1;page<=pages;page++){doc.setPage(page);doc.setDrawColor(...RULE);doc.line(margin,807,width-margin,807);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(...SLATE);doc.text(`${report.report_id} / ${report.target_sha?.slice(0,12)||'unavailable'}`,margin,822);doc.text(`Page ${page} of ${pages}`,width-margin,822,{align:'right'});} return doc.output('blob');
 }
 
-export async function createThreatReportDownload(report: ThreatReportData, scope: ExportScope, filters: ReportFilterSnapshot): Promise<{blob:Blob;filename:string}> {
+export async function createThreatReportDownload(report: ThreatReportData, scope: ExportScope, filters: ReportFilterSnapshot,onProgress:(percent:number)=>void=()=>{}): Promise<{blob:Blob;filename:string}> {
+  onProgress(5);
   const model=buildPdfModel(report,scope,filters),base=safeExportBaseName(report,scope),[trust,mphasis]=await Promise.all([dataUrl(trustLabLogo),dataUrl(mphasisLogo)]);
-  return {blob:render(model,trust,mphasis),filename:`${base}.pdf`};
+  onProgress(20);
+  const blob=await render(model,trust,mphasis,onProgress);onProgress(100);
+  return {blob,filename:`${base}.pdf`};
 }

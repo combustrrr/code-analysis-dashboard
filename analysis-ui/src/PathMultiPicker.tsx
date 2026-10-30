@@ -8,9 +8,11 @@ export function MultiValuePicker({label,options,value,onChange,itemName='value',
  const normalized=query.trim().toLowerCase();
  const choices=useMemo(()=>options.filter(path=>!value.includes(path)&&(!normalized||path.toLowerCase().includes(normalized))).slice(0,60),[options,value,normalized]);
  const add=(path:string)=>{if(path&&!value.includes(path))onChange([...value,path]);setQuery('');};
+ const plural=itemName==='severity'?'severities':itemName==='category'?'categories':`${itemName}s`;
+ const summary=value.length?`${value.length} ${value.length===1?itemName:plural} selected`:`Choose ${plural}`;
  return <div className="path-multi-picker" ref={root}>
   <details>
-   <summary aria-label={label}><span>{value.length?`${value.length} ${itemName}${value.length===1?'':'s'} selected`:`Choose ${itemName}s`}</span><small>Select multiple</small></summary>
+   <summary><span>{summary}</span><small>Select multiple</small></summary>
    <div className="path-picker-popover">
     <Input aria-label={`${label} search`} value={query} placeholder={searchPlaceholder} onChange={event=>setQuery(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'&&choices.length===1){event.preventDefault();add(choices[0]);}}}/>
     <div className="path-picker-options" role="listbox" aria-label={`${label} options`} aria-multiselectable="true">

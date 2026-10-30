@@ -1,1 +1,16 @@
 .projects-shell .shell-native-button,.project-action{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 15px;border:1px solid var(--workspace-line);border-radius:6px;background:transparent;color:var(--workspace-ink);font:650 12px/1 Manrope,sans-serif;text-decoration:none;cursor:pointer}.project-action-primary{border-color:var(--workspace-primary);background:var(--workspace-primary);color:#fff}.project-alert{display:grid;gap:5px;padding:14px 16px;border:1px solid #d89a3d;border-radius:7px;background:color-mix(in srgb,#d89a3d 10%,transparent)}.project-alert span{color:var(--workspace-muted);font-size:12px}.project-empty{padding:55px;border:1px dashed var(--workspace-line);color:var(--workspace-muted);text-align:center}.project-progress{height:8px;border-radius:999px;background:var(--workspace-line);overflow:hidden}.project-progress i{display:block;height:100%;border-radius:inherit;background:var(--workspace-accent)}.project-state{color:var(--workspace-muted);border:1px solid var(--workspace-line)}.project-state.state-ready{color:#a6dc77;border-color:#638743}.project-state.state-needs-attention{color:#e5ad55;border-color:#9b7131}.projects-shell .project-record-actions .project-action{height:38px;font-weight:650}@media(max-width:980px){.projects-shell .shell-user,.projects-shell .shell-native-button{display:none}}@media(max-width:600px){.projects-shell .project-record-actions .project-action{width:100%}}
+/* Keep anchor link colors from overriding the primary card action in either theme. */
+.projects-shell .project-record-actions .project-action-primary,
+.projects-shell .project-record-actions .project-action-primary:visited {
+  border-color: var(--workspace-primary);
+  background: var(--workspace-primary);
+  color: #fff;
+  text-decoration: none;
+}
+
+.projects-shell .project-record-actions .project-action-primary:hover,
+.projects-shell .project-record-actions .project-action-primary:focus-visible {
+  border-color: color-mix(in srgb, var(--workspace-primary) 82%, #000);
+  background: color-mix(in srgb, var(--workspace-primary) 82%, #000);
+  color: #fff;
+}
