@@ -81,6 +81,10 @@ operationally incomplete evidence, allowing healthy sibling evidence to proceed 
 Before a coverage command starts, the runner removes coverage outputs already present in the
 source checkout. Only documents materialized by the current bounded command can satisfy the
 coverage channel; committed or otherwise stale source artifacts are never adopted as evidence.
+When a current-run coverage shard is retained after the test deadline, its observations remain
+available, but the native `OPERATIONAL_FAILURE` status takes precedence over the generic
+artifact-retention gate. The report therefore keeps useful partial coverage while still listing
+the coverage channel as incomplete.
 The coordinator heartbeat renews the fenced lease once per minute and exits when terminal
 completion invalidates that lease, so a published Actions run should not remain visibly active
 for more than one renewal interval solely because of its heartbeat job.

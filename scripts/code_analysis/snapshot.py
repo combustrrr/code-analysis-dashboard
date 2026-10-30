@@ -64,7 +64,10 @@ def build_analysis_channels(catalog: dict, artifacts: Path | None,
         finding_ids = set().union(*(findings_by_family.get(family, set()) for family in families))
         status = str(gate["status"] if gate else native.get("status") or
                      ("COMPLETED_OPTIONAL" if observations else "NOT_AVAILABLE"))
-        if native.get("status") in {"FAILED", "NOT_AVAILABLE", "SETUP_REQUIRED"}:
+        if native.get("status") in {
+            "FAILED", "INVALID_EVIDENCE", "NOT_AVAILABLE",
+            "OPERATIONAL_FAILURE", "SETUP_REQUIRED",
+        }:
             status = native["status"]
         reason = str(native.get("reason") or (gate or {}).get("reason") or "")
         if not gate and not native and not observations:

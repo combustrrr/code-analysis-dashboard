@@ -822,6 +822,24 @@ class MonitoringTests(unittest.TestCase):
         self.assertEqual(completed["status"],"CONFIGURED_COMPLETE")
         self.assertEqual(completed["reason"],"")
 
+    def test_native_operational_failure_overrides_retained_evidence_gate(self):
+        catalog={"tools":[{"tool":"Coverage.py","channel":"coverage","class":"reliability"}]}
+        snapshot={"observations":[{"scanner_family":"Coverage.py","observation_id":"coverage-1"}],
+                  "canonical_findings":[],"ai_advisories":[],
+                  "channel_status":[{"channel":"coverage","scanner_family":"Coverage.py",
+                                      "status":"COMPLETED","artifact_files":["coverage.json"]}]}
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/"coverage-status.json").write_text(json.dumps({
+                "scanner_family":"Coverage.py","status":"OPERATIONAL_FAILURE",
+                "reason":"Tests exceeded the trusted limit; partial coverage retained",
+            }),encoding="utf-8")
+            row=build_analysis_channels(catalog,root,snapshot)[0]
+        self.assertEqual(row["status"],"OPERATIONAL_FAILURE")
+        self.assertEqual(row["observation_count"],1)
+        self.assertIsNone(row["findings"])
+        self.assertIn("partial coverage retained",row["reason"])
+
     def test_unified_snapshot_has_one_catalog_inventory_and_separate_gate(self):
         result=snapshot([raw("CodeQL"),raw("Semgrep")])
         validate_snapshot(result)
