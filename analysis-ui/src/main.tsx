@@ -4,6 +4,7 @@ import './document.css';
 import {AppearanceProvider} from './Appearance';
 import {DashboardAccess} from './DashboardAccess';
 import {LandingPage} from './LandingPage';
+import {AuthTransition} from './AuthTransition';
 import {isWorkspaceRoute, parseAppRoute, routeHash} from './appRoutes';
 import type {useLaunchAuth} from './useLaunchAuth';
 
@@ -23,6 +24,7 @@ function openWorkspace(){
 }
 
 function PublicLanding({auth,accessError,accessPending,workspaceRequested}:{auth:Auth;accessError?:string;accessPending?:boolean;workspaceRequested?:boolean}){
+ if(auth.state.status!=='anonymous'||accessPending)return <AuthTransition auth={auth} accessError={accessError} accessPending={accessPending}/>;
  return <LandingPage auth={auth} accessError={accessError} accessPending={accessPending} workspaceRequested={workspaceRequested} onStart={openWorkspace}/>;
 }
 

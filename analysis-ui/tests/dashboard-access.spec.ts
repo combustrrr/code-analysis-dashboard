@@ -119,11 +119,11 @@ test('GitHub sign-in presents one stable confirmation state',async({page,context
   throw new Error(`Unexpected request ${url.pathname}`);
  });
  await page.goto('/#/projects');
- const shellBounds=await page.locator('.landing-hero').evaluate(element=>{const rect=element.getBoundingClientRect();return{left:Math.round(rect.left),width:Math.round(rect.width)};});
  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
- await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('Confirming GitHub access');
- await expect(page.getByRole('status',{name:'GitHub sign-in progress'})).toContainText('opaque, short-lived application session');
- expect(await page.locator('.landing-hero').evaluate(element=>{const rect=element.getBoundingClientRect();return{left:Math.round(rect.left),width:Math.round(rect.width)};})).toEqual(shellBounds);
+ await expect(page.locator('.auth-transition-panel')).toContainText('Confirming GitHub access');
+ await expect(page.locator('.auth-transition-panel')).toContainText('opaque, short-lived application session');
+ await expect(page.locator('.landing-hero')).toHaveCount(0);
+ await expect(page.locator('.auth-transition-panel')).toBeVisible();
  await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
  expect(Math.abs(sessionStarted-projectsStarted)).toBeLessThan(100);expect(projectsRequests).toBe(1);
 });
@@ -175,14 +175,13 @@ test('cancellation and exchange failures stay on the public shell',async({page,c
   return route.fulfill({status:200,headers,json:{targets:[],projects:[]}});
  });
   await page.goto('/#/projects');
-  const signIn=page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/});
-  await signIn.click();
+  await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
   await expect(page.getByText(/needs collaborator access from the repository owner/)).toBeVisible();
   await expect(page.getByRole('heading',{name:'Projects'})).toHaveCount(0);
-  await signIn.click();
+  await page.getByRole('button',{name:'Start sign-in again'}).click();
   await expect(page.getByText('GitHub sign-in was cancelled. Retry when you are ready.')).toBeVisible();
   await expect(page.getByRole('heading',{name:'Projects'})).toHaveCount(0);
-  await signIn.click();
+  await page.getByRole('button',{name:'Start sign-in again'}).click();
  await expect(page.getByText('GitHub sign-in was interrupted. Start sign-in again.')).toBeVisible();
  await expect(page.getByText('private store diagnostic')).toHaveCount(0);
  expect(sessionChecks).toBe(0);expect(reportRequests).toBe(0);
@@ -209,7 +208,7 @@ test('a revoked workspace API request clears the session immediately',async({pag
   revoked=true;
    await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
    await expect(page.getByText(/needs collaborator access from the repository owner/)).toBeVisible();
-  await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Start sign-in again'})).toBeVisible();
   expect(reportRequests).toBe(0);
  });
 
@@ -459,7 +458,7 @@ test('GitHub rate-limit and permission ambiguity retain the tab session for retr
  await page.goto('/#/projects');
  await expect(page.getByText('GitHub is temporarily limiting access checks. Retry shortly.')).toBeVisible();
  expect(await page.evaluate(()=>sessionStorage.getItem('analysis-auth-session'))).toBe(handle);
- await expect(page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Retry access check'})).toBeVisible();
 });
 
 test('authorized user follows one repository project from selection through publication',async({page,context})=>{
