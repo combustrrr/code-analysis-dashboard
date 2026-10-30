@@ -116,6 +116,10 @@ class PortabilityTests(unittest.TestCase):
                            if step.get('name') == 'Install pinned trusted analysis runtime')
             self.assertLess(runtime, runner)
             self.assertIn('$RUNNER_TEMP/analysis-tooling/.ci/requirements.txt', steps[runtime]['run'])
+        upload = next(step for step in jobs['scanner-7-schemathesis-fuzz']['steps']
+                      if step.get('with', {}).get('name') == 'schemathesis-report')
+        self.assertEqual(upload['with']['path'],
+                         'fuzzing-results.xml\nschema.json\nschemathesis-status.json')
 
     def test_bundle_synchronizes_all_services_without_overwriting(self):
         with tempfile.TemporaryDirectory() as directory:

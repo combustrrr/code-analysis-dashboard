@@ -1026,7 +1026,9 @@ jobs:
         name: schemathesis-report
         path: 'fuzzing-results.xml
 
-          backend/schema.json'
+          schema.json
+
+          schemathesis-status.json'
         if-no-files-found: error
         retention-days: 7
     - name: Upload fuzzing-findings as artifact

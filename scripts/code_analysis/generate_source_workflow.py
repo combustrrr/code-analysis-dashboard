@@ -182,7 +182,8 @@ def generate(config=None):
                         s['run'] = 'PYTHONPATH="$GITHUB_WORKSPACE/.analysis-tooling" python -m scripts.code_analysis.run_profile python-install --source "$GITHUB_WORKSPACE"\npython -m pip install schemathesis==3.39.16 httpx==0.27.2'
                     elif s.get('name') == 'Run API Fuzzing (Schemathesis)':
                         s['run'] = 'PYTHONPATH="$GITHUB_WORKSPACE/.analysis-tooling" python -m scripts.code_analysis.run_profile api-fuzz --source "$GITHUB_WORKSPACE"'
-                    elif s.get('name') == 'Upload Fuzzing Report':
+                    elif (s.get('name') in {'Upload Fuzzing Report', 'Upload schemathesis-report as artifact'}
+                          or s.get('with', {}).get('name') == 'schemathesis-report'):
                         s['with']['path'] = 'fuzzing-results.xml\nschema.json\nschemathesis-status.json'
             if name == 'typescript-quality':
                 steps.extend([
