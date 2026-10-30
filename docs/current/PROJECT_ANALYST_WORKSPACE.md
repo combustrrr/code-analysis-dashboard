@@ -47,6 +47,14 @@ The Durable Object permits five newly accepted audit downloads per opaque sessio
 
 Deploy the backward-compatible Cloudflare Worker before publishing Pages. Verify `/api/public/config` and an authenticated bootstrap/report request against the Worker, then push the Pages assets and confirm that their hashed entry chunks load without console errors. New Pages code treats missing overview and audit-bundle references as compatibility states, so it remains safe while older current reports await republication.
 
+Issue-detail navigation uses element anchors rather than restoring an absolute window
+offset. Opening a desktop finding focuses and reveals the detail canvas below the sticky
+header. Closing the detail restores focus to the originating finding when it remains on
+the active page, with the Issues heading as the fallback. Mobile retains the drawer and
+restores the same finding without moving the document to its top or bottom. Dynamic
+Issues content opts out of native scroll anchoring to prevent catalog and polling updates
+from moving the analyst's viewport.
+
 ## Compatibility and removal
 
 Older manifests without `project-overview-v1` remain reviewable through client derivation. Older targets without `audit_bundle` show the existing report exports and do not advertise an unavailable ZIP. Remove the overview fallback only after every retained current report has been republished with the new document.

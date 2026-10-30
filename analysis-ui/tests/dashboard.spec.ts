@@ -247,6 +247,29 @@ test.describe('production shell',()=>{
   await expectAxeClean(page);
  });
 
+ test('issue detail navigation uses stable scroll and focus anchors',async({page})=>{
+  await page.setViewportSize({width:1366,height:768});
+  await page.goto(PROJECT+'/issues');
+  const loadAll=page.getByRole('button',{name:'Load complete catalog'});
+  if(await loadAll.isVisible())await loadAll.click();
+  const issue=page.locator('.issue-link').nth(10);
+  await issue.scrollIntoViewIfNeeded();
+  const label=(await issue.textContent())?.trim();
+  expect(label).toBeTruthy();
+  await issue.click();
+  const detail=page.locator('.evidence-panel');
+  await expect(detail).toBeVisible();
+  const detailPosition=await detail.evaluate(element=>({top:element.getBoundingClientRect().top,bottom:element.getBoundingClientRect().bottom,viewport:innerHeight}));
+  expect(detailPosition.top).toBeGreaterThanOrEqual(0);
+  expect(detailPosition.top).toBeLessThan(detailPosition.viewport);
+  await detail.getByRole('button',{name:'Back to findings'}).click();
+  const restored=page.locator('.issue-link').filter({hasText:label!}).first();
+  await expect(restored).toBeFocused();
+  const restoredPosition=await restored.evaluate(element=>({top:element.getBoundingClientRect().top,bottom:element.getBoundingClientRect().bottom,viewport:innerHeight}));
+  expect(restoredPosition.bottom).toBeGreaterThan(0);
+  expect(restoredPosition.top).toBeLessThan(restoredPosition.viewport);
+ });
+
  test('legacy activity URLs fall through to Projects and settings remains reachable',async({page})=>{
   await page.goto('/#/activity');
   await expect(page.getByRole('heading',{name:'Projects',level:1})).toBeVisible();

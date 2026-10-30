@@ -50,7 +50,7 @@ function isRepositoryAvailabilityError(value: string) { return /retired|unsuppor
 const PROJECT_RUNS_STORAGE_KEY = 'analysis-project-runs';
 const ACTIVE_PROJECT_RUN_PHASES = new Set(['preparing', 'queued', 'running', 'scanning', 'analyzing', 'collecting', 'publishing']);
 function readProjectRuns(): ProjectRunRequest[] { try { const value = JSON.parse(sessionStorage.getItem(PROJECT_RUNS_STORAGE_KEY) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } }
-function navigate(target: string, tab: ProjectView, issue = '',filters?:IssueRouteFilters) { const current = route(); if(!current.project)return;navigateAppHash(routeHash({kind:'project',projectId:current.project,target:target||undefined,view:tab,issue:issue||undefined,filters}),{preserveScroll:true}); }
+function navigate(target: string, tab: ProjectView, issue = '',filters?:IssueRouteFilters) { const current = route(); if(!current.project)return;const changesIssueCanvas=tab==='issues'&&current.tab==='issues'&&Boolean(issue)!==Boolean(current.issue);navigateAppHash(routeHash({kind:'project',projectId:current.project,target:target||undefined,view:tab,issue:issue||undefined,filters}),{preserveScroll:!changesIssueCanvas}); }
 function date(s?: string) { return s ? new Date(s).toLocaleString() : 'Unavailable'; }
 const colors: Record<string, string> = { CRITICAL: 'red', HIGH: 'volcano', MEDIUM: 'gold', LOW: 'blue', INFO: 'default', current: 'green', partial: 'orange', failed: 'red', scanning: 'blue', COMPLETED: 'green', CONFIGURED_COMPLETE: 'green', POLICY_FINDINGS: 'orange', NOT_AVAILABLE: 'orange', FAILED: 'red' };
 function Badge({ value }: { value: string }) { return <Tag className={`status-tag status-${value}`} color={colors[value]}>{states[value] || value.replaceAll('_', ' ')}</Tag>; }
@@ -102,8 +102,9 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
    const [index, setIndex] = useState<Index>(); const [error, setError] = useState(''); const [r, setRoute] = useState(route());
    const [currentOverlay,setCurrentOverlay]=useState<PrOverlay>(); const [overlayError,setOverlayError]=useState('');
    const refreshSequence = useRef(0);
-  const [report, setReport] = useState<Report>(); const [overview,setOverview]=useState<ProjectOverview>(); const [findings, setFindings] = useState<Finding[]>([]); const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
+  const [report, setReport] = useState<Report>(); const [overview,setOverview]=useState<ProjectOverview>(); const [findings, setFindings] = useState<Finding[]>([]); const findingsRef=useRef(findings);findingsRef.current=findings; const [detail, setDetail] = useState<Detail>(); const [source, setSource] = useState<string[]>([]);
   const [findingsCatalog,setFindingsCatalog]=useState<FindingsCatalog>();const [catalogReady,setCatalogReady]=useState(false);const [catalogLoading,setCatalogLoading]=useState(false);
+  const issueDetailRef=useRef<HTMLElement>(null),returnFindingRef=useRef(''),previousIssueRef=useRef('');
   const {issueGrouping}=useWorkspacePreferences();
   const [query, setQuery] = useState(''); const [selectedSeverities, setSelectedSeverities] = useState<string[]>([]); const [selectedCategories,setSelectedCategories]=useState<string[]>([]); const [selectedScanners, setSelectedScanners] = useState<string[]>([]); const [groupBy, setGroupBy] = useState(issueGrouping); const [moreFilters,setMoreFilters]=useState(false); const [page, setPage] = useState(0); const [loading, setLoading] = useState(false);
     useEffect(() => {
@@ -256,6 +257,21 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
   const locatedCount=overview?.findings.located??findings.filter(f=>f.file&&f.line).length;
   const reviewObjective=criticalCount?'Validate critical findings before making a release decision.':highCount?'Triage high-severity findings and confirm whether they are reachable in production.':incompleteCount?'Close the scanner coverage gaps before treating this review as complete.':'Review the leading evidence clusters and record the engineering decision.';
   const issueRoute=(filters:IssueRouteFilters={},issue='')=>{if(!target)return;navigateAppHash(routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:issue||undefined,filters}),{preserveScroll:true});};
+  useEffect(()=>{
+    if(r.tab!=='issues')return;
+    const previous=previousIssueRef.current;
+    previousIssueRef.current=r.issue;
+    if(r.issue){
+      returnFindingRef.current=r.issue;
+      if(!screens.lg)return;
+      const frame=window.requestAnimationFrame(()=>{issueDetailRef.current?.focus({preventScroll:true});issueDetailRef.current?.scrollIntoView({block:'start'});});
+      return()=>window.cancelAnimationFrame(frame);
+    }
+    if(!previous)return;
+    const id=returnFindingRef.current||previous,message=findingsRef.current.find(item=>item.id===id)?.message;
+    const frame=window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{const candidates=Array.from(document.querySelectorAll<HTMLElement>('.issue-link,.related-finding'));const row=candidates.find(item=>item.classList.contains('issue-link')?item.textContent?.trim()===message:item.querySelector('span')?.textContent?.trim()===message)||document.getElementById('issues-title');row?.focus({preventScroll:true});row?.scrollIntoView({block:'nearest'});}));
+    return()=>window.cancelAnimationFrame(frame);
+  },[r.tab,r.issue,screens.lg]);
   useEffect(()=>{if(r.tab!=='issues'||!target)return;const timer=window.setTimeout(()=>{const current=parseAppRoute();if(current.kind!=='project'||current.view!=='issues'||(current.issue||'')!==(r.issue||''))return;const filters={query,severity:selectedSeverities,category:selectedCategories,scanner:selectedScanners,rule:selectedRules,files,directory:selectedDirectories,location:locationFilter,overlap,group:groupBy==='none'?'':groupBy};const next=routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:r.issue||undefined,filters});if(location.hash!==next)history.replaceState(null,'',next);},50);return()=>window.clearTimeout(timer);},[r.tab,r.project,r.issue,target?.id,query,selectedSeverities,selectedCategories,selectedScanners,selectedRules,files,selectedDirectories,locationFilter,overlap,groupBy]);
     if (!r.repository) {
       if(r.tab==='settings')return <ConfigProvider><AppShell auth={viewerAuth}><Settings auth={launchAuth} onRun={projectId=>location.hash=routeHash({kind:'project-run',projectId})}/></AppShell></ConfigProvider>;
@@ -312,7 +328,7 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
          </section></></OverviewTab></React.Suspense>}
         {r.tab === 'issues' && <React.Suspense fallback={<div className="workspace-tab-loading" role="status">Opening issues…</div>}><IssuesTab><>
           <section className="issues-heading" aria-labelledby="issues-title">
-            <div className="issues-heading-copy"><span className="eyebrow">EVIDENCE QUEUE</span><h2 id="issues-title">Findings to investigate</h2><p>Filter the current report, open one finding, and verify its exact source context before deciding whether code must change.</p></div>
+            <div className="issues-heading-copy"><span className="eyebrow">EVIDENCE QUEUE</span><h2 id="issues-title" tabIndex={-1}>Findings to investigate</h2><p>Filter the current report, open one finding, and verify its exact source context before deciding whether code must change.</p></div>
             <dl className="issues-summary" aria-label="Current finding scope"><div><dt>In view</dt><dd>{filtered.length.toLocaleString()}</dd></div><div><dt>Critical</dt><dd>{filtered.filter(f=>f.severity==='CRITICAL').length.toLocaleString()}</dd></div><div className="summary-correlation"><dt>Multiple scanners</dt><dd>{filtered.filter(f=>f.scanners.length>1).length.toLocaleString()}</dd></div><div><dt>Missing location</dt><dd>{filtered.filter(f=>!f.file||!f.line).length.toLocaleString()}</dd></div></dl>
           </section>
           <div className="issues-guidance"><strong>How to read this evidence</strong><span>One finding may contain observations from several scanners. That overlap strengthens the evidence trail, but it does not by itself prove impact or a common root cause.</span></div>
@@ -336,12 +352,12 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
             { title: 'Finding and immutable source', key: 'issue', render: (_, f) => <div className="finding-primary"><Button type="link" className="issue-link" onClick={() => navigate(target!.id, 'issues', f.id)}>{f.message}</Button><small className="finding-location">{f.file||'Source file unavailable'}{f.line ? `:${f.line}` : ''}</small><code>{f.rules.join(', ')||'Rule unavailable'}</code></div> },
             { title: 'Scanner support', key: 'scanner', width: 280, render: (_, f) => <div className="scanner-support"><span className={f.scanners.length>1?'scanner-correlation':'scanner-single'}>{f.scanners.length>1?`${f.scanners.length} scanners support this finding`:'One scanner supports this finding'}</span><small>{f.scanners.join(', ')||'Scanner unavailable'}</small><small>{(f.observation_count??f.scanners.length).toLocaleString()} retained observation{(f.observation_count??f.scanners.length)===1?'':'s'}</small></div> }
           ]}/>}</div>
-          {r.issue && screens.lg && <section className="evidence-panel" aria-label="Issue detail"><div className="pane-heading"><div><span className="eyebrow">SELECTED FINDING</span><h2>Issue detail</h2></div><Button onClick={() => navigate(target!.id, 'issues')}>Back to findings</Button></div><Evidence detail={detail} source={source} error={error} findings={findings} openFinding={id => navigate(target!.id, 'issues', id)}/></section>}
+          {r.issue && screens.lg && <section ref={issueDetailRef} tabIndex={-1} className="evidence-panel" aria-label="Issue detail"><div className="pane-heading"><div><span className="eyebrow">SELECTED FINDING</span><h2>Issue detail</h2></div><Button onClick={() => navigate(target!.id, 'issues','',r.filters)}>Back to findings</Button></div><Evidence detail={detail} source={source} error={error} findings={findings} openFinding={id => navigate(target!.id, 'issues', id,r.filters)}/></section>}
           </div>
        </></IssuesTab></React.Suspense>}</>}
       </>}
-      <Drawer title="Issue detail" open={!!r.issue && r.tab === 'issues' && !screens.lg} onClose={() => navigate(target?.id || '', 'issues')} size="min(850px, 100vw)" destroyOnHidden>
-        <Evidence detail={detail} source={source} error={error} findings={findings} openFinding={id => navigate(target?.id || '', 'issues', id)}/>
+      <Drawer title="Issue detail" open={!!r.issue && r.tab === 'issues' && !screens.lg} onClose={() => navigate(target?.id || '', 'issues','',r.filters)} size="min(850px, 100vw)" destroyOnHidden>
+        <Evidence detail={detail} source={source} error={error} findings={findings} openFinding={id => navigate(target?.id || '', 'issues', id,r.filters)}/>
       </Drawer>
       <footer>Findings are scanner observations, not confirmed defects.</footer>
     </main>
