@@ -1,6 +1,7 @@
 const json=(value,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
 const UUID=/^[0-9a-f-]{36}$/i,HANDLE=/^[A-Za-z0-9_-]{43}$/;
 const now=()=>Date.now(),LEASE_MS=30*60*1000,REQUEST_SCHEMA='analysis-request-v4',MAX_RECORDS=500;
+const LAUNCH_RATE_WINDOW_MS=60*1000,LAUNCH_RATE_LIMIT=3;
 const emptyMeta=()=>({schema_version:'analysis-control-v4',next_acceptance:1,generation:1,paused:false,reset_notice:null});
 const active=row=>['preparing','analyzing'].includes(row?.status),analysisKey=intent=>`${intent.project_id}:${intent.source_sha}`;
 const terminal=value=>['completed','failed'].includes(value?.status);
@@ -21,6 +22,9 @@ export class AuthExchangeStore{
    const meta=(await s.get('queue:meta'))||emptyMeta();if(meta.paused)return json({error:'admission_paused',reset_notice:meta.reset_notice},503);
    const dedupeKey=`queue:dedupe:${intent.idempotency_key}`,priorId=await s.get(dedupeKey);
    if(priorId){const prior=await s.get(`queue:id:${priorId}`),submitted=prior?.submissions?.[intent.idempotency_key]||prior?.intent;return prior&&JSON.stringify(submitted)===JSON.stringify(intent)?json({...prior,duplicate:true}):json({error:'idempotency_conflict'},409);}
+   if(!Number.isSafeInteger(intent.actor_id))return json({error:'invalid_request'},400);
+   const rateKey=`rate:launch:${intent.actor_id}`,timestamp=now(),recent=((await s.get(rateKey))||[]).filter(value=>Number.isFinite(value)&&timestamp-value<LAUNCH_RATE_WINDOW_MS);
+   if(recent.length>=LAUNCH_RATE_LIMIT){const retry_after=Math.max(1,Math.ceil((recent[0]+LAUNCH_RATE_WINDOW_MS-timestamp)/1000));return json({error:'launch_rate_limited',retry_after_seconds:retry_after},429);}
    const key=analysisKey(intent),activeId=await s.get(`queue:active:${key}`),existing=activeId?await s.get(`queue:id:${activeId}`):null;
    if(existing&&active(existing)){
     if(intent.run_again===true)return json({error:'analysis_active',request_id:existing.request_id},409);
@@ -34,12 +38,12 @@ export class AuthExchangeStore{
     }
    }
    const created_at=new Date().toISOString(),channels=Object.fromEntries([...new Set(intent.requested_channels)].sort().map(channel=>[channel,{status:'preparing',attempts:0}]));const row={schema_version:'analysis-control-v4',request_id:intent.request_id,analysis_key:key,acceptance:meta.next_acceptance++,generation:meta.generation,status:'preparing',attempts:0,created_at,updated_at:created_at,intent:{...intent,requested_channels:Object.keys(channels)},submissions:{[intent.idempotency_key]:intent},channels,claims:{}};
-   await s.put(`queue:id:${row.request_id}`,row);await s.put(`queue:active:${key}`,row.request_id);await s.put(`queue:project-latest:${intent.project_id}`,{request_id:row.request_id,source_sha:intent.source_sha,acceptance:row.acceptance});await s.put(dedupeKey,row.request_id);await s.put('queue:meta',meta);
+   recent.push(timestamp);await s.put(rateKey,recent);await s.put(`queue:id:${row.request_id}`,row);await s.put(`queue:active:${key}`,row.request_id);await s.put(`queue:project-latest:${intent.project_id}`,{request_id:row.request_id,source_sha:intent.source_sha,acceptance:row.acceptance});await s.put(dedupeKey,row.request_id);await s.put('queue:meta',meta);
    const records=await s.list({prefix:'queue:id:'});if(records.size>MAX_RECORDS){const removable=[...records.entries()].filter(([,value])=>!active(value)).sort(([,a],[,b])=>(a.acceptance||0)-(b.acceptance||0));for(const [recordKey,value] of removable.slice(0,records.size-MAX_RECORDS)){await s.delete(recordKey);for(const submission of Object.keys(value.submissions||{}))await s.delete(`queue:dedupe:${submission}`);}}
    return json(row,201);
   });
   if(path==='/queue/status'){if(!UUID.test(body.request_id||''))return json({error:'invalid_request'},400);const row=await this.state.storage.get(`queue:id:${body.request_id}`);return row?json(row):json({error:'not_found'},404);}
-  if(path==='/queue/recent'){const entries=await this.state.storage.list({prefix:'queue:id:'});const rows=[...entries.values()].sort((a,b)=>(b.acceptance||0)-(a.acceptance||0)).slice(0,100);return json({checked_at:new Date().toISOString(),requests:rows.map(row=>({request_id:row.request_id,status:row.status,created_at:row.created_at,completed_at:row.completed_at||null,intent:row.intent,result:row.result||null}))});}
+  if(path==='/queue/recent'){const entries=await this.state.storage.list({prefix:'queue:id:'});const rows=[...entries.values()].sort((a,b)=>(b.acceptance||0)-(a.acceptance||0)).slice(0,100);return json({checked_at:new Date().toISOString(),requests:rows.map(row=>{const channels=Object.values(row.channels||{});return{request_id:row.request_id,status:row.status,created_at:row.created_at,completed_at:row.completed_at||null,intent:row.intent,result:row.result||null,scanner_summary:{completed:channels.filter(value=>value.status==='completed').length,total:channels.length,incomplete:channels.filter(value=>value.status==='failed').length}};})});}
   if(path==='/queue/public-state'){const meta=(await this.state.storage.get('queue:meta'))||emptyMeta();return json({admission_paused:meta.paused===true,reset_notice:meta.paused===true?'Analysis is temporarily unavailable for maintenance.':null,generation:meta.generation});}
   if(path==='/queue/claim')return this.transact(async s=>{
    const meta=(await s.get('queue:meta'))||emptyMeta(),timestamp=now();if(meta.paused)return json({status:'paused',reset_notice:meta.reset_notice},409);let row;

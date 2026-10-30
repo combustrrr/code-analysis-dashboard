@@ -1,4 +1,4 @@
-import {getProjectRegistry} from './projectRegistry';
+import {getProjectRegistry,markProjectPreparing} from './projectRegistry';
 import {EVIDENCE_REFRESH_EVENT,invalidateEvidenceCaches} from './evidenceRefresh';
 import { applicationEndpoint, repositoryJson } from './repositoryReports';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -167,6 +167,8 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
       previousGeneratedAt: request.previousGeneratedAt || report?.generated_at,
     };
     persistProjectRuns([...projectRunsRef.current.filter(item => item.project !== run.project), run]);
+    markProjectPreparing(run.project,run.request_id,run.target_sha);
+    window.dispatchEvent(new Event(EVIDENCE_REFRESH_EVENT));
   };
   const updateProjectRunPhase = (requestId: string, phase: string) => {
     const current = projectRunsRef.current;

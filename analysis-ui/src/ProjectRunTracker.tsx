@@ -163,7 +163,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
         <p><strong>{request.source_repository||request.repository}</strong> · {request.kind} <code>{request.ref}</code>{request.target_sha&&<> · <code>{request.target_sha.slice(0,12)}</code></>}</p>
         <p>Started {new Date(request.submittedAt).toLocaleString()} · elapsed {elapsedMinutes<1?'less than a minute':`${elapsedMinutes} minute${elapsedMinutes===1?'':'s'}`}</p>
         {progress.length>0&&<p>{finished} of {progress.length} channels finished{activeChannels.length>0?` · active: ${activeChannels.map(channel=>channel.channel).join(', ')}`:''}</p>}
-        {activity?.producer?.url&&<Button size="small" href={activity.producer.url} target="_blank" rel="noreferrer">Open GitHub Actions</Button>}
+        {activity?.producer?.url&&<Button size="small" href={activity.producer.url} target="_blank" rel="noopener noreferrer">Open GitHub Actions</Button>}
         {(activity?.error||activity?.message||error)&&<p><strong>Service detail:</strong> {activity?.error||activity?.message||error}</p>}
       </>}]} />
     </>}

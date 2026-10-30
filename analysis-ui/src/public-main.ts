@@ -1,13 +1,13 @@
 import './landing-fonts.css';
 import './document.css';
 import './landing.css';
-import './landing-footer.css';
 import './landing-dossier.css';
 import './brand-landing.css';
 import './auth.css';
 import './landing-controls.css';
 import './institutional-lockup.css';
 import './landing-refinement.css';
+import './landing-stripe-inspired.css';
 import {landingShell} from './landing-shell';
 import {beginGitHubSignIn,readSessionHandle} from './authClient';
 

@@ -34,6 +34,31 @@ source repository in a URL. The project registry endpoint is authenticated; anon
 report visibility, if deliberately enabled, does not expose the project list or grant
 launch/setup capabilities.
 
+## Project register contract
+
+`GET /api/projects` returns `project-register-v1` and the same registry is embedded in
+`auth-bootstrap-v1`. Each entry carries full published and preferred-branch SHAs, a
+seven-character display revision, a `MATCHED`, `BEHIND_HEAD`, `UNKNOWN_REVISION`, or
+`UNVERIFIABLE` comparison, typed branch/evidence/activity diagnostics, and route-neutral
+actions. Action precedence is active progress, unavailable-provider retry, stale-report
+analysis plus prior evidence, current evidence review, then first analysis. The Worker
+uses SHA equality only; it does not issue GitHub compare requests or claim commit-behind
+counts.
+
+The register performs one bounded Durable Object recent-queue read and concurrently
+settles branch-head and lightweight private-R2-manifest reads. A failed provider marks
+only the affected diagnostics as temporarily unavailable and preserves healthy sibling
+projects. No findings, report bodies, scanner logs, or commit messages are returned by
+this endpoint. Legacy capability fields remain during the compatibility period; removal
+requires all deployed Pages assets to decode `project-register-v1` and production
+telemetry to show no legacy consumers.
+
+New launch admissions are transactionally limited in the existing Durable Object to
+three per authenticated GitHub user in a rolling minute. Idempotency is checked first,
+so retrying the same key returns its original request without consuming quota. A limited
+request receives HTTP 429, `Retry-After`, and `launch_rate_limited`. Existing duplicate
+project/SHA admission controls and queue fencing remain authoritative.
+
 ## Execution and storage
 
 Source execution is isolated in GitHub Actions jobs against immutable source SHAs.

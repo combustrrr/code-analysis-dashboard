@@ -101,13 +101,21 @@ remain publicly accessible outside the signed-in dashboard. See the
 [system architecture](../architecture/SYSTEM_OVERVIEW.md) and
 [production readiness](../operations/PRODUCTION_READINESS.md) for boundaries and verification status.
 
-The Projects register refreshes its registry at most once per minute while visible and
-immediately when the tab becomes visible. Publication invalidates both the registry and
-report-manifest caches through one refresh signal. Report validity is independent of
-repository freshness: a partial report remains reviewable at its immutable published
-revision while a different preferred-branch head is shown as **Newer revision awaiting
-analysis**. Revision, coverage, publication time, and report status are always read from
-the same canonical report object.
+The Projects register consumes `project-register-v1`. It refreshes every eight seconds
+while any project is preparing or analyzing, every 90 seconds while all projects are
+idle, pauses while the tab is hidden, and refreshes immediately when visibility returns.
+Manual refresh has a three-second cooldown and shares the in-flight request. Publication
+invalidates both the registry and report-manifest caches through one refresh signal.
+The UI retains the last valid register if a refresh fails, reconciles entries by project
+ID so unchanged cards keep object identity, and announces lifecycle or scanner-count
+changes through a polite live region. After launch it immediately marks that project as
+Preparing and then forces an authoritative refresh.
+
+Report validity is independent of repository freshness: a partial report remains
+reviewable at its immutable published revision while a different preferred-branch head
+offers **Run analysis** and **Review prior evidence**. The Worker, rather than the UI,
+resolves the primary and secondary actions. Revision, coverage, publication time, and
+report status are always read from the same canonical report object.
 
 Deep project links begin fetching the lazy workspace bundle while authorization is
 verified. Concurrent report consumers share one in-flight manifest read per project;

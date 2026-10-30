@@ -29,7 +29,7 @@ export async function unseal(value, secret, type) {
     return decoded;
   } catch { throw new Failure(401, 'Sign in again; the session is invalid or expired.', 'session_invalid'); }
 }
-class Failure extends Error { constructor(status, message, code) { super(message); this.status = status; if (code) this.code = code; } }
+class Failure extends Error { constructor(status, message, code, retryAfter) { super(message); this.status = status; if (code) this.code = code; if(retryAfter)this.retryAfter=retryAfter; } }
 const cookie = (value, age) => `__Host-analysis-oauth=${value}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${age}`;
 function settings(env) {
   if (env.APPLICATION_MODE !== 'repositories' || !/^[\w.-]+\/[\w.-]+$/.test(env.ANALYSIS_REPOSITORY || '')) throw new Failure(503, 'Configured repository service is unavailable.', 'launcher_misconfigured');
@@ -350,7 +350,8 @@ export default { async fetch(request, env) {
     const known = e instanceof Failure || e instanceof BodyLimitError;
     failureCode = known ? e.code : undefined;
     const message=known?e.message:'Launcher unavailable. No successful launch has been confirmed; check GitHub Actions before retrying.',status=known?e.status:503,path=new URL(request.url).pathname;
-    response = authRoutePaths.has(path)||path==='/api/logout'?json({...authErrorDocument(failureCode||'launcher_unavailable',message,status,e.retryAfter),request_id:requestId},status):json({error:message,...(failureCode?{code:failureCode}:{}),request_id:requestId},status);
+    const extra=e.retryAfter?{'Retry-After':String(e.retryAfter)}:{};
+    response = authRoutePaths.has(path)||path==='/api/logout'?json({...authErrorDocument(failureCode||'launcher_unavailable',message,status,e.retryAfter),request_id:requestId},status,extra):json({error:message,...(failureCode?{code:failureCode}:{}),request_id:requestId},status,extra);
   }
   const headers = new Headers(response.headers);
   headers.set('X-Request-ID',requestId);

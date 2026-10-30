@@ -77,14 +77,29 @@ test('pull-only collaborators can list and launch from the exact fixed target re
   const response=await repositoryApi(get('/api/projects'),env,session,h);
   const result=await response.json();
   assert.equal(response.status,200);
+  assert.equal(result.schema_version,'project-register-v1');
+  assert.equal(result.refresh_after_seconds,90);
   assert.equal(result.execution_repository.full_name,EXECUTION_REPOSITORY);
   assert.equal(result.can_launch,true);
   assert.equal(result.can_configure,false);
+  assert.deepEqual(result.capabilities,{launch:true,configure:false});
   assert.deepEqual(result.projects.map(project=>project.id),CONFIGURED_TARGETS.map(project=>project.id));
   assert.deepEqual(result.projects.map(({id,relationship})=>[id,relationship]),CONFIGURED_TARGETS.map(({id,relationship})=>[id,relationship]));
+  assert.ok(result.projects.every(project=>['MATCHED','BEHIND_HEAD','UNKNOWN_REVISION','UNVERIFIABLE'].includes(project.revision_comparison)));
+  assert.ok(result.projects.every(project=>project.primary_action&&project.primary_action.project_id===project.id));
+  assert.ok(result.projects.every(project=>project.source_verification.branch.checked_at&&project.source_verification.evidence.checked_at&&project.source_verification.activity.checked_at));
+  assert.equal(h.queueCalls.filter(call=>call.path==='/queue/recent').length,1);
   assert.ok(h.calls.some(call=>call.path.includes('/contents/.github/code-analysis/projects.json')&&call.token==='central-app-read-token'));
   assert.ok(CONFIGURED_TARGETS.filter(target=>target.repository!==EXECUTION_REPOSITORY).every(target=>!h.calls.some(call=>call.path===`repos/${target.repository}`)), 'read-only registry must not re-fetch source repositories');
   assert.ok(!JSON.stringify(result).includes('user-token'));
+});
+
+test('project register preserves healthy siblings when one branch provider fails',async()=>{
+ const failed=CONFIGURED_TARGETS[0],overrides={};for(const [index,target] of CONFIGURED_TARGETS.entries())overrides[`repos/${target.repository}/branches/${encodeURIComponent(target.branch)}`]=index===0?new Error('provider down'):{commit:{sha:String(index+1).repeat(40)}};
+ const h=helpers({overrides}),result=await (await repositoryApi(get('/api/projects'),env,session,h)).json();
+ assert.equal(result.projects.length,3);
+ assert.equal(result.projects.find(project=>project.id===failed.id).source_verification.branch.status,'temporarily_unavailable');
+ assert.ok(result.projects.filter(project=>project.id!==failed.id).every(project=>project.source_verification.branch.status==='verified'));
 });
 
 test('reviewed agentic scanner profiles remain listable while portable profiles are validated',async()=>{
@@ -220,7 +235,8 @@ test('pull-only collaborator launch persists a pinned v4 envelope and idempotent
   const preview=await (await repositoryApi(post('/api/project-preview',{project_id:source.id,selection:{kind:'pr',ref:'7'}}),env,session,h)).json();
   const input={project_id:source.id,preview_token:preview.preview_token,requested_channels:['semgrep'],idempotency_key:'22222222-2222-4222-8222-222222222222'};
   const response=await repositoryApi(post('/api/project-launch',input),env,session,h);
-  const envelope=h.queueCalls[0].body.request;
+  const admitCall=h.queueCalls.find(call=>call.path==='/queue/admit');
+  const envelope=admitCall.body.request;
     assert.equal(response.status,202);
     assert.equal((await response.clone().json()).status,'preparing');
     assert.equal((await response.clone().json()).lifecycle,'Preparing');
@@ -237,7 +253,7 @@ test('pull-only collaborator launch persists a pinned v4 envelope and idempotent
     assert.deepEqual(envelope.pr_context,preview.pr_context);
     assert.equal(envelope.project_id,source.id);
     assert.equal(envelope.actor_id,73);
-  assert.equal(h.queueCalls[0].path,'/queue/admit');
+  assert.ok(admitCall);
   assert.equal(h.calls.some(call=>call.options.method&&call.options.method!=='GET'),false);
 });
 
