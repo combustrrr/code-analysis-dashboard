@@ -516,6 +516,8 @@ test('authorized user follows one repository project from selection through publ
    await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
    await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
     await expect(page.locator('.project-record')).toHaveCount(3);
+    const cardGeometry=await page.locator('.project-record').evaluateAll(cards=>cards.map(card=>{const title=card.querySelector('h2')!.getBoundingClientRect(),state=card.querySelector('.project-state')!.getBoundingClientRect();return{height:card.getBoundingClientRect().height,overlap:!(title.right<=state.left||title.left>=state.right||title.bottom<=state.top||title.top>=state.bottom),overflow:card.scrollWidth>card.clientWidth};}));
+    expect(cardGeometry.every(card=>!card.overlap&&!card.overflow&&card.height<680)).toBe(true);
     await expect(page.locator('.project-record').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('Not available');
     await expect(page.getByText('Read-only source')).toHaveCount(2);
     await expect(page.getByText('Connected project')).toHaveCount(1);
