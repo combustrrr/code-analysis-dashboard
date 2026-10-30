@@ -22,4 +22,7 @@ same aggregate and advertise their 31 January 2027 sunset.
 The Pages client caches by session handle and project ID, purges every settings entry on
 authentication loss, and removes detailed cached diagnostics after a hidden tab reaches
 the 30-minute session idle boundary. Canonical routes are `#/settings/overview`,
-`#/settings/projects`, `#/settings/integrations`, and `#/settings/provenance`.
+`#/settings/integrations`, and `#/settings/provenance`. The project register remains the
+single project inventory at `#/projects`; legacy `#/settings/projects` and
+`#/settings?section=projects` bookmarks resolve there rather than duplicating it inside
+Settings.

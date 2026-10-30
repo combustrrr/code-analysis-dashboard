@@ -1,4 +1,5 @@
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -8,6 +9,28 @@ from scripts.code_analysis import extensions
 
 
 class ScannerUpdateTests(unittest.TestCase):
+    def test_zizmor_pin_is_stable_and_synchronized_across_generated_workflows(self):
+        paths = (
+            'config/code-analysis/workflow-templates/03-dependency-security.yml',
+            'scripts/code_analysis/community_workflow.py',
+            '.github/workflows/11-source-analysis.yml',
+            '.github/workflows/reusable-source.yml',
+            '.github/workflows/reusable-source-full.yml',
+        )
+        pins = {}
+        for path in paths:
+            matches = set(re.findall(
+                r'zizmor==([0-9]+\.[0-9]+\.[0-9]+)',
+                Path(path).read_text(encoding='utf-8'),
+            ))
+            self.assertEqual(len(matches), 1, f'{path} must contain one stable exact Zizmor pin')
+            pins[path] = matches.pop()
+        self.assertEqual(
+            len(set(pins.values())),
+            1,
+            f'Zizmor pins must be synchronized by sync_scanner_workflows: {pins}',
+        )
+
     def test_standalone_tooling_cannot_borrow_product_configuration(self):
         import tempfile
         from unittest.mock import patch

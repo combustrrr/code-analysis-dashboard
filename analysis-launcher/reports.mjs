@@ -124,3 +124,27 @@ export async function publicReports(request,env) {
     return Response.json({error:failure.message, code:failure.code}, {status:failure.status, headers:{'Cache-Control':'no-store'}});
   }
 }
+
+const RANGE=/^bytes=(\d*)-(\d*)$/;
+export async function auditReportExport(request,env){
+ const url=new URL(request.url),project=url.searchParams.get('project_id'),targetId=url.searchParams.get('target_id');
+ if(request.method!=='GET'||url.searchParams.get('format')!=='audit-zip'||!/^[1-9][0-9]*$/.test(project||'')||!targetId||targetId.length>160||/[\u0000-\u001f\u007f\\/]/.test(targetId)||targetId.includes('..')||/%2e|%2f|%5c/i.test(targetId))return Response.json({error:'Invalid audit export request.',code:'invalid_export_request'},{status:400});
+ if(!env.ANALYSIS_REPORTS)return Response.json({error:'Evidence storage is unavailable.',code:'storage_not_configured'},{status:503});
+ let manifestObject=await env.ANALYSIS_REPORTS.get(reportStorageKey(env.ANALYSIS_REPOSITORY,project));
+ if(!manifestObject||typeof manifestObject.json!=='function')manifestObject=await env.ANALYSIS_REPORTS.get(`analysis-current-${project}.json`);
+ if(!manifestObject)return Response.json({error:'Current report is unavailable.',code:'report_not_found'},{status:404});
+ const manifest=await manifestObject.json(),target=canonicalReportTarget(manifest);
+ if(manifest.schema_version!=='analysis-current-v1'||manifest.project_id!==project||!target||![target.id,target.original_target_id].includes(targetId)||!target.audit_bundle?.asset)return Response.json({error:'Selected audit bundle is unavailable.',code:'audit_bundle_not_found'},{status:404});
+ const asset=target.audit_bundle.asset;
+ if(!/^audit-[a-f0-9]{64}\.zip$/.test(asset)||target.audit_bundle.sha256!==asset.slice(6,-4))return Response.json({error:'Audit bundle identity could not be verified.',code:'audit_bundle_identity'},{status:502});
+ const key=reportStorageKey(env.ANALYSIS_REPOSITORY,project,asset),head=typeof env.ANALYSIS_REPORTS.head==='function'?await env.ANALYSIS_REPORTS.head(key):null;
+ const size=Number(head?.size||target.audit_bundle.bytes),etag=head?.httpEtag||`"${target.audit_bundle.sha256}"`;
+ if(request.headers.get('If-None-Match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'private, no-store'}});
+ let range,rangeHeader=request.headers.get('Range');
+ if(rangeHeader){const match=RANGE.exec(rangeHeader);if(!match||(!match[1]&&!match[2]))return new Response(null,{status:416,headers:{'Content-Range':`bytes */${size}`}});const suffix=!match[1],requested=suffix?Number(match[2]):0,start=suffix?Math.max(0,size-requested):Number(match[1]),end=suffix?size-1:match[2]?Number(match[2]):size-1;if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||end<start||end>=size||suffix&&requested<=0)return new Response(null,{status:416,headers:{'Content-Range':`bytes */${size}`}});range={offset:start,length:end-start+1};}
+ const object=await env.ANALYSIS_REPORTS.get(key,range?{range}:undefined);
+ if(!object)return Response.json({error:'Audit bundle is temporarily unavailable.',code:'audit_bundle_missing'},{status:502});
+ const headers=new Headers({'Content-Type':'application/zip','Content-Disposition':`attachment; filename="audit-${project}-${String(target.analyzed_sha||'current').slice(0,12)}.zip"`,'Cache-Control':'private, no-store','Accept-Ranges':'bytes','ETag':etag,'X-Content-Type-Options':'nosniff'});
+ if(range)headers.set('Content-Range',`bytes ${range.offset}-${range.offset+range.length-1}/${size}`);headers.set('Content-Length',String(range?.length||size));
+ return new Response(object.body,{status:range?206:200,headers});
+}

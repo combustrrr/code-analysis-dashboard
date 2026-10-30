@@ -46,12 +46,13 @@ const phaseCopy: Record<string, string> = {
   collecting: 'Preparing report', publishing: 'Preparing report', published: 'Ready', reused: 'Ready',
   failed: 'Needs attention', superseded: 'Ready', cancelled_cutover: 'Needs attention',
 };
-export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPhase }: {
+export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPhase, autoOpenOnPublished=false }: {
   auth: Auth;
   request: ProjectRunRequest;
   onDismiss: () => void;
   onOpenReport: (targetId: string) => void;
   onPhase: (requestId: string, phase: string) => void;
+  autoOpenOnPublished?: boolean;
 }) {
   const [activity, setActivity] = useState<Activity>();
   const [error, setError] = useState('');
@@ -77,13 +78,14 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
         request_id: request.request_id,
       });
       const result = await auth.api<Activity>(`project-activity?${query}`);
+      if (result.request_id && result.request_id !== request.request_id) return undefined;
       setActivity(result);
       setError('');
       onPhaseRef.current(request.request_id, result.phase);
       if ((result.phase === 'published' || result.phase === 'reused') && publishedRequest.current !== request.request_id) {
         publishedRequest.current = request.request_id;
         invalidateEvidenceCaches();
-        if (result.target_id && window.location.hash.includes(`/projects/${request.project}`) && openedRequest.current !== request.request_id) {
+        if (autoOpenOnPublished && result.target_id && window.location.hash.includes(`/projects/${request.project}`) && openedRequest.current !== request.request_id) {
           openedRequest.current = request.request_id;
           window.setTimeout(() => onOpenReportRef.current(result.target_id!), 1500);
           window.setTimeout(() => onDismissRef.current(), 2200);
@@ -96,7 +98,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
     } finally {
       setChecking(false);
     }
-  }, [auth, request.project, request.request_id]);
+  }, [auth, request.project, request.request_id, autoOpenOnPublished]);
 
   useEffect(() => {
     let active = true;
@@ -152,7 +154,7 @@ export function ProjectRunTracker({ auth, request, onDismiss, onOpenReport, onPh
       {progress.length>0&&<div className="analysis-progress-summary"><strong>{finished} of {progress.length} checks complete</strong>{activeChannels.length>0&&<span>Analysis is in progress.</span>}</div>}
       {!terminal&&progress.length===0&&<div className="analysis-progress-summary"><strong>Scanner jobs are starting</strong><span>Channel progress will appear after the workflow reports its first result.</span></div>}
       <p>{primaryIssue || previousReportNote}</p>
-      {!terminal&&<p className="analysis-time-note">{hasPreviousReport?'You can keep reviewing the previous report or leave this page.':'You can leave this page while analysis continues.'} New results will open automatically when they are ready.</p>}
+      {!terminal&&<p className="analysis-time-note">{hasPreviousReport?'You can keep reviewing the published report or leave this page.':'You can leave this page while analysis continues.'} {autoOpenOnPublished?'The verified result will open here after publication.':'This view will not change until you choose the new revision.'}</p>}
       {error && <p>The analysis is still running. Refresh in a moment; this does not start another analysis.</p>}
       <div className="run-tracker-actions">
         {publishedTargetId && <Button size="small" type="primary" onClick={() => onOpenReport(publishedTargetId)}>Open report</Button>}

@@ -1,7 +1,7 @@
 import {emitDiagnostic} from './diagnostics.mjs';
 import {verifyCollaborator,ViewerAccessError} from './viewer-access.mjs';
 import { reportToken } from './github-app.mjs';
-import { publicReports } from './reports.mjs';
+import { publicReports, auditReportExport } from './reports.mjs';
 import { applicationApi } from './application.mjs';
 import {readBody, BodyLimitError, resolveLimit, DEFAULT_LIMITS} from './request-limits.mjs';
 import {MAX_GITHUB_READ_RETRIES, sleep, retryAfterMs, secondaryRateLimit, transientReadStatus} from './github-retry.mjs';
@@ -322,6 +322,17 @@ async function route(request, env, executionContext) {
   const sessionRow=await storedSession.json(),grant=await unseal(sessionRow.grant,env.SESSION_KEY,'grant');
   const session={token:grant.token,user_id:sessionRow.user_id,login:sessionRow.login,handle,capabilities:sessionRow.authorization?.capabilities||{read:true,write:false,admin:false}};
   if(request.method==='GET'&&url.pathname==='/api/bootstrap')return json(await bootstrapSession(env,session,sessionRow),200,{'Cache-Control':'no-store'});
+  if(request.method==='GET'&&url.pathname==='/api/report-export'){
+    await authorizeSession(env,session,sessionRow);
+    if(!session.capabilities.read)throw new Failure(403,'Report access is not available for this session.','report_read_required');
+    const identityUrl=new URL('/api/project-identity',url);identityUrl.search=new URLSearchParams({project_id:url.searchParams.get('project_id')||''});
+    const identity=await applicationApi(new Request(identityUrl,{headers:{Authorization:request.headers.get('Authorization')||''}}),env,session,helpersFor(env));
+    if(!identity?.ok)return identity||json({error:'Configured project is unavailable.',code:'project_unavailable'},404);
+    const limited=await controlRequest(env,'control-plane','/rate/export',{handle});
+    if(limited.status===429){const body=await limited.json();throw new Failure(429,'Too many audit downloads. Wait before downloading again.','audit_export_rate_limited',body.retry_after_seconds||60);}
+    if(!limited.ok)throw new Failure(503,'Audit download limits are temporarily unavailable.','audit_export_unavailable');
+    return auditReportExport(request,env);
+  }
   if (restricted(env) || url.pathname === '/api/session' || (reportPath(url.pathname) && privateReports(env))) {
     const live=request.method!=='GET'||url.pathname==='/api/session',authorized=live||!authorizationFresh(sessionRow,Number(env.ANALYSIS_REPOSITORY_ID||EXECUTION_REPOSITORY_ID))?await authorizeSession(env,session,sessionRow):sessionRow;
     if (request.method === 'GET' && url.pathname === '/api/session') {const value=authorized.authorization;return json({login:value.login,user_id:value.user_id,role:value.role,capabilities:value.capabilities,verified_at:new Date(value.verified_at).toISOString()});}

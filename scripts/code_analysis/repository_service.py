@@ -15,6 +15,8 @@ from scripts.code_analysis.applicability import GROUPS as SCANNER_GROUPS
 from scripts.code_analysis.hosted import accept, analysis_key, now, reconcile
 from scripts.code_analysis.projects import service_config, validate
 from scripts.code_analysis.report_assets import shard, verify_asset
+from scripts.code_analysis.project_overview import build_project_overview
+from scripts.code_analysis.audit_bundle import build_audit_bundle
 
 WORKFLOW = '.github/workflows/code-analysis-coordinator.yml'
 GENERATED_WORKFLOW = '.github/workflows/11-source-analysis.yml'
@@ -281,7 +283,7 @@ def merge_channel_documents(previous, incoming, selected_channels):
         findings.append(row)
         details[identity]={**detail,**row,'origins':[{key:origin.get(key) for key in ('scanner_family','rule','file','start_line','raw_artifact','observation_id')} for origin in origins]}
     findings.sort(key=lambda row:(row.get('severity',''),row.get('file',''),row.get('line',0),row['id']))
-    merged_documents={path:value for path,value in previous.items() if not (path.startswith('details/') or path in {'report.json','snapshot.json','findings.json'})}
+    merged_documents={path:value for path,value in previous.items() if not (path.startswith('details/') or path in {'report.json','snapshot.json','findings.json','project-overview.json'})}
     merged_documents.update({path:value for path,value in incoming.items() if path.startswith('source/')})
     for index,row in enumerate(findings):
         row['page']=index//100
@@ -293,7 +295,8 @@ def merge_channel_documents(previous, incoming, selected_channels):
     incomplete=[row for row in channels if row.get('status') not in {'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_SELECTED'} and not (row.get('status') in {'NOT_APPLICABLE','DEFERRED'} and row.get('reason'))]
     report={**old_report,**new_report,'finding_count':len(findings),'observation_count':len(snapshot['observations']),
             'channels':channels,'severities':severities,'status':'partial' if incomplete or selected-replace else 'complete'}
-    merged_documents.update({'snapshot.json':snapshot,'report.json':report,'findings.json':findings})
+    merged_documents.update({'snapshot.json':snapshot,'report.json':report,'findings.json':findings,
+                             'project-overview.json':build_project_overview(report,findings)})
     return merged_documents,report
 
 
@@ -380,6 +383,7 @@ def report_publication(config, state, report_release, document=None):
         'status', 'scan_run_id', 'run_attempt', 'execution_sha', 'error', 'channel_statuses',
         'overlay_id') if key in row} for row in requests[-20:] if isinstance(row, dict)]
     pending = {}
+    pending_exports = {}
     entries = []
     with tempfile.TemporaryDirectory(prefix='analysis-publication-') as directory:
         project_dispatches = 0
@@ -391,7 +395,7 @@ def report_publication(config, state, report_release, document=None):
             old = prior.get(row['id'], {})
             if not old and prior_current and prior_current.get('original_target_id') == row.get('id'):
                 old = prior_current
-            for key in ('documents', 'assets', 'analyzed_sha', 'collected_run', 'report_status', 'tooling_sha', 'profile_digest', 'requested_channels', 'execution_channels', 'reused_channels', 'channel_statuses'):
+            for key in ('documents', 'assets', 'audit_bundle', 'analyzed_sha', 'collected_run', 'report_status', 'tooling_sha', 'profile_digest', 'requested_channels', 'execution_channels', 'reused_channels', 'channel_statuses'):
                 if key in old:
                     entry[key] = old[key]
             if row.get('status') == 'collected' and old.get('collected_run') == f"{row.get('scan_run_id')}-{row.get('run_attempt')}":
@@ -454,8 +458,11 @@ def report_publication(config, state, report_release, document=None):
                     elif not valid_selected:
                         raise ValueError('No selected scanner channel produced valid evidence; the previous current report is preserved')
                     documents['report.json']=report
+                    documents['project-overview.json']=build_project_overview(report,documents.get('findings.json',[]))
                     manifest, blobs = shard(documents)
                     pending.update(blobs)
+                    export_name,export_data,export_meta=build_audit_bundle(report,documents.get('findings.json',[]),documents['project-overview.json'])
+                    pending_exports[export_name]=export_data
                     entry['lifecycle_status'] = 'publishing'
                     entry.update(documents=manifest['documents'], assets=manifest['assets'],
                                  analyzed_sha=report['analyzed_sha'], collected_run=run_key,
@@ -465,6 +472,7 @@ def report_publication(config, state, report_release, document=None):
                                   attempt_channel_statuses=attempt_channel_statuses,
                                  channel_statuses=report.get('channels',[]),
                                  status=report['status'], report_status=report['status'])
+                    entry['audit_bundle']={**export_meta,'asset':export_name}
                     for key in ('generated_at', 'report_generation_timestamp', 'producer_runs', 'requested_selection', 'pr_context'):
                         if key in report:
                             entry[key] = report[key]
@@ -549,13 +557,18 @@ def report_publication(config, state, report_release, document=None):
         result['recent_runs'] = list(reversed(deduped))[-10:]
         referenced = {name:meta for row in result['targets'] for name,meta in row.get('assets', {}).items()}
         referenced.update((result.get('current_overlay') or {}).get('assets',{}))
-        size = sum(meta['bytes'] for meta in referenced.values())
+        referenced_exports={row.get('audit_bundle',{}).get('asset'):row.get('audit_bundle',{}) for row in result['targets'] if row.get('audit_bundle',{}).get('asset')}
+        size = sum(meta['bytes'] for meta in referenced.values())+sum(meta.get('bytes',0) for meta in referenced_exports.values())
         for name in referenced:
             if name in pending:
                 path = Path(directory) / name
                 path.write_bytes(pending[name])
                 github.cf_api(config, github.storage_path(config, 'report', f'{config["report_release"]}/{name}'),
                               method='POST', data=path.read_bytes(), content_type='application/gzip')
+        for name in referenced_exports:
+            if name in pending_exports:
+                github.cf_api(config,github.storage_path(config,'report',f'{config["report_release"]}/{name}'),
+                              method='POST',data=pending_exports[name],content_type='application/zip')
         result['metrics'] = {'compressed_bytes':size,
                              'queued':sum(r.get('status')=='queued' for r in result['targets']),
                              'scanning':sum(r.get('status')=='scanning' for r in result['targets']),
@@ -578,8 +591,9 @@ def report_publication(config, state, report_release, document=None):
         result['checked_at'] = now()
         release_manifest.write(config, report_release, result)
         previous_assets={name for row in previous_targets for name in row.get('assets',{})}
+        previous_assets.update(row.get('audit_bundle',{}).get('asset') for row in previous_targets if row.get('audit_bundle',{}).get('asset'))
         previous_assets.update((previous.get('current_overlay') or {}).get('assets',{}))
-        for name in previous_assets-set(referenced):
+        for name in previous_assets-(set(referenced)|set(referenced_exports)):
             try:
                 github.cf_api(config,github.storage_path(config,'report',f'{config["report_release"]}/{name}'),method='DELETE')
             except (ValueError,RuntimeError):

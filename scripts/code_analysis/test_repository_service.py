@@ -1,4 +1,5 @@
 import json
+import re
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -501,8 +502,10 @@ class PublicationCompletenessTests(unittest.TestCase):
                 patch('scripts.code_analysis.repository_service.release_manifest.write'):
             report_publication(config, state, 'analysis-current-1')
 
-        self.assertEqual(len(uploaded), 1)
-        self.assertRegex(uploaded[0][0], r'^/api/report/repositories/owner/repo/analysis-current-1/analysis-[a-f0-9]{64}\.json\.gz$')
+        self.assertEqual(len(uploaded), 2)
+        paths = [row[0] for row in uploaded]
+        self.assertTrue(any(re.match(r'^/api/report/repositories/owner/repo/analysis-current-1/analysis-[a-f0-9]{64}\.json\.gz$', path) for path in paths))
+        self.assertTrue(any(re.match(r'^/api/report/repositories/owner/repo/analysis-current-1/audit-[a-f0-9]{64}\.zip$', path) for path in paths))
 
     def test_reconciliation_preserves_partial_and_never_deletes_before_upload(self):
         old={'id':'one','head_sha':'a'*40,'analyzed_sha':'a'*40,'collected_run':'12-1','report_status':'partial','assets':{},'documents':{}}

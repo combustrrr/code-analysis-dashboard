@@ -3,6 +3,7 @@ const UUID=/^[0-9a-f-]{36}$/i,HANDLE=/^[A-Za-z0-9_-]{43}$/;
 const now=()=>Date.now(),LEASE_MS=30*60*1000,REQUEST_SCHEMA='analysis-request-v4',MAX_RECORDS=500;
 const LAUNCH_RATE_WINDOW_MS=60*1000,LAUNCH_RATE_LIMIT=3;
 const SETTINGS_RATE_WINDOW_MS=60*1000,SETTINGS_RATE_LIMIT=30;
+const EXPORT_RATE_WINDOW_MS=60*1000,EXPORT_RATE_LIMIT=5;
 const emptyMeta=()=>({schema_version:'analysis-control-v4',next_acceptance:1,generation:1,paused:false,reset_notice:null});
 const active=row=>['preparing','analyzing'].includes(row?.status),analysisKey=intent=>`${intent.project_id}:${intent.source_sha}`;
 const terminal=value=>['completed','failed'].includes(value?.status);
@@ -23,6 +24,12 @@ export class AuthExchangeStore{
    const timestamp=now(),key=`rate:settings:${body.handle}`,recent=((await s.get(key))||[]).filter(value=>Number.isFinite(value)&&timestamp-value<SETTINGS_RATE_WINDOW_MS);
    if(recent.length>=SETTINGS_RATE_LIMIT){const retry_after_seconds=Math.max(1,Math.ceil((recent[0]+SETTINGS_RATE_WINDOW_MS-timestamp)/1000));return json({error:'settings_rate_limited',retry_after_seconds},429);}
    recent.push(timestamp);await s.put(key,recent);return json({ok:true,remaining:SETTINGS_RATE_LIMIT-recent.length});
+  });
+  if(path==='/rate/export')return this.transact(async s=>{
+   if(!HANDLE.test(body.handle||''))return json({error:'session_invalid'},401);
+   const timestamp=now(),key=`rate:export:${body.handle}`,recent=((await s.get(key))||[]).filter(value=>Number.isFinite(value)&&timestamp-value<EXPORT_RATE_WINDOW_MS);
+   if(recent.length>=EXPORT_RATE_LIMIT){const retry_after_seconds=Math.max(1,Math.ceil((recent[0]+EXPORT_RATE_WINDOW_MS-timestamp)/1000));return json({error:'audit_export_rate_limited',retry_after_seconds},429);}
+   recent.push(timestamp);await s.put(key,recent);return json({ok:true,remaining:EXPORT_RATE_LIMIT-recent.length});
   });
   if(path==='/queue/admit')return this.transact(async s=>{
    const intent=body.request;if(!intent||intent.schema_version!==REQUEST_SCHEMA||!UUID.test(intent.request_id||'')||!UUID.test(intent.idempotency_key||'')||!/^[0-9a-f]{40}$/.test(intent.source_sha||'')||!Array.isArray(intent.requested_channels)||!intent.requested_channels.length)return json({error:'invalid_request'},400);

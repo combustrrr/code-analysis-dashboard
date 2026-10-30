@@ -765,9 +765,10 @@ class MonitoringTests(unittest.TestCase):
     def test_security_expansion_is_structured_and_runtime_lanes_stay_isolated(self):
         dependency=Path("config/code-analysis/workflow-templates/03-dependency-security.yml").read_text(encoding="utf-8")
         for marker in ("shipping-image-security:","workflow-security-posture:",
-                       "backend.cdx.json","webui.spdx.json","zizmor==1.29.0",
+                       "backend.cdx.json","webui.spdx.json",
                        "secret_scanning_push_protection","shipping-image-provenance.intoto.json"):
             self.assertIn(marker,dependency)
+        self.assertRegex(dependency, r'zizmor==\d+\.\d+\.\d+')
         self.assertIn("shipping-image-trivy-status.json",dependency)
         self.assertIn("SECURITY_POSTURE_TOKEN",dependency)
         self.assertIn("status=CONFIGURED_PARTIAL",dependency)

@@ -11,10 +11,12 @@ const branchHeadCache = new Map();
 const reportManifestCache = new Map();
 const settingsAggregateCache = new Map();
 const settingsAggregateFlights = new Map();
+const activityQueueFlights = new Map();
 const SETTINGS_FRESH_MS=60000,SETTINGS_STALE_MS=120000,SETTINGS_CACHE_LIMIT=32;
 
 const stable = value => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value);
 const orderedRequests = assets => (assets||[]).filter(asset=>asset.name?.startsWith('request-')&&asset.name.endsWith('.json')).sort((left,right)=>String(left.created_at||'').localeCompare(String(right.created_at||''))||Number(left.id||0)-Number(right.id||0));
+const coalescedActivityQueue=(id,queue)=>{if(activityQueueFlights.has(id))return activityQueueFlights.get(id);const flight=queue('/queue/status',{request_id:id}).finally(()=>activityQueueFlights.delete(id));activityQueueFlights.set(id,flight);return flight;};
 
 export function registryReportState(target) {
   if (!target) return {report:null, attention:'No current report is available. Run analysis to create the first evidence set.'};
@@ -440,7 +442,7 @@ export async function repositoryApi(request, env, session, helpers, executionCon
       return result;
     };
     let queuedState;
-    const queued=await queue('/queue/status',{request_id:id});
+    const queued=await coalescedActivityQueue(id,queue);
     if(queued.ok){queuedState=await queued.json();if(['preparing','analyzing'].includes(queuedState.status)){const activity=await activityFromQueue(queuedState);return json(activity,activity.phase==='preparing'?202:200,{'Cache-Control':'private, max-age=5'});}}
     const reportUrl = new URL('/api/public/manifest', url);
     reportUrl.search = new URLSearchParams({repository:repository.full_name,project_id:project.id});

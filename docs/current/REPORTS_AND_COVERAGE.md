@@ -17,3 +17,6 @@ The generated PDF includes every retained finding, source locations, scanner
 attribution, remediation guidance, coverage limitations, and immutable report
 provenance. Opening these sections or downloading an artifact is read-only and never
 submits analysis, modifies a configured source repository, or publishes source feedback.
+## Current workspace contract
+
+The project analyst loading sequence, `project-overview-v1`, and sanitized collaborator audit ZIP are documented in [PROJECT_ANALYST_WORKSPACE.md](PROJECT_ANALYST_WORKSPACE.md). Audit ZIPs are prebuilt during publication and remain in private R2; the Worker never assembles them on demand or exposes a browser-supplied object key.

@@ -527,12 +527,12 @@ test('authorized user follows one repository project from selection through publ
     await expect(connected).toContainText('Evidence unavailable');
     await expect(connected).not.toContainText('All reported channels are complete');
     await page.getByRole('link',{name:'Settings'}).click();
-    await page.locator('.settings-rail a[href*="section=projects"]').click();
-    await expect(page.locator('.settings-project-row').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('24 available');
-    await expect(page.locator('.settings-project-list')).not.toContainText('0 of 0');
-    await page.locator('.settings-rail a[href*="section=provenance"]').click();
-    await expect(page.locator('.provenance-boundary')).toContainText('Needs attention');
-    await expect(page.locator('.provenance-boundary')).not.toContainText('partial');
+    await expect(page.locator('.settings-rail').getByRole('link',{name:/Projects/})).toHaveCount(0);
+    await page.goto(`/#/settings?section=projects&project=${project}`);
+    await expect(page).toHaveURL(/#\/projects$/);
+    await expect(page.locator('.project-record')).toHaveCount(3);
+    await page.goto(`/#/settings/projects?project=${project}`);
+    await expect(page).toHaveURL(/#\/projects$/);
     await page.locator('.shell-header').getByRole('link',{name:'Project register'}).click();
     await page.locator('.project-record').filter({hasText:source}).getByRole('button',{name:'Review evidence'}).click();
      await expect(page).toHaveURL(new RegExp(`#/projects/${project}`));

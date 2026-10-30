@@ -11,6 +11,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
 from scripts.code_analysis.dashboard import validate_snapshot
+from scripts.code_analysis.project_overview import build_project_overview
 from scripts.code_analysis.snapshot import COMPLETE_STATUSES
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -137,6 +138,7 @@ def build(snapshot: dict, identity: dict, output: Path, *, producer_repository: 
         name = finding.get("file", "")
         line = finding.get("start_line", 0)
         row = {"id": fid, "severity": finding["severity"], "file": name, "line": line,
+               "category": finding.get("category") or finding.get("concept") or "Uncategorized",
                "message": "Potential secret detected; value withheld from public report." if secret else finding.get("message", ""),
                "scanners": finding.get("supporting_scanner_families", []),
                "rules": sorted({str(o["rule"]) for o in origins}),
@@ -162,6 +164,7 @@ def build(snapshot: dict, identity: dict, output: Path, *, producer_repository: 
     report["severities"] = dict(Counter(r["severity"] for r in index))
     write(output / "findings.json", index)
     write(output / "report.json", report)
+    write(output / "project-overview.json", build_project_overview(report, index))
     return report
 
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {reportToken} from './github-app.mjs';
-import {publicReports,reportStorageKey,canonicalReportTarget} from './reports.mjs';
+import {publicReports,reportStorageKey,canonicalReportTarget,auditReportExport} from './reports.mjs';
 const reportProjectConfig={schema_version:'analysis-projects-v1',execution_repository:{id:88},tooling_sha:'a'.repeat(40),projects:[{id:'1',source_repository:{id:1267340546,full_name:'owner/source'},profile:{mode:'portable'},preferred_branch:'main',enabled_scanners:['semgrep'],deferred_channels:{},report_budget_bytes:900000000}]};
 const reportConfigFile=()=>Response.json({encoding:'base64',content:Buffer.from(JSON.stringify(reportProjectConfig)).toString('base64')});test('public report tokens are limited to one repository and read-only contents',async()=>{
  const pair=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
@@ -20,6 +20,18 @@ const reportConfigFile=()=>Response.json({encoding:'base64',content:Buffer.from(
   assert.deepEqual(JSON.parse(request.options.body),{repositories:['public'],permissions:{contents:'read'}});
   await reportToken(env,'owner/public');assert.equal(calls.length,2);
  } finally {globalThis.fetch=original;}
+});
+test('audit export validates manifest membership and streams valid byte ranges',async()=>{
+ const bytes=Buffer.from('0123456789'),sha='a'.repeat(64),asset=`audit-${sha}.zip`,target={id:'current:1',original_target_id:'branch-main',analyzed_sha:'b'.repeat(40),audit_bundle:{asset,sha256:sha,bytes:bytes.length}};
+ const manifest={schema_version:'analysis-current-v1',project_id:'1',analysis_repository:'owner/repo',current_target_id:'current:1',targets:[target]};
+ const manifestKey=reportStorageKey('owner/repo','1'),assetKey=reportStorageKey('owner/repo','1',asset);
+ const bucket={head:async key=>key===assetKey?{size:bytes.length,httpEtag:'"etag"'}:null,get:async(key,options)=>key===manifestKey?{json:async()=>manifest}:key===assetKey?{body:options?.range?bytes.subarray(options.range.offset,options.range.offset+options.range.length):bytes}:null};
+ const env={ANALYSIS_REPOSITORY:'owner/repo',ANALYSIS_REPORTS:bucket};
+ const response=await auditReportExport(new Request('https://worker/api/report-export?project_id=1&target_id=current%3A1&format=audit-zip',{headers:{Range:'bytes=2-5'}}),env);
+ assert.equal(response.status,206);assert.equal(response.headers.get('Content-Range'),'bytes 2-5/10');assert.equal(await response.text(),'2345');assert.equal(response.headers.get('Cache-Control'),'private, no-store');
+ const suffix=await auditReportExport(new Request('https://worker/api/report-export?project_id=1&target_id=current%3A1&format=audit-zip',{headers:{Range:'bytes=-3'}}),env);assert.equal(suffix.status,206);assert.equal(await suffix.text(),'789');
+ assert.equal((await auditReportExport(new Request('https://worker/api/report-export?project_id=1&target_id=..%2Fbad&format=audit-zip'),env)).status,400);
+ assert.equal((await auditReportExport(new Request('https://worker/api/report-export?project_id=1&target_id=missing&format=audit-zip'),env)).status,404);
 });
 
 async function appKey() {

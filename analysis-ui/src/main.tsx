@@ -40,7 +40,7 @@ function AuthenticatedHome({auth}:{auth:Auth}){
 
 function WorkspaceRoute({auth}:{auth:Auth}){
  const [kind,setKind]=useState(()=>parseAppRoute().kind);
- useEffect(()=>{const update=()=>setKind(parseAppRoute().kind);window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
+ useEffect(()=>{const update=()=>{const parsed=parseAppRoute(),canonical=routeHash(parsed),recognized=/^#\/(projects(?:\/|$)|settings(?:\/|\?|$))/.test(location.hash);if(recognized&&location.hash!==canonical)history.replaceState(null,'',canonical);setKind(parsed.kind)};update();window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
  return <Suspense fallback={<main className="workspace-loading" role="status">Opening workspace...</main>}>{kind==='projects'?<ProjectsApp viewerAuth={auth}/>:<WorkspaceApp viewerAuth={auth}/>}</Suspense>;
 }
 
