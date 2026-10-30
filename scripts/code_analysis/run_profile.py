@@ -80,13 +80,14 @@ def main():
                 raise RuntimeError('Schemathesis execution failed')
             status, reason = 'COMPLETED', 'Bounded API campaign completed; JUnit findings retained'
         finally:
-            process.terminate()
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
             write(root / 'schemathesis-status.json', {'scanner_family': 'Schemathesis', 'status': status, 'reason': reason})
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
         return
     if a.task == 'python-install':
         command = [sys.executable, '-m', 'pip', 'install', '-r', str(root / profile['python_requirements'])]
@@ -101,10 +102,16 @@ def main():
             candidate = cwd / name
             if candidate.is_file() or candidate.is_symlink():
                 candidate.unlink()
+    test_timeout = 900
+    if a.task == 'python-test':
+        configured_timeout = profile.get('python_test_timeout_seconds', 900)
+        if not isinstance(configured_timeout, int) or not 60 <= configured_timeout <= 2400:
+            raise ValueError('python_test_timeout_seconds must be an integer between 60 and 2400')
+        test_timeout = configured_timeout
     try:
         result = subprocess.run(
             command, cwd=cwd, env=env, check=False,
-            timeout=900 if a.task in ('python-test', 'javascript-test') else None,
+            timeout=test_timeout if a.task == 'python-test' else 900 if a.task == 'javascript-test' else None,
         )
     except subprocess.TimeoutExpired:
         if a.task == 'javascript-test':
@@ -123,7 +130,7 @@ def main():
             'scanner_family': 'Coverage.py',
             'status': 'COMPLETED' if measured else 'OPERATIONAL_FAILURE',
             'test_exit_code': None,
-            'reason': 'Tests exceeded the trusted 900-second limit; coverage output ' +
+            'reason': f'Tests exceeded the trusted {test_timeout}-second limit; coverage output ' +
                       ('retained' if measured else 'missing'),
         })
         return

@@ -55,6 +55,8 @@ def generate(config=None):
                 # GitHub's host-PR gate is not an upstream-head scanner.
                 continue
             job = copy.deepcopy(original)
+            if name == 'test-coverage':
+                job['timeout-minutes'] = max(job.get('timeout-minutes', 30), 40)
             # Source jobs may inspect public source, but never receive credentials.
             job['env'] = {key: value for key, value in job.get('env', {}).items()
                           if not (isinstance(value, str) and 'secrets.' in value)}

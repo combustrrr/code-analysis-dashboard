@@ -268,15 +268,27 @@ class ReportTests(unittest.TestCase):
         from scripts.code_analysis import run_profile
         (self.root / 'backend').mkdir()
         (self.root / 'backend' / 'coverage.json').write_text('{"stale":true}')
-        timeout = run_profile.subprocess.TimeoutExpired('pytest', 900)
+        timeout = run_profile.subprocess.TimeoutExpired('pytest', 1500)
         with patch('sys.argv', ['profile', 'python-test', '--source', str(self.root)]), \
                 patch.object(run_profile.subprocess, 'run', side_effect=timeout) as execute:
             run_profile.main()
         status = h.load(self.root / 'backend' / 'coverage-status.json')
         self.assertEqual(status['status'], 'OPERATIONAL_FAILURE')
-        self.assertIn('900-second', status['reason'])
-        self.assertEqual(execute.call_args.kwargs['timeout'], 900)
+        self.assertIn('1500-second', status['reason'])
+        self.assertEqual(execute.call_args.kwargs['timeout'], 1500)
         self.assertFalse((self.root / 'backend' / 'coverage.json').exists())
+
+    def test_python_profile_accepts_bounded_project_timeout(self):
+        from scripts.code_analysis import run_profile
+        (self.root / 'backend').mkdir()
+        profile = h.load(Path('config/code-analysis/service.json'))['profile']
+        profile.update(python_root='backend', python_test_command=['pytest'],
+                       python_test_timeout_seconds=1500)
+        with patch('scripts.code_analysis.run_profile.load_profile', return_value=profile), \
+                patch('sys.argv', ['profile', 'python-test', '--source', str(self.root)]), \
+                patch.object(run_profile.subprocess, 'run', return_value=SimpleNamespace(returncode=0)) as execute:
+            run_profile.main()
+        self.assertEqual(execute.call_args.kwargs['timeout'], 1500)
 
     def test_api_profile_timeout_stops_source_process_and_records_failure(self):
         from scripts.code_analysis import run_profile
@@ -286,6 +298,7 @@ class ReportTests(unittest.TestCase):
                 patch.object(run_profile.urllib.request, 'urlopen', return_value=io.BytesIO(b'{}')), \
                 patch.object(run_profile.subprocess, 'run', side_effect=run_profile.subprocess.TimeoutExpired('fuzzer', 300)):
             with self.assertRaises(run_profile.subprocess.TimeoutExpired):
+                process.return_value.poll.return_value = None
                 run_profile.main()
         process.return_value.terminate.assert_called_once()
         self.assertEqual(h.load(self.root / 'schemathesis-status.json')['status'], 'OPERATIONAL_FAILURE')

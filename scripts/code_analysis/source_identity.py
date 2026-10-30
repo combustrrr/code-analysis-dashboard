@@ -2,11 +2,33 @@
 import argparse
 import json
 import os
+import time
 from pathlib import Path
 
 from scripts.code_analysis.github_service import api, extract_zip, gh, pages
 from scripts.code_analysis.hosted import load, target, write
 from scripts.code_analysis.hosted_pipeline import assemble
+
+
+def execution_jobs_with_terminal_conclusions(host: str, run: str, attempt: int,
+                                             selected_jobs: list[str], adapter_jobs: dict[str, list[str]],
+                                             retries: int = 6, delay_seconds: float = 2) -> list[dict]:
+    """Wait for the Actions jobs API to expose terminal producer conclusions."""
+    jobs: list[dict] = []
+    for index in range(retries):
+        jobs = pages(f'repos/{host}/actions/runs/{run}/attempts/{attempt}/jobs', 'jobs')
+        relevant: list[dict] = []
+        for group in selected_jobs:
+            if group in adapter_jobs:
+                relevant.extend(j for j in jobs if j.get('name', '').endswith('Portable ' + group))
+        if 'codeql' in selected_jobs:
+            relevant.extend(j for j in jobs if 'CodeQL (' in j.get('name', ''))
+        codeql_ready = 'codeql' not in selected_jobs or any('CodeQL (' in j.get('name', '') for j in jobs)
+        if codeql_ready and relevant and all(j.get('conclusion') for j in relevant):
+            return jobs
+        if index + 1 < retries:
+            time.sleep(delay_seconds)
+    return jobs
 
 
 def expected_dispatch_id(request_id: str, channels: list[str]) -> str:
@@ -98,10 +120,10 @@ def main():
                                         'source_repository': row['source_repository'], 'source_sha': row['head_sha']})
     from scripts.code_analysis.applicability import selection
     selected_jobs, excluded, _ = selection(json.loads(Path('config/code-analysis/service.json').read_text()), Path('.source'), row.get('execution_channels') or row.get('requested_channels'))
-    execution_jobs = pages(f'repos/{host}/actions/runs/{run}/attempts/{attempt}/jobs', 'jobs')
     from scripts.code_analysis.applicability import GROUPS
     from scripts.code_analysis.portable_profile import ADAPTER_JOBS
     JOBS = {key:value for key,value in GROUPS.items() if key in ADAPTER_JOBS}
+    execution_jobs = execution_jobs_with_terminal_conclusions(host, run, attempt, selected_jobs, JOBS)
     from scripts.code_analysis.portable_runner import FAMILIES
     for group, channels in JOBS.items():
         matching = [j for j in execution_jobs if j.get('name','').endswith('Portable ' + group)]

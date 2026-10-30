@@ -38,6 +38,7 @@
           "--cov=app",
           "--cov-report=json:coverage.json"
         ],
+        "python_test_timeout_seconds": 1500,
         "javascript_root": "webui",
         "javascript_install_command": [
           "npm",
@@ -146,6 +147,7 @@
           "--cov=app",
           "--cov-report=json:coverage.json"
         ],
+        "python_test_timeout_seconds": 1500,
         "javascript_root": "webui",
         "javascript_install_command": [
           "npm",

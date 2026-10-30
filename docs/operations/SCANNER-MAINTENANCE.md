@@ -133,6 +133,15 @@ remain in its JSON report without also becoming workflow error annotations.
 Do not suppress genuine scanner execution failures: those belong in the scanner
 status evidence and remain operationally visible.
 
+Report assembly waits briefly for the Actions jobs API to expose terminal
+conclusions. The report job already depends on every producer, but the REST
+projection can lag the workflow scheduler; a missing conclusion must not be
+converted into a false scanner failure. Trusted Python coverage profiles may set
+`python_test_timeout_seconds` from 60 through 2400 seconds. The two larger
+configured sources use 1500 seconds, within the generated 40-minute coverage
+job boundary, so their progressing test suites can finish and retain current-run
+coverage rather than being cut off at the former 900-second default.
+
 The current-report manifest is a bounded index. Channel progress entries retain
 status, counts, scanner identity, and artifact provenance, while finding bodies
 and observation identifiers live only in the integrity-addressed report shards.
