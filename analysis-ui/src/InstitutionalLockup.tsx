@@ -1,5 +1,5 @@
-import trustLabLogo from './assets/trustlab-logo.jpg';
-import mphasisLogo from './assets/mphasis-logo.jpg';
+import trustLabLogo from './assets/trustlab-logo-landing.webp';
+import mphasisLogo from './assets/mphasis-logo-landing.webp';
 import './institutional-lockup.css';
 
 export function InstitutionalLockup({href,className=''}:{href:string;className?:string}){

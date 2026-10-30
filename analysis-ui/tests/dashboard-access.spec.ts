@@ -427,11 +427,11 @@ test('a stale project URL falls back to the current project register after sign-
 test('reload restores a tab session while a fresh tab requires GitHub sign-in',async({page,context})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
  const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4178','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
- let sessionChecks=0,bootstrapChecks=0;const handle='m'.repeat(43),registry={execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]};
+ let configChecks=0,sessionChecks=0,bootstrapChecks=0;const handle='m'.repeat(43),registry={execution_repository:{id:1360051890,full_name:'combustrrr/code-analysis-dashboard'},can_launch:false,can_configure:false,projects:[{id:'1278177697',source_repository:'combustrrr/Agentic-Kibana',source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false}]};
  await context.route('https://launcher.example/**',async route=>{
   const url=new URL(route.request().url());
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
-  if(url.pathname==='/api/public/config')return route.fulfill({headers,json:{require_login:true,require_report_login:true}});
+  if(url.pathname==='/api/public/config'){configChecks++;return route.fulfill({headers,json:{require_login:true,require_report_login:true}});}
   if(url.pathname==='/auth/login')return route.fulfill({status:302,headers:{Location:`http://127.0.0.1:4178/#analysis_auth=${'e'.repeat(43)}`}});
   if(url.pathname==='/api/auth/redeem'){
    const body=route.request().postDataJSON();expect(body.code).toBe('e'.repeat(43));expect(body.verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
@@ -453,6 +453,7 @@ test('reload restores a tab session while a fresh tab requires GitHub sign-in',a
  await page.reload();
  await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
  expect(sessionChecks).toBe(1);expect(bootstrapChecks).toBe(1);
+ expect(configChecks).toBe(0);
  const anotherTab=await context.newPage();
  await anotherTab.goto('/#/projects');
  await expect(anotherTab.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/})).toBeVisible();

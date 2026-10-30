@@ -11,9 +11,9 @@ export function DashboardAccess({children,publicFallback}:{children:(auth?:Retur
  const [verified,setVerified]=useState<string>();
  const [error,setError]=useState('');
  const [workspaceRequested,setWorkspaceRequested]=useState(()=>isWorkspaceRoute()||Boolean(pendingAuthDestination()?.includes('#/')));
- useEffect(()=>{if(!applicationEndpoint)return;let active=true;
+ useEffect(()=>{if(!applicationEndpoint||required!==undefined)return;let active=true;
   fetch(applicationEndpoint+'/api/public/config',{cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error('Access configuration unavailable.');return r.json();}).then(c=>{if(active)setRequired(c.require_login===true||c.require_report_login===true);}).catch(()=>{if(active)setError('Could not verify dashboard access. Reload to retry.');});return()=>{active=false;};
- },[]);
+ },[required]);
  useEffect(()=>{const update=()=>setWorkspaceRequested(isWorkspaceRoute());window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
  useEffect(()=>{setVerified(undefined);setReportSession(undefined);if(!required||!auth.session)return;
   let active=true,rechecking=false;const token=auth.session.token;

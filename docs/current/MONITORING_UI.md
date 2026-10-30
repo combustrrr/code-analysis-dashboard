@@ -136,3 +136,10 @@ render without loading React or authenticated workspace modules. OAuth callbacks
 workspace hashes dynamically load the existing React application; authentication,
 session verification, and registry access remain owned by that application. The UI
 build enforces initial landing JavaScript, CSS, and font budgets from the Vite manifest.
+
+For repository deployments, the authenticated entry knows at build time that access is
+required and does not repeat the public configuration request during same-tab session
+restoration. The verified `auth-bootstrap-v1` response remains the only source of the
+session and trusted registry. Header branding uses the bundled responsive WebP assets,
+and repeated project actions expose repository-qualified accessible names while keeping
+their concise visible labels.
