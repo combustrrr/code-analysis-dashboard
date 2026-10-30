@@ -31,6 +31,18 @@ def execution_jobs_with_terminal_conclusions(host: str, run: str, attempt: int,
     return jobs
 
 
+def producer_artifacts_with_consistency_wait(host: str, run: str, retries: int = 4,
+                                             delay_seconds: float = 2) -> list[dict]:
+    """Merge bounded artifact-list projections while Actions storage converges."""
+    artifacts: dict[int, dict] = {}
+    for index in range(retries):
+        for artifact in pages(f'repos/{host}/actions/runs/{run}/artifacts', 'artifacts'):
+            artifacts[artifact['id']] = artifact
+        if index + 1 < retries:
+            time.sleep(delay_seconds)
+    return list(artifacts.values())
+
+
 def expected_dispatch_id(request_id: str, channels: list[str]) -> str:
     import hashlib
     return request_id[:8]+'-'+hashlib.sha256((request_id+':'+','.join(channels)).encode()).hexdigest()[:16]
@@ -110,7 +122,7 @@ def main():
             "--endpoint-url", endpoint
         ], check=True)
     else:
-        for artifact in pages(f'repos/{host}/actions/runs/{run}/artifacts', 'artifacts'):
+        for artifact in producer_artifacts_with_consistency_wait(host, run):
             if artifact['expired'] or artifact['name'].startswith('hosted-report-') or artifact['created_at'] < producer['run_started_at']:
                 continue
             destination = root / str(artifact['id'])

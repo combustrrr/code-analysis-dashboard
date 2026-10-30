@@ -1,7 +1,10 @@
 import unittest
 from unittest.mock import patch
 
-from scripts.code_analysis.source_identity import execution_jobs_with_terminal_conclusions
+from scripts.code_analysis.source_identity import (
+    execution_jobs_with_terminal_conclusions,
+    producer_artifacts_with_consistency_wait,
+)
 
 
 class ExecutionJobConsistencyTests(unittest.TestCase):
@@ -32,6 +35,17 @@ class ExecutionJobConsistencyTests(unittest.TestCase):
             )
         self.assertEqual(result, pending)
         self.assertEqual(pages.call_count, 3)
+        self.assertEqual(sleep.call_count, 2)
+
+    def test_artifact_projections_are_merged_while_storage_converges(self):
+        first = [{'id': 1, 'name': 'coverage'}]
+        second = [*first, {'id': 2, 'name': 'schemathesis-report'}]
+        with patch('scripts.code_analysis.source_identity.pages', side_effect=[first, second, second]), \
+                patch('scripts.code_analysis.source_identity.time.sleep') as sleep:
+            result = producer_artifacts_with_consistency_wait(
+                'owner/repo', '123', retries=3, delay_seconds=0.5,
+            )
+        self.assertEqual({row['id'] for row in result}, {1, 2})
         self.assertEqual(sleep.call_count, 2)
 
 

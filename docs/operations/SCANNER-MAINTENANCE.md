@@ -136,7 +136,9 @@ status evidence and remain operationally visible.
 Report assembly waits briefly for the Actions jobs API to expose terminal
 conclusions. The report job already depends on every producer, but the REST
 projection can lag the workflow scheduler; a missing conclusion must not be
-converted into a false scanner failure. Trusted Python coverage profiles may set
+converted into a false scanner failure. Artifact-list projections are likewise
+merged across a bounded consistency window before report assembly so a newly
+finalized scanner artifact is not misclassified as absent. Trusted Python coverage profiles may set
 `python_test_timeout_seconds` from 60 through 2400 seconds. The two larger
 configured sources use 1500 seconds, within the generated 40-minute coverage
 job boundary, so their progressing test suites can finish and retain current-run
