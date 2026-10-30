@@ -48,6 +48,12 @@ uses `auth-bootstrap-v1` and atomically returns the verified identity, capabilit
 trusted project registry. Explicit logout calls `POST /api/auth/logout`, deletes the
 Durable Object session first, and then attempts GitHub grant revocation.
 
+Pages bounds callback redemption and same-tab bootstrap restoration to 12 seconds.
+If either request stalls, the transition panel becomes a persistent recoverable error
+with a retry action instead of leaving the user on "Returning you to Projects"
+indefinitely. The opaque session handle is retained for this retry unless the Worker
+authoritatively returns a sign-out action.
+
 Successful collaborator and capability verification is cached in that session record
 for at most 60 seconds for protected reads. Bootstrap, periodic access checks, and every
 mutation verify GitHub live. A confirmed collaborator `404` or identity mismatch deletes
