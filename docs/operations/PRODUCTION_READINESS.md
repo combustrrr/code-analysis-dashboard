@@ -4,6 +4,15 @@ This document records deployment acceptance and remaining limitations. The UI/AP
 is deployed; full scanner acceptance is not claimed. Stable boundaries are defined by the
 [system architecture](../architecture/SYSTEM_OVERVIEW.md).
 
+## Workflow annotation readiness
+
+Before treating annotation evidence as complete, confirm the publisher has
+`actions: read`, the report contains `workflow-annotation-evidence-v1`, and the
+run ID and attempt match the admitted request. Permission, rate-limit, partial,
+truncated, and unavailable states are limitations, never zero findings. Canary
+acceptance must reconcile retained, correlated, excluded, and unavailable rows
+with GitHub's visible annotations for the same run and attempt.
+
 Verified: product/service separation, current-release storage, exact producer/source
 provenance, login/launch/report round trip, no-source-write behavior for all three
 configured projects, validated update adoption, combined issue filters,

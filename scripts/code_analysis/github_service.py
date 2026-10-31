@@ -401,6 +401,21 @@ def collect(config: dict, row: dict, destination: Path) -> dict:
         raise ValueError('report producer attempt mismatch')
     if {str(r['id']) for r in report['producer_runs']} != {str(run_id)}:
         raise ValueError('mixed producer runs')
+    # Annotation collection happens only after the producer identity above is
+    # validated. A caller/browser cannot select a different run or attempt.
+    from scripts.code_analysis.workflow_annotations import apply as apply_annotations, collect as collect_annotations
+    profile_digest = row.get('profile_digest')
+    if not isinstance(profile_digest, str) or not re.fullmatch(r'[0-9a-f]{64}', profile_digest):
+        # Legacy collection has no versioned profile digest. Preserve the
+        # absence explicitly instead of fabricating successful annotation evidence.
+        profile_digest = digest({'legacy_analysis_key': row.get('analysis_key', '')})
+    envelope = collect_annotations(
+        execution_repository=host, source_repository=report['target']['source_repository'],
+        source_sha=report['analyzed_sha'], workflow=run['path'], run_id=int(run_id),
+        run_attempt=int(row['run_attempt']), tooling_sha=report['tooling_sha'],
+        profile_digest=profile_digest,
+    )
+    report = apply_annotations(destination, envelope)
     return report
 
 

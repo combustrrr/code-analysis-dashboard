@@ -13,6 +13,10 @@ in `config/code-analysis/service-layout.json`:
 - **application** verifies exact-commit evidence and assembles publishable snapshots;
 - **presentation** builds the bounded read-only dashboard inside GitHub Actions;
 - **infrastructure adapters** publish immutable GitHub Actions artifacts;
+
+`workflow_annotations.py` performs bounded, read-only collection for the exact
+validated producer run and attempt, sanitizes provider output, and reconciles
+annotations without double-counting authoritative scanner artifacts.
 - **verification** enforces workflow policy, canaries, scale, and regressions.
 
 New code must respect dependency direction:

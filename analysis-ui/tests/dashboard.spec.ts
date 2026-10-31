@@ -114,6 +114,24 @@ test.describe('production shell',()=>{
   await expect(page.getByRole('heading',{name:'Why this was reported'})).toBeVisible();
  });
 
+ test('workflow annotations filter safely and expose exact run provenance',async({page})=>{
+  const annotation={id:'workflow-annotation:1',severity:'MEDIUM',category:'WORKFLOW',message:'Compiler warning <script>alert(1)</script>',file:'src/example.ts',line:12,scanners:['Workflow annotations'],rules:['TS1234'],observation_count:1,scanner_family_count:1,page:0,annotation:{source:'check-run',level:'warning',workflow:'.github/workflows/ci.yml',run_id:123,run_attempt:2,job:'build',step:null,check_run_id:456,policy:'actionable',contributes_to_needs_attention:true,run_url:'https://github.com/combustrrr/code-analysis-dashboard/actions/runs/123/attempts/2',check_url:'https://github.com/combustrrr/code-analysis-dashboard/runs/456',file_url:'https://github.com/combustrrr/Agentic-Kibana/blob/'+'a'.repeat(40)+'/src/example.ts#L12',correlation:{status:'unmatched',finding_id:null,scanner:null}}};
+  await page.route('**/*',route=>{const url=decodeURIComponent(route.request().url());if(url.includes('data/index.json'))return route.fulfill({json:{schema_version:'dashboard-index-v1',checked_at:'2026-01-01T00:00:00Z',preferred_branch:'main',analysis_repository:'combustrrr/code-analysis-dashboard',source_repository:'combustrrr/Agentic-Kibana',targets:[{id:'current',label:'main',repository:'combustrrr/Agentic-Kibana',source_repository:'combustrrr/Agentic-Kibana',head_sha:'a'.repeat(40),kind:'branch',branch:'main',checked_at:'2026-01-01T00:00:00Z',status:'current',report:'reports/fixture'}]}});if(url.includes('project-overview.json'))return route.fulfill({json:{schema_version:'project-overview-v1',analyzed_sha:'a'.repeat(40),generated_at:'2026-01-01T00:00:00Z',findings:{total:1,observations:1,critical:0,high:0,located:1},coverage:{completed:1,total:1,publication_gate_satisfied:true,incomplete_channels:[]},distributions:{severity:[{label:'MEDIUM',count:1}],category:[{label:'WORKFLOW',count:1}],scanner:[{label:'Workflow annotations',count:1}],rule:[{label:'TS1234',count:1}],directory:[{label:'src',count:1}],scanner_overlap:[{label:'1 scanner',count:1}]},priority_findings:[annotation],investigation_clusters:[]}});if(url.includes('findings-catalog.json'))return route.fulfill({json:{schema_version:'findings-catalog-v1',total:1,page_size:500,pages:1}});if(url.includes('findings-pages/0.json'))return route.fulfill({json:[annotation]});if(url.includes('finding-locators/1.json'))return route.fulfill({json:[{id:annotation.id,detail_page:0}]});if(url.includes('details/0.json'))return route.fulfill({json:[{...annotation,origins:[{scanner_family:'Workflow annotations',rule:'TS1234',file:'src/example.ts',start_line:12,raw_artifact:'workflow-annotations.json',observation_id:annotation.id}],source:null,source_start:null,source_url:null}]});return route.continue();});
+  await page.goto(PROJECT+'/issues');
+  await expect(page.getByText('Compiler warning <script>alert(1)</script>')).toBeVisible();
+  await expect(page.locator('.issue-link').first()).toContainText('<script>alert(1)</script>');
+  await page.getByRole('button',{name:'More filters'}).click();
+  await page.locator('.path-multi-picker summary').filter({hasText:/Choose annotation sources/i}).click();
+  await page.getByLabel('Annotation sources options').getByRole('option',{name:'check-run'}).click();
+  await expect(page).toHaveURL(/annotationSource=check-run/);
+  await page.getByRole('button',{name:'Compiler warning <script>alert(1)</script>'}).click();
+  await expect(page.getByRole('heading',{name:'Workflow annotation provenance'})).toBeVisible();
+  await expect(page.getByText(/run 123 attempt 2/)).toBeVisible();
+  for(const name of ['Open trusted run','Open trusted check','Open immutable file']){
+   const link=page.getByRole('link',{name});await expect(link).toHaveAttribute('target','_blank');await expect(link).toHaveAttribute('rel',/noopener noreferrer/);
+  }
+ });
+
  test('project status and issue content remain in intrinsic document flow',async({page})=>{
   await page.goto(PROJECT+'/issues');
   await expect(page.getByRole('heading',{name:'Findings to investigate'})).toBeVisible();

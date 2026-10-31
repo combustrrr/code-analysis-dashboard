@@ -1,5 +1,5 @@
-export type IndexableFinding={id:string;severity:string;category?:string;scanners:string[];rules:string[];file:string;line:number;message:string};
-type Family='severity'|'category'|'scanner'|'rule'|'file'|'directory'|'location'|'overlap';
+export type IndexableFinding={id:string;severity:string;category?:string;scanners:string[];rules:string[];file:string;line:number;message:string;annotation?:{source?:string;workflow?:string;job?:string;level?:string;correlation?:{status?:string;scanner?:string|null}}};
+type Family='severity'|'category'|'scanner'|'rule'|'file'|'directory'|'location'|'overlap'|'annotationSource'|'workflow'|'job'|'annotationLevel'|'correlatedScanner';
 export type FindingIndex<T extends IndexableFinding>={rows:T[];byId:Map<string,number>;families:Record<Family,Map<string,Set<number>>>;search:string[]};
 
 const directory=(file:string)=>file.includes('/')?file.slice(0,file.lastIndexOf('/')):'(root)';
@@ -7,7 +7,7 @@ const add=(map:Map<string,Set<number>>,key:string,index:number)=>{const values=m
 
 export function buildFindingIndex<T extends IndexableFinding>(rows:T[]):FindingIndex<T>{
  const families={} as Record<Family,Map<string,Set<number>>>;
- (['severity','category','scanner','rule','file','directory','location','overlap'] as Family[]).forEach(key=>families[key]=new Map());
+ (['severity','category','scanner','rule','file','directory','location','overlap','annotationSource','workflow','job','annotationLevel','correlatedScanner'] as Family[]).forEach(key=>families[key]=new Map());
  const byId=new Map<string,number>(),search:string[]=[];
  rows.forEach((row,index)=>{
   byId.set(row.id,index);add(families.severity,row.severity,index);add(families.category,row.category||'Uncategorized',index);
@@ -16,7 +16,8 @@ export function buildFindingIndex<T extends IndexableFinding>(rows:T[]):FindingI
   const located=Boolean(row.file&&row.line>0);add(families.location,located?'located':'unlocated',index);
   if(located)add(families.location,`${row.file}#L${row.line}`,index);
   add(families.overlap,new Set(row.scanners).size>1?'multiple':'single',index);
-  search[index]=`${row.message} ${row.file} ${row.category||''} ${row.rules.join(' ')} ${row.scanners.join(' ')}`.toLowerCase();
+  if(row.annotation){if(row.annotation.source)add(families.annotationSource,row.annotation.source,index);if(row.annotation.workflow)add(families.workflow,row.annotation.workflow,index);if(row.annotation.job)add(families.job,row.annotation.job,index);if(row.annotation.level)add(families.annotationLevel,row.annotation.level,index);const scanner=row.annotation.correlation?.scanner;if(scanner)add(families.correlatedScanner,scanner,index);}
+  search[index]=`${row.message} ${row.file} ${row.category||''} ${row.rules.join(' ')} ${row.scanners.join(' ')} ${row.annotation?.job||''} ${row.annotation?.workflow||''}`.toLowerCase();
  });
  return{rows,byId,families,search};
 }

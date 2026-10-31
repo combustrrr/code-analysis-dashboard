@@ -148,6 +148,7 @@ sequenceDiagram
 | Coordinator | `.github/workflows/code-analysis-coordinator.yml` |
 | Scanner workflow generators | `scripts/code_analysis/generate_source_workflow.py` and `generate_reusable_workflows.py` |
 | Evidence assembly and publication | `scripts/code_analysis/` |
+| Exact-run workflow annotations | `scripts/code_analysis/workflow_annotations.py` |
 | Scanner contracts and templates | `config/code-analysis/` |
 | Security fixtures | `tests/security_canary/` |
 
