@@ -59,7 +59,7 @@ def scanner_jobs():
         "timeout-minutes": 25,
         "permissions": {"contents": "read"},
         "steps": common + [
-            {"name": "Install pinned njsscan", "run": "python -m pip install njsscan==1.0.1"},
+            {"name": "Install pinned njsscan", "run": "python -m pip install njsscan==1.0.2"},
             {"name": "Analyze exact-revision JavaScript and TypeScript", "run":
              "set +e\n"
              "njsscan --sarif --output owasp-js.sarif .source\n"

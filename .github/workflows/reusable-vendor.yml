@@ -72,7 +72,7 @@ jobs:
           node-version: '20'
       - name: Install pinned Snyk CLI
         if: env.SNYK_TOKEN != ''
-        run: npm install --global snyk@1.1307.4
+        run: npm install --global snyk@1.1308.3
       - name: Run Snyk dependency and code scans
         if: env.SNYK_TOKEN != ''
         working-directory: .source
