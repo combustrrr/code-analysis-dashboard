@@ -195,7 +195,7 @@ jobs:
 
         pip install -r backend/requirements-dev.txt
 
-        pip install "pyright==1.1.411"
+        pip install "pyright==1.1.414"
 
         '
     - name: Run Pyright (advisory)
@@ -424,7 +424,7 @@ jobs:
       with:
         python-version: '3.11'
     - name: Install Semgrep
-      run: pip install semgrep==1.178.0 click==8.4.2 python-dateutil==2.9.0.post0
+      run: pip install semgrep==1.182.1 click==8.5.0 python-dateutil==2.9.0.post0
     - name: Validate custom Semgrep rules
       run: semgrep --validate --config=$RUNNER_TEMP/analysis-tooling/.github/semgrep-rules/
     - name: Run Semgrep (JSON output)
@@ -624,7 +624,7 @@ jobs:
       with:
         python-version: '3.11'
     - name: Install Checkov
-      run: pip install "checkov==3.2.468"
+      run: pip install "checkov==3.3.30"
     - name: Run Checkov
       run: "checkov \\\n  --directory . \\\n  --framework dockerfile,github_actions \\\n  --output sarif \\\n  --output-file-path\
         \ checkov.sarif \\\n  --soft-fail || true\n"
@@ -799,11 +799,11 @@ jobs:
         TARGET_JSON: ${{ inputs.target }}
         EXPECTED_PROFILE: agentic-soc
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
-    - name: Install verified Scorecard 5.5.0
-      run: 'curl --fail --location --retry 3 https://github.com/ossf/scorecard/releases/download/v5.5.0/scorecard_5.5.0_linux_amd64.tar.gz
+    - name: Install verified Scorecard 5.6.0
+      run: 'curl --fail --location --retry 3 https://github.com/ossf/scorecard/releases/download/v5.6.0/scorecard_5.6.0_linux_amd64.tar.gz
         -o scorecard.tar.gz
 
-        echo "83b90a05c1540ef1390db1cd5711e5fd04be9c1d8537fb84d39d02092d6a8dff  scorecard.tar.gz" | sha256sum --check
+        echo "19bde07129450cb65a95c6e3b9f34e034341579e6f0e241546ec3ae6efb2dd9a  scorecard.tar.gz" | sha256sum --check
 
         tar -xzf scorecard.tar.gz scorecard
 
@@ -969,7 +969,7 @@ jobs:
   scanner-4-test-coverage:
     name: Coverage.py (Test Coverage)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
     - name: Checkout
       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -1083,7 +1083,7 @@ jobs:
       run: 'python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile python-install
         --source "$GITHUB_WORKSPACE"
 
-        python -m pip install schemathesis==3.39.16 httpx==0.27.2'
+        python -m pip install schemathesis==3.39.16 httpx==0.28.1'
     - name: Run API Fuzzing (Schemathesis)
       id: schemathesis
       run: python -I "$RUNNER_TEMP/analysis-tooling/scripts/code_analysis/trusted_entry.py" run_profile api-fuzz
@@ -1095,7 +1095,9 @@ jobs:
         name: schemathesis-report
         path: 'fuzzing-results.xml
 
-          backend/schema.json'
+          schema.json
+
+          schemathesis-status.json'
         if-no-files-found: error
         retention-days: 7
     - name: Upload fuzzing-findings as artifact
@@ -1149,7 +1151,7 @@ jobs:
       shell: bash
       run: 'set -euo pipefail
 
-        pip install -r backend/requirements.txt "atheris==3.0.0"
+        pip install -r backend/requirements.txt "atheris==3.1.0"
 
         '
     - name: Run deterministic case-decision fuzz campaign
@@ -1471,7 +1473,7 @@ jobs:
     - *id002
     - *id003
     - name: Install pinned njsscan
-      run: python -m pip install njsscan==1.0.1
+      run: python -m pip install njsscan==1.0.2
     - name: Analyze exact-revision JavaScript and TypeScript
       run: 'set +e
 
@@ -1596,7 +1598,7 @@ jobs:
       with:
         python-version: '3.11'
     - name: Install trusted reporting dependencies
-      run: python -m pip install click==8.5.0 ruff==0.16.9
+      run: python -m pip install click==8.5.0 ruff==0.17.3
     - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
         repository: ${{ fromJSON(inputs.target).source_repository }}
