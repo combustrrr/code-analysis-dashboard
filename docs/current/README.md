@@ -9,6 +9,7 @@ Authoritative current-state material for the deployed service.
 | Acceptance limitations | [Production readiness](../operations/PRODUCTION_READINESS.md) |
 | Application usage | [Monitoring UI](MONITORING_UI.md) |
 | Launch flow | [Authenticated launching](AUTHENTICATED_LAUNCHING.md) |
+| Workflow annotation evidence | [Workflow annotations](WORKFLOW_ANNOTATIONS.md) |
 | Threat reports | [Threat reports](THREAT_REPORTS.md) |
 | Community health | [Community health configuration](COMMUNITY_HEALTH.md) |
 

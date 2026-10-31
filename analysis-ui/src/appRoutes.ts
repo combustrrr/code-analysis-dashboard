@@ -1,6 +1,6 @@
 export type ProjectView='overview'|'issues'|'coverage'|'report';
 type MultiFilter=string|string[];
-export type IssueRouteFilters={query?:string;severity?:MultiFilter;category?:MultiFilter;scanner?:MultiFilter;rule?:MultiFilter;files?:string[];directory?:MultiFilter;location?:string;overlap?:string;group?:string};
+export type IssueRouteFilters={query?:string;severity?:MultiFilter;category?:MultiFilter;scanner?:MultiFilter;rule?:MultiFilter;files?:string[];directory?:MultiFilter;location?:string;overlap?:string;group?:string;annotationSource?:MultiFilter;workflow?:MultiFilter;job?:MultiFilter;annotationLevel?:MultiFilter;correlatedScanner?:MultiFilter};
 export type SettingsSection='overview'|'integrations'|'provenance';
 export type AppRoute=
  |{kind:'landing'}
@@ -30,7 +30,7 @@ export function parseAppRoute(hash=location.hash):AppRoute{
   const view:ProjectView=parts[2]==='issues'?'issues':parts[2]==='coverage'?'coverage':parts[2]==='report'?'report':'overview';
   const many=(name:string)=>{const values=params.getAll(name).map(value=>value.trim()).filter(Boolean);return values.length>1?values:values[0];};
   const files=params.getAll('file').map(value=>value.trim()).filter(Boolean);
-  const filters=view==='issues'?{query:clean(params.get('q')),severity:many('severity'),category:many('category'),scanner:many('scanner'),rule:many('rule'),files:files.length?files:undefined,directory:many('directory'),location:clean(params.get('location')),overlap:clean(params.get('overlap')),group:clean(params.get('group'))}:undefined;
+  const filters=view==='issues'?{query:clean(params.get('q')),severity:many('severity'),category:many('category'),scanner:many('scanner'),rule:many('rule'),files:files.length?files:undefined,directory:many('directory'),location:clean(params.get('location')),overlap:clean(params.get('overlap')),group:clean(params.get('group')),annotationSource:many('annotationSource'),workflow:many('workflow'),job:many('job'),annotationLevel:many('annotationLevel'),correlatedScanner:many('correlatedScanner')}:undefined;
   return{kind:'project',projectId,view,target:safeOpaqueId(clean(params.get('target'))),issue:view==='issues'?safeOpaqueId(clean(params.get('issue'))):undefined,filters};
  }
  return{kind:'projects'};
