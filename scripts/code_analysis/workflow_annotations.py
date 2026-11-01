@@ -32,6 +32,14 @@ SECRET = re.compile(
     r"(?i)(bearer\s+[A-Za-z0-9._~+/=-]{8,}|(?:token|secret|password|api[_-]?key)\s*[:=]\s*\S+|"
     r"https?://[^\s?#]+\?[^\s]*(?:token|signature|sig|key)=[^\s&]+|gh[opusr]_[A-Za-z0-9]{20,})"
 )
+AUTHORIZATION = re.compile(
+    r"(?i)\b(?:proxy-)?authorization\s*[:=]\s*(?:basic|bearer|digest|token)\s+[A-Za-z0-9._~+/=-]+"
+)
+ENVIRONMENT_CREDENTIAL = re.compile(
+    r"(?i)\b(?:AWS|R2|S3|CLOUDFLARE|CLOUDFLARE_R2)_"
+    r"(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN|SECURITY_TOKEN|API_TOKEN|API_KEY|TOKEN|SECRET|PASSWORD)"
+    r"\s*[:=]\s*(?:\"[^\"\r\n]*\"|'[^'\r\n]*'|[^\s,;]+)"
+)
 RUNNER_PATH = re.compile(r"^(?:[A-Za-z]:[\\/]|/(?:home/runner|opt/hostedtoolcache|tmp|__w)/)", re.I)
 
 
@@ -44,6 +52,8 @@ class ApiFailure(RuntimeError):
 
 def _text(value: object, limit: int = MAX_MESSAGE) -> str:
     text = CONTROL.sub("", str(value or "")).replace("\r\n", "\n").replace("\r", "\n")
+    text = AUTHORIZATION.sub("Authorization: [credential withheld]", text)
+    text = ENVIRONMENT_CREDENTIAL.sub("[credential environment value withheld]", text)
     text = SECRET.sub("[credential withheld]", text)
     return text[:limit]
 
@@ -174,6 +184,10 @@ def _record(annotation: dict, *, job: dict, check: dict, identity: dict, source:
         "job_id": job.get("id"),
         "job": _text(job.get("name"), 300),
         "step": None,
+        "step_provenance": {
+            "status": "unavailable",
+            "reason": "github_check_run_annotations_do_not_expose_step_identity",
+        },
         "check_run_id": check.get("id"),
         "check_name": _text(check.get("name"), 300),
         "action_identity": _text(check.get("app", {}).get("slug"), 100) if isinstance(check.get("app"), dict) else "",
@@ -307,15 +321,17 @@ def apply(destination: Path, envelope: dict) -> dict:
             "file": annotation.get("file") or "", "start_line": annotation.get("start_line") or 0,
             "raw_artifact": "workflow-annotations.json", "observation_id": annotation["annotation_id"],
             "annotation": {key: annotation.get(key) for key in (
-                "source", "level", "run_id", "run_attempt", "job", "step", "check_run_id", "policy")},
+                "source", "level", "run_id", "run_attempt", "job", "step", "step_provenance",
+                "check_run_id", "policy")},
         }
         if correlated:
             annotation["correlation"] = {"status": "supporting", "finding_id": correlated["id"],
                                          "scanner": correlated.get("scanners", [None])[0] if correlated.get("scanners") else None}
             target = by_id[correlated["id"]]
             annotation_meta = {key: annotation.get(key) for key in (
-                "source", "level", "workflow", "run_id", "run_attempt", "job", "step", "check_run_id",
-                "correlation", "policy", "contributes_to_needs_attention", "run_url", "check_url", "file_url")}
+                "source", "level", "workflow", "run_id", "run_attempt", "job", "step", "step_provenance",
+                "check_run_id", "correlation", "policy", "contributes_to_needs_attention", "run_url",
+                "check_url", "file_url")}
             correlated.setdefault("annotation", annotation_meta)
             target.setdefault("annotation", annotation_meta)
             if not any(value.get("observation_id") == annotation["annotation_id"] for value in target["origins"]):
@@ -333,8 +349,9 @@ def apply(destination: Path, envelope: dict) -> dict:
                "scanners": ["Workflow annotations"], "rules": [annotation.get("title") or "workflow-annotation"],
                "observation_count": 1, "scanner_family_count": 1, "page": 0,
                "annotation": {key: annotation.get(key) for key in (
-                   "source", "level", "workflow", "run_id", "run_attempt", "job", "step", "check_run_id",
-                   "correlation", "policy", "contributes_to_needs_attention", "run_url", "check_url", "file_url")}}
+                   "source", "level", "workflow", "run_id", "run_attempt", "job", "step", "step_provenance",
+                   "check_run_id", "correlation", "policy", "contributes_to_needs_attention", "run_url",
+                   "check_url", "file_url")}}
         detail = {**row, "origins": [origin], "source": None, "source_start": None, "source_url": None}
         findings.append(row)
         details.append(detail)

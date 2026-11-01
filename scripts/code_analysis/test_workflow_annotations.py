@@ -56,6 +56,11 @@ class WorkflowAnnotationCollectionTests(unittest.TestCase):
         self.assertEqual([row["level"] for row in result["annotations"]], ["notice", "warning", "failure"])
         self.assertEqual(result["annotations"][0]["location_kind"], "workflow")
         self.assertEqual(result["annotations"][1]["end_line"], 4)
+        self.assertIsNone(result["annotations"][0]["step"])
+        self.assertEqual(result["annotations"][0]["step_provenance"], {
+            "status": "unavailable",
+            "reason": "github_check_run_annotations_do_not_expose_step_identity",
+        })
         self.assertIn("/runs/10/attempts/2/jobs", fake.paths[0])
         self.assertTrue(all(row["source_sha"] == SHA and row["run_attempt"] == 2 for row in result["annotations"]))
 
@@ -74,6 +79,27 @@ class WorkflowAnnotationCollectionTests(unittest.TestCase):
         self.assertNotIn("super-secret-value", first["message"])
         self.assertNotIn("abcdef123456", second["message"])
         self.assertTrue(first["raw_details_withheld"])
+
+    def test_withholds_basic_authorization_and_r2_compatible_environment_credentials(self):
+        basic = "dXNlcjpzdXBlci1zZWNyZXQ="
+        access_key = "0123456789abcdef0123456789abcdef"
+        secret_key = "r2-secret-access-key-value"
+        session_token = "temporary-session-token-value"
+        rows = [{
+            "annotation_level": "failure",
+            "title": f"Authorization: Basic {basic}",
+            "message": (
+                f"AWS_ACCESS_KEY_ID={access_key}\n"
+                f"AWS_SECRET_ACCESS_KEY: '{secret_key}'\n"
+                f"R2_SESSION_TOKEN=\"{session_token}\""
+            ),
+        }]
+        annotation = collect(**identity(), fetch=FakeGitHub(rows))["annotations"][0]
+        serialized = json.dumps(annotation)
+        for value in (basic, access_key, secret_key, session_token):
+            self.assertNotIn(value, serialized)
+        self.assertIn("credential withheld", annotation["title"])
+        self.assertEqual(annotation["message"].count("credential environment value withheld"), 3)
 
     def test_error_states_are_explicit(self):
         for status, expected in ((403, "permission_denied"), (404, "unavailable"),
@@ -140,7 +166,10 @@ class WorkflowAnnotationReconciliationTests(unittest.TestCase):
         row = {"annotation_id": "workflow-annotation:1", "level": "warning", "title": "python.sql-injection",
                "message": "SQL injection", "file": "src/a.py", "start_line": 5, "end_line": 5,
                "source": "check-run", "workflow": ".github/workflows/ci.yml", "run_id": 10, "run_attempt": 2,
-               "job": "semgrep", "step": None, "check_run_id": 33, "action_identity": "semgrep",
+               "job": "semgrep", "step": None,
+               "step_provenance": {"status": "unavailable",
+                                   "reason": "github_check_run_annotations_do_not_expose_step_identity"},
+               "check_run_id": 33, "action_identity": "semgrep",
                "correlation": {"status": "unmatched", "finding_id": None, "scanner": None}}
         row.update(values)
         return row
@@ -161,6 +190,7 @@ class WorkflowAnnotationReconciliationTests(unittest.TestCase):
         findings = json.loads((self.root / "findings.json").read_text())
         self.assertEqual(findings[1]["category"], "WORKFLOW")
         self.assertEqual(findings[1]["annotation"]["job"], "semgrep")
+        self.assertEqual(findings[1]["annotation"]["step_provenance"]["status"], "unavailable")
 
     def test_unavailable_keeps_native_sibling_and_marks_report_partial(self):
         envelope = self.envelope([], "permission_denied")

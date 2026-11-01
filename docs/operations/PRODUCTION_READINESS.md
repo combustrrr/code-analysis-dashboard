@@ -12,6 +12,10 @@ run ID and attempt match the admitted request. Permission, rate-limit, partial,
 truncated, and unavailable states are limitations, never zero findings. Canary
 acceptance must reconcile retained, correlated, excluded, and unavailable rows
 with GitHub's visible annotations for the same run and attempt.
+Confirm retained annotations redact Basic Authorization and labelled R2/S3-compatible
+credential environment values. Because the GitHub check-run annotation API does not
+provide step identity, confirm every retained record carries an explicit unavailable
+step-provenance reason rather than an unexplained null.
 
 Verified: product/service separation, current-release storage, exact producer/source
 provenance, login/launch/report round trip, no-source-write behavior for all three

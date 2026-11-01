@@ -11,7 +11,10 @@ comments, SARIF uploads, commits, or pull-request changes.
 
 `workflow-annotation-evidence-v1` binds every retained observation to the
 execution/source repositories, immutable source and tooling SHAs, workflow, run,
-attempt, job, check, optional step, and reviewed scanner-profile digest.
+attempt, job, check, optional step, and reviewed scanner-profile digest. GitHub's
+check-run annotation API does not expose step identity, so each affected record
+retains `step: null` plus `step_provenance.status: unavailable` and the explicit
+reason `github_check_run_annotations_do_not_expose_step_identity`.
 
 The inventory covers check-run annotations. Workflow commands, problem matchers,
 and action-generated annotations are collected through their check-run
@@ -25,7 +28,10 @@ page, 1,000 annotations, and bounded response/message sizes. A limit produces a
 Only relative repository paths are accepted. Absolute, traversal,
 runner-temporary, control-character, and drive-qualified paths become unlocated
 workflow observations. Messages are plain text. Credential-shaped values,
-signed query parameters, raw details, and over-limit content are withheld.
+Basic Authorization values, labelled Cloudflare R2/S3-compatible credential
+environment values, signed query parameters, raw details, and over-limit content
+are withheld. These R2 variables may use AWS-prefixed names because the interface
+is S3-compatible; this does not add an AWS service dependency.
 
 The channel distinguishes `measured_zero`, `complete`, `partial`, `truncated`,
 `permission_denied`, `rate_limited`, `unavailable`, `invalid`, and
