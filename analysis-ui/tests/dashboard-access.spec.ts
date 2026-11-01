@@ -19,10 +19,20 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  await expect(page.getByRole('heading',{name:'Trace every finding to the exact code analyzed.'})).toBeVisible();
  await expect(page.locator('.landing-copy > p').first()).toBeVisible();
  const rootLanding=await page.evaluate(()=>{const wrap=document.querySelector('.landing-wrap')!.getBoundingClientRect();const hero=getComputedStyle(document.querySelector('.landing-hero')!);return{left:Math.round(wrap.left),width:Math.round(wrap.width),columns:hero.gridTemplateColumns};});
- await page.goto('/#/projects/1267340546');
- await expect(page.getByRole('heading',{name:'Trace every finding to the exact code analyzed.'})).toBeVisible();
+ const deepLink='/#/projects/1360051890/issues?target=current%3A1360051890&issue=sid-v1%3A04443b9946a4607db5f55027efa217a78d6f8fa4d730a69f0e08f16a8d27df79';
+ await page.goto(deepLink);
+ await page.reload();
+ expect(await page.evaluate(()=>performance.getEntriesByType('resource').some(entry=>entry.name.includes('WorkspaceApp')||entry.name.includes('ProjectsApp')))).toBe(false);
+ await expect(page.getByRole('heading',{name:'Sign in to open the requested issue detail.'})).toBeVisible();
+ expect(new URL(page.url()).hash).toBe(deepLink.slice(1));
+ await expect(page.getByLabel('Requested destination')).toContainText('Code Analysis');
+ await expect(page.getByLabel('Requested destination')).toContainText('Issue detail after authorization');
+ await expect(page.getByLabel('Requested destination').locator('.dossier-row')).toHaveCount(1);
+ await expect(page.getByText('The requested route remains in the address bar')).toBeVisible();
  const deepLinkLanding=await page.evaluate(()=>{const wrap=document.querySelector('.landing-wrap')!.getBoundingClientRect();const hero=getComputedStyle(document.querySelector('.landing-hero')!);return{left:Math.round(wrap.left),width:Math.round(wrap.width),columns:hero.gridTemplateColumns};});
  expect(deepLinkLanding).toEqual(rootLanding);
+ await page.getByRole('link',{name:'Return to public home'}).click();
+ await expect(page.getByRole('heading',{name:'Trace every finding to the exact code analyzed.'})).toBeVisible();
  await page.getByText('Light',{exact:true}).click();
  await expect(page.locator('.landing-copy > p').first()).toBeVisible();
  await expect(page.locator('.landing-proof')).toContainText('Independent');
@@ -33,7 +43,9 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
  const compactDossier=await page.locator('.analysis-dossier').boundingBox();
  expect(compactDossier).not.toBeNull();
  expect(compactDossier!.y+compactDossier!.height).toBeLessThanOrEqual(720);
- await expect(page.locator('.dossier-row')).toHaveCount(3);
+ await expect(page.locator('.dossier-row')).toHaveCount(2);
+ await expect(page.locator('.analysis-dossier')).not.toContainText('Kavach');
+ await expect(page.locator('.landing-proof>div').first().locator('strong')).toHaveText('2');
  const firstName=page.locator('.dossier-project strong').first();
  await firstName.evaluate(element=>{element.textContent='A very long configured repository name that deliberately exceeds sixty characters for clamping';});
  expect(await firstName.evaluate(element=>getComputedStyle(element).webkitLineClamp)).toBe('2');
@@ -72,17 +84,18 @@ test('public landing remains accessible and visually stable across target viewpo
  for(const viewport of viewports){
   await page.setViewportSize({width:viewport.width,height:viewport.height});
   await page.goto('/');
-  await page.evaluate(theme=>{localStorage.setItem('analysis-theme',theme.toLowerCase());location.reload();},viewport.theme);
-  await page.waitForLoadState('networkidle');
+  await page.evaluate(theme=>localStorage.setItem('analysis-theme',theme.toLowerCase()),viewport.theme);
+  await page.reload({waitUntil:'networkidle'});
   await page.evaluate(()=>document.fonts.ready);
+  await page.locator('.institutional-lockup img').evaluateAll(images=>Promise.all(images.map(image=>(image as HTMLImageElement).decode())));
   await page.waitForTimeout(500);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   await expect.soft(page).toHaveScreenshot(`landing-${viewport.name}.png`,{fullPage:false,animations:'disabled',maxDiffPixelRatio:.002});
  }
  await page.setViewportSize({width:1536,height:720});
  await page.goto('/');
- await page.evaluate(()=>{localStorage.setItem('analysis-theme','dark');location.reload();});
- await page.waitForLoadState('networkidle');
+ await page.evaluate(()=>localStorage.setItem('analysis-theme','dark'));
+ await page.reload({waitUntil:'networkidle'});
  const accessibility=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
  expect(accessibility.violations).toEqual([]);
 });
@@ -322,7 +335,8 @@ test('repository deep links open the authenticated workspace with a shared theme
   throw new Error(`Unexpected request ${url.pathname}`);
  });
  await page.goto('/#/projects');
- await expect(page.getByRole('heading',{name:'Trace every finding to the exact code analyzed.'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Sign in to open the requested project register.'})).toBeVisible();
+ await expect(page.getByLabel('Requested destination')).toContainText('Project register after authorization');
  await expect(page.getByText(/Access is limited to approved GitHub collaborators/)).toBeVisible();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
  await page.getByText('Light',{exact:true}).click();

@@ -14,10 +14,6 @@ const loadProjectsApp=()=>import('./ProjectsApp');
 const ProjectsApp=lazy(()=>loadProjectsApp().then(module=>({default:module.ProjectsApp})));
 type Auth=ReturnType<typeof useLaunchAuth>;
 
-const initialRoute=parseAppRoute();
-if(initialRoute.kind==='projects')void loadProjectsApp();
-else if(isWorkspaceRoute())void loadWorkspaceApp();
-
 function openWorkspace(){
  try{sessionStorage.setItem('analysis-workspace-requested','true');}catch{}
  location.hash=routeHash({kind:'projects'});

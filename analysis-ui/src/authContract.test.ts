@@ -14,5 +14,10 @@ describe('tab-scoped auth storage',()=>{
  afterEach(()=>vi.unstubAllGlobals());
  it('stores only a validated opaque handle',()=>{writeSessionHandle('s'.repeat(43));expect(values.get(AUTH_SESSION_KEY)).toBe('s'.repeat(43));expect(readSessionHandle()).toBe('s'.repeat(43));clearSessionHandle();expect(readSessionHandle()).toBeUndefined();expect(()=>writeSessionHandle('github-token')).toThrow();});
  it('expires pending PKCE transactions after ten minutes',()=>{const pending:PendingAuth={verifier:'v'.repeat(43),createdAt:1000,returnRoute:'#/projects',endpoint:'https://worker.example'};vi.spyOn(Date,'now').mockReturnValue(1000+AUTH_PENDING_MS);expect(pendingAuthValid(pending,pending.endpoint)).toBe(true);vi.spyOn(Date,'now').mockReturnValue(1001+AUTH_PENDING_MS);expect(pendingAuthValid(pending,pending.endpoint)).toBe(false);});
- it('canonicalizes only recognized application routes',()=>{expect(safeReturnRoute('#/projects/1360051890/report?target=current')).toBe('#/projects/1360051890/report?target=current');expect(safeReturnRoute('#/admin/escape')).toBe('#/projects');});
+ it('canonicalizes only recognized application routes',()=>{
+  const issueRoute='#/projects/1360051890/issues?target=current%3A1360051890&issue=sid-v1%3A04443b9946a4607db5f55027efa217a78d6f8fa4d730a69f0e08f16a8d27df79';
+  expect(safeReturnRoute(issueRoute)).toBe(issueRoute);
+  expect(safeReturnRoute('#/projects/1360051890/report?target=current')).toBe('#/projects/1360051890/report?target=current');
+  expect(safeReturnRoute('#/admin/escape')).toBe('#/projects');
+ });
 });
