@@ -28,6 +28,11 @@ The browser fixtures are generated from a tracked, bounded script into an ignore
 test-only directory. Production builds use a separate static directory and cannot
 copy report fixtures into Pages output.
 
+CI runs the functional Playwright contract on hosted Ubuntu. Pixel baselines remain
+a fixed-host check because text rasterization varies across ephemeral GitHub runners;
+the cross-runner visual-regression gate remains tracked in issue #159. Failed browser
+runs upload bounded `test-results/` diagnostics for seven days.
+
 The final `CI` job succeeds only when every lane succeeds. Branch protection requires
 that stable status together with `Scanner compatibility` before ordinary pull requests
 can merge.

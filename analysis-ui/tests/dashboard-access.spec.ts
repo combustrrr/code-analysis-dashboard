@@ -58,6 +58,7 @@ test('public welcome page explains the evidence workflow at desktop and mobile w
 
 test('public landing remains accessible and visually stable across target viewports',async({page})=>{
  test.skip(!process.env.TEST_DASHBOARD_ACCESS,'Requires access-test build');
+ test.skip(!!process.env.CI,'Pixel baselines require a fixed rendering host; CI coverage is tracked in #159');
  test.setTimeout(90_000);
  await page.emulateMedia({reducedMotion:'reduce'});
  await page.route('**/api/public/config',route=>route.fulfill({status:503,contentType:'application/json',body:'{}'}));

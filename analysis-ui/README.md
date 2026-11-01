@@ -51,3 +51,6 @@ ignored `public/data/` evidence. The explicit `fixtures` mode copies only that
 generated test dataset; `npm run build` and the Pages workflow use
 `public-static/`, so no report fixtures enter production `dist/` output. CI runs
 both the fixture workspace suite and the authenticated access suite in Chromium.
+The functional suites run in CI. The pixel-baseline case is skipped there because
+hosted runners do not provide stable font rasterization; run it on a fixed Windows or
+Linux host, and track the reproducible CI visual-regression gate in issue #159.
