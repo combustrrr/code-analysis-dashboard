@@ -8,8 +8,8 @@ from scripts.code_analysis.status_contract import (
     REUSABLE_STATUSES,
     is_complete,
     is_not_run,
-    is_report_incomplete,
     is_replacement_eligible,
+    is_report_incomplete,
     is_reusable,
     semantics,
 )

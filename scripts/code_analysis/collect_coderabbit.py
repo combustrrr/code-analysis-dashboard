@@ -45,7 +45,7 @@ def paged(url: str, token: str) -> list[dict[str, Any]]:
         except Exception as exc:
             raise CollectionUnavailable(f"GitHub collection request failed: {type(exc).__name__}", partial=bool(rows)) from exc
         if not isinstance(batch, list):
-            raise ValueError("GitHub API returned a non-list collection")
+            raise TypeError("GitHub API returned a non-list collection")
         rows.extend(batch)
         if len(batch) < 100:
             break
@@ -97,7 +97,7 @@ def collect(repository: str, branch: str, commit: str, token: str, *, pr_number:
     try:
         pulls = ([request_json(f"{API}/repos/{repository}/pulls/{pr_number}", token)] if pr_number
                  else request_json(f"{API}/repos/{repository}/commits/{commit}/pulls", token))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- provider failures become explicit unavailable evidence.
         return unavailable(repository, branch, commit,
                            f"GitHub pull-request lookup failed: {type(exc).__name__}",
                            provenance, pr_number=pr_number)
@@ -167,7 +167,7 @@ def collect(repository: str, branch: str, commit: str, token: str, *, pr_number:
         try:
             combined = request_json(f"{API}/repos/{repository}/commits/{commit}/status", token)
             statuses = combined.get("statuses", []) if isinstance(combined, dict) else []
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- partial advisory evidence must survive provider failures.
             unavailable_reasons.append(f"status: {type(exc).__name__}")
             statuses = []
         if any(str(row.get("context") or "").strip().lower() == "coderabbit" and

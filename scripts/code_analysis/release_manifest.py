@@ -45,7 +45,7 @@ def read(config, tag):
         raise ValueError('manifest response was empty')
     manifest = json.loads(data)
     if not isinstance(manifest, dict):
-        raise ValueError('manifest response must be a JSON object')
+        raise TypeError('manifest response must be a JSON object')
     return manifest
 
 def write(config, tag, state):

@@ -7,7 +7,6 @@ import time
 import urllib.request
 from pathlib import Path
 
-
 TOOLING_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -16,10 +15,10 @@ def profile(project_id: str) -> dict:
     project = next((row for row in config.get('projects', [])
                     if str(row.get('id')) == str(project_id)), None)
     if not isinstance(project, dict):
-        raise ValueError('Trusted frontend project is unavailable')
+        raise TypeError('Trusted frontend project is unavailable')
     value = project.get('profile')
     if not isinstance(value, dict):
-        raise ValueError('Reviewed project profile is unavailable')
+        raise TypeError('Reviewed project profile is unavailable')
     return value
 
 

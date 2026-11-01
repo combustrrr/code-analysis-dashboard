@@ -5,14 +5,13 @@ attempt have been validated.  It never accepts a run identifier from a browser.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
-from typing import Callable
 
 from scripts.code_analysis.hosted import digest, load, write
 from scripts.code_analysis.project_overview import build_project_overview
@@ -40,7 +39,7 @@ ENVIRONMENT_CREDENTIAL = re.compile(
     r"(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN|SECURITY_TOKEN|API_TOKEN|API_KEY|TOKEN|SECRET|PASSWORD)"
     r"\s*[:=]\s*(?:\"[^\"\r\n]*\"|'[^'\r\n]*'|[^\s,;]+)"
 )
-RUNNER_PATH = re.compile(r"^(?:[A-Za-z]:[\\/]|/(?:home/runner|opt/hostedtoolcache|tmp|__w)/)", re.I)
+RUNNER_PATH = re.compile(r"^(?:[A-Za-z]:[\\/]|/(?:home/runner|opt/hostedtoolcache|tmp|__w)/)", re.IGNORECASE)
 WORKFLOW_UPDATE = re.compile(
     r"(?i)\b(?:deprecated|deprecation|outdated|no longer supported|"
     r"will be forced to run using node|uses? node(?:\.js)?\s*[0-9]+)\b"

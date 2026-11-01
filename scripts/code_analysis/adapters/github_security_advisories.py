@@ -65,7 +65,7 @@ def main():
                 "--header", "Accept: application/vnd.github+json",
                 "--header", "X-GitHub-Api-Version: 2022-11-28",
                 f"https://api.github.com/repos/{owner}/{repo}/security-advisories?per_page=100",
-            ],
+            ], check=False,
             capture_output=True,
             text=True,
             timeout=60,
@@ -80,7 +80,6 @@ def main():
             # Map GHSA advisory to a finding
             ghsa_id = _fallback_rule_id(adv)
             summary = _fallback_summary(adv)
-            description = adv.get("description", "")
             severity = adv.get("severity", "").upper()
             if severity not in {"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"}:
                 severity = "MEDIUM"
@@ -98,7 +97,7 @@ def main():
         status = "COMPLETED" if findings else "COMPLETED_OPTIONAL"
         reason = f"Fetched {len(advisories)} published security advisory(s)" if advisories else "No published security advisories found"
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- adapter boundaries retain operational failure evidence.
         status = "OPERATIONAL_FAILURE"
         reason = f"Failed to fetch security advisories: {e}"
         findings = []

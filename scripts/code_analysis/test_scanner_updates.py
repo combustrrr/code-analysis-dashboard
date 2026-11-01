@@ -43,7 +43,7 @@ class ScannerUpdateTests(unittest.TestCase):
         projects = json.loads(Path('.github/code-analysis/projects.json').read_text(encoding='utf-8'))['projects']
         for project in projects:
             self.assertEqual(profile(project['id']), project['profile'])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             profile('../../untrusted')
 
         for name in ('frontend_build.py', 'frontend_tests.py',
@@ -141,9 +141,11 @@ class ScannerUpdateTests(unittest.TestCase):
             self.assertEqual(status['ext-second']['status'], 'COMPLETED')
 
     def test_malformed_registration_is_rejected_predictably(self):
-        for row in [None, [], {'channel': []}]:
-            with self.assertRaises(ValueError):
+        for row in [None, []]:
+            with self.assertRaises(TypeError):
                 extensions.registry({'scanner_extensions': [row]})
+        with self.assertRaises(ValueError):
+            extensions.registry({'scanner_extensions': [{'channel': []}]})
         example = json.loads(Path('config/code-analysis/scanner-extension.example.json').read_text())
         with self.assertRaises(ValueError):
             extensions.registry({'scanner_extensions': [{**example, 'name': 'Ruff'}]})

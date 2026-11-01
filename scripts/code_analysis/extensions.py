@@ -15,14 +15,14 @@ STATUSES = {'COMPLETED', 'COMPLETED_OPTIONAL', 'POLICY_FINDINGS', 'OPERATIONAL_F
 def registry(config: dict) -> list[dict]:
     rows = config.get('scanner_extensions', [])
     if not isinstance(rows, list):
-        raise ValueError('scanner_extensions must be an array')
+        raise TypeError('scanner_extensions must be an array')
     ids, families = set(), set()
     from scripts.code_analysis.monitoring import scanner_family
     catalog_path = Path(__file__).resolve().parents[2] / 'config/code-analysis/proposal-tool-catalog.json'
     builtins = {item['tool'] for item in json.loads(catalog_path.read_text(encoding='utf-8'))['tools']}
     for row in rows:
         if not isinstance(row, dict):
-            raise ValueError('Each scanner extension must be an object')
+            raise TypeError('Each scanner extension must be an object')
         channel = row.get('channel', '')
         if not isinstance(channel, str) or not re.fullmatch(r'ext-[a-z0-9][a-z0-9-]{0,45}', channel) or channel in ids:
             raise ValueError('Extension channels require unique ext- identifiers')
@@ -42,7 +42,7 @@ def registry(config: dict) -> list[dict]:
         if row.get('secrets') and row['mode'] != 'vendor':
             raise ValueError('Source-executing adapters cannot receive vendor credentials')
         if not isinstance(row.get('secrets', {}), dict):
-            raise ValueError('Extension secrets must be an object')
+            raise TypeError('Extension secrets must be an object')
         for env, secret in row.get('secrets', {}).items():
             if not isinstance(env, str) or not isinstance(secret, str) or not re.fullmatch(r'[A-Z][A-Z0-9_]*', env) or not re.fullmatch(r'[A-Z][A-Z0-9_]*', secret):
                 raise ValueError('Invalid vendor credential mapping')
@@ -89,7 +89,7 @@ def ingest(config: dict, artifacts: Path, identity: dict, run_id: str) -> tuple[
                 raise ValueError('Unsafe or oversized scanner envelope')
             envelope = json.loads(path.read_text(encoding='utf-8'))
             if not isinstance(envelope, dict):
-                raise ValueError('Invalid scanner envelope')
+                raise TypeError('Invalid scanner envelope')
             if (envelope.get('schema_version') != 'channel-evidence-v1' or envelope.get('channel') != channel
                     or envelope.get('source_repository') != identity['source_repository']
                     or envelope.get('source_sha') != identity['head_sha']
@@ -103,11 +103,11 @@ def ingest(config: dict, artifacts: Path, identity: dict, run_id: str) -> tuple[
             if envelope['status'] != 'COMPLETED' and not envelope.get('reason'):
                 raise ValueError('Non-complete status requires an explanation')
             if not isinstance(envelope.get('reason', ''), str):
-                raise ValueError('Invalid scanner explanation')
+                raise TypeError('Invalid scanner explanation')
             pending = []
             for finding in envelope['findings']:
                 if not isinstance(finding, dict):
-                    raise ValueError('Invalid scanner finding')
+                    raise TypeError('Invalid scanner finding')
                 if (not isinstance(finding.get('severity'), str) or finding['severity'] not in {'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'UNKNOWN'}
                         or not isinstance(finding.get('message'), str) or not isinstance(finding.get('rule_id'), str) or not finding['rule_id'].strip()
                         or not safe_file(finding.get('file', ''))

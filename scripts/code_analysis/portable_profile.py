@@ -1,6 +1,6 @@
 """Reviewed portable execution configuration; no implicit application commands."""
-from pathlib import PurePosixPath
 import re
+from pathlib import PurePosixPath
 
 COMMAND_CHANNELS = {'eslint', 'typescript', 'coverage', 'atheris', 'schemathesis', 'pyright'}
 STATIC_JOBS = {'python-bandit', 'python-ruff', 'complexity', 'dead-code'}

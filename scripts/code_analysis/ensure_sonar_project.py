@@ -10,7 +10,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-
 SERVER = "https://sonarcloud.io"
 
 

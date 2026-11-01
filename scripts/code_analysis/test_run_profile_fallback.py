@@ -19,23 +19,23 @@ class ExplicitProfileTests(unittest.TestCase):
     def test_example_profile_is_not_used_as_a_production_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
             missing = Path(tmp) / 'missing-service.json'
-            with patch.object(run_profile, 'SERVICE_CONFIG', missing):
-                with self.assertRaisesRegex(SystemExit, 'Explicit service profile configuration is required'):
-                    run_profile.load_profile('python-test')
+            with patch.object(run_profile, 'SERVICE_CONFIG', missing), \
+                    self.assertRaisesRegex(SystemExit, 'Explicit service profile configuration is required'):
+                run_profile.load_profile('python-test')
 
     def test_empty_profile_fails_before_source_execution(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.write_config(tmp, {})
-            with patch.object(run_profile, 'SERVICE_CONFIG', config):
-                with self.assertRaisesRegex(SystemExit, 'missing a non-empty profile'):
-                    run_profile.load_profile('python-test')
+            with patch.object(run_profile, 'SERVICE_CONFIG', config), \
+                    self.assertRaisesRegex(SystemExit, 'missing a non-empty profile'):
+                run_profile.load_profile('python-test')
 
     def test_missing_task_fields_are_reported(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.write_config(tmp, {'python_root': '.'})
-            with patch.object(run_profile, 'SERVICE_CONFIG', config):
-                with self.assertRaisesRegex(SystemExit, 'python_requirements'):
-                    run_profile.load_profile('python-install')
+            with patch.object(run_profile, 'SERVICE_CONFIG', config), \
+                    self.assertRaisesRegex(SystemExit, 'python_requirements'):
+                run_profile.load_profile('python-install')
 
     def test_explicit_configured_profile_runs_without_guessed_commands(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -30,9 +30,9 @@ def snapshot():
 
 class GithubServiceTests(unittest.TestCase):
     def test_gh_timeout_is_bounded_and_fail_closed(self):
-        with patch.object(service.subprocess, 'run', side_effect=service.subprocess.TimeoutExpired(['gh', 'api'], service.GH_TIMEOUT_SECONDS)) as run:
-            with self.assertRaisesRegex(RuntimeError, r'GitHub request timed out after 120s: api repos/owner/repo'):
-                service.gh('api', 'repos/owner/repo')
+        with patch.object(service.subprocess, 'run', side_effect=service.subprocess.TimeoutExpired(['gh', 'api'], service.GH_TIMEOUT_SECONDS)) as run, \
+                self.assertRaisesRegex(RuntimeError, r'GitHub request timed out after 120s: api repos/owner/repo'):
+            service.gh('api', 'repos/owner/repo')
         self.assertEqual(run.call_args.kwargs['timeout'], service.GH_TIMEOUT_SECONDS)
 
 
@@ -72,9 +72,8 @@ class IdentityTests(unittest.TestCase):
     def test_closed_targets_removed_only_from_complete_inventory(self):
         old = h.target('owner/repo', 'main', 'a' * 40)
         self.assertEqual(h.reconcile({'targets': [old]}, [], 'now')['targets'], [])
-        with patch.object(service, 'api', side_effect=RuntimeError('failed page')):
-            with self.assertRaises(RuntimeError):
-                service.discover({'source_repository': 'owner/repo'})
+        with patch.object(service, 'api', side_effect=RuntimeError('failed page')), self.assertRaises(RuntimeError):
+            service.discover({'source_repository': 'owner/repo'})
 
     def test_pagination_is_exhaustive(self):
         with patch.object(service, 'api', side_effect=[[{}] * 100, [{'last': True}]]) as api:
@@ -176,41 +175,41 @@ class ReportTests(unittest.TestCase):
 
     def test_wrong_producer_workflow_rejected_before_download(self):
         row = {**self.identity, 'scan_run_id': 123, 'tooling_sha': 'd' * 40}
-        with patch.object(service, 'api', return_value={'path': '.github/workflows/other.yml'}):
-            with self.assertRaisesRegex(ValueError, 'producer workflow'):
-                service.collect({'analysis_repository': 'service/host'}, row, self.root)
+        with patch.object(service, 'api', return_value={'path': '.github/workflows/other.yml'}), \
+                self.assertRaisesRegex(ValueError, 'producer workflow'):
+            service.collect({'analysis_repository': 'service/host'}, row, self.root)
 
     def test_exact_current_coordinator_may_collect_before_its_workflow_finishes(self):
         row = {**self.identity, 'scan_run_id': 123, 'tooling_sha': 'd' * 40, 'run_attempt': 1}
         run = {'path': '.github/workflows/code-analysis-coordinator.yml', 'head_sha': 'd' * 40, 'status': 'in_progress'}
         config = {'analysis_repository': 'service/host', 'source_workflow': run['path'], 'active_coordinator_run_id': 123}
-        with patch.object(service, 'api', return_value=run), patch.object(service, 'pages', return_value=[]):
-            with self.assertRaisesRegex(ValueError, 'exact producer report missing'):
-                service.collect(config, row, self.root)
+        with patch.object(service, 'api', return_value=run), patch.object(service, 'pages', return_value=[]), \
+                self.assertRaisesRegex(ValueError, 'exact producer report missing'):
+            service.collect(config, row, self.root)
 
     def test_unrelated_in_progress_coordinator_is_rejected(self):
         row = {**self.identity, 'scan_run_id': 123, 'tooling_sha': 'd' * 40, 'run_attempt': 1}
         run = {'path': '.github/workflows/code-analysis-coordinator.yml', 'head_sha': 'd' * 40, 'status': 'in_progress'}
         config = {'analysis_repository': 'service/host', 'source_workflow': run['path'], 'active_coordinator_run_id': 456}
-        with patch.object(service, 'api', return_value=run):
-            with self.assertRaisesRegex(ValueError, 'producer workflow identity'):
-                service.collect(config, row, self.root)
+        with patch.object(service, 'api', return_value=run), \
+                self.assertRaisesRegex(ValueError, 'producer workflow identity'):
+            service.collect(config, row, self.root)
 
     def test_expired_exact_artifact_is_unavailable(self):
         row = {**self.identity, 'scan_run_id': 123, 'tooling_sha': 'd' * 40, 'run_attempt': 2}
         run = {'path': '.github/workflows/11-source-analysis.yml', 'head_sha': 'd' * 40, 'status': 'completed'}
         with patch.object(service, 'api', return_value=run), patch.object(service, 'pages', return_value=[
                 {'name': 'hosted-report-123-1', 'expired': False},
-                {'name': 'hosted-report-123-2', 'expired': True}]):
-            with self.assertRaisesRegex(ValueError, 'missing or expired'):
-                service.collect({'analysis_repository': 'service/host'}, row, self.root)
+                {'name': 'hosted-report-123-2', 'expired': True}]), \
+                self.assertRaisesRegex(ValueError, 'missing or expired'):
+            service.collect({'analysis_repository': 'service/host'}, row, self.root)
 
     def test_missing_exact_artifact_is_unavailable(self):
         row = {**self.identity, 'scan_run_id': 123, 'tooling_sha': 'd' * 40, 'run_attempt': 2}
         run = {'path': '.github/workflows/11-source-analysis.yml', 'head_sha': 'd' * 40, 'status': 'completed'}
-        with patch.object(service, 'api', return_value=run), patch.object(service, 'pages', return_value=[]):
-            with self.assertRaisesRegex(ValueError, r'exact producer report missing'):
-                service.collect({'analysis_repository': 'service/host'}, row, self.root)
+        with patch.object(service, 'api', return_value=run), patch.object(service, 'pages', return_value=[]), \
+                self.assertRaisesRegex(ValueError, r'exact producer report missing'):
+            service.collect({'analysis_repository': 'service/host'}, row, self.root)
 
 
     def test_snyk_metadata_rejects_executable_requirements(self):
@@ -296,10 +295,10 @@ class ReportTests(unittest.TestCase):
         with patch('sys.argv', ['profile', 'api-fuzz', '--source', str(self.root)]), \
                 patch.object(run_profile.subprocess, 'Popen') as process, \
                 patch.object(run_profile.urllib.request, 'urlopen', return_value=io.BytesIO(b'{}')), \
-                patch.object(run_profile.subprocess, 'run', side_effect=run_profile.subprocess.TimeoutExpired('fuzzer', 300)):
-            with self.assertRaises(run_profile.subprocess.TimeoutExpired):
-                process.return_value.poll.return_value = None
-                run_profile.main()
+                patch.object(run_profile.subprocess, 'run', side_effect=run_profile.subprocess.TimeoutExpired('fuzzer', 300)), \
+                self.assertRaises(run_profile.subprocess.TimeoutExpired):
+            process.return_value.poll.return_value = None
+            run_profile.main()
         process.return_value.terminate.assert_called_once()
         self.assertEqual(h.load(self.root / 'schemathesis-status.json')['status'], 'OPERATIONAL_FAILURE')
 

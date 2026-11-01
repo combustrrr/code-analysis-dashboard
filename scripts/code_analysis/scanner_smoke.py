@@ -8,7 +8,7 @@ from pathlib import Path
 
 def check(module, arguments, root, exits=(0, 1)):
     result = subprocess.run([sys.executable, '-m', module, *arguments], cwd=root,
-                            capture_output=True, text=True, timeout=90)
+                            capture_output=True, text=True, timeout=90, check=False)
     if result.returncode not in exits:
         raise RuntimeError(f'{module} invocation failed (exit {result.returncode})')
     return result.stdout

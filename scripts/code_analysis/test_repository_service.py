@@ -171,7 +171,7 @@ class TrustedBootstrapTests(unittest.TestCase):
             (package/'__init__.py').write_text('')
             (package/'snapshot.py').write_text("raise RuntimeError('SOURCE_PACKAGE_EXECUTED')")
             command=[sys.executable,'-I',str(Path('scripts/code_analysis/trusted_entry.py').resolve()),'run_profile','--help']
-            result=subprocess.run(command,cwd=root,env={**os.environ,'PYTHONPATH':str(root)},capture_output=True,text=True)
+            result=subprocess.run(command,cwd=root,env={**os.environ,'PYTHONPATH':str(root)},capture_output=True,text=True,check=False)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertNotIn('SOURCE_PACKAGE_EXECUTED',result.stderr)
 
@@ -222,8 +222,9 @@ class PublicationRecoveryTests(unittest.TestCase):
         row={'scan_run_id':12,'run_attempt':2,'request_id':'request'}
         with patch('scripts.code_analysis.repository_service.github.pages',return_value=[{'name':'hosted-report-12-2','expired':False}]):
             self.assertFalse(recover_expired_evidence({'analysis_repository':'owner/repo'},row))
-        with patch('scripts.code_analysis.repository_service.github.pages',side_effect=RuntimeError('unavailable')):
-            with self.assertRaises(RuntimeError):recover_expired_evidence({'analysis_repository':'owner/repo'},row)
+        with patch('scripts.code_analysis.repository_service.github.pages',side_effect=RuntimeError('unavailable')), \
+                self.assertRaises(RuntimeError):
+            recover_expired_evidence({'analysis_repository':'owner/repo'},row)
         self.assertEqual(row['request_id'],'request')
         with patch('scripts.code_analysis.repository_service.github.pages',return_value=[]):
             self.assertTrue(recover_expired_evidence({'analysis_repository':'owner/repo'},row))
@@ -241,9 +242,9 @@ class ConfigurationSnapshotTests(unittest.TestCase):
             self.assertEqual(trusted_configuration_revision({'default_branch':'main'},{'execution_sha':revision}),revision)
             with self.assertRaises(ValueError):
                 trusted_configuration_revision({'default_branch':'main'},{'execution_sha':'b'*40})
-        with patch.dict('os.environ',{'GITHUB_SHA':revision,'GITHUB_REF':'refs/pull/1/head'}):
-            with self.assertRaises(ValueError):
-                trusted_configuration_revision({'default_branch':'main'},{'execution_sha':revision})
+        with patch.dict('os.environ',{'GITHUB_SHA':revision,'GITHUB_REF':'refs/pull/1/head'}), \
+                self.assertRaises(ValueError):
+            trusted_configuration_revision({'default_branch':'main'},{'execution_sha':revision})
 
 
 class ExternalServiceBoundaryTests(unittest.TestCase):
@@ -534,7 +535,7 @@ class PublicationCompletenessTests(unittest.TestCase):
         old={'id':'one','head_sha':'a'*40,'analyzed_sha':'a'*40,'collected_run':'12-1','report_status':'partial','assets':{},'documents':{}}
         state={'targets':[{'id':'one','head_sha':'a'*40,'status':'collected','scan_run_id':12,'run_attempt':1}]}
         config={'analysis_repository':'owner/repo','report_budget_bytes':1000, 'launch_endpoint': 'http://localhost'}
-        with patch('scripts.code_analysis.repository_service.github.pages',return_value=[]),patch('scripts.code_analysis.repository_service.release_manifest.write') as write, patch('scripts.code_analysis.repository_service.release_manifest.read', return_value={'targets':[old]}):
+        with patch('scripts.code_analysis.repository_service.github.pages',return_value=[]),patch('scripts.code_analysis.repository_service.release_manifest.write'), patch('scripts.code_analysis.repository_service.release_manifest.read', return_value={'targets':[old]}):
             result=report_publication(config,state,'analysis-current-1')
         self.assertEqual(result['targets'][0]['status'],'partial')
         self.assertEqual(result['targets'][0]['collected_run'],'12-1')

@@ -9,7 +9,6 @@ import re
 import time
 import urllib.request
 
-
 EXIT_CODE = re.compile(r"sonar-scanner.+failed with exit code (\d+)", re.IGNORECASE)
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 

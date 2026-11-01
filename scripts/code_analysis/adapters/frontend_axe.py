@@ -5,7 +5,15 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from frontend_common import command, frontend, install, run, start_preview, stop_preview, write_result
+from frontend_common import (
+    command,
+    frontend,
+    install,
+    run,
+    start_preview,
+    stop_preview,
+    write_result,
+)
 
 p = argparse.ArgumentParser()
 p.add_argument('--request', type=Path, required=True)
