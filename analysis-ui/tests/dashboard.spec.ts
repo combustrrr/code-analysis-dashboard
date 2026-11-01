@@ -291,6 +291,8 @@ test.describe('production shell',()=>{
   const deepLink=page.url();
   const detail=page.locator('.evidence-panel');
   await expect(detail).toBeVisible();
+  await expect(detail.getByRole('heading',{name:label!})).toBeVisible();
+  await expect(detail).toBeFocused();
   const detailPosition=await detail.evaluate(element=>({top:element.getBoundingClientRect().top,bottom:element.getBoundingClientRect().bottom,viewport:innerHeight,clientHeight:element.clientHeight,scrollHeight:element.scrollHeight,overflowY:getComputedStyle(element).overflowY,overscrollY:getComputedStyle(element).overscrollBehaviorY}));
   expect(detailPosition.top).toBeGreaterThanOrEqual(0);
   expect(detailPosition.top).toBeLessThan(detailPosition.viewport);
@@ -299,7 +301,7 @@ test.describe('production shell',()=>{
   expect(detailPosition.overscrollY).toBe('contain');
   expect(detailPosition.scrollHeight).toBeGreaterThan(detailPosition.clientHeight);
   const pageScrollBefore=await page.evaluate(()=>window.scrollY);
-  await detail.evaluate(element=>element.scrollTo({top:element.scrollHeight,behavior:'instant'}));
+  await detail.evaluate(element=>{element.scrollTop=element.scrollHeight;});
   await expect.poll(()=>detail.evaluate(element=>element.scrollTop)).toBeGreaterThan(0);
   expect(await page.evaluate(()=>window.scrollY)).toBe(pageScrollBefore);
   await detail.getByRole('button',{name:'Back to findings'}).click();
