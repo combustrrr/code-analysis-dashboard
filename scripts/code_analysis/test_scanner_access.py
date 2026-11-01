@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 import urllib.error
+from email.message import Message
 from pathlib import Path
 from unittest.mock import patch
 
@@ -67,7 +68,7 @@ class ScannerAccessTests(unittest.TestCase):
 
     def test_branch_entitlement_is_distinct_from_token_failure(self):
         for message, kind in [('Organization is not allowed to access data from non main branches.', 'branch_entitlement'), ('private provider data', 'access_denied')]:
-            error = urllib.error.HTTPError('https://sonarcloud.io', 403, 'Forbidden', {}, io.BytesIO(json.dumps({'errors':[{'msg':message}]}).encode()))
+            error = urllib.error.HTTPError('https://sonarcloud.io', 403, 'Forbidden', Message(), io.BytesIO(json.dumps({'errors':[{'msg':message}]}).encode()))
             with patch.object(probe.urllib.request, 'urlopen', side_effect=error):
                 status, document = probe._request('https://sonarcloud.io', 'do-not-log')
             self.assertEqual(status, 403)

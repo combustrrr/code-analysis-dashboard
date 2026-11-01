@@ -59,7 +59,7 @@ def processing(repository, feedback):
     uploads = result.get('uploads', [])
     for upload in uploads:
         if upload.get('status') not in ('complete', 'failed'):
-            response = github.api(f"repos/{repository}/code-scanning/sarifs/{upload['id']}")
+            response = github.api_object(f"repos/{repository}/code-scanning/sarifs/{upload['id']}")
             upload['status'] = response.get('processing_status', 'pending')
             if response.get('errors'):
                 upload['errors'] = response['errors']
@@ -86,12 +86,12 @@ def publish(document, project_id, row, report, findings, *, dashboard_url):
         github.api(f"repos/{repo}/check-runs/{previous['id']}",payload={k:v for k,v in check.items() if k!='head_sha'},method='PATCH')
         check_id=previous['id']
     else:
-        check_id=github.api(f'repos/{repo}/check-runs',payload=check)['id']
+        check_id=github.api_object(f'repos/{repo}/check-runs',payload=check)['id']
     # Manual commits have no proven branch/PR ref. Checks are sufficient there.
     ref = f"refs/heads/{row['branch']}" if row['kind']=='branch' else f"refs/pull/{row['pr']}/head" if row['kind']=='pr' else None
     if not ref:
         return {'status':'checks_published','check_id':check_id}
-    from scripts.code_analysis.snapshot import COMPLETE_STATUSES
+    from scripts.code_analysis.status_contract import COMPLETE_STATUSES
     security = [c for c in report['channels'] if c['channel'] in {'bandit','gitleaks','osv','trivy'}]
     completed = [c['channel'] for c in security if c['status'] in COMPLETE_STATUSES]
     missing = sorted({'bandit','gitleaks','osv','trivy'} - set(completed))
@@ -108,9 +108,9 @@ def publish(document, project_id, row, report, findings, *, dashboard_url):
     uploads = []
     for index, payload in enumerate(payloads):
         try:
-            upload = github.api(f'repos/{repo}/code-scanning/sarifs',payload={
+            upload = github.api_object(f'repos/{repo}/code-scanning/sarifs',payload={
                 'commit_sha':report['analyzed_sha'],'ref':ref,'sarif':payload})
             uploads.append({'bucket':index,'id':upload['id'],'status':'pending'})
-        except (RuntimeError, ValueError) as error:
+        except (RuntimeError, TypeError, ValueError) as error:
             return {'status':'failed','adapter_version':3,'check_id':check_id,'expected_uploads':len(payloads),'unavailable_channels':missing,'uploads':uploads,'reason':str(error)}
     return {'status':'security_processing','adapter_version':3,'check_id':check_id,'expected_uploads':len(payloads),'unavailable_channels':missing,'uploads':uploads}

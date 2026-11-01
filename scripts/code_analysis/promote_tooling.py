@@ -23,15 +23,15 @@ def relevant(path):
     return path.startswith(('.ci/','scripts/code_analysis/','config/code-analysis/')) or path in ('sonar-project.properties','.github/workflows/reusable-source.yml','.github/workflows/reusable-source-full.yml') or bool(re.fullmatch(r'\.github/workflows/0[1-9]-.*\.yml',path))
 
 def contents(repo,ref):
-    return {p:base64.b64decode(github.api(f'repos/{repo}/contents/{p}?ref={ref}')['content']).decode('utf-8') for p in FILES}
+    return {p:base64.b64decode(github.api_object(f'repos/{repo}/contents/{p}?ref={ref}')['content']).decode('utf-8') for p in FILES}
 
 def api_repo(repo,path,body=None,method=None):
-    return github.api(f'repos/{repo}/{path}',body,method=method) if method else github.api(f'repos/{repo}/{path}',body)
+    return github.api_object(f'repos/{repo}/{path}',body,method=method) if method else github.api_object(f'repos/{repo}/{path}',body)
 
 def main():
     repo=os.environ['GITHUB_REPOSITORY'];candidate=os.environ['GITHUB_SHA']
     api=lambda path,body=None,method=None:api_repo(repo,path,body,method)
-    meta=github.api('repos/'+repo);branch=meta['default_branch']
+    meta=github.api_object('repos/'+repo);branch=meta['default_branch']
     current=api('git/ref/heads/'+branch)['object']['sha']
     if current!=candidate:
         print('Default branch advanced; next reconciliation will validate the new revision.');return

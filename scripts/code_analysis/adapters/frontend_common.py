@@ -73,6 +73,9 @@ def start_preview(ui: Path, value: dict) -> subprocess.Popen[bytes]:
             or parsed.username is not None or parsed.password is not None or parsed.fragment):
         process.kill()
         raise ValueError('Reviewed preview URL is invalid')
+    if not isinstance(url, str):
+        process.kill()
+        raise TypeError('Reviewed preview URL is missing')
     for _ in range(80):
         if process.poll() is not None:
             raise RuntimeError('Frontend preview stopped before it became ready')

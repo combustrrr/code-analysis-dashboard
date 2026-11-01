@@ -1,4 +1,5 @@
 import unittest
+from typing import Any, cast
 
 from scripts.code_analysis.workspace_documents import (
     FINDINGS_PAGE_SIZE,
@@ -24,7 +25,7 @@ class WorkspaceDocumentTests(unittest.TestCase):
                           'evidence_state': 'measured_zero'}],
             'publication_gate': {'satisfied': True},
         }
-        documents = build_workspace_documents(report, findings)
+        documents = cast(dict[str, Any], build_workspace_documents(report, findings))
         self.assertEqual(documents['coverage.json']['schema_version'], 'project-coverage-v1')
         self.assertEqual(documents['coverage.json']['channels'][0]['evidence_state'], 'measured_zero')
         self.assertEqual(documents['findings-catalog.json']['pages'], 2)

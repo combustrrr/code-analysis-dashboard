@@ -20,6 +20,8 @@ class TestChannelRegistry(unittest.TestCase):
     def test_get_channel_codeql_is_security(self):
         row = get_channel('codeql')
         self.assertIsNotNone(row)
+        if row is None:
+            self.fail('codeql channel is missing')
         self.assertEqual(row['class'], 'security')
 
     def test_channels_by_class_has_security(self):

@@ -12,7 +12,7 @@ NAME = re.compile(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')
 SHA = re.compile(r'^[a-f0-9]{40}$')
 
 
-def repository(value: dict) -> dict:
+def repository(value: object) -> dict:
     if (not isinstance(value, dict) or type(value.get('id')) is not int or value['id'] <= 0
             or not NAME.fullmatch(value.get('full_name', '')) or value.get('private') is not False):
         raise ValueError('A verified public GitHub repository with a numeric ID is required')

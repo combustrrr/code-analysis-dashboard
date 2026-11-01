@@ -500,6 +500,8 @@ def apply(destination: Path, envelope: dict) -> dict:
     for start in range(0, len(details), 100):
         write(destination / "details" / f"{start // 100}.json", details[start:start + 100])
     status = envelope.get("status")
+    if status is not None and not isinstance(status, str):
+        raise ValueError("workflow annotation evidence status must be a string")
     complete = status in {"complete", "measured_zero"}
     state_reasons = {
         "complete": "Workflow annotations were collected completely for the exact run and attempt.",
@@ -518,7 +520,8 @@ def apply(destination: Path, envelope: dict) -> dict:
                "evidence_state": status or "unknown",
                "findings": len(unique) if complete else None, "observation_count": len(envelope.get("annotations", [])),
                "observation_ids": [row["annotation_id"] for row in envelope.get("annotations", [])],
-               "reason": diagnostic_reason or state_reasons.get(status, "Workflow annotation evidence state is unknown."),
+               "reason": diagnostic_reason or (state_reasons.get(status, "Workflow annotation evidence state is unknown.")
+                                                  if status else "Workflow annotation evidence state is unknown."),
                "workflow": report.get("producer_runs", [{}])[0].get("url", "")}
     report["channels"] = [row for row in report.get("channels", []) if row.get("channel") != channel["channel"]] + [channel]
     report["finding_count"] = len(findings)
