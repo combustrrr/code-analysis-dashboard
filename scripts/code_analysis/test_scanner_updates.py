@@ -50,8 +50,14 @@ class ScannerUpdateTests(unittest.TestCase):
                      'frontend_axe.py', 'frontend_lighthouse.py'):
             adapter = Path('scripts/code_analysis/adapters') / name
             source = adapter.read_text(encoding='utf-8')
-            self.assertIn("frontend(a.source, target['project_id'])", source,
-                          f'{name} must select the reviewed project profile')
+            if name in ('frontend_axe.py', 'frontend_lighthouse.py'):
+                self.assertIn('browser.request(', source,
+                              f'{name} must use the shared reviewed request boundary')
+            else:
+                self.assertIn("frontend(a.source, target['project_id'])", source,
+                              f'{name} must select the reviewed project profile')
+        common = Path('scripts/code_analysis/adapters/frontend_common.py').read_text(encoding='utf-8')
+        self.assertIn("frontend(arguments.source, target['project_id'])", common)
 
     def test_zizmor_pin_is_stable_and_synchronized_across_generated_workflows(self):
         paths = (

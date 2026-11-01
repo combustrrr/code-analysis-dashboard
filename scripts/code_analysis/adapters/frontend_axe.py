@@ -1,19 +1,11 @@
 """Run a browser accessibility audit for the reviewed project frontend."""
-import argparse
-import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import frontend_common as browser
 
-p = argparse.ArgumentParser()
-p.add_argument('--request', type=Path, required=True)
-p.add_argument('--output', type=Path, required=True)
-p.add_argument('--source', type=Path, required=True)
-a = p.parse_args()
-target = json.loads(a.request.read_text(encoding='utf-8'))['target']
-ui, project_profile = browser.frontend(a.source, target['project_id'])
+a, target, ui, project_profile = browser.request('Run the reviewed axe accessibility audit')
 prepared = browser.install(ui, project_profile)
 built = browser.run(browser.command(project_profile, 'frontend_build_command'), ui, 1200) if prepared.returncode == 0 else prepared
 audit = built

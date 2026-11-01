@@ -1,6 +1,7 @@
 """Shared, reviewed frontend scanner execution for configured source projects."""
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import time
@@ -31,6 +32,17 @@ def frontend(source: Path, project_id: str) -> tuple[Path, dict]:
     if not ui.is_relative_to(source.resolve()) or not (ui / 'package-lock.json').is_file():
         raise ValueError('Reviewed frontend project is unavailable')
     return ui, value
+
+
+def request(description: str) -> tuple[argparse.Namespace, dict, Path, dict]:
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('--request', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--source', type=Path, required=True)
+    arguments = parser.parse_args()
+    target = json.loads(arguments.request.read_text(encoding='utf-8'))['target']
+    ui, project_profile = frontend(arguments.source, target['project_id'])
+    return arguments, target, ui, project_profile
 
 
 def command(value: dict, key: str) -> list[str]:
