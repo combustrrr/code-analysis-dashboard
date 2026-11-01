@@ -11,6 +11,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from scripts.code_analysis.network_access import open_url
+
 API = "https://api.github.com"
 BOT_LOGINS = {"coderabbitai[bot]", "coderabbitai"}
 MAX_PAGES = 10
@@ -32,7 +34,7 @@ def request_json(url: str, token: str) -> Any:
         "User-Agent": "agentic-soc-coderabbit-advisory-collector/1",
         "X-GitHub-Api-Version": "2022-11-28",
     })
-    with urllib.request.urlopen(request, timeout=60) as response:
+    with open_url(request, timeout=60, allowed_hosts={"api.github.com"}) as response:
         return json.load(response)
 
 

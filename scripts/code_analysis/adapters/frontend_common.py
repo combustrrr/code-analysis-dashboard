@@ -7,6 +7,7 @@ import subprocess
 import time
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 TOOLING_ROOT = Path(__file__).resolve().parents[3]
 
@@ -65,14 +66,17 @@ def start_preview(ui: Path, value: dict) -> subprocess.Popen[bytes]:
     process = subprocess.Popen(command(value, 'frontend_preview_command'), cwd=ui,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     url = value.get('frontend_preview_url')
-    if not isinstance(url, str) or not url.startswith('http://127.0.0.1:'):
+    parsed = urlsplit(url) if isinstance(url, str) else None
+    if (parsed is None or parsed.scheme != 'http' or parsed.hostname != '127.0.0.1'
+            or parsed.username is not None or parsed.password is not None or parsed.fragment):
         process.kill()
         raise ValueError('Reviewed preview URL is invalid')
     for _ in range(80):
         if process.poll() is not None:
             raise RuntimeError('Frontend preview stopped before it became ready')
         try:
-            with urllib.request.urlopen(url, timeout=1) as response:
+            # The reviewed URL is exact loopback HTTP with no credentials or fragment.
+            with urllib.request.urlopen(url, timeout=1) as response:  # nosec B310
                 if response.status == 200:
                     return process
         except OSError:

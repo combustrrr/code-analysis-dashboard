@@ -59,9 +59,14 @@ def main():
         reason = 'API startup or bounded Schemathesis execution failed'
         try:
             url = profile['openapi_url']
+            parsed = urlsplit(url)
+            if (parsed.scheme != 'http' or parsed.hostname != '127.0.0.1'
+                    or parsed.username is not None or parsed.password is not None or parsed.fragment):
+                raise ValueError('Reviewed OpenAPI URL must use exact loopback HTTP')
             for _ in range(60):
                 try:
-                    with urllib.request.urlopen(url, timeout=2) as response:
+                    # The reviewed URL is exact loopback HTTP with no credentials or fragment.
+                    with urllib.request.urlopen(url, timeout=2) as response:  # nosec B310
                         (root / 'schema.json').write_bytes(response.read())
                     break
                 except OSError:
@@ -70,7 +75,6 @@ def main():
                     time.sleep(1)
             else:
                 raise RuntimeError('API schema startup deadline exceeded')
-            parsed = urlsplit(url)
             result = subprocess.run(['schemathesis', 'run', str(root / 'schema.json'),
                 '--experimental=openapi-3.1', '--base-url', f'{parsed.scheme}://{parsed.netloc}',
                 '--checks', 'all', '--max-response-time', '5000', '--hypothesis-max-examples', '50',

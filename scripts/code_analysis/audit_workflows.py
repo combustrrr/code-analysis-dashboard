@@ -163,7 +163,11 @@ def audit() -> list[str]:
     for path in sorted(WORKFLOWS.glob("*.y*ml")):
         relative = path.relative_to(ROOT).as_posix()
         try:
-            document = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+            source = path.read_text(encoding="utf-8")
+            # PyYAML follows YAML 1.1 and otherwise coerces GitHub's top-level
+            # `on` trigger key to boolean true. Quote only that exact key before
+            # safe construction so an accidentally serialized `true:` remains visible.
+            document = yaml.safe_load(re.sub(r"(?m)^on:", '"on":', source, count=1))
         except yaml.YAMLError as exc:
             errors.append(f"{relative}: invalid YAML: {exc}")
             continue
@@ -200,20 +204,18 @@ def audit() -> list[str]:
                 if permissions.get(forbidden) == "write":
                     errors.append(f"{relative}: analysis workflow grants {forbidden}: write globally")
 
-    coderabbit = yaml.load(
-        (ROOT / ".coderabbit.yaml").read_text(encoding="utf-8"), Loader=yaml.BaseLoader
-    )
+    coderabbit = yaml.safe_load((ROOT / ".coderabbit.yaml").read_text(encoding="utf-8"))
     auto_review = ((coderabbit.get("reviews") or {}).get("auto_review") or {})
-    if auto_review.get("enabled") != "true":
+    if auto_review.get("enabled") is not True:
         errors.append(".coderabbit.yaml: automatic cloud review must remain enabled")
     if auto_review.get("base_branches") != [".*"]:
         errors.append(".coderabbit.yaml: base_branches must explicitly cover every PR target")
     github_checks = ((coderabbit.get("reviews") or {}).get("tools") or {}).get(
         "github-checks"
     ) or {}
-    if github_checks.get("enabled") != "true":
+    if github_checks.get("enabled") is not True:
         errors.append(".coderabbit.yaml: GitHub Checks integration must remain enabled")
-    if github_checks.get("timeout_ms") != "900000":
+    if github_checks.get("timeout_ms") != 900000:
         errors.append(".coderabbit.yaml: GitHub Checks must wait for the scanner window")
 
     return errors
