@@ -9,6 +9,11 @@ are not Worker runtime code and must never receive scanner or publication creden
 - `validate_deployment.py`: validates wrangler.jsonc config, required Worker secrets,
   and optionally checks R2 `temp-runs/` 1-day lifecycle rule (requires boto3 and
   R2 read credentials; prints manual steps if unavailable).
+- `secret_contract.py`: validates the centralized secret-name manifest, workflow and
+  Worker bindings, source-job isolation, repository token/private-key patterns, and
+  optional provider names without reading values.
+- `rotate_worker_api_token.py`: performs a nonlogging, transition-probed rotation of
+  the dual-store Worker API token.
 - `test_register_github_app.py`: unit tests for cross-platform command selection
   (`_find_npx`, `_find_openssl`).
 
@@ -17,6 +22,10 @@ are not Worker runtime code and must never receive scanner or publication creden
 ```bash
 # Basic config and secrets validation (no credentials needed)
 python scripts/deployment/validate_deployment.py
+python -m scripts.deployment.secret_contract
+
+# Provider name validation (requires authenticated gh and wrangler CLIs)
+python -m scripts.deployment.secret_contract --verify-provider-names
 
 # With R2 lifecycle check (requires boto3 and R2 read credentials)
 R2_ACCESS_KEY=<key> R2_SECRET_KEY=<secret> \

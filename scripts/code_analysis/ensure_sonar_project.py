@@ -28,9 +28,11 @@ def _request(url: str, token: str = "", data: bytes | None = None) -> tuple[int,
 
 
 def ensure(organization: str, project: str, name: str, token: str,
-           main_branch: str = "") -> dict[str, Any]:
+           main_branch: str = "", analysis_mode: str = "ci_exact_revision") -> dict[str, Any]:
     if not token:
         raise SystemExit("SONAR_TOKEN is required to bootstrap a Sonar project")
+    if analysis_mode != "ci_exact_revision":
+        raise RuntimeError("Trusted Sonar project must use CI exact-revision analysis mode")
     query = urllib.parse.urlencode({"component": project})
     status, document = _request(f"{SERVER}/api/components/show?{query}")
     visibility = (document.get("component") or {}).get("visibility")
@@ -75,6 +77,8 @@ def ensure(organization: str, project: str, name: str, token: str,
         "visibility": "public",
         "created": created,
         "main_branch": configured_main,
+        "analysis_mode": analysis_mode,
+        "automatic_analysis": "not_configured_for_dedicated_ci_project",
     }
     return result
 
@@ -86,6 +90,7 @@ def main() -> None:
         os.environ.get("SOURCE_REPOSITORY", ""),
         os.environ.get("SONAR_TOKEN", ""),
         os.environ.get("SONAR_MAIN_BRANCH", ""),
+        os.environ.get("SONAR_ANALYSIS_MODE", ""),
     )
     Path("sonar-project-bootstrap.json").write_text(
         json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"

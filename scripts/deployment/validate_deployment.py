@@ -11,6 +11,8 @@ import os
 import sys
 from pathlib import Path
 
+from scripts.deployment.secret_contract import contract_errors
+
 
 def _parse_jsonc(text: str) -> dict:
     """Parse JSONC (JSON with comments) by stripping line comments."""
@@ -261,6 +263,17 @@ def check_deployment_workflows() -> bool:
     return True
 
 
+def check_secret_contract() -> bool:
+    """Validate manifest parity, source isolation, and secret-like repository content."""
+    errors = contract_errors()
+    for error in errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+    if errors:
+        return False
+    print("OK: centralized secret contract validated")
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check-r2-lifecycle", action="store_true", help="Check R2 temp-runs lifecycle rule")
@@ -272,6 +285,7 @@ def main() -> int:
     all_ok &= check_wrangler_config()
     all_ok &= check_worker_secrets_declared()
     all_ok &= check_deployment_workflows()
+    all_ok &= check_secret_contract()
 
     if args.check_r2_lifecycle:
         all_ok &= check_r2_lifecycle_rule(

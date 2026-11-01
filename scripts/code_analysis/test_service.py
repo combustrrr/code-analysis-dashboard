@@ -84,7 +84,13 @@ class MonitoringTests(unittest.TestCase):
             )
         self.assertTrue(result["created"])
         self.assertEqual(result["visibility"], "public")
+        self.assertEqual(result["analysis_mode"], "ci_exact_revision")
+        self.assertEqual(result["automatic_analysis"], "not_configured_for_dedicated_ci_project")
         self.assertEqual(request.call_count, 3)
+
+    def test_sonar_project_rejects_non_ci_analysis_mode(self):
+        with self.assertRaisesRegex(RuntimeError, "CI exact-revision"):
+            ensure_sonar_project("org", "org_repo_ci", "org/repo", "token", analysis_mode="automatic")
 
     def test_sonar_project_does_not_mutate_existing_private_visibility(self):
         with patch(

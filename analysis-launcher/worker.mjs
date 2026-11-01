@@ -72,6 +72,7 @@ async function pages(path, token) {
 }
 const restricted = env => env.APPLICATION_MODE === 'repositories' || env.DASHBOARD_ACCESS === 'collaborators';
 const privateReports = env => env.REPORT_ACCESS !== 'public';
+const workerApiAuthorized=(request,env)=>{const authorization=request.headers.get('Authorization');return Boolean(env.WORKER_API_TOKEN)&&authorization===`Bearer ${env.WORKER_API_TOKEN}`||Boolean(env.WORKER_API_TOKEN_NEXT)&&authorization===`Bearer ${env.WORKER_API_TOKEN_NEXT}`;};
 const reportPath = path => path.startsWith('/api/public/') && path !== '/api/public/config';
 const protectedReportResponse = async (request, env) => {
   const response = await publicReports(request, env);
@@ -129,9 +130,15 @@ async function wakeCoordinator(env,requestId,sourceSha){
 }
 async function route(request, env, executionContext) {
   const url = new URL(request.url);
+
+  if(url.pathname==='/api/internal/rotation-probe'){
+    if(!workerApiAuthorized(request,env))throw new Failure(401,'Unauthorized rotation probe.','unauthorized');
+    if(request.method!=='GET')throw new Failure(405,'Method not allowed.','method_not_allowed');
+    return new Response(null,{status:204});
+  }
   
   if (url.pathname.startsWith('/api/state/') || url.pathname.startsWith('/api/report/')) {
-    if (request.headers.get('Authorization') !== `Bearer ${env.WORKER_API_TOKEN}`) {
+    if (!workerApiAuthorized(request,env)) {
       throw new Failure(401, 'Unauthorized state access.', 'unauthorized');
     }
     // Keep the complete suffix so repository-qualified keys cannot collide.
@@ -212,7 +219,7 @@ async function route(request, env, executionContext) {
   }
 
   if(url.pathname.startsWith('/api/internal/queue/')){
-    if(request.headers.get('Authorization')!==`Bearer ${env.WORKER_API_TOKEN}`)throw new Failure(401,'Unauthorized queue access.','unauthorized');
+    if(!workerApiAuthorized(request,env))throw new Failure(401,'Unauthorized queue access.','unauthorized');
     if(request.method!=='POST')throw new Failure(405,'Method not allowed.','method_not_allowed');
     let body={};try{body=await request.json();}catch{}
     const action=['admit','claim','heartbeat','complete','pause','reset','resume'].find(name=>url.pathname.endsWith('/'+name));
@@ -225,7 +232,7 @@ async function route(request, env, executionContext) {
     return json({...completed,next_started});
   }
   if(url.pathname==='/api/internal/cutover/reset-reports'){
-    if(request.headers.get('Authorization')!==`Bearer ${env.WORKER_API_TOKEN}`)throw new Failure(401,'Unauthorized cutover access.','unauthorized');
+    if(!workerApiAuthorized(request,env))throw new Failure(401,'Unauthorized cutover access.','unauthorized');
     if(request.method!=='POST')throw new Failure(405,'Method not allowed.','method_not_allowed');
     const body=await request.json();if(body.confirm!=='RESET_CURRENT_REPORTS')throw new Failure(400,'Explicit reset confirmation is required.','invalid_request');
     const state=await controlRequest(env,'control-plane','/queue/public-state',{}),queueState=await state.json();

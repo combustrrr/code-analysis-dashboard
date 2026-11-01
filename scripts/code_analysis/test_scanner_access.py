@@ -122,6 +122,8 @@ class ScannerAccessTests(unittest.TestCase):
         self.assertIn('sonar.sources=.', settings['run'])
         self.assertEqual(settings['env']['SONAR_ORGANIZATION'], '${{ fromJSON(inputs.target).sonar_organization }}')
         self.assertEqual(settings['env']['SONAR_PROJECT_KEY'], '${{ fromJSON(inputs.target).sonar_project_key }}')
+        self.assertEqual(settings['env']['SONAR_ANALYSIS_MODE'], '${{ fromJSON(inputs.target).sonar_analysis_mode }}')
+        self.assertIn('[[ "$SONAR_ANALYSIS_MODE" == "ci_exact_revision" ]]', settings['run'])
         self.assertIn('sonar.organization=$SONAR_ORGANIZATION', settings['run'])
         self.assertIn('sonar.projectKey=$SONAR_PROJECT_KEY', settings['run'])
         self.assertIn('sonar.branch.name=$SOURCE_BRANCH', settings['run'])
@@ -140,6 +142,8 @@ class ScannerAccessTests(unittest.TestCase):
                          '${{ fromJSON(inputs.target).sonar_organization }}')
         self.assertEqual(bootstrap['env']['SONAR_PROJECT_KEY'],
                          '${{ fromJSON(inputs.target).sonar_project_key }}')
+        self.assertEqual(bootstrap['env']['SONAR_ANALYSIS_MODE'],
+                         '${{ fromJSON(inputs.target).sonar_analysis_mode }}')
         self.assertNotIn('SONAR_API_TOKEN', yaml.safe_dump(bootstrap))
 
     def test_reconciliation_cannot_publish_checks_or_security_events_to_sources(self):

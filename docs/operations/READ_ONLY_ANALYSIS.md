@@ -91,10 +91,13 @@ SonarQube Cloud organization and project keys are trusted per configured project
 than derived from the source repository owner. Scanner submission and native export use
 the same configured key, selected branch, and immutable source SHA; a missing project,
 permission failure, or unsuccessful compute/export remains incomplete evidence.
-The dashboard uses a dedicated CI-owned Sonar project key so its retained scanner lane
-does not conflict with SonarCloud Automatic Analysis on the existing linked project.
-CI-owned Sonar projects for these public repositories are verified as public before the
-separate read-only API token exports native issues.
+Each active target carries `sonar_analysis_mode=ci_exact_revision`. The workflow
+rejects any other value before scanning and uses a dedicated, API-created CI project
+that is not configured for Automatic Analysis, so it cannot conflict with an existing
+ALM-linked project. CI-owned Sonar projects for these public repositories are verified
+as public before the separate read-only API token exports native issues. The scanner
+submission remains pinned to the admitted source SHA even when Sonar projects the
+result onto the configured main branch.
 The dashboard-source profile
 explicitly defers container-image/SBOM channels (there is no shipping image),
 Schemathesis (there is no application API contract), and Hadolint (its only Dockerfile

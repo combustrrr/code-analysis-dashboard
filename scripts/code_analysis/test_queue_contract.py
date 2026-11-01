@@ -28,6 +28,7 @@ class QueueContractTests(unittest.TestCase):
         self.assertEqual(row["execution_channels"], ["semgrep"])
         self.assertEqual(row["sonar_organization"], "combustrrr")
         self.assertEqual(row["sonar_project_key"], "combustrrr_Agentic-Kibana-ci-v3")
+        self.assertEqual(row["sonar_analysis_mode"], "ci_exact_revision")
         self.assertEqual(row["sonar_main_branch"], "Testing")
 
     def test_each_project_has_a_trusted_sonar_identity(self):

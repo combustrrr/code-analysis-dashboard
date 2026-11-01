@@ -5,6 +5,19 @@ description: SESSION_KEY entropy requirements and secret rotation procedures.
 
 # Secret management and rotation
 
+`config/secret-manifest-v1.json` is the versioned authority for secret names,
+stores, consumers, minimum scope, required/optional state, rotation cadence, and
+source-job eligibility. It contains metadata only, never values. Validate it with:
+
+```bash
+python -m scripts.deployment.secret_contract
+python -m scripts.deployment.secret_contract --verify-provider-names
+```
+
+The second command reads names only from GitHub and Cloudflare. It also fails if a
+manifest secret name has been placed in a GitHub Actions Variable. Worker deployment
+performs the Cloudflare name check using the protected `production` Environment.
+
 ## SESSION_KEY entropy requirements
 
 `SESSION_KEY` is a Worker secret used to encrypt and authenticate session cookies. It must meet
@@ -47,6 +60,25 @@ Environment to `main`; pull-request validation never receives either value. The 
 coordinator uses `WORKER_API_TOKEN` only in its claim, publication, and completion jobs.
 Reusable source-executing jobs must never receive this token.
 
+`WORKER_API_TOKEN` exists in both the GitHub repository secret store and the
+Cloudflare Worker secret store. Rotate it without an outage using the checked-in
+transition procedure; the generated token is passed to both CLIs through stdin and is
+never printed or supplied as a command-line argument:
+
+```bash
+python scripts/deployment/rotate_worker_api_token.py \
+  --worker-origin https://code-analysis-launcher.<account>.workers.dev \
+  --repository combustrrr/code-analysis-dashboard \
+  --confirm-production-rotation
+```
+
+The procedure installs `WORKER_API_TOKEN_NEXT`, verifies the dedicated authenticated
+rotation probe, updates the GitHub repository secret, promotes the same value to the
+primary Worker secret, verifies it again, and removes the transition secret. If it
+stops before primary promotion, retain `WORKER_API_TOKEN_NEXT`, correct the provider
+or network failure, and rerun. Do not manually remove the transition secret until the
+new primary probe succeeds.
+
 ### GitHub App secrets
 
 1. In GitHub: Settings → Developer settings → GitHub Apps → <app> → Generate a new client secret.
@@ -83,7 +115,6 @@ Reusable source-executing jobs must never receive this token.
 |--------|------------------|---------|
 | SESSION_KEY | 90 days or on compromise suspicion | Scheduled or incident |
 | GITHUB_CLIENT_SECRET | 180 days or on compromise suspicion | Scheduled or incident |
-| WEBHOOK_SECRET | 180 days or on compromise suspicion | Scheduled or incident |
 | R2_ACCESS_KEY / R2_SECRET_KEY | 90 days | Scheduled |
 | SNYK_TOKEN / SONAR_TOKEN / SONAR_API_TOKEN | Per provider policy | Provider notification |
 | SCANNER_UPDATE_TOKEN | 180 days or on personnel change | Scheduled or offboarding |

@@ -105,6 +105,12 @@ class PortabilityTests(unittest.TestCase):
     def test_current_workflow_is_unchanged(self):
         self.assertEqual(generate(), Path('.github/workflows/11-source-analysis.yml').read_text(encoding='utf-8'))
 
+    def test_portable_pytest_pin_matches_authoritative_inventory(self):
+        authoritative = next(line.split('==', 1)[1] for line in Path('.ci/requirements.txt').read_text(encoding='utf-8').splitlines() if line.startswith('pytest=='))
+        workflow = generate(self.config())
+        pins = set(__import__('re').findall(r'pytest==([0-9.]+)', workflow))
+        self.assertEqual(pins, {authoritative})
+
     def test_trusted_profile_runner_installs_its_pinned_runtime(self):
         jobs = yaml.safe_load(generate())['jobs']
         for name in ('scanner-1-typescript-quality', 'scanner-4-test-coverage',

@@ -64,7 +64,8 @@ def scanner_target(claim: dict) -> dict:
                queue_intent=intent)
     sonar_organization, sonar_project_key = SONAR_PROJECTS[str(intent["project_id"])]
     row.update(sonar_organization=sonar_organization, sonar_project_key=sonar_project_key,
-               sonar_main_branch=branch if str(intent["project_id"]) in SONAR_MANAGED_MAIN_BRANCH else "")
+               sonar_main_branch=branch if str(intent["project_id"]) in SONAR_MANAGED_MAIN_BRANCH else "",
+               sonar_analysis_mode="ci_exact_revision")
     return row
 
 

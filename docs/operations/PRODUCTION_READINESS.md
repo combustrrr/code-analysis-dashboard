@@ -23,10 +23,19 @@ configured projects, validated update adoption, combined issue filters,
 source details, charts/themes/mobile navigation, connection verification, configuration
 preview/confirmation, retry behavior and login/logout/revocation regression coverage.
 
+The deployment secret contract is centralized in
+`config/secret-manifest-v1.json`. CI rejects undeclared workflow secrets, secrets used
+as ordinary variables, production credentials entering source-executing jobs, required
+Worker binding drift, and tracked token/private-key-like content. Provider checks read
+names only. `WORKER_API_TOKEN` has a transition-probed, stdin-only dual-store rotation
+procedure documented in `SECRET-MANAGEMENT.md`.
+
 Sonar's OSS plan accepts the project main branch, not arbitrary long-lived branches. The
 service-owned Agentic-Kibana and dashboard scanner identities therefore use dedicated CI
 projects whose Sonar main branch is set to the configured preferred branch before the
-first analysis. Upstream Kavach is absent from the active registry until issue #194 is
+first analysis. Each admitted target must declare `ci_exact_revision`; the workflow
+rejects any other Sonar analysis mode. These dedicated API-created projects are not
+configured for Sonar Automatic Analysis. Upstream Kavach is absent from the active registry until issue #194 is
 completed; do not delete or rewrite its existing Sonar branch history.
 
 Still incomplete and intentionally deferred under issue #194: Kavach Sonar main-branch
