@@ -15,9 +15,10 @@ host; dashboard users do not install it on their own repositories.
 
 The execution host is fixed to `combustrrr/code-analysis-dashboard` (repository ID
 `1360051890`). Its versioned `.github/code-analysis/projects.json` registry must contain
-exactly these three public project identities: `ARYDESTROYER/Kavach-AgenticSOC`
-(`1267340546`, observer), `combustrrr/code-analysis-dashboard` (`1360051890`, connected
-self-analysis), and `combustrrr/Agentic-Kibana` (`1278177697`, observer). The Worker
+exactly these two public project identities: `combustrrr/code-analysis-dashboard`
+(`1360051890`, connected self-analysis) and `combustrrr/Agentic-Kibana`
+(`1278177697`, observer). Upstream `ARYDESTROYER/Kavach-AgenticSOC` is not an active
+target until issue #194's owner-approved onboarding is complete. The Worker
 validates IDs, names, relationships, branches, and native-feedback policy and fails
 closed on mismatch. Native feedback is disabled for self-analysis and observer targets
 alike; all configured targets remain read-only analysis sources.

@@ -2,14 +2,15 @@
 
 The repository-mode dashboard uses one fixed execution host:
 `combustrrr/code-analysis-dashboard` (repository ID `1360051890`). The Worker exposes
-its authenticated `/api/projects` route to read the three configured public targets from
+its authenticated `/api/projects` route to read the two configured public targets from
 `.github/code-analysis/projects.json` using the centrally installed GitHub App. Target
 identities are validated against `analysis-launcher/target-registry.mjs`; an incomplete
 or mismatched registry fails closed instead of silently listing a partial catalog.
 
-The configured targets are Kavach-AgenticSOC (`1267340546`, `observer`), this service's
-self-analysis project (`1360051890`, `connected`), and Agentic-Kibana (`1278177697`,
-`observer`). Preferred branches and project profiles are kept in the versioned registry.
+The configured targets are this service's self-analysis project (`1360051890`,
+`connected`) and Agentic-Kibana (`1278177697`, `observer`). Preferred branches and
+project profiles are kept in the versioned registry. Upstream Kavach-AgenticSOC is
+deferred and cannot be selected or admitted; issue #194 records its restoration gates.
 Native feedback is disabled for observer and connected self-analysis targets alike. The
 later configured-source policy supersedes the earlier sign-in rollout's connected-only
 feedback allowance: no findings, checks, SARIF, comments, commits, or pull requests are

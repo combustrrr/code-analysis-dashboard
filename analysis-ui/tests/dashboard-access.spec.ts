@@ -493,7 +493,6 @@ test('authorized user follows one repository project from selection through publ
   expect(route.request().headers().authorization).toBe('Bearer flow-session');
   if(url.pathname==='/api/session')return route.fulfill({headers,json:{login:'developer'}});
      if(url.pathname==='/api/projects')return route.fulfill({headers,json:{execution_repository:{id:1360051890,full_name:execution},can_launch:true,can_configure:false,projects:[
-      {id:'1267340546',source_repository:'ARYDESTROYER/Kavach-AgenticSOC',source_repository_id:1267340546,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Needs attention',readiness_summary:{profile_mode:'agentic-soc',configured_channels:26,selectable_channels:24,vendor_channels:3,deferred_channels:9,unavailable_channels:2},current_report:{status:'partial'}},
      {id:'1278177697',source_repository:source,source_repository_id:1278177697,relationship:'observer',preferred_branch:'Testing',native_feedback_enabled:false,lifecycle:'Preparing',current_report:{status:'partial'}},
      {id:'1360051890',source_repository:execution,source_repository_id:1360051890,relationship:'connected',preferred_branch:'main',native_feedback_enabled:false,lifecycle:'Needs attention',attention_reason:'The current report contains no scanner results. Run analysis to publish scanner evidence.',readiness_summary:{profile_mode:'portable',configured_channels:24,selectable_channels:24,vendor_channels:2,deferred_channels:0,unavailable_channels:0},current_report:{status:'complete',generated_at:'2026-10-10T00:00:00Z',scanner_summary:{completed:0,total:0,incomplete:0}}},
     ]}});
@@ -519,11 +518,10 @@ test('authorized user follows one repository project from selection through publ
    await page.goto('/');
    await page.locator('.landing-actions').getByRole('button',{name:/Sign in with GitHub/}).click();
    await expect(page.getByRole('heading',{name:'Projects'})).toBeVisible();
-    await expect(page.locator('.project-record')).toHaveCount(3);
+    await expect(page.locator('.project-record')).toHaveCount(2);
     const cardGeometry=await page.locator('.project-record').evaluateAll(cards=>cards.map(card=>{const title=card.querySelector('h2')!.getBoundingClientRect(),state=card.querySelector('.project-state')!.getBoundingClientRect();return{height:card.getBoundingClientRect().height,overlap:!(title.right<=state.left||title.left>=state.right||title.bottom<=state.top||title.top>=state.bottom),overflow:card.scrollWidth>card.clientWidth};}));
     expect(cardGeometry.every(card=>!card.overlap&&!card.overflow&&card.height<680)).toBe(true);
-    await expect(page.locator('.project-record').filter({hasText:'ARYDESTROYER/Kavach-AgenticSOC'})).toContainText('Not available');
-    await expect(page.getByText('Read-only source')).toHaveCount(2);
+    await expect(page.getByText('Read-only source')).toHaveCount(1);
     await expect(page.getByText('Connected project')).toHaveCount(1);
     const connected=page.locator('.project-record').filter({hasText:execution});
     await expect(connected).toContainText('Needs attention');
@@ -534,7 +532,7 @@ test('authorized user follows one repository project from selection through publ
     await expect(page.locator('.settings-rail').getByRole('link',{name:/Projects/})).toHaveCount(0);
     await page.goto(`/#/settings?section=projects&project=${project}`);
     await expect(page).toHaveURL(/#\/projects$/);
-    await expect(page.locator('.project-record')).toHaveCount(3);
+    await expect(page.locator('.project-record')).toHaveCount(2);
     await page.goto(`/#/settings/projects?project=${project}`);
     await expect(page).toHaveURL(/#\/projects$/);
     await page.locator('.shell-header').getByRole('link',{name:'Project register'}).click();

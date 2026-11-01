@@ -1,7 +1,6 @@
 export const EXECUTION_REPOSITORY = 'combustrrr/code-analysis-dashboard';
 export const EXECUTION_REPOSITORY_ID = 1360051890;
 export const CONFIGURED_TARGETS = [
-  { id: '1267340546', repository_id: 1267340546, repository: 'ARYDESTROYER/Kavach-AgenticSOC', relationship: 'observer', branch: 'Testing', native_feedback: false },
   { id: '1278177697', repository_id: 1278177697, repository: 'combustrrr/Agentic-Kibana', relationship: 'observer', branch: 'Testing', native_feedback: false },
   { id: '1360051890', repository_id: 1360051890, repository: EXECUTION_REPOSITORY, relationship: 'connected', branch: 'main', native_feedback: false },
 ];

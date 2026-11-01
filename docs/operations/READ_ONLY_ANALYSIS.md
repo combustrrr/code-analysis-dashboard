@@ -5,11 +5,11 @@
 > best-effort coordinator wake after durable admission. This code is not production
 > state until the big-bang cutover runbook has been executed and commissioned.
 
-This runbook covers the three public source targets configured on the fixed analysis host:
+This runbook covers the two public source targets configured on the fixed analysis host.
+Upstream Kavach-AgenticSOC is deferred under issue #194 and is not selectable:
 
 | Target | Branch to select | Detected code/dependency surfaces |
 |---|---|---|
-| [`ARYDESTROYER/Kavach-AgenticSOC`](https://github.com/ARYDESTROYER/Kavach-AgenticSOC) | `Testing` | Python and TypeScript/JavaScript; `backend/`, `webui/`, `updater/`; Python requirements, npm lockfile, and shipping Dockerfiles |
 | [`combustrrr/code-analysis-dashboard`](https://github.com/combustrrr/code-analysis-dashboard) | `main` | Python and TypeScript/JavaScript; `scripts/code_analysis/`, `analysis-ui/`; `.ci/requirements.txt` and `analysis-ui/package-lock.json`; its only Dockerfile is a scanner canary fixture |
 | [`combustrrr/Agentic-Kibana`](https://github.com/combustrrr/Agentic-Kibana) | `Testing` | Python and TypeScript/JavaScript; `backend/`, `webui/`; backend and web UI dependency manifests |
 
@@ -24,7 +24,7 @@ execution; the configured branch is not treated as a permanent revision pin.
 3. Authorized collaborators on the fixed execution repository may separately choose
    **Fast analysis** or **Configure analysis**. Project selection and report inspection remain read-only;
    repository administration is required to change the trusted project registry.
-4. Choose the target's configured branch (`Testing` for Kavach and Agentic-Kibana,
+4. Choose the target's configured branch (`Testing` for Agentic-Kibana,
    `main` for dashboard self-analysis), an open pull request, or a full 40-character
    commit SHA. Choose the scanner channels; the common portable baseline is preselected
    and vendor lanes are opt-in. CodeRabbit review is available only for an open PR.
@@ -98,13 +98,14 @@ separate read-only API token exports native issues.
 The dashboard-source profile
 explicitly defers container-image/SBOM channels (there is no shipping image),
 Schemathesis (there is no application API contract), and Hadolint (its only Dockerfile
-is a scanner fixture). The Kavach product profile retains its Python/API/web/image-
-specific adapters. Unsupported integrations remain explicitly deferred/unavailable,
+is a scanner fixture). The Agentic-Kibana fork profile retains its
+Python/API/web/image-specific adapters; the equivalent upstream Kavach profile is
+preserved as a restoration requirement in issue #194. Unsupported integrations remain explicitly deferred/unavailable,
 not clean zeroes.
 
 The coordinator contains two static reusable-workflow call sites because GitHub Actions
 cannot choose a reusable workflow dynamically. Exactly one is applicable: the dashboard
-self-analysis uses the portable-profile lane, while Kavach and Agentic-Kibana use the
+self-analysis uses the portable-profile lane, while Agentic-Kibana uses the
 agentic-soc-profile lane. Actions displays the non-applicable profile branch as skipped;
 this is expected profile routing and is not an incomplete scanner channel. The jobs use
 explicit profile names so this routing is not confused with scanner execution failure.

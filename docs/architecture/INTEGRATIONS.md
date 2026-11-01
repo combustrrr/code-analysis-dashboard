@@ -19,8 +19,10 @@ Source repository branch / PR / commit
   -> current report Release assets -> one static dashboard
 ```
 
-The current source is `ARYDESTROYER/Kavach-AgenticSOC`. Repository identity and
-application commands are configuration; source repositories remain read-only.
+The historical source for this archived pattern was `ARYDESTROYER/Kavach-AgenticSOC`.
+The active external source is now `combustrrr/Agentic-Kibana`; upstream re-onboarding is
+deferred under issue #194. Repository identity and application commands are
+configuration; source repositories remain read-only.
 New scanner channels appear in Issues, Scanners, overview counts and provenance
 through the existing report contract. No frontend scanner-specific component is needed.
 

@@ -11,12 +11,10 @@ from scripts.code_analysis.hosted import target
 
 EXECUTION_REPOSITORY_ID = 1360051890
 PROJECTS = {
-    "1267340546": ("ARYDESTROYER/Kavach-AgenticSOC", 1267340546),
     "1278177697": ("combustrrr/Agentic-Kibana", 1278177697),
     "1360051890": ("combustrrr/code-analysis-dashboard", 1360051890),
 }
 SONAR_PROJECTS = {
-    "1267340546": ("combustrrr", "combustrrr_Kavach-AgenticSOC"),
     "1278177697": ("combustrrr", "combustrrr_Agentic-Kibana-ci-v3"),
     "1360051890": ("combustrrr", "combustrrr_code-analysis-dashboard-ci-v4"),
 }

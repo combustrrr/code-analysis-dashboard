@@ -4,14 +4,15 @@ This document outlines planned improvements to scale the dashboard, increase sec
 
 ## Current boundary
 
-The Kavach-focused service is deployed with GitHub Actions for scanner execution,
+The service-owned Agentic-Kibana fork and dashboard self-analysis are deployed with GitHub Actions for scanner execution,
 Cloudflare Workers for authentication/API delivery, and Cloudflare R2 for temporary
 producer artifacts and current report assets. The roadmap below is future work, not a
 description of capabilities currently promised to users.
 
 Priority order:
 
-1. Keep the Kavach path reliable and truthful: verify publication/channel evidence,
+1. Keep the active fork path reliable and truthful; defer upstream Kavach onboarding to
+   issue #194 while preserving publication/channel evidence,
    preserve read-only source boundaries, and keep free-tier limits.
 2. Add triage and suppression only with durable audit history and explicit policy review.
 3. Expand scanner coverage through isolated, contract-tested adapters.

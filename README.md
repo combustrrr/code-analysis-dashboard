@@ -45,7 +45,7 @@ npm run build
 ## Browse configured projects
 
 For the already configured analysis instance, sign in and open **Projects**, the only
-workspace home, to browse the service's three trusted targets. Project selection,
+workspace home, to browse the service's two trusted targets. Project selection,
 settings, and report viewing do not trigger a scan. On a project, **Fast analysis** repeats
 that user's most recent branch, pull request, or commit, then recomputes and submits every
 scanner currently available for the resolved revision. Without prior history it resolves the
@@ -82,9 +82,10 @@ Every pull request and `main` push runs the repository-wide CI workflow. Scoped 
 workflows deploy UI changes to Pages, Worker changes to Cloudflare, and validated
 scanner changes through immutable tooling promotion. See the
 [CI/CD runbook](docs/operations/CI-CD.md).
-The checked-in project registry targets `ARYDESTROYER/Kavach-AgenticSOC`,
-`combustrrr/code-analysis-dashboard`, and `combustrrr/Agentic-Kibana`; the dashboard is
-the fixed execution host and its self-analysis target. Registry/workflow changes are
+The checked-in project registry targets `combustrrr/code-analysis-dashboard` and
+`combustrrr/Agentic-Kibana`; the dashboard is the fixed execution host and its
+self-analysis target. Upstream Kavach onboarding is deferred in issue #194.
+Registry/workflow changes are
 deployed to the fixed service as part of the 2026-10-16 configured-source rollout.
 Independent external-owner installations are not part of the
 dashboard onboarding flow.
@@ -106,7 +107,7 @@ remediation steps, coverage limitations, private links, JSON/Markdown downloads,
 locally generated single-PDF exports without changing the underlying scanner evidence.
 
 Analysis begins only after an authorized collaborator starts Fast or configured
-analysis. Administrators may explicitly run the preferred-branch batch when all three
+analysis. Administrators may explicitly run the preferred-branch batch when both
 trusted projects need refreshing; it is not scheduled automatically. Scheduled
 coordinator reconciliation recovers already accepted durable requests and never
 discovers a branch or pull request. Each immutable

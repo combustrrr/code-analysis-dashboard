@@ -16,7 +16,7 @@ identifiers.
    repository relationship, preferred branch, one of the four public lifecycle states,
    immutable published SHA, live preferred-branch head, publication time, channel coverage, limitations, and Review evidence plus
    Configure analysis or View progress actions. There is no Activity route or API.
-2. Select one of the three configured source projects. The project overview distinguishes
+2. Select one of the two configured source projects. The project overview distinguishes
    the current source-only report from an optional separately retained PR overlay and
    shows compact readiness, active work, source/analyzed SHA, and timestamps. Opening a
    project or browsing revisions is read-only.

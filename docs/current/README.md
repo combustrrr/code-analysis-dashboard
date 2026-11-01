@@ -14,8 +14,9 @@ Authoritative current-state material for the deployed service.
 | Threat reports | [Threat reports](THREAT_REPORTS.md) |
 | Community health | [Community health configuration](COMMUNITY_HEALTH.md) |
 
-The checked-in project registry targets `ARYDESTROYER/Kavach-AgenticSOC`,
-`combustrrr/Agentic-Kibana`, and `combustrrr/code-analysis-dashboard`. Read-only launch and storage boundaries are
+The checked-in project registry targets `combustrrr/Agentic-Kibana` and
+`combustrrr/code-analysis-dashboard`. Upstream Kavach-AgenticSOC is deferred under issue
+#194. Read-only launch and storage boundaries are
 documented in [the operations runbook](../operations/READ_ONLY_ANALYSIS.md). Do not
 infer support for future roadmap items from implementation documents.
 

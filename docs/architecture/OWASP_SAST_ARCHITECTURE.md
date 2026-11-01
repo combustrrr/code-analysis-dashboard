@@ -1,6 +1,6 @@
 # OWASP Source Code Analysis (SAST) Architecture
 
-This document defines the proposed enterprise architecture for the Code Analysis Dashboard, specifically designed to align with the **OWASP Source Code Analysis** methodology. It is a forward-looking blueprint; the deployed Kavach-focused service does not yet implement every capability described here.
+This document defines the proposed enterprise architecture for the Code Analysis Dashboard, specifically designed to align with the **OWASP Source Code Analysis** methodology. It is a forward-looking blueprint; the deployed fork-focused service does not yet implement every capability described here, and upstream Kavach onboarding is deferred under issue #194.
 
 ## 1. Architectural Philosophy
 

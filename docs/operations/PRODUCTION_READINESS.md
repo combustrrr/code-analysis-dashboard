@@ -18,7 +18,7 @@ provide step identity, confirm every retained record carries an explicit unavail
 step-provenance reason rather than an unexplained null.
 
 Verified: product/service separation, current-release storage, exact producer/source
-provenance, login/launch/report round trip, no-source-write behavior for all three
+provenance, login/launch/report round trip, no-source-write behavior for the two active
 configured projects, validated update adoption, combined issue filters,
 source details, charts/themes/mobile navigation, connection verification, configuration
 preview/confirmation, retry behavior and login/logout/revocation regression coverage.
@@ -26,18 +26,18 @@ preview/confirmation, retry behavior and login/logout/revocation regression cove
 Sonar's OSS plan accepts the project main branch, not arbitrary long-lived branches. The
 service-owned Agentic-Kibana and dashboard scanner identities therefore use dedicated CI
 projects whose Sonar main branch is set to the configured preferred branch before the
-first analysis. Kavach remains on its existing project identity until the upstream layer
-is explicitly onboarded; do not delete or rewrite its existing Sonar branch history.
+first analysis. Upstream Kavach is absent from the active registry until issue #194 is
+completed; do not delete or rewrite its existing Sonar branch history.
 
-Still incomplete: Kavach Sonar main-branch onboarding and upstream
-repository-security-posture permissions. Inspect actual channel evidence rather than
+Still incomplete and intentionally deferred under issue #194: Kavach Sonar main-branch
+onboarding and upstream repository-security-posture permissions. Inspect actual channel evidence rather than
 workflow color. Unknown findings are unavailable, not zero; a valid partial report
 remains useful and preserves the failed strict gate as evidence.
 
 Owner login is verified; another accepted collaborator's live login is deferred.
 Independent external-owner installation is not live-proven. Broad self-service abuse,
 quota and provider entitlement acceptance must be assessed before expanding beyond
-the current Kavach-focused scope. Triage/suppression, SLA tracking, DAST/mobile
+the current service-owned fork and self-analysis scope. Triage/suppression, SLA tracking, DAST/mobile
 scanning and enforcement-mode blocking remain future work. Free hosting is not
 unlimited usage. No automatic purchases, upstream writes or branch-protection
 bypasses are authorized.

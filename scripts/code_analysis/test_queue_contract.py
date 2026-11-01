@@ -32,7 +32,6 @@ class QueueContractTests(unittest.TestCase):
 
     def test_each_project_has_a_trusted_sonar_identity(self):
         expected = {
-            "1267340546": ("ARYDESTROYER/Kavach-AgenticSOC", "combustrrr_Kavach-AgenticSOC"),
             "1278177697": ("combustrrr/Agentic-Kibana", "combustrrr_Agentic-Kibana-ci-v3"),
             "1360051890": ("combustrrr/code-analysis-dashboard", "combustrrr_code-analysis-dashboard-ci-v4"),
         }
@@ -45,6 +44,16 @@ class QueueContractTests(unittest.TestCase):
             row = scanner_target(claim)
             self.assertEqual(row["sonar_organization"], "combustrrr")
             self.assertEqual(row["sonar_project_key"], sonar_key)
+
+    def test_deferred_upstream_kavach_identity_is_rejected(self):
+        claim = self.intent()
+        claim["intent"].update(project_id="1267340546",
+                               source_repository="ARYDESTROYER/Kavach-AgenticSOC",
+                               source_repository_id=1267340546)
+        claim["intent"]["resolved_selection"].update(
+            repository="ARYDESTROYER/Kavach-AgenticSOC", repository_id=1267340546)
+        with self.assertRaisesRegex(ValueError, "identity is not trusted"):
+            scanner_target(claim)
 
     def test_unpinned_or_identity_changed_claim_fails_closed(self):
         claim = self.intent()

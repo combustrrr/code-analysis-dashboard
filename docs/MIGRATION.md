@@ -8,8 +8,9 @@ the [system overview](architecture/SYSTEM_OVERVIEW.md), with acceptance evidence
 
 - `combustrrr/code-analysis-dashboard` owns scanner execution, orchestration, current
   reports, the Pages application, and the Cloudflare Worker.
-- `ARYDESTROYER/Kavach-AgenticSOC` and `combustrrr/Agentic-Kibana` are read-only source
-  projects for this service instance.
+- `combustrrr/Agentic-Kibana` is the active read-only external source project for this
+  service instance. `ARYDESTROYER/Kavach-AgenticSOC` is deferred pending the explicit
+  upstream-owner onboarding and provider prerequisites tracked in issue #194.
 - No scanner workflow, credential, report publication, or dashboard runtime is copied
   into an upstream/product repository.
 - Source-executing jobs use the configured immutable tooling revision and do not receive

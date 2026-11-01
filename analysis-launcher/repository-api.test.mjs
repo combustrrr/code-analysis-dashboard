@@ -125,7 +125,7 @@ test('pull-only collaborators can list and launch from the exact fixed target re
 test('project register preserves healthy siblings when one branch provider fails',async()=>{
  const failed=CONFIGURED_TARGETS[0],overrides={};for(const [index,target] of CONFIGURED_TARGETS.entries())overrides[`repos/${target.repository}/branches/${encodeURIComponent(target.branch)}`]=index===0?new Error('provider down'):{commit:{sha:String(index+1).repeat(40)}};
  const h=helpers({overrides}),result=await (await repositoryApi(get('/api/projects'),env,session,h)).json();
- assert.equal(result.projects.length,3);
+ assert.equal(result.projects.length,CONFIGURED_TARGETS.length);
  assert.equal(result.projects.find(project=>project.id===failed.id).source_verification.branch.status,'temporarily_unavailable');
  assert.ok(result.projects.filter(project=>project.id!==failed.id).every(project=>project.source_verification.branch.status==='verified'));
 });
@@ -408,12 +408,12 @@ test('retired configuration endpoints are absent',async()=>{
 });
 
 test('identity drift or an incomplete target registry fails closed',async()=>{
-  const changed={...config,projects:config.projects.slice(0,2)};
+  const changed={...config,projects:config.projects.slice(0,1)};
   const h=helpers({overrides:{[`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`]:{content:Buffer.from(JSON.stringify(changed)).toString('base64')}}});
   await assert.rejects(()=>repositoryApi(get('/api/projects'),env,session,h),error=>error.status===503&&error.code==='target_registry_invalid');
   const sourceMismatch=helpers({overrides:{[`repos/${CONFIGURED_TARGETS[0].repository}`]:{id:99,full_name:CONFIGURED_TARGETS[0].repository,private:false}}});
-  await assert.rejects(()=>repositoryApi(get('/api/project-readiness?project_id=1267340546'),env,session,sourceMismatch),error=>error.status===409&&error.code==='project_identity');
-  const listMismatch=helpers({overrides:{[`repos/${CONFIGURED_TARGETS[1].repository}`]:{id:99,full_name:CONFIGURED_TARGETS[1].repository,private:false}}});
+  await assert.rejects(()=>repositoryApi(get(`/api/project-readiness?project_id=${CONFIGURED_TARGETS[0].id}`),env,session,sourceMismatch),error=>error.status===409&&error.code==='project_identity');
+  const listMismatch=helpers({overrides:{[`repos/${CONFIGURED_TARGETS[0].repository}`]:{id:99,full_name:CONFIGURED_TARGETS[0].repository,private:false}}});
   assert.equal((await repositoryApi(get('/api/projects'),env,session,listMismatch)).status,200);
-  await assert.rejects(()=>repositoryApi(get('/api/project-identity?project_id=1278177697'),env,session,listMismatch),error=>error.status===409&&error.code==='project_identity');
+  await assert.rejects(()=>repositoryApi(get(`/api/project-identity?project_id=${CONFIGURED_TARGETS[0].id}`),env,session,listMismatch),error=>error.status===409&&error.code==='project_identity');
 });

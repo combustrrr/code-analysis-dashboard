@@ -66,8 +66,8 @@ Validation must distinguish adapter coverage from universal language support:
 CodeQL portability currently covers Python and JavaScript/TypeScript. A second
 read-only source proves another layout; it does not prove a second App installation.
 
-Current registry: service-self, read-only Kavach upstream, and read-only Agentic-Kibana
-are the only configured targets. Project selection reads this trusted registry and
+Current registry: service-self and read-only Agentic-Kibana are the only configured
+targets. Upstream Kavach is deferred under issue #194. Project selection reads this trusted registry and
 never provisions a target or dispatches a scan. New profiles use the adopted service
 tooling pin; do not copy a historical pin without checking the execution profile. See the
 [system architecture](../architecture/SYSTEM_OVERVIEW.md) for the ownership boundary.

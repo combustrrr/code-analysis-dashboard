@@ -3,7 +3,7 @@
 The deployed application has one repository-service mode; discovery workflow 10 no longer exists.
 The [Worker](https://code-analysis-launcher.icsarthak9.workers.dev) handles login,
 viewer authorization, fixed-host APIs, explicit launch requests and report delivery.
-`combustrrr/code-analysis-dashboard` is the only execution host for the three trusted
+`combustrrr/code-analysis-dashboard` is the only execution host for the two trusted
 project-registry entries. Users do not choose or install an execution repository.
 
 Users sign in to **Projects**, the only workspace home. It contains the three fixed
@@ -70,7 +70,7 @@ channels remain visible but are not counted as selectable or silently submitted.
 Profile-runner jobs install the pinned trusted tooling runtime before executing a reviewed
 project command. Frontend build, test, axe, and Lighthouse adapters resolve their commands,
 root, preview URL, and budgets from the selected trusted project entry rather than from a
-service-wide default profile. This keeps all three projects independently executable without
+service-wide default profile. This keeps both active projects independently executable without
 allowing a browser-supplied path or command to cross the source boundary.
 Each frontend adapter passes the trusted project ID to that resolver. Preview-based adapters
 use the reviewed executable command directly, so they do not depend on an optional source
