@@ -268,14 +268,14 @@ export function WorkspaceApp({viewerAuth}:{viewerAuth?:ReturnType<typeof useLaun
     if(r.issue){
       returnFindingRef.current=r.issue;
       if(!screens.lg)return;
-      const frame=window.requestAnimationFrame(()=>{issueDetailRef.current?.focus({preventScroll:true});issueDetailRef.current?.scrollIntoView({block:'start'});});
+      const frame=window.requestAnimationFrame(()=>{const panel=issueDetailRef.current;if(!panel)return;panel.scrollTop=0;panel.focus({preventScroll:true});panel.scrollIntoView({block:'start'});});
       return()=>window.cancelAnimationFrame(frame);
     }
     if(!previous)return;
     const id=returnFindingRef.current||previous,message=findingsRef.current.find(item=>item.id===id)?.message;
     const frame=window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{const candidates=Array.from(document.querySelectorAll<HTMLElement>('.issue-link,.related-finding'));const row=candidates.find(item=>item.classList.contains('issue-link')?item.textContent?.trim()===message:item.querySelector('span')?.textContent?.trim()===message)||document.getElementById('issues-title');row?.focus({preventScroll:true});row?.scrollIntoView({block:'nearest'});}));
     return()=>window.cancelAnimationFrame(frame);
-  },[r.tab,r.issue,screens.lg]);
+  },[r.tab,r.issue,screens.lg,detail?.id]);
   useEffect(()=>{if(r.tab!=='issues'||!target)return;const timer=window.setTimeout(()=>{const current=parseAppRoute();if(current.kind!=='project'||current.view!=='issues'||(current.issue||'')!==(r.issue||''))return;const filters={query,severity:selectedSeverities,category:selectedCategories,scanner:selectedScanners,rule:selectedRules,files,directory:selectedDirectories,location:locationFilter,overlap,annotationSource:annotationSources,workflow:workflows,job:jobs,annotationLevel:annotationLevels,correlatedScanner:correlatedScanners,group:groupBy==='none'?'':groupBy};const next=routeHash({kind:'project',projectId:r.project,target:target.id,view:'issues',issue:r.issue||undefined,filters});if(location.hash!==next)history.replaceState(null,'',next);},50);return()=>window.clearTimeout(timer);},[r.tab,r.project,r.issue,target?.id,query,selectedSeverities,selectedCategories,selectedScanners,selectedRules,files,selectedDirectories,locationFilter,overlap,annotationSources,workflows,jobs,annotationLevels,correlatedScanners,groupBy]);
     if (!r.repository) {
       if(r.tab==='settings')return <ConfigProvider><AppShell auth={viewerAuth}><Settings auth={launchAuth} onRun={projectId=>location.hash=routeHash({kind:'project-run',projectId})}/></AppShell></ConfigProvider>;

@@ -678,7 +678,16 @@ textarea {
   width: 100%;
   max-width: none;
   min-width: 0;
+  height: calc(100dvh - 112px);
   margin-inline: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+.application-shell .findings-workspace.split .pane-heading {
+  top: 0;
 }
 
 .application-shell .findings-workspace.split .evidence-content > h2,

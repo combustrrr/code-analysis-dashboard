@@ -288,17 +288,32 @@ test.describe('production shell',()=>{
   const label=(await issue.textContent())?.trim();
   expect(label).toBeTruthy();
   await issue.click();
+  const deepLink=page.url();
   const detail=page.locator('.evidence-panel');
   await expect(detail).toBeVisible();
-  const detailPosition=await detail.evaluate(element=>({top:element.getBoundingClientRect().top,bottom:element.getBoundingClientRect().bottom,viewport:innerHeight}));
+  const detailPosition=await detail.evaluate(element=>({top:element.getBoundingClientRect().top,bottom:element.getBoundingClientRect().bottom,viewport:innerHeight,clientHeight:element.clientHeight,scrollHeight:element.scrollHeight,overflowY:getComputedStyle(element).overflowY,overscrollY:getComputedStyle(element).overscrollBehaviorY}));
   expect(detailPosition.top).toBeGreaterThanOrEqual(0);
   expect(detailPosition.top).toBeLessThan(detailPosition.viewport);
+  expect(detailPosition.bottom).toBeLessThanOrEqual(detailPosition.viewport+1);
+  expect(detailPosition.overflowY).toBe('auto');
+  expect(detailPosition.overscrollY).toBe('contain');
+  expect(detailPosition.scrollHeight).toBeGreaterThan(detailPosition.clientHeight);
+  const pageScrollBefore=await page.evaluate(()=>window.scrollY);
+  await detail.evaluate(element=>element.scrollTo({top:element.scrollHeight,behavior:'instant'}));
+  await expect.poll(()=>detail.evaluate(element=>element.scrollTop)).toBeGreaterThan(0);
+  expect(await page.evaluate(()=>window.scrollY)).toBe(pageScrollBefore);
   await detail.getByRole('button',{name:'Back to findings'}).click();
   const restored=page.locator('.issue-link').filter({hasText:label!}).first();
   await expect(restored).toBeFocused();
   const restoredPosition=await restored.evaluate(element=>({top:element.getBoundingClientRect().top,bottom:element.getBoundingClientRect().bottom,viewport:innerHeight}));
   expect(restoredPosition.bottom).toBeGreaterThan(0);
   expect(restoredPosition.top).toBeLessThan(restoredPosition.viewport);
+  await page.goto(deepLink);
+  await expect(detail.getByRole('heading',{name:label!})).toBeVisible();
+  await expect.poll(()=>detail.evaluate(element=>element.scrollTop)).toBe(0);
+  const deepLinkPosition=await detail.evaluate(element=>({top:element.getBoundingClientRect().top,bottom:element.getBoundingClientRect().bottom,viewport:innerHeight}));
+  expect(deepLinkPosition.top).toBeGreaterThanOrEqual(0);
+  expect(deepLinkPosition.bottom).toBeLessThanOrEqual(deepLinkPosition.viewport+1);
  });
 
  test('legacy activity URLs fall through to Projects and settings remains reachable',async({page})=>{
