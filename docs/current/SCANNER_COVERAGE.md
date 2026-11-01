@@ -12,6 +12,12 @@ fewer scanners cannot suppress a scanner that is now ready. Configure analysis
 also starts with every available scanner selected, but permits an explicit narrower
 selection after the user reviews the channel list.
 
+The Configure analysis catalog is the union of enabled and explicitly deferred project
+channels. Deferred, unavailable, setup-required, and contextually not-applicable entries
+remain visible with their reason but cannot be selected. The four browser/frontend lanes
+(`ext-axe-accessibility`, `ext-frontend-build`, `ext-frontend-tests`, and
+`ext-lighthouse-ui`) are registered launch channels, not hidden implementation details.
+
 The `ext-github-security-advisories` lane inventories published repository
 security advisories through GitHub's public, read-only REST endpoint. It uses no
 credential, checks out only trusted dashboard tooling, and is enabled for all

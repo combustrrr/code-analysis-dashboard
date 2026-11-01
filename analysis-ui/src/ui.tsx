@@ -49,7 +49,7 @@ export function Tag({children,color,className,closable,onClose,...rest}:Loose){r
 export function Tooltip({children,title}:Loose){return <span className="ant-tooltip-host" title={typeof title==='string'?title:undefined}>{children}</span>}
 
 type CollapseItem={key:React.Key;label:ReactNode;children:ReactNode};
-export function Collapse({items=[],className}:Loose){return <div className={cx('ant-collapse',className)}>{(items as CollapseItem[]).map(item=><details className="ant-collapse-item" key={item.key}><summary className="ant-collapse-header"><span className="ant-collapse-header-text">{item.label}</span></summary><div className="ant-collapse-content"><div className="ant-collapse-content-box">{item.children}</div></div></details>)}</div>}
+export function Collapse({items=[],className,defaultActiveKey}:Loose){const expanded=new Set((Array.isArray(defaultActiveKey)?defaultActiveKey:defaultActiveKey==null?[]:[defaultActiveKey]).map(String));return <div className={cx('ant-collapse',className)}>{(items as CollapseItem[]).map(item=><details className="ant-collapse-item" key={item.key} open={expanded.has(String(item.key))}><summary className="ant-collapse-header"><span className="ant-collapse-header-text">{item.label}</span></summary><div className="ant-collapse-content"><div className="ant-collapse-content-box">{item.children}</div></div></details>)}</div>}
 
 export function Drawer({open,onClose,title,children,className,placement='right'}:Loose){
  useEffect(()=>{if(!open)return;const close=(event:KeyboardEvent)=>event.key==='Escape'&&(onClose as (()=>void)|undefined)?.();window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[open,onClose]);

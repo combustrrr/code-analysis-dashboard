@@ -500,7 +500,7 @@ test('authorized user follows one repository project from selection through publ
    if(url.pathname==='/api/public/manifest')return route.fulfill({headers,json:{schema_version:'analysis-current-v1',analysis_repository:execution,project_id:project,checked_at:new Date().toISOString(),preferred_branch:'Testing',current_overlay:{schema_version:'analysis-pr-overlay-v1',overlay_key:'overlay-seven',status:'complete',head_sha:sha,checked_at:overlay.checked_at,pr_context:overlay.pr_context,channel:overlay.channel,documents:{'pr-overlay.json':overlayAssetName},assets:{[overlayAssetName]:{sha256:createHash('sha256').update(compressedOverlay).digest('hex'),bytes:compressedOverlay.byteLength}}},targets:published?[{id:'published-target',label:'Testing',repository:source,source_repository:source,head_sha:sha,kind:'branch',branch:'Testing',checked_at:new Date().toISOString(),status:'partial',collected_run:43,documents:{'report.json':assetName,'findings.json':assetName},assets}]:[]}});
    if(url.pathname==='/api/public/asset')return route.fulfill({headers,body:url.searchParams.get('overlay')==='current'?compressedOverlay:compressedReport});
   if(url.pathname==='/api/project-targets')return route.fulfill({headers,json:{repository:source,branches:[{name:'Testing',sha}],prs:[]}});
-   const channels=[{id:'semgrep',channel:'semgrep',mode:'configured',group:'semgrep',status:'profile_declared',reason:'',default_selected:true,selectable:true,last_observed:{status:'completed',complete:true,reason:null,findings:3,checked_at:new Date().toISOString()}},{id:'snyk',channel:'snyk',mode:'vendor',group:'snyk',status:'profile_declared',reason:'May use vendor quota.',default_selected:false,selectable:true,last_observed:{status:'configured_complete',complete:true,reason:null,findings:0,checked_at:new Date().toISOString()}}];
+   const channels=[{id:'semgrep',channel:'semgrep',mode:'configured',group:'semgrep',status:'profile_declared',reason:'',default_selected:true,selectable:true,last_observed:{status:'completed',complete:true,reason:null,findings:3,checked_at:new Date().toISOString()}},{id:'snyk',channel:'snyk',mode:'vendor',group:'snyk',status:'profile_declared',reason:'May use vendor quota.',default_selected:false,selectable:true,last_observed:{status:'configured_complete',complete:true,reason:null,findings:0,checked_at:new Date().toISOString()}},{id:'owasp-go',channel:'owasp-go',mode:'configured',group:'owasp-go',status:'DEFERRED',reason:'No Go module is present.',default_selected:false,selectable:false,last_observed:null}];
    if(url.pathname==='/api/project-readiness')return route.fulfill({headers,json:{profile_mode:'agentic-soc',tooling_sha:'e'.repeat(40),summary:{selectable:2,vendor:1,deferred:0,unavailable:0,completed:2,needs_attention:0},channels,checked_at:new Date().toISOString()}});
    if(url.pathname==='/api/project-preview')return route.fulfill({headers,json:{preview_id:'preview-access',preview_token:'signed-preview',previewed_at:new Date().toISOString(),project_id:project,source_repository:source,source_repository_id:1278177697,selection:{kind:'branch',ref:'Testing'},target_sha:sha,pr_context:null,tooling_sha:'e'.repeat(40),profile_digest:'f'.repeat(64),channels,cached_channels:[]}});
     if(url.pathname==='/api/project-launch-fast'){
@@ -549,9 +549,12 @@ test('authorized user follows one repository project from selection through publ
   await page.getByRole('button',{name:/Configure analysis/}).click();
   await page.getByLabel('Full commit SHA').fill(sha);
   await page.getByRole('button',{name:'Choose scanner channels'}).click();
-  await page.getByText('Customize scanner selection').click();
+  await expect(page.getByText('1 selected · 2 available · 3 configured')).toBeVisible();
+  await expect(page.getByText('All 3 configured scanner channels')).toBeVisible();
+  await expect(page.getByText('No Go module is present.')).toBeVisible();
   const scannerRows=page.locator('.scanner-option');
-  expect(await scannerRows.count()).toBeGreaterThan(1);
+  await expect(scannerRows).toHaveCount(3);
+  await expect(scannerRows.filter({hasText:'owasp-go'}).getByRole('checkbox')).toBeDisabled();
   await expect(scannerRows.first().locator('.scanner-option-name')).not.toContainText(' + ');
   await page.setViewportSize({width:390,height:844});
   const scannerGeometry=await page.locator('.analysis-configurator .ant-modal').evaluate(element=>({clientWidth:element.clientWidth,scrollWidth:element.scrollWidth}));

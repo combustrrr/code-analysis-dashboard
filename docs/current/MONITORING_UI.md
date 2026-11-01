@@ -28,7 +28,9 @@ identifiers.
    Branch and open-PR selection, including drafts, is available as a fallback.
    Configured analysis then chooses scanner producer groups.
    Every available channel is selected by default; vendor lanes require explicit confirmation. Shared producer
-   groups must be selected together. Disabled channels explain whether they are deferred,
+   groups must be selected together. The scanner list is expanded by default and reports
+   selected, available, and total configured counts. Every enabled or explicitly deferred
+   channel is visible; disabled channels explain whether they are deferred,
    unavailable, not applicable, or require setup. CodeRabbit is available only for an
    open PR.
 3. **Review exact revision** resolves the branch/PR/SHA server-side and displays the full

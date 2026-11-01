@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {repositoryApi,channelProgress,cachedChannelsForSnapshot,registryReportState} from './repository-api.mjs';
-import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID} from './target-registry.mjs';
+import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID, SUPPORTED_SCANNERS} from './target-registry.mjs';
 import {CHANNEL_STATUS_CONTRACT,isCompleteChannelStatus,isNotRunChannelStatus,isReportIncompleteChannelStatus,isReusableChannelStatus} from './status-contract.mjs';
 
 class Failure extends Error { constructor(status,message,code){super(message);this.status=status;this.code=code;} }
@@ -10,6 +10,12 @@ const env={APPLICATION_MODE:'repositories',ANALYSIS_REPOSITORY:EXECUTION_REPOSIT
 const config={schema_version:'analysis-projects-v1',execution_repository:{id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY},tooling_sha:'a'.repeat(40),projects:CONFIGURED_TARGETS.map(target=>({id:target.id,source_repository:{id:target.repository_id,full_name:target.repository,private:false},relationship:target.relationship,preferred_branch:target.branch,native_feedback_enabled:target.native_feedback,profile:{mode:'portable'},enabled_scanners:['semgrep','snyk'],deferred_channels:{},report_budget_bytes:900000000}))};
 const configBlob={content:Buffer.from(JSON.stringify(config)).toString('base64')};
 const host=(permissions={pull:true,push:true,admin:false})=>({id:EXECUTION_REPOSITORY_ID,full_name:EXECUTION_REPOSITORY,private:false,default_branch:'main',permissions});
+
+test('browser and frontend evidence lanes are registered launch channels',()=>{
+  for(const channel of ['ext-axe-accessibility','ext-frontend-build','ext-frontend-tests','ext-lighthouse-ui']){
+    assert.ok(SUPPORTED_SCANNERS.includes(channel),channel);
+  }
+});
 
 function helpers({permissions,overrides={},wakeCoordinator,queueRecent=[]}={}) {
   const calls=[],queueCalls=[],wakeCalls=[];
@@ -202,7 +208,7 @@ test('Configure analysis resolves branch pull request and commit selections for 
   }
 });
 
-test('analysis choices omit deferred scanners that are irrelevant to the project profile',async()=>{
+test('analysis choices expose deferred scanners with honest non-selectable reasons',async()=>{
   const source=CONFIGURED_TARGETS[0];
   const configured={...config,projects:config.projects.map(project=>project.id===source.id?{...project,
     deferred_channels:{'owasp-go':'No configured Go project.','owasp-jvm':'No configured JVM project.'}}:project)};
@@ -210,7 +216,13 @@ test('analysis choices omit deferred scanners that are irrelevant to the project
   const h=helpers({overrides:{[registryPath]:{content:Buffer.from(JSON.stringify(configured)).toString('base64')},
     [`repos/${source.repository}/branches/Testing`]:{commit:{sha:'b'.repeat(40)}}}});
   const result=await (await repositoryApi(post('/api/project-preview',{project_id:source.id,selection:{kind:'branch',ref:'Testing'}}),env,session,h)).json();
-  assert.deepEqual(result.channels.map(channel=>channel.id).sort(),['semgrep','snyk']);
+  assert.deepEqual(result.channels.map(channel=>channel.id).sort(),['owasp-go','owasp-jvm','semgrep','snyk']);
+  for(const id of ['owasp-go','owasp-jvm']){
+    const choice=result.channels.find(channel=>channel.id===id);
+    assert.equal(choice.selectable,false);
+    assert.equal(choice.status,'DEFERRED');
+    assert.match(choice.reason,/No configured/);
+  }
 });
 
 test('CodeRabbit selection is unavailable outside an open PR and launch validation enforces the restriction',async()=>{
