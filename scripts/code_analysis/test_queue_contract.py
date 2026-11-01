@@ -27,14 +27,14 @@ class QueueContractTests(unittest.TestCase):
         self.assertEqual(row["queue_intent"], claim["intent"])
         self.assertEqual(row["execution_channels"], ["semgrep"])
         self.assertEqual(row["sonar_organization"], "combustrrr")
-        self.assertEqual(row["sonar_project_key"], "combustrrr_Agentic-Kibana-ci-v2")
+        self.assertEqual(row["sonar_project_key"], "combustrrr_Agentic-Kibana-ci-v3")
         self.assertEqual(row["sonar_main_branch"], "Testing")
 
     def test_each_project_has_a_trusted_sonar_identity(self):
         expected = {
             "1267340546": ("ARYDESTROYER/Kavach-AgenticSOC", "combustrrr_Kavach-AgenticSOC"),
-            "1278177697": ("combustrrr/Agentic-Kibana", "combustrrr_Agentic-Kibana-ci-v2"),
-            "1360051890": ("combustrrr/code-analysis-dashboard", "combustrrr_code-analysis-dashboard-ci-v3"),
+            "1278177697": ("combustrrr/Agentic-Kibana", "combustrrr_Agentic-Kibana-ci-v3"),
+            "1360051890": ("combustrrr/code-analysis-dashboard", "combustrrr_code-analysis-dashboard-ci-v4"),
         }
         for project_id, (repository, sonar_key) in expected.items():
             claim = self.intent()

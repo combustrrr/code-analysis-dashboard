@@ -17,8 +17,8 @@ PROJECTS = {
 }
 SONAR_PROJECTS = {
     "1267340546": ("combustrrr", "combustrrr_Kavach-AgenticSOC"),
-    "1278177697": ("combustrrr", "combustrrr_Agentic-Kibana-ci-v2"),
-    "1360051890": ("combustrrr", "combustrrr_code-analysis-dashboard-ci-v3"),
+    "1278177697": ("combustrrr", "combustrrr_Agentic-Kibana-ci-v3"),
+    "1360051890": ("combustrrr", "combustrrr_code-analysis-dashboard-ci-v4"),
 }
 SONAR_MANAGED_MAIN_BRANCH = {"1278177697", "1360051890"}
 
