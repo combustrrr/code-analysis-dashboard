@@ -40,13 +40,19 @@ jobs:
       run: "set -euo pipefail\npython scripts/code_analysis/collect_coderabbit.py \\\n  --repository \"$GITHUB_REPOSITORY\"\
         \ \\\n  --branch \"$SCAN_BRANCH\" \\\n  --commit \"$SCAN_SHA\" \\\n  --output-dir coderabbit-evidence\n"
     - name: Upload coderabbit-advisory-evidence-${{ steps.identity.outputs.commit }} to R2
-      if: always()
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
         AWS_DEFAULT_REGION: auto
-      run: aws s3 cp coderabbit-evidence/ s3://${ secrets.R2_BUCKET_NAME }/${ github.run_id }/${ github.run_attempt }/coderabbit-advisory-evidence-${{
-        steps.identity.outputs.commit }} --recursive --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        EVIDENCE_SHA: ${{ steps.identity.outputs.commit }}
+      shell: bash
+      run: >-
+        aws s3 cp coderabbit-evidence/
+        "s3://${R2_BUCKET_NAME}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/coderabbit-advisory-evidence-${EVIDENCE_SHA}"
+        --recursive
+        --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
     - name: Publish evidence summary
       env:
         PR_NUMBER: ${{ steps.identity.outputs.pr_number }}
