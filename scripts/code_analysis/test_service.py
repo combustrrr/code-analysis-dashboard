@@ -96,6 +96,21 @@ class MonitoringTests(unittest.TestCase):
                 )
         request.assert_called_once()
 
+    def test_sonar_project_renames_fresh_main_branch_before_analysis(self):
+        with patch(
+            "scripts.code_analysis.ensure_sonar_project._request",
+            side_effect=[
+                (200, {"component": {"visibility": "public"}}),
+                (200, {"branches": [{"name": "master", "isMain": True}]}),
+                (204, {}),
+            ],
+        ) as request:
+            result = ensure_sonar_project(
+                "org", "org_repo_ci", "org/repo", "token", "main"
+            )
+        self.assertEqual(result["main_branch"], "main")
+        self.assertEqual(request.call_count, 3)
+
     def test_coderabbit_branch_status_is_not_a_measured_zero(self):
         status = coderabbit_branch_status()
         self.assertEqual(status["status"], "NOT_APPLICABLE")

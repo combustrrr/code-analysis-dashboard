@@ -141,6 +141,7 @@ jobs:
           SOURCE_BRANCH: ${{ fromJSON(inputs.target).branch }}
           SONAR_ORGANIZATION: ${{ fromJSON(inputs.target).sonar_organization }}
           SONAR_PROJECT_KEY: ${{ fromJSON(inputs.target).sonar_project_key }}
+          SONAR_MAIN_BRANCH: ${{ fromJSON(inputs.target).sonar_main_branch }}
         run: |
           set -euo pipefail
           [[ "$SONAR_ORGANIZATION" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo "Invalid trusted Sonar organization" >&2; exit 2; }

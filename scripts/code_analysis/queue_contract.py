@@ -17,9 +17,10 @@ PROJECTS = {
 }
 SONAR_PROJECTS = {
     "1267340546": ("combustrrr", "combustrrr_Kavach-AgenticSOC"),
-    "1278177697": ("combustrrr", "combustrrr_Agentic-Kibana"),
-    "1360051890": ("combustrrr", "combustrrr_code-analysis-dashboard-ci-v2"),
+    "1278177697": ("combustrrr", "combustrrr_Agentic-Kibana-ci-v2"),
+    "1360051890": ("combustrrr", "combustrrr_code-analysis-dashboard-ci-v3"),
 }
+SONAR_MANAGED_MAIN_BRANCH = {"1278177697", "1360051890"}
 
 
 def scanner_target(claim: dict) -> dict:
@@ -64,7 +65,8 @@ def scanner_target(claim: dict) -> dict:
                dispatch_id=expected_dispatch_id(intent["request_id"], intent.get("requested_channels", [])),
                queue_intent=intent)
     sonar_organization, sonar_project_key = SONAR_PROJECTS[str(intent["project_id"])]
-    row.update(sonar_organization=sonar_organization, sonar_project_key=sonar_project_key)
+    row.update(sonar_organization=sonar_organization, sonar_project_key=sonar_project_key,
+               sonar_main_branch=branch if str(intent["project_id"]) in SONAR_MANAGED_MAIN_BRANCH else "")
     return row
 
 
