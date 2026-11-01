@@ -173,8 +173,7 @@ jobs:
           SONAR_PROJECT_KEY: ${{ fromJSON(inputs.target).sonar_project_key }}
         run: |
           python .analysis-tooling/scripts/code_analysis/ensure_sonar_public.py \
-            --project "$SONAR_PROJECT_KEY" \
-            --output sonar-visibility.json
+            --project "$SONAR_PROJECT_KEY"
       - name: Export Sonar findings
         id: sonar_export
         if: always() && env.SONAR_TOKEN != '' && env.SONAR_API_TOKEN != '' && hashFiles('.source/.scannerwork/report-task.txt') != ''

@@ -57,9 +57,8 @@ def ensure(project: str, token: str, output: Path) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", required=True)
-    parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    ensure(args.project, os.environ.get("SONAR_TOKEN", ""), args.output)
+    ensure(args.project, os.environ.get("SONAR_TOKEN", ""), Path("sonar-visibility.json"))
 
 
 if __name__ == "__main__":
