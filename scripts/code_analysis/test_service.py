@@ -23,6 +23,7 @@ from scripts.code_analysis.dashboard import (
 )
 from scripts.code_analysis.evidence_contract import build as build_evidence_contract
 from scripts.code_analysis.export_sonar_issues import export as export_sonar_issues
+from scripts.code_analysis.ensure_sonar_project import ensure as ensure_sonar_project
 from scripts.code_analysis.monitoring import (
     EvidenceError,
     build_snapshot,
@@ -72,6 +73,29 @@ def snapshot(items=None, channel_state=None):
     return build_analysis_snapshot(build_snapshot(current,channels,provenance),catalog)
 
 class MonitoringTests(unittest.TestCase):
+    def test_sonar_project_is_created_public_once_and_verified(self):
+        with patch(
+            "scripts.code_analysis.ensure_sonar_project._request",
+            side_effect=[(404, {}), (200, {}),
+                         (200, {"component": {"visibility": "public"}})],
+        ) as request:
+            result = ensure_sonar_project(
+                "org", "org_repo_ci", "org/repo", "token"
+            )
+        self.assertTrue(result["created"])
+        self.assertEqual(result["visibility"], "public")
+        self.assertEqual(request.call_count, 3)
+
+    def test_sonar_project_does_not_mutate_existing_private_visibility(self):
+        with patch(
+            "scripts.code_analysis.ensure_sonar_project._request", return_value=(403, {})
+        ) as request:
+            with self.assertRaisesRegex(RuntimeError, "not publicly readable"):
+                ensure_sonar_project(
+                    "org", "org_repo_ci", "org/repo", "token"
+                )
+        request.assert_called_once()
+
     def test_coderabbit_branch_status_is_not_a_measured_zero(self):
         status = coderabbit_branch_status()
         self.assertEqual(status["status"], "NOT_APPLICABLE")

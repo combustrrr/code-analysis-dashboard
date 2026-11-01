@@ -122,6 +122,7 @@ jobs:
           ref: ${{ inputs.tooling_sha }}
           path: .analysis-tooling
           sparse-checkout: |
+            scripts/code_analysis/ensure_sonar_project.py
             scripts/code_analysis/export_sonar_issues.py
             scripts/code_analysis/finalize_sonar_status.py
           sparse-checkout-cone-mode: false
@@ -152,6 +153,13 @@ jobs:
           sonar.branch.name=$SOURCE_BRANCH
           sonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/.venv/**,**/vendor/**
           EOF
+      - name: Ensure trusted public Sonar project
+        if: env.SONAR_TOKEN != ''
+        env:
+          SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+          SONAR_ORGANIZATION: ${{ fromJSON(inputs.target).sonar_organization }}
+          SONAR_PROJECT_KEY: ${{ fromJSON(inputs.target).sonar_project_key }}
+        run: python .analysis-tooling/scripts/code_analysis/ensure_sonar_project.py
       - name: Run SonarQube analysis
         id: sonar_scan
         if: env.SONAR_TOKEN != ''
@@ -193,6 +201,7 @@ jobs:
           path: |
             sonar-status.json
             sonar-native-issues.json
+            sonar-project-bootstrap.json
           if-no-files-found: error
           retention-days: 7
 

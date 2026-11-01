@@ -134,6 +134,11 @@ class ScannerAccessTests(unittest.TestCase):
                          '${{ secrets.SONAR_TOKEN }}')
         self.assertNotIn('SONAR_API_TOKEN',
                          workflow.get('on', workflow.get(True))['workflow_call']['secrets'])
+        bootstrap = next(step for step in steps if step.get('name') == 'Ensure trusted public Sonar project')
+        self.assertEqual(bootstrap['env']['SONAR_ORGANIZATION'],
+                         '${{ fromJSON(inputs.target).sonar_organization }}')
+        self.assertEqual(bootstrap['env']['SONAR_PROJECT_KEY'],
+                         '${{ fromJSON(inputs.target).sonar_project_key }}')
 
     def test_reconciliation_cannot_publish_checks_or_security_events_to_sources(self):
         for path in ('.github/workflows/code-analysis-coordinator.yml',):

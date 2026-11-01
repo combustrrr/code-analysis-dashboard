@@ -208,7 +208,9 @@ secrets; source scanner jobs receive none of these values and vendor jobs receiv
 no R2/publication credentials. Configure `SNYK_TOKEN` and `SONAR_TOKEN` in the
 selected Actions Environment. The same project-scoped Sonar token submits the exact
 analysis and reads its bounded native issue export; this avoids a second user token
-whose project permissions can drift. The workflow does not change project visibility.
+whose project permissions can drift. For a missing trusted project key, the workflow
+creates that project as public before its first scan. It never changes the visibility
+of an existing project; a non-public existing key fails explicitly.
 Missing secrets produce
 explicit `NOT_CONFIGURED` evidence. Snyk SARIF and Sonar native issue exports are
 uploaded as run-scoped artifacts and included by normal report assembly.
