@@ -73,6 +73,9 @@ def build_analysis_channels(catalog: dict, artifacts: Path | None,
         reason = str(native.get("reason") or (gate or {}).get("reason") or "")
         if not gate and not native and not observations:
             reason = "No retained evidence for this exact snapshot"
+        if not reason and status == "INVALID_EVIDENCE":
+            reason = ("Retained output could not be accepted as successful evidence. Finding count is unknown; "
+                      "other scanner results remain available.")
         rows.append({
             "channel": configured["channel"], "name": name,
             "class": configured["class"], "surface": configured.get("surface", ""),

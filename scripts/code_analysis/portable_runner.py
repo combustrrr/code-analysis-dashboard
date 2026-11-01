@@ -69,6 +69,12 @@ def execute(channel, profile, source, output):
                 native.write_text(json.dumps(relative(data)))
             if channel=='typescript' and rc!=0 and not re.search(r'error TS\d+:',native.read_text()):raise ValueError('TypeScript failed without native compiler diagnostics')
             status.update(status='COMPLETED',reason='Native report retained.' if rc==0 else 'Native report retained; command reported findings or test failures.')
+            if channel == 'coverage' and rc != 0:
+                status.update(
+                    status='INVALID_EVIDENCE',
+                    reason=(f'Tests exited with code {rc}. Coverage output was retained but cannot be accepted '
+                            'as successful evidence. Finding count is unknown; other scanner results remain available.'),
+                )
             if channel=='radon' and any(isinstance(v,dict) and 'error' in v for v in data.values()):
                 status.update(status='FAILED',reason='Radon could not parse one or more source files; retained diagnostics identify affected files.')
         if channel=='typescript' and native.exists() and command and command.get('cwd','.')!='.':

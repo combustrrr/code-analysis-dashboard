@@ -36,3 +36,11 @@ export function displayRuleId(rule?: string) {
 export function displayFindingMessage(message?: string) {
   return String(message || '').replace(/\[([^\]]+)\]\(https?:\/\/[^)\s]+\)/g, '$1');
 }
+
+export function channelEvidenceReason(status: string, reason?: string) {
+  if (String(reason || '').trim()) return String(reason).trim();
+  if (new Set(['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS']).has(status)) {
+    return 'Retained evidence is available for this scanner.';
+  }
+  return 'This scanner did not produce usable completion evidence. Finding count is unknown; other scanner results remain available.';
+}

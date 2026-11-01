@@ -23,6 +23,11 @@ Findings do not make `POLICY_FINDINGS` incomplete: the scanner completed and ret
 actionable evidence. A zero count is known only for a completed state with a retained
 measured result.
 
+SonarQube Cloud may use `CONFIGURED_COMPLETE` only when scanner submission, successful
+compute processing, exact-revision verification, and bounded native issue export all
+succeed. A failed scan or absent/failed native export keeps findings unknown and
+publishes an operational or invalid-evidence reason; submission alone is not completion.
+
 ## Non-completion states
 
 - `PARTIAL` and `CONFIGURED_PARTIAL` retain usable evidence but remain incomplete.
@@ -33,6 +38,9 @@ measured result.
   replace previously completed same-SHA evidence.
 - Every not-run state requires a stable reason. A reasonless not-run record makes the
   report incomplete instead of silently disappearing from coverage.
+- Every incomplete state requires a user-facing reason. Retained coverage from a failed
+  or timed-out test command is `INVALID_EVIDENCE`, keeps the test exit provenance, and
+  reports an unknown finding count while healthy sibling scanner results remain visible.
 - Any unrecognized status is incomplete, non-reusable, and replacement-ineligible.
 
 ## Operational behavior

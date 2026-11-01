@@ -30,8 +30,9 @@ class PortableTests(unittest.TestCase):
                 return subprocess.CompletedProcess(argv,1 if 'run' in argv else 0)
             with patch('scripts.code_analysis.portable_runner.subprocess.run',side_effect=run):
                 result=execute('coverage',{'mode':'portable','commands':{'coverage':{'argv':['python','-m','coverage','run','tests.py']}}},source,out)
-            self.assertEqual(result['status'],'COMPLETED');self.assertEqual(result['test_exit_code'],1)
+            self.assertEqual(result['status'],'INVALID_EVIDENCE');self.assertEqual(result['test_exit_code'],1)
             self.assertEqual(result['coverage_exit_code'],0)
+            self.assertEqual(result['reason'],'Tests exited with code 1. Coverage output was retained but cannot be accepted as successful evidence. Finding count is unknown; other scanner results remain available.')
 
     def test_missing_native_output_never_counts_zero(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -128,17 +128,31 @@ def main():
         write(cwd / 'coverage-status.json', {
             'schema_version': '1',
             'scanner_family': 'Coverage.py',
-            'status': 'COMPLETED' if measured else 'OPERATIONAL_FAILURE',
+            'status': 'INVALID_EVIDENCE' if measured else 'OPERATIONAL_FAILURE',
             'test_exit_code': None,
-            'reason': f'Tests exceeded the trusted {test_timeout}-second limit; coverage output ' +
-                      ('retained' if measured else 'missing'),
+            'reason': (f'Tests exceeded the trusted {test_timeout}-second limit. Coverage output was retained but '
+                       'cannot be accepted as successful evidence. Finding count is unknown; other scanner results '
+                       'remain available.' if measured else
+                       f'Tests exceeded the trusted {test_timeout}-second limit. Coverage output was not retained. '
+                       'Finding count is unknown; other scanner results remain available.'),
         })
         return
     if a.task == 'python-test':
         measured = (cwd / 'coverage.json').is_file()
+        if measured and result.returncode == 0:
+            status = 'COMPLETED'
+            reason = 'Tests completed successfully and coverage output was retained.'
+        elif measured:
+            status = 'INVALID_EVIDENCE'
+            reason = (f'Tests exited with code {result.returncode}. Coverage output was retained but cannot '
+                      'be accepted as successful evidence. Finding count is unknown; other scanner results '
+                      'remain available.')
+        else:
+            status = 'OPERATIONAL_FAILURE'
+            reason = (f'Tests exited with code {result.returncode}. Coverage output was not retained. '
+                      'Finding count is unknown; other scanner results remain available.')
         write(cwd / 'coverage-status.json', {'schema_version': '1', 'scanner_family': 'Coverage.py',
-              'status': 'COMPLETED' if measured else 'OPERATIONAL_FAILURE', 'test_exit_code': result.returncode,
-              'reason': f'Test exit={result.returncode}; coverage output ' + ('retained' if measured else 'missing')})
+              'status': status, 'test_exit_code': result.returncode, 'reason': reason})
         return
     if a.task == 'javascript-test':
         write(root / 'typescript-test-status.json', {'scanner_family': 'TypeScript',
