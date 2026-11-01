@@ -105,6 +105,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: source-snapshot
+    outputs:
+      scan_outcome: ${{ steps.sonar_scan.outcome }}
+      export_outcome: ${{ steps.sonar_export.outcome }}
     permissions:
       contents: none
     env:
@@ -124,7 +127,6 @@ jobs:
           sparse-checkout: |
             scripts/code_analysis/export_sonar_issues.py
             scripts/code_analysis/finalize_sonar_status.py
-            scripts/code_analysis/retain_sonar_exit_code.py
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Record Sonar unavailable status
@@ -159,14 +161,6 @@ jobs:
             -Dproject.settings=${{ runner.temp }}/sonar-project.properties
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      - name: Retain native Sonar exit code
-        id: sonar_exit
-        if: always() && env.SONAR_TOKEN != '' && steps.sonar_scan.outcome != 'success'
-        run: |
-          exit_code=$(python .analysis-tooling/scripts/code_analysis/retain_sonar_exit_code.py)
-          if [[ "$exit_code" =~ ^[0-9]+$ ]]; then
-            echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          fi
       - name: Export Sonar findings
         id: sonar_export
         if: always() && env.SONAR_TOKEN != '' && env.SONAR_API_TOKEN != '' && hashFiles('.source/.scannerwork/report-task.txt') != ''
@@ -189,8 +183,51 @@ jobs:
         env:
           SONAR_SCAN_OUTCOME: ${{ steps.sonar_scan.outcome }}
           SONAR_EXPORT_OUTCOME: ${{ steps.sonar_export.outcome }}
-          SONAR_SCANNER_EXIT_CODE: ${{ steps.sonar_exit.outputs.exit_code }}
         run: python .analysis-tooling/scripts/code_analysis/finalize_sonar_status.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: sonar-intermediate-${{ inputs.request_id }}
+          path: |
+            sonar-status.json
+            sonar-native-issues.json
+          if-no-files-found: error
+          retention-days: 7
+
+  sonar-finalize:
+    if: ${{ always() && needs.sonar.result != 'skipped' }}
+    name: Finalize SonarQube evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: sonar
+    permissions:
+      contents: none
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: sonar-intermediate-${{ inputs.request_id }}
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ inputs.tooling_sha }}
+          path: .analysis-tooling
+          sparse-checkout: |
+            scripts/code_analysis/finalize_sonar_status.py
+            scripts/code_analysis/retain_sonar_exit_code.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Reconcile completed Sonar job
+        if: needs.sonar.outputs.scan_outcome != '' && needs.sonar.outputs.scan_outcome != 'skipped'
+        env:
+          SONAR_SCAN_OUTCOME: ${{ needs.sonar.outputs.scan_outcome }}
+          SONAR_EXPORT_OUTCOME: ${{ needs.sonar.outputs.export_outcome }}
+        run: |
+          if [[ "$SONAR_SCAN_OUTCOME" != "success" ]]; then
+            exit_code=$(python .analysis-tooling/scripts/code_analysis/retain_sonar_exit_code.py)
+            if [[ "$exit_code" =~ ^[0-9]+$ ]]; then
+              export SONAR_SCANNER_EXIT_CODE="$exit_code"
+            fi
+          fi
+          python .analysis-tooling/scripts/code_analysis/finalize_sonar_status.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:

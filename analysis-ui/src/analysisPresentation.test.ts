@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {analysisStage,analysisStatus,channelEvidenceReason,displayFindingMessage,displayRuleId,isCompleteChannelStatus,plainAnalysisIssue} from './analysisPresentation';
+import {analysisStage,analysisStatus,channelEvidenceReason,channelFindingCount,displayFindingMessage,displayRuleId,isCompleteChannelStatus,plainAnalysisIssue} from './analysisPresentation';
 
 describe('analysis presentation',()=>{
   it('maps backend phases to the five user-facing states',()=>{
@@ -25,5 +25,9 @@ describe('analysis presentation',()=>{
   it('never describes missing failure detail as retained successful evidence',()=>{
     expect(channelEvidenceReason('INVALID_EVIDENCE','')).toBe('This scanner did not produce usable completion evidence. Finding count is unknown; other scanner results remain available.');
     expect(channelEvidenceReason('CONFIGURED_COMPLETE','')).toBe('Retained evidence is available for this scanner.');
+  });
+  it('does not present retained incomplete measurements as a known finding count',()=>{
+    expect(channelFindingCount('INVALID_EVIDENCE',570)).toBe('Unknown');
+    expect(channelFindingCount('COMPLETED',570)).toBe('570');
   });
 });

@@ -1,5 +1,6 @@
 export type AnalysisStatus = 'Preparing' | 'Analyzing' | 'Preparing report' | 'Ready' | 'Needs attention';
 
+import { isCompleteChannelStatus } from './channelStatusContract';
 export { isCompleteChannelStatus } from './channelStatusContract';
 
 const ready = new Set(['published', 'reused', 'superseded']);
@@ -43,4 +44,8 @@ export function channelEvidenceReason(status: string, reason?: string) {
     return 'Retained evidence is available for this scanner.';
   }
   return 'This scanner did not produce usable completion evidence. Finding count is unknown; other scanner results remain available.';
+}
+
+export function channelFindingCount(status: string, findings: number | null) {
+  return isCompleteChannelStatus(status) && findings !== null ? findings.toLocaleString() : 'Unknown';
 }

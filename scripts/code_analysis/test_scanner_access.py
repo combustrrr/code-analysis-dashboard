@@ -109,6 +109,10 @@ class ScannerAccessTests(unittest.TestCase):
             self.assertEqual(job['permissions']['contents'], 'none')
             self.assertFalse(any(step.get('uses', '').startswith('actions/checkout@') and step.get('with', {}).get('path') == '.source' for step in job['steps']))
             self.assertTrue(any(step.get('uses', '').startswith('actions/download-artifact@') for step in job['steps']))
+        sonar_finalizer = workflow['jobs']['sonar-finalize']
+        self.assertEqual(sonar_finalizer['needs'], 'sonar')
+        self.assertEqual(sonar_finalizer['permissions']['contents'], 'none')
+        self.assertNotIn('${{ secrets.', yaml.safe_dump(sonar_finalizer))
 
     def test_portable_sonar_does_not_trust_source_controlled_project_properties(self):
         workflow = yaml.safe_load(Path('.github/workflows/reusable-vendor.yml').read_text())

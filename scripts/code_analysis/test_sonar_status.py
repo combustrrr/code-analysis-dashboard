@@ -49,8 +49,16 @@ class SonarStatusTests(unittest.TestCase):
         self.assertEqual(export['id'], 'sonar_export')
         self.assertIn('steps.sonar_scan.outcome', finalize['env']['SONAR_SCAN_OUTCOME'])
         self.assertIn('steps.sonar_export.outcome', finalize['env']['SONAR_EXPORT_OUTCOME'])
-        self.assertIn('steps.sonar_exit.outputs.exit_code', finalize['env']['SONAR_SCANNER_EXIT_CODE'])
         self.assertNotIn('CONFIGURED_COMPLETE', yaml.safe_dump(steps))
+
+        finalizer = workflow['jobs']['sonar-finalize']
+        self.assertEqual(finalizer['needs'], 'sonar')
+        self.assertEqual(finalizer['permissions']['contents'], 'none')
+        reconcile = next(step for step in finalizer['steps'] if step.get('name') == 'Reconcile completed Sonar job')
+        self.assertIn('retain_sonar_exit_code.py', reconcile['run'])
+        self.assertIn('SONAR_SCANNER_EXIT_CODE', reconcile['run'])
+        upload = next(step for step in finalizer['steps'] if step.get('uses', '').startswith('actions/upload-artifact@'))
+        self.assertEqual(upload['with']['name'], 'vendor-sonar-${{ inputs.request_id }}')
 
 
 if __name__ == '__main__':
