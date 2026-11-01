@@ -6,9 +6,15 @@ from pathlib import Path
 import yaml
 
 from scripts.code_analysis.finalize_sonar_status import build_status
+from scripts.code_analysis.retain_sonar_exit_code import exit_code
 
 
 class SonarStatusTests(unittest.TestCase):
+    def test_native_scanner_exit_is_extracted_without_retaining_annotation_text(self):
+        annotations = [{'message': "Action failed: The process '/opt/sonar-scanner' failed with exit code 3"}]
+        self.assertEqual(exit_code(annotations), 3)
+        self.assertIsNone(exit_code([{'message': 'Process completed with exit code 1.'}]))
+
     def test_scanner_exit_three_is_unknown_not_completed_zero(self):
         result = build_status('failure', 'skipped', Path('missing.json'), scanner_exit_code=3)
         self.assertEqual(result['status'], 'OPERATIONAL_FAILURE')
@@ -43,6 +49,7 @@ class SonarStatusTests(unittest.TestCase):
         self.assertEqual(export['id'], 'sonar_export')
         self.assertIn('steps.sonar_scan.outcome', finalize['env']['SONAR_SCAN_OUTCOME'])
         self.assertIn('steps.sonar_export.outcome', finalize['env']['SONAR_EXPORT_OUTCOME'])
+        self.assertIn('steps.sonar_exit.outputs.exit_code', finalize['env']['SONAR_SCANNER_EXIT_CODE'])
         self.assertNotIn('CONFIGURED_COMPLETE', yaml.safe_dump(steps))
 
 

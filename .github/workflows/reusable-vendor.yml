@@ -124,6 +124,7 @@ jobs:
           sparse-checkout: |
             scripts/code_analysis/export_sonar_issues.py
             scripts/code_analysis/finalize_sonar_status.py
+            scripts/code_analysis/retain_sonar_exit_code.py
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Record Sonar unavailable status
@@ -158,6 +159,14 @@ jobs:
             -Dproject.settings=${{ runner.temp }}/sonar-project.properties
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Retain native Sonar exit code
+        id: sonar_exit
+        if: always() && env.SONAR_TOKEN != '' && steps.sonar_scan.outcome != 'success'
+        run: |
+          exit_code=$(python .analysis-tooling/scripts/code_analysis/retain_sonar_exit_code.py)
+          if [[ "$exit_code" =~ ^[0-9]+$ ]]; then
+            echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          fi
       - name: Export Sonar findings
         id: sonar_export
         if: always() && env.SONAR_TOKEN != '' && env.SONAR_API_TOKEN != '' && hashFiles('.source/.scannerwork/report-task.txt') != ''
@@ -180,6 +189,7 @@ jobs:
         env:
           SONAR_SCAN_OUTCOME: ${{ steps.sonar_scan.outcome }}
           SONAR_EXPORT_OUTCOME: ${{ steps.sonar_export.outcome }}
+          SONAR_SCANNER_EXIT_CODE: ${{ steps.sonar_exit.outputs.exit_code }}
         run: python .analysis-tooling/scripts/code_analysis/finalize_sonar_status.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()

@@ -27,6 +27,8 @@ SonarQube Cloud may use `CONFIGURED_COMPLETE` only when scanner submission, succ
 compute processing, exact-revision verification, and bounded native issue export all
 succeed. A failed scan or absent/failed native export keeps findings unknown and
 publishes an operational or invalid-evidence reason; submission alone is not completion.
+When GitHub exposes the scanner's native exit code in the current job annotation, the
+retained status carries that integer and the user-facing reason reports it exactly.
 
 ## Non-completion states
 
