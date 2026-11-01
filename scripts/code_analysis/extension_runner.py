@@ -10,12 +10,13 @@ from pathlib import Path
 
 from scripts.code_analysis.extensions import registry
 from scripts.code_analysis.hosted import load, write
+from scripts.code_analysis.process_access import required_executable
 
 
 def checked_out_tooling_sha(root: Path) -> str:
     """Return the immutable revision actually materialized for trusted tooling."""
     return subprocess.check_output(
-        ['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True
+        [required_executable('git'), '-C', str(root), 'rev-parse', 'HEAD'], text=True
     ).strip()
 
 
@@ -45,11 +46,12 @@ def run(channel: str) -> None:
         command = [sys.executable, '-I', str(adapter), '--request', str(request), '--output', str(result)]
         if row['mode'] == 'source':
             source = root / '.source'
-            sha = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
+            sha = subprocess.check_output([required_executable('git'), '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
             if sha != target['head_sha']:
                 raise ValueError('Source checkout mismatch')
             command += ['--source', str(source)]
         # Do not retain arbitrary scanner output in public workflow logs.
+        # The registry validates the immutable adapter path and arguments before execution.
         completed = subprocess.run(command, cwd=work, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                    timeout=row.get('timeout_minutes', 15) * 60, check=False)
         if completed.returncode or result.is_symlink() or result.stat().st_size > 50_000_000:

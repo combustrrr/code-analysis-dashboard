@@ -30,6 +30,7 @@ def main():
                        '--remote-repo-url=https://github.com/' + repository]
             if name in profile['snyk_python_manifests']:
                 command += ['--command=' + str(Path(os.environ['RUNNER_TEMP']) / 'snyk-metadata/inspect-python')]
+            # command is built from fixed Snyk flags and validated package-manager metadata.
             result = subprocess.run(command, check=False, env=environment)
             if result.returncode > 1 or not output.is_file():
                 failures.append(name)

@@ -2,12 +2,14 @@
 import argparse
 import json
 import os
+import subprocess
 import time
 from pathlib import Path
 
 from scripts.code_analysis.github_service import api, extract_zip, gh, pages
 from scripts.code_analysis.hosted import load, target, write
 from scripts.code_analysis.hosted_pipeline import assemble
+from scripts.code_analysis.process_access import required_executable
 
 
 def coderabbit_branch_status() -> dict:
@@ -88,12 +90,12 @@ def main():
     intent = validate_durable_request(row)
     validated = target(row['repository'], row['branch'], row['head_sha'], pr=row.get('pr'),
                        source_repository=row['source_repository'], base_sha=row.get('base_sha'), base_branch=row.get('base_branch'), kind=row.get('kind'))
-    import subprocess
-    tooling_revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() if os.environ.get('IS_REUSABLE_ANALYSIS') == 'true' else os.environ['GITHUB_SHA']
+    git = required_executable('git')
+    tooling_revision = subprocess.check_output([git, 'rev-parse', 'HEAD'], text=True).strip() if os.environ.get('IS_REUSABLE_ANALYSIS') == 'true' else os.environ['GITHUB_SHA']
     if validated.get('head_sha') != row['head_sha'] or os.environ['TOOLING_SHA'] != tooling_revision:
         raise ValueError('dispatch identity or tooling revision mismatch')
     if Path('.source').exists():
-        checkout_sha=subprocess.check_output(['git','-C','.source','rev-parse','HEAD'],text=True).strip()
+        checkout_sha=subprocess.check_output([git,'-C','.source','rev-parse','HEAD'],text=True).strip()
         if checkout_sha!=row['head_sha']:
             raise ValueError('Source checkout differs from the immutable accepted target SHA')
     if a.validate_only:
@@ -120,12 +122,11 @@ def main():
     artifact_bytes = 0
     # Download from R2 (temp-runs prefix isolates ephemeral brokered artifacts)
     bucket = os.environ.get('R2_BUCKET_NAME')
-    import subprocess
     if bucket:
         endpoint = f"https://{os.environ.get('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com"
         # Since R2 paths are {run}/{attempt}/{artifact_name}/, we sync the attempt prefix to .hosted/artifacts/
         subprocess.run([
-            "aws", "s3", "sync", 
+            required_executable("aws"), "s3", "sync",
             f"s3://{bucket}/temp-runs/{run}/{attempt}/", 
             str(root),
             "--endpoint-url", endpoint

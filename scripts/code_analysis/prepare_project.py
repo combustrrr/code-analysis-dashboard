@@ -8,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.code_analysis.network_access import open_url
+from scripts.code_analysis.process_access import required_executable
 from scripts.code_analysis.projects import service_config, validate
 
 
@@ -32,7 +33,7 @@ def trusted_configuration_revision(execution, target):
 def main():
     import base64
     root = Path(__file__).resolve().parents[2]
-    actual = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
+    actual = subprocess.check_output([required_executable('git'), '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
     if actual != os.environ['TOOLING_SHA']:
         raise ValueError('Checked-out tooling does not match requested revision')
     execution = fetch('repos/' + os.environ['GITHUB_REPOSITORY'])

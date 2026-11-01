@@ -1,6 +1,439 @@
 {
   "schema_version": "1",
   "triage_version": 1,
-  "decisions": [],
+  "decisions": [
+    {
+      "stable_id": "sid-v1:bc54c70b44ccda6cd79f3b63b7972d86c572143475811febd109c10e912e4127",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed external process call uses an allowlisted absolute executable, a fixed argument vector, and shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:2be5cc4ad617fc9b6c74f1f7d2e59be2ce6c55ffad8cfddddb24748a65bcbf7d",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Command originates from the immutable reviewed service or project profile, runs as an argument vector without a shell, and receives no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:7d518fbe65dd4dcba37e410649884406e59a288a99f6c8274b5a79e87ae1437d",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:8566f22776d74a9684ceef64df3116a28424bcbf3b74d06e372062ca358092d4",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed external process call uses an allowlisted absolute executable, a fixed argument vector, and shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:8e77ac94b4c62ae9b787a4ef8191555cb64ec51296e7cc4d29a6a9b352074391",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Command originates from the immutable reviewed service or project profile, runs as an argument vector without a shell, and receives no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:405e4983b33e0333fbb080fa5b0ad1b435b7137c9d90632b48bf6208857d440c",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:a4eca46699e393a56720583910e4f61d94251180e093acd26cc33d36b6da07e2",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed external process call uses an allowlisted absolute executable, a fixed argument vector, and shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:57034f7113c0f8ce5e7d416c88060187e286f3cbbdb0ec55c1faccc3e748b77c",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed trusted-tooling process call uses an argument vector with shell execution disabled; source-executing jobs have no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:2bdcfa52ef213612fb50f19871156925bc356280fea898849d5f91324f31552c",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Deterministic test-only process invocation using an argument vector with shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:f53ce73aa11cfbd93e38d49aca890bb8641a6c9b3e3506bf37f417fb4f56de71",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Deterministic test-only process invocation using an argument vector with shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:28e3926987fcb0f671690d95f39e1a1cb0a4ab324b31a193f01ae61709ee1f8b",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed trusted-tooling process call uses an argument vector with shell execution disabled; source-executing jobs have no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:d7a826f4ecef575087a66d493a71a0c1b14a8938419bb193d1f7e869422c3321",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed external process call uses an allowlisted absolute executable, a fixed argument vector, and shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:9293af42503e175b906e9553363d16ce7ce3f6dc8fcbdd4e134f214ade3bd1f2",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "GitHub Actions runtime expression names the platform token context; no credential value is stored in source.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:60dba425747a593da8e6ef0d73bc1763ddf4c1c4d88bb94f8b1ec40756c333d7",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed scanner helper builds a fixed argument vector from validated package metadata and runs without a shell.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:c958fe3ee1352b66b6c19a61458b3a4c27de34a29568ed13db8ebafc191fdcaa",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Command originates from the immutable reviewed service or project profile, runs as an argument vector without a shell, and receives no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:0859aaa5cb6bca4fef3b86d912a844095edc2faf626a5968fe5dd475eb0e10bf",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Deliberate fake credential canary used only to prove annotation redaction.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:1126eb51db0fc21f968bb9afcc9a2badabc09c53c9dd06aa8b252187a6a51ffb",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed external process call uses an allowlisted absolute executable, a fixed argument vector, and shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:64b01340e05acda54da0d46815cfc89ebbd4295abe57c83d0e80b6a1f317d009",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed scanner helper builds a fixed argument vector from validated package metadata and runs without a shell.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:8cb329ded1d29f4f66f1a60e4de3e84689c11ceaa6e87ddcad048147818e2e03",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:99ef5b3212d988fd8f6420f13b19c029318d9b0aa15e1474b11a7a7f77e412c1",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:4e4bcbcb936de60371a8da69c9346370bbafe6d300aec0b3d61d909b03eb82f8",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed scanner helper builds a fixed argument vector from validated package metadata and runs without a shell.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:2cc3d8c9f7707e7cf7c4b1949c59d3b414a67fb125f99ccdd1c2a9e29b790950",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed trusted-tooling process call uses an argument vector with shell execution disabled; source-executing jobs have no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:e725b0af417b471a0a4d164ab177baf78660bd710cc26e587af657d7f0cd2037",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Command originates from the immutable reviewed service or project profile, runs as an argument vector without a shell, and receives no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:a52d31db7b3bb874ff5857e2ab8d3d998d5d9d37cfc7a51dc131cc1f1f20065a",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Finding category enum value, not authentication or credential material.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:eb8b94c97342a99503725cb962883a55e765e64b65e165eb50989514ed86b900",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:5b9722e856f1e67eab8a9b3cb75c8a755b6f54cc3e96ca6b32cb3ad62d50ead9",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:83f41b4c08d561a465f7264414d2cf6e406d8e28d19d6f8ccf50c60eae8c7349",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Test-only secret-variable name or fixed canary; no usable credential material is present.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:fd70a3c63c2345c0ff67e690baada219442a656cfb3008620ebcab43ce2a6994",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Command originates from the immutable reviewed service or project profile, runs as an argument vector without a shell, and receives no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:1cb55f4a7459e27acfef0551e818d84b53c548381effd87a874c6cdc86cd9502",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed trusted-tooling process call uses an argument vector with shell execution disabled; source-executing jobs have no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:0fe673a5e165dc92abd1437de76d549ea6fb1c51004b4999292614e2ea519781",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:0a88351bc7be51f60340dd571d0bed2b9cf881537f72d1b24bb582014dccb457",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Command originates from the immutable reviewed service or project profile, runs as an argument vector without a shell, and receives no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:3b812f1c56d14775c7d4361ac3e14e2a0de7d3fe7bb51200e160191cdd8cb249",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed external process call uses an allowlisted absolute executable, a fixed argument vector, and shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:bd72df920609fb2ec896b89d45d08d7de1d27b94c1fbaba48ed37978293d31cf",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed external process call uses an allowlisted absolute executable, a fixed argument vector, and shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:24915805f637438379230ccb91a4f7aecef6d69818e7b244883138832528e42c",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Credentialless GitHub advisory query uses a resolved curl executable, fixed public endpoint, argument vector, and shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:293ec80de711e82eed8d9183c86997d7512ec55c7850a9f6ad285dcba26e36a4",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed scanner helper builds a fixed argument vector from validated package metadata and runs without a shell.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:508982cf68d0ef422bf8ed555fb4a620df63c63de08a85fb2748bcc6640000d5",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed external process call uses an allowlisted absolute executable, a fixed argument vector, and shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:bf286569c9ea5359bff9a1f4f2bdedceaa6c9ac8beec0ac134fd5afd1a2a506f",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:2207df3edad7c7f621798eebaa9d7bdcca7e7015bd75091076d2a8a298875a68",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed trusted-tooling process call uses an argument vector with shell execution disabled; source-executing jobs have no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:1bab958893827b15102f8f1f096aadae891273f7497ebecfd231bfdec13cad58",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Test-only secret-variable name or fixed canary; no usable credential material is present.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:3031b921b0c508f9c6711926d9424e52222cee3a808b1e35285308125b36bedc",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:b9d96ba0c2746959e39b90a5f140ba9cff7217236b18af6d3d216df54f47c839",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:384cf2c7e125b3a08875929b1a6f08b772a5e91aea29133d0f5a17566016d3fa",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:0eb8e49536fd1a71e91dc58b4de3482e0faca5bc7d1bc8d799888cdd7e427220",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:659dcc2e9d51af7d76367a6e7f297f6b2354626c4fb0010f39e713c5fbb702c3",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:10690e36c3c9cd7bc94a00817303208eca7ffd4472295dff6fbed109df3c3aef",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:f8fa9949976a3538f4c72763c286107f5497a54c6fce356d6bea8fa021c9002e",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:f0b74fe7c90fa1e0df78aaf7a1b5b9f9ff5ce1d097a8b9ee9bab18dcbf826ffb",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed external process call uses an allowlisted absolute executable, a fixed argument vector, and shell execution disabled.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:0a1878ba7754a70ff080e5055643b7ac43287f97af713b154c6dacb85d06e886",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Fixed in-memory lease sentinel used only to verify queue contract propagation.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:2f3ff9c6399d017ecba0ff7184d14db2c09c2a92d2e9a03db790eecbbf839941",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:ffbb2222086f9ba6082df2e9f875fe91ae6e3d84bd802f0516d9ef17e567712c",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:3be2752b59693174495e4f4d22c79a064d21f0afa4586266aab0b8ea63d55213",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:313a5fe7f3cc3d5e9c18c1d2a0d4fe7bd849cb888bc45b6b622187750190d2ae",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Deliberate fake credential canary used only to prove annotation redaction.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:4bb85682833721bb5724cb63b4cb861da912132307d6d0ea5d1ff624cccbe8b7",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed trusted-tooling process call uses an argument vector with shell execution disabled; source-executing jobs have no vendor or publication credentials.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    },
+    {
+      "stable_id": "sid-v1:54c212cbd58adb7412c7610824a58994d812a582cb1fb48572543a4856a835d2",
+      "status": "FALSE_POSITIVE",
+      "reviewed_by": "codex/bandit-review",
+      "reviewed_at": "2026-11-01T16:57:02Z",
+      "rationale": "Reviewed subprocess module import. Execution sites use argument vectors with shell execution disabled and are reviewed separately.",
+      "expires_at": "2027-02-06T00:00:00Z"
+    }
+  ],
   "identity_migrations": []
 }

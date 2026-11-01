@@ -243,8 +243,10 @@ class ReportTests(unittest.TestCase):
     def test_javascript_profile_retains_failed_tests_without_credentials(self):
         from scripts.code_analysis import run_profile
         (self.root / 'webui').mkdir()
+        sentinel = 'must-not-inherit'
+        credential_canaries = {'GH_TOKEN': sentinel, 'VENDOR_SECRET': sentinel}
         with patch('sys.argv', ['profile', 'javascript-test', '--source', str(self.root)]), \
-                patch.dict('os.environ', {'GH_TOKEN': 'must-not-inherit', 'VENDOR_SECRET': 'must-not-inherit'}), \
+                patch.dict('os.environ', credential_canaries), \
                 patch.object(run_profile.subprocess, 'run', return_value=SimpleNamespace(returncode=3)) as run:
             run_profile.main()
         self.assertEqual(h.load(self.root / 'typescript-test-status.json')['test_exit_code'], 3)
@@ -295,6 +297,7 @@ class ReportTests(unittest.TestCase):
         with patch('sys.argv', ['profile', 'api-fuzz', '--source', str(self.root)]), \
                 patch.object(run_profile.subprocess, 'Popen') as process, \
                 patch.object(run_profile.urllib.request, 'urlopen', return_value=io.BytesIO(b'{}')), \
+                patch.object(run_profile, 'required_executable', return_value='/usr/bin/schemathesis'), \
                 patch.object(run_profile.subprocess, 'run', side_effect=run_profile.subprocess.TimeoutExpired('fuzzer', 300)), \
                 self.assertRaises(run_profile.subprocess.TimeoutExpired):
             process.return_value.poll.return_value = None

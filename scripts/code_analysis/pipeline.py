@@ -17,6 +17,7 @@ HERE = Path(__file__).resolve().parent
 
 
 def run(command: list[str]) -> None:
+    # Callers construct fixed scanner commands from this trusted tooling module; no shell is used.
     subprocess.run(command, check=True)
 
 

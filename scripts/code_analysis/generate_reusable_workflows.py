@@ -4,7 +4,10 @@ from pathlib import Path
 
 import yaml
 
-from scripts.code_analysis.generate_source_workflow import generate
+from scripts.code_analysis.generate_source_workflow import (
+    GITHUB_TOKEN_EXPRESSION,
+    generate,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLING_REPOSITORY = 'combustrrr/code-analysis-dashboard'
@@ -43,7 +46,7 @@ def reusable_source(portable=True):
                     steps.append(step)
                     path = opts.get('path', '.')
                     steps.append({'name':'Load reviewed execution project configuration',
-                        'env': {'GH_TOKEN':'${{ github.token }}', 'TOOLING_SHA':'${{ inputs.tooling_sha }}', 'TARGET_JSON':'${{ inputs.target }}', 'EXPECTED_PROFILE':'portable' if portable else 'agentic-soc'},
+                        'env': {'GH_TOKEN':GITHUB_TOKEN_EXPRESSION, 'TOOLING_SHA':'${{ inputs.tooling_sha }}', 'TARGET_JSON':'${{ inputs.target }}', 'EXPECTED_PROFILE':'portable' if portable else 'agentic-soc'},
                         'run': f'python -I "$GITHUB_WORKSPACE/{path}/scripts/code_analysis/prepare_project.py"'})
                     continue
             if 'env' in step and 'TOOLING_SHA' in step['env']:

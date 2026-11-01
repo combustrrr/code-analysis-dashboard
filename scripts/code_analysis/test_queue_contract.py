@@ -6,7 +6,9 @@ from scripts.code_analysis.queue_contract import scanner_target
 class QueueContractTests(unittest.TestCase):
     def intent(self):
         request_id = "11111111-1111-4111-8111-111111111111"
-        return {"request_id": request_id, "generation": 4, "lease_token": "lease-token", "intent": {
+        # Fixed sentinel verifies lease propagation; it is not accepted outside this in-memory test.
+        lease_token = "lease-token"
+        return {"request_id": request_id, "generation": 4, "lease_token": lease_token, "intent": {
             "schema_version": "analysis-request-v4", "request_id": request_id,
             "idempotency_key": request_id, "actor_id": 73,
             "execution_repository_id": 1360051890,

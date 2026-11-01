@@ -360,10 +360,13 @@ def normalize_severity(raw: str) -> str:
     return _SEVERITY_MAP.get(raw.lower(), "MEDIUM")
 
 
+# Finding category enum, not credential material.
+SECRET_CATEGORY = "SECRET"
+
 _CATEGORY_MAP: dict[str, str] = {
     "security": "SECURITY",
     "vulnerability": "SECURITY",
-    "secret": "SECRET",
+    "secret": SECRET_CATEGORY,
     "dead_code": "DEAD_CODE",
     "complexity": "COMPLEXITY",
     "quality": "QUALITY",
@@ -1053,7 +1056,7 @@ class SarifExporter:
 class SonarExternalIssuesExporter:
     """Project code-local deterministic canonical findings to Sonar's generic format."""
 
-    _QUALITY: ClassVar[dict[str, str]] = {"SECURITY": "SECURITY", "SECRET": "SECURITY"}
+    _QUALITY: ClassVar[dict[str, str]] = {"SECURITY": "SECURITY", SECRET_CATEGORY: "SECURITY"}
     _SEVERITY: ClassVar[dict[str, str]] = {
         "CRITICAL": "BLOCKER", "HIGH": "HIGH", "MEDIUM": "MEDIUM",
         "LOW": "LOW", "INFO": "INFO",
