@@ -11,6 +11,12 @@ The repository uses one general CI workflow and three narrowly scoped CD paths.
 CI never receives deployment or scanner-vendor credentials. Deployment credentials
 remain confined to their protected jobs and environments.
 
+CodeRabbit advisory collection starts only from a completed `CodeRabbit` check run
+owned by GitHub App ID `347564`. The collector resolves the check's exact head SHA
+to exactly one open, same-repository pull request before any vendor or publication
+credential is made available. Comment text and actor display names are not trusted
+as an authorization boundary.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`.

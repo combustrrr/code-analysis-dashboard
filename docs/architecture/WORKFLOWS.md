@@ -36,7 +36,7 @@ publication credentials.
 | `11-source-analysis.yml` | `workflow_call` | Generated compatibility surface; not an admission path |
 | `12-scanner-diagnostics.yml` | Manual | Operator-only scanner access diagnostics |
 | `preferred-branch-analysis.yml` | Manual | Optional administrator batch admission for configured preferred branches |
-| `09-coderabbit-advisory-refresh.yml` | CodeRabbit review event | Retains separate PR advisory evidence |
+| `09-coderabbit-advisory-refresh.yml` | Completed CodeRabbit GitHub App check, verified by stable App ID and exact same-repository PR head | Retains separate PR advisory evidence |
 | `06-canary-validation.yml` | Canary-source changes | Validates scanner rule coverage |
 | `13-scanner-updates.yml` | Daily; manual | Reconciles scanner dependency pins |
 | `14-scanner-compatibility.yml` | Pull request; manual | Validates scanner and workflow compatibility |

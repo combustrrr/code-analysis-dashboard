@@ -534,8 +534,6 @@ class BanditParser:
 class RuffParser:
     """Parses Ruff JSON output."""
 
-    _SECURITY_PREFIXES = {"S", "B"}
-
     def parse(self, ruff_path: Path) -> list[Finding]:
         with ruff_path.open() as f:
             data = json.load(f)
@@ -543,8 +541,11 @@ class RuffParser:
         findings: list[Finding] = []
         for result in data:
             code = result.get("code") or "syntax-error"
-            prefix = code[:1]
-            is_security = prefix in self._SECURITY_PREFIXES
+            # Ruff's security rules use the flake8-bandit S### namespace.
+            # B### is flake8-bugbear, BLE### is blind-except, and SIM### is
+            # simplify; treating every B/S prefix as security promoted ordinary
+            # quality diagnostics to HIGH security findings in threat reports.
+            is_security = re.fullmatch(r"S\d+", code) is not None
             category = "SECURITY" if is_security else "QUALITY"
             severity = "HIGH" if is_security else "LOW"
             fix = result.get("fix")

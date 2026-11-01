@@ -100,7 +100,7 @@ def generate(config=None):
                     command = re.search(r'aws s3 cp\s+(.*?)\s+s3://', str(step.get('run', '')), re.DOTALL)
                     if not command:
                         raise ValueError('Cannot safely convert R2 upload in ' + str(step.get('name', 'unnamed')))
-                    paths = '\n'.join(line.strip().rstrip('\\\\') for line in command.group(1).splitlines() if line.strip())
+                    paths = '\n'.join(line.strip().rstrip('\\') for line in command.group(1).splitlines() if line.strip())
                     artifact_name = step.get('name', 'scanner-output').replace('Upload ', '').replace(' to R2', '').strip()
                     # A normalized findings directory is legitimately absent when a
                     # scanner reports zero findings. The primary scanner report is

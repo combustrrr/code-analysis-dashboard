@@ -108,6 +108,24 @@ class NativeSyntaxEvidenceTests(unittest.TestCase):
             self.assertEqual(findings[0].rule_id,'syntax-error')
             self.assertEqual(findings[0].start_line,2)
 
+    def test_ruff_only_classifies_numeric_bandit_rules_as_security(self):
+        from scripts.code_analysis.normalizer import RuffParser
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'ruff-results.json'
+            path.write_text(json.dumps([
+                {'code':'S105','filename':'pkg/security.py','message':'Possible hardcoded password','location':{'row':2}},
+                {'code':'B005','filename':'pkg/quality.py','message':'Misleading strip call','location':{'row':3}},
+                {'code':'BLE001','filename':'pkg/quality.py','message':'Blind exception','location':{'row':4}},
+                {'code':'SIM117','filename':'pkg/quality.py','message':'Combine with statements','location':{'row':5}},
+            ]))
+            findings=RuffParser().parse(path)
+            self.assertEqual([(finding.rule_id,finding.category,finding.severity) for finding in findings],[
+                ('S105','SECURITY','HIGH'),
+                ('B005','QUALITY','LOW'),
+                ('BLE001','QUALITY','LOW'),
+                ('SIM117','QUALITY','LOW'),
+            ])
+
     def test_radon_parse_errors_are_native_diagnostics(self):
         from scripts.code_analysis.normalizer import RadonParser
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,24 +1,19 @@
 name: CodeRabbit Advisory Evidence
 'on':
-  pull_request_review:
+  check_run:
     types:
-    - submitted
-  issue_comment:
-    types:
-    - created
+    - completed
 permissions:
   contents: read
   pull-requests: read
 jobs:
   collect:
     name: Retain exact-head AI advisory evidence
-    if: "(github.actor == 'coderabbitai[bot]' || github.actor == 'coderabbitai') && ((github.event_name == 'pull_request_review'\
-      \ &&\n  github.event.pull_request.head.repo.full_name == github.repository) ||\n (github.event_name == 'issue_comment'\
-      \ && github.event.issue.pull_request &&\n  contains(github.event.comment.body, 'Review finished')))"
+    if: github.event.check_run.app.id == 347564 && github.event.check_run.name == 'CodeRabbit'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     concurrency:
-      group: coderabbit-evidence-${{ github.event.pull_request.head.sha || github.event.issue.number }}
+      group: coderabbit-evidence-${{ github.event.check_run.head_sha }}
       cancel-in-progress: false
     steps:
     - name: Checkout trusted evidence collector
@@ -31,12 +26,9 @@ jobs:
       id: identity
       env:
         GH_TOKEN: ${{ github.token }}
-        PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        CHECK_HEAD_SHA: ${{ github.event.check_run.head_sha }}
       shell: bash
-      run: "set -euo pipefail\npr=\"$(gh api \"repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER\")\"\nhead_repo=\"$(jq -r '.head.repo.full_name'\
-        \ <<< \"$pr\")\"\n[[ \"$head_repo\" == \"$GITHUB_REPOSITORY\" ]] || {\n  echo \"External-fork PR evidence is not collected\"\
-        \ >&2\n  exit 1\n}\njq -r '\"branch=\\(.head.ref)\\ncommit=\\(.head.sha)\\npr_number=\\(.number)\"' <<< \"$pr\" >>\
-        \ \"$GITHUB_OUTPUT\"\n"
+      run: "set -euo pipefail\nprs=\"$(gh api -H 'Accept: application/vnd.github+json' \"repos/$GITHUB_REPOSITORY/commits/$CHECK_HEAD_SHA/pulls?per_page=100\")\"\npr=\"$(jq -cer --arg repo \"$GITHUB_REPOSITORY\" --arg sha \"$CHECK_HEAD_SHA\" '[.[] | select(.state == \"open\" and .head.sha == $sha and .head.repo.full_name == $repo)] | if length == 1 then .[0] else error(\"CodeRabbit check must map to exactly one open same-repository pull request\") end' <<< \"$prs\")\"\njq -r '\"branch=\\(.head.ref)\\ncommit=\\(.head.sha)\\npr_number=\\(.number)\"' <<< \"$pr\" >> \"$GITHUB_OUTPUT\"\n"
     - name: Collect exact-head CodeRabbit evidence
       env:
         CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
