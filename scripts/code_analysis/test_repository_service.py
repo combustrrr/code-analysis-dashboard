@@ -1,5 +1,9 @@
 import json
+import os
 import re
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -98,7 +102,9 @@ class RepositoryExecutionTests(unittest.TestCase):
                             producer_dispatch_id('12345678-1111-4111-8111-111111111111',lanes[1]))
 
     def test_publication_requires_completed_selected_evidence(self):
-        from scripts.code_analysis.repository_service import has_completed_selected_channel
+        from scripts.code_analysis.repository_service import (
+            has_completed_selected_channel,
+        )
         rows={
             'semgrep':{'status':'COMPLETED'},
             'codeql':{'status':'NOT_APPLICABLE'},
@@ -159,10 +165,6 @@ class RepositoryExecutionTests(unittest.TestCase):
 
 class TrustedBootstrapTests(unittest.TestCase):
     def test_source_packages_cannot_shadow_trusted_profile_modules(self):
-        import os
-        import subprocess
-        import sys
-        import tempfile
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)
             package=root/'scripts'/'code_analysis'

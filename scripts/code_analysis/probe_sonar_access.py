@@ -49,7 +49,8 @@ def probe(output: Path) -> dict[str, object]:
         "credentials": {},
     }
     credentials = result["credentials"]
-    assert isinstance(credentials, dict)
+    if not isinstance(credentials, dict):
+        raise TypeError("Sonar credential mapping is invalid")
     for role, variable in (
         ("analysis", "SONAR_TOKEN"),
         ("issue_api", "SONAR_API_TOKEN"),

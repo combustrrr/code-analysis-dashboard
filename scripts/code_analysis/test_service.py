@@ -242,9 +242,17 @@ class MonitoringTests(unittest.TestCase):
         self.assertEqual(result["counts"],{"NOT_OBSERVED":1})
     def test_triage_expiry_and_no_identity_transfer(self):
         old=evidence([raw()]);sid=old["findings"][0]["stable_id"]
-        registry={"decisions":[{"stable_id":sid,"status":"FALSE_POSITIVE","expires_at":"2020-01-01T00:00:00Z"}]}
+        registry={"decisions":[{"stable_id":sid,"status":"FALSE_POSITIVE",
+            "reviewed_by":"test-reviewer","reviewed_at":"2019-01-01T00:00:00Z",
+            "rationale":"Deterministic expired test decision.","expires_at":"2020-01-01T00:00:00Z"}]}
         self.assertEqual(effective_triage(registry,datetime.now(UTC))[sid]["effective_status"],"UNREVIEWED")
         changed=evidence([raw(snippet="different statement")]);self.assertNotEqual(sid,changed["findings"][0]["stable_id"])
+    def test_reviewed_triage_requires_auditable_metadata(self):
+        with self.assertRaisesRegex(EvidenceError,"requires reviewer"):
+            effective_triage({"decisions":[{"stable_id":"sid-v1:test","status":"FALSE_POSITIVE"}]})
+        with self.assertRaisesRegex(EvidenceError,"invalid timestamp"):
+            effective_triage({"decisions":[{"stable_id":"sid-v1:test","status":"FALSE_POSITIVE",
+                "reviewed_by":"reviewer","reviewed_at":"not-a-date","rationale":"Reviewed."}]})
     def test_required_channel_missing_fails(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);(root/"codeql.sarif").write_text("{}")

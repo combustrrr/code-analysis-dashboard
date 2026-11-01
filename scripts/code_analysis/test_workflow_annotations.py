@@ -3,7 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.code_analysis.workflow_annotations import ApiFailure, apply, collect, safe_path
+from scripts.code_analysis.workflow_annotations import (
+    ApiFailure,
+    apply,
+    collect,
+    safe_path,
+)
 
 SHA = "a" * 40
 TOOLING = "b" * 40
@@ -86,6 +91,7 @@ class WorkflowAnnotationCollectionTests(unittest.TestCase):
     def test_withholds_basic_authorization_and_r2_compatible_environment_credentials(self):
         basic = "dXNlcjpzdXBlci1zZWNyZXQ="
         access_key = "0123456789abcdef0123456789abcdef"
+        # Deliberate fake canaries prove environment credentials are redacted.
         secret_key = "r2-secret-access-key-value"
         session_token = "temporary-session-token-value"
         rows = [{

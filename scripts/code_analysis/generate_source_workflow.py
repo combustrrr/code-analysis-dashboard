@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECKOUT = 'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803'
 UPLOAD = 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
 PYTHON = 'actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1'
+# GitHub resolves this expression at runtime; it contains no credential material in source.
+GITHUB_TOKEN_EXPRESSION = '${{ github.token }}'
 
 
 def generate(config=None):
@@ -34,7 +36,7 @@ def generate(config=None):
                   {'uses': CHECKOUT, 'with': {'repository': '${{ fromJSON(inputs.target).source_repository }}',
                     'ref': '${{ fromJSON(inputs.target).head_sha }}', 'path': '.source', 'persist-credentials': False}},
                   {'name': 'Validate trusted tooling and selected target', 'id': 'identity',
-                    'env': {'GH_TOKEN':'${{ github.token }}','TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}','REQUEST_ID':'${{ inputs.request_id }}'},
+                    'env': {'GH_TOKEN':GITHUB_TOKEN_EXPRESSION,'TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}','REQUEST_ID':'${{ inputs.request_id }}'},
                    'run': 'python -m scripts.code_analysis.source_identity'}]}
     # Scanner recipes are inputs to the generated production workflows, not
     # independently runnable Actions entry points.
@@ -218,7 +220,7 @@ def generate(config=None):
                     f'echo "{digest}  scorecard.tar.gz" | sha256sum --check\n'
                     'tar -xzf scorecard.tar.gz scorecard\n'},
                     {'name': 'Scan external repository at selected commit', 'id': 'scorecard', 'continue-on-error': True,
-                     'env': {'GITHUB_AUTH_TOKEN': '${{ github.token }}', 'ENABLE_SARIF': 'true', 'SOURCE_SHA': '${{ fromJSON(inputs.target).head_sha }}'},
+                     'env': {'GITHUB_AUTH_TOKEN': GITHUB_TOKEN_EXPRESSION, 'ENABLE_SARIF': 'true', 'SOURCE_SHA': '${{ fromJSON(inputs.target).head_sha }}'},
                      'run': './scorecard --repo="github.com/$SOURCE_REPOSITORY" --commit="$SOURCE_SHA" --format=json --show-details > scorecard-native.json\npython -I scripts/code_analysis/scorecard_report.py'},
                     {'name': 'Retain Scorecard execution status', 'if': 'always()',
                      'env': {'OUTCOME': '${{ steps.scorecard.outcome }}'},
@@ -273,7 +275,7 @@ def generate(config=None):
                     source_step['env'] = {key: value for key, value in source_step['env'].items()
                                           if not (isinstance(value, str) and 'secrets.' in value)}
                 if source_step.get('name') == 'Observe GitHub secret-scanning posture':
-                    source_step['env'] = {'GH_TOKEN': '${{ github.token }}'}
+                    source_step['env'] = {'GH_TOKEN': GITHUB_TOKEN_EXPRESSION}
             if name == 'sonarqube-cloud':
                 identity_step = {
                     'name': 'Derive Sonar project identity',
@@ -348,7 +350,7 @@ def generate(config=None):
             {'uses': CHECKOUT, 'with': {'repository': '${{ fromJSON(inputs.target).source_repository }}',
                 'ref': '${{ fromJSON(inputs.target).head_sha }}', 'path': '.source', 'persist-credentials': False}},
             {'name': 'Collect exact producer artifacts and assemble report',
-             'env': {'GH_TOKEN': '${{ github.token }}', 'TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}','REQUEST_ID':'${{ inputs.request_id }}'},
+             'env': {'GH_TOKEN': GITHUB_TOKEN_EXPRESSION, 'TARGET_JSON': '${{ inputs.target }}', 'TOOLING_SHA': '${{ inputs.tooling_sha }}','REQUEST_ID':'${{ inputs.request_id }}'},
              'run': 'python -m scripts.code_analysis.source_identity --assemble'},
             {'uses': UPLOAD, 'with': {'name': 'hosted-report-${{ github.run_id }}-${{ github.run_attempt }}',
                 'path': '.hosted/report/', 'if-no-files-found': 'error', 'retention-days': 7}}]}

@@ -63,7 +63,9 @@ class ExtensionTests(unittest.TestCase):
         self.assertEqual(statuses['ext-example']['status'], 'INVALID_EVIDENCE')
 
     def test_source_credentials_and_path_escapes_are_rejected(self):
-        for update in [{'secrets':{'VENDOR_TOKEN':'TOKEN'}}, {'adapter':'../outside.py'}, {'channel':'ruff'}]:
+        # Sentinel names prove source-mode credential mappings are rejected.
+        fake_token = 'TOKEN'
+        for update in [{'secrets':{'VENDOR_TOKEN':fake_token}}, {'adapter':'../outside.py'}, {'channel':'ruff'}]:
             with self.assertRaises(ValueError):
                 e.registry({'scanner_extensions':[{**self.extension, **update}]})
 
@@ -76,8 +78,10 @@ class ExtensionTests(unittest.TestCase):
                         self.root/'config/code-analysis/workflow-templates')
         shutil.copytree('.ci', self.root/'.ci')
         config = h.load(Path('config/code-analysis/service.json'))
+        # The value names a secret variable and contains no secret material.
+        secret_variable = 'VENDOR_ACCESS_TOKEN'
         vendor = {**self.extension, 'channel':'ext-vendor', 'name':'Vendor example', 'mode':'vendor',
-                  'secrets':{'VENDOR_TOKEN':'VENDOR_ACCESS_TOKEN'}}
+                  'secrets':{'VENDOR_TOKEN':secret_variable}}
         config['scanner_extensions'] = [self.extension, vendor]
         h.write(self.root/'config/code-analysis/service.json', config)
         with patch.object(generator, 'ROOT', self.root):
@@ -107,10 +111,12 @@ class ExtensionTests(unittest.TestCase):
 
     def test_extension_runner_verifies_materialized_tooling_not_caller_sha(self):
         from scripts.code_analysis import extension_runner
-        with patch.object(extension_runner.subprocess, 'check_output', return_value='b' * 40 + '\n') as check:
+        git = str(self.root / 'trusted-git')
+        with patch.object(extension_runner, 'required_executable', return_value=git), \
+                patch.object(extension_runner.subprocess, 'check_output', return_value='b' * 40 + '\n') as check:
             self.assertEqual(extension_runner.checked_out_tooling_sha(self.root), 'b' * 40)
         check.assert_called_once_with(
-            ['git', '-C', str(self.root), 'rev-parse', 'HEAD'], text=True)
+            [git, '-C', str(self.root), 'rev-parse', 'HEAD'], text=True)
 
 
 if __name__ == '__main__':

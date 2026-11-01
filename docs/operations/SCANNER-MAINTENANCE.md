@@ -133,6 +133,23 @@ remain in its JSON report without also becoming workflow error annotations.
 Do not suppress genuine scanner execution failures: those belong in the scanner
 status evidence and remain operationally visible.
 
+### Reviewed finding triage
+
+Scanner-native output remains unchanged by triage. Record a reviewed disposition in
+`config/code-analysis/triage-registry.json` against the canonical stable finding ID;
+do not add inline scanner suppressions merely to obtain a zero count. Every disposition
+other than `UNREVIEWED` requires a reviewer identifier, review timestamp, and explicit
+rationale. Time-bounded decisions become `UNREVIEWED` after `expires_at`, and duplicate
+stable IDs fail closed. A source or rule change that produces a new stable ID requires a
+new review; decisions are never transferred by substring or approximate identity.
+
+For the November 2026 Bandit baseline, 54 retained low-severity B404, B603, and B105
+observations were reviewed individually and expire on 2027-02-06. They remain present in
+Bandit's native artifact while the dashboard can distinguish the reviewed disposition.
+The executable-boundary changes that preceded review removed B607, B101, and B107
+findings without suppressions. Re-run native Bandit and reconcile every current stable ID
+before extending or replacing these decisions.
+
 Report assembly waits briefly for the Actions jobs API to expose terminal
 conclusions. The report job already depends on every producer, but the REST
 projection can lag the workflow scheduler; a missing conclusion must not be

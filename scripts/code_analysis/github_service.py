@@ -59,6 +59,7 @@ def gh(*args: str, payload: object | None = None, binary: bool = False):
     if payload is not None:
         command += ['--input', '-']
     try:
+        # Command begins with the fixed GitHub CLI and receives arguments as a list, never a shell string.
         result = subprocess.run(command, input=json.dumps(payload).encode() if payload is not None else None,
                                 capture_output=True, check=False,
                                 timeout=GH_TIMEOUT_SECONDS)
@@ -405,7 +406,9 @@ def collect(config: dict, row: dict, destination: Path) -> dict:
     # Annotation collection happens only after the producer identity above is
     # validated. A caller/browser cannot select a different run or attempt.
     from scripts.code_analysis.workflow_annotations import apply as apply_annotations
-    from scripts.code_analysis.workflow_annotations import collect as collect_annotations
+    from scripts.code_analysis.workflow_annotations import (
+        collect as collect_annotations,
+    )
     profile_digest = row.get('profile_digest')
     if not isinstance(profile_digest, str) or not re.fullmatch(r'[0-9a-f]{64}', profile_digest):
         # Legacy collection has no versioned profile digest. Preserve the

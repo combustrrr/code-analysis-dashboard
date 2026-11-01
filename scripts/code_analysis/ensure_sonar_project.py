@@ -18,7 +18,7 @@ except ImportError:
 SERVER = "https://sonarcloud.io"
 
 
-def _request(url: str, token: str = "", data: bytes | None = None) -> tuple[int, dict[str, Any]]:
+def _request(url: str, token: str | None = None, data: bytes | None = None) -> tuple[int, dict[str, Any]]:
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     if token:
         headers["Authorization"] = f"Bearer {token}"

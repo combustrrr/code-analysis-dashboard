@@ -54,6 +54,7 @@ def command(value: dict, key: str) -> list[str]:
 
 
 def run(argv: list[str], cwd: Path, timeout: int) -> subprocess.CompletedProcess[str]:
+    # argv is selected from the reviewed immutable project profile; shell execution is disabled.
     return subprocess.run(argv, cwd=cwd, text=True, stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT, timeout=timeout, check=False)
 
@@ -63,6 +64,7 @@ def install(ui: Path, value: dict) -> subprocess.CompletedProcess[str]:
 
 
 def start_preview(ui: Path, value: dict) -> subprocess.Popen[bytes]:
+    # The preview command is selected from the reviewed immutable project profile.
     process = subprocess.Popen(command(value, 'frontend_preview_command'), cwd=ui,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     url = value.get('frontend_preview_url')

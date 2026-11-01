@@ -312,12 +312,26 @@ def effective_triage(registry: dict[str, Any], now: datetime | None = None) -> d
     for row in registry.get("decisions", []):
         if row.get("status") not in TRIAGE_STATES or not row.get("stable_id"):
             raise EvidenceError("invalid triage decision")
+        stable_id = str(row["stable_id"])
+        if stable_id in result:
+            raise EvidenceError("duplicate triage decision")
+        if row.get("status") != "UNREVIEWED":
+            required = ("reviewed_by", "reviewed_at", "rationale")
+            if any(not row.get(field) for field in required):
+                raise EvidenceError("reviewed triage decision requires reviewer, timestamp, and rationale")
+            try:
+                datetime.fromisoformat(str(row["reviewed_at"]).replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise EvidenceError("reviewed triage decision has an invalid timestamp") from exc
         effective = row["status"]
         if row.get("expires_at"):
-            expires = datetime.fromisoformat(str(row["expires_at"]))
+            try:
+                expires = datetime.fromisoformat(str(row["expires_at"]).replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise EvidenceError("triage expiry has an invalid timestamp") from exc
             if expires <= now:
                 effective = "UNREVIEWED"
-        result[str(row["stable_id"])] = {**row, "effective_status": effective}
+        result[stable_id] = {**row, "effective_status": effective}
     return result
 
 

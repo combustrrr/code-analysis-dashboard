@@ -5,6 +5,7 @@ for the selected repository. Does not run any analysis on external repositories.
 """
 import argparse
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -59,9 +60,14 @@ def main():
         # Published advisories for public repositories are exposed by GitHub's
         # read-only REST API without a credential.  Deliberately avoid gh here:
         # gh requires a token even when the underlying endpoint does not.
+        curl = shutil.which("curl")
+        if not curl:
+            raise RuntimeError("Required public API client is unavailable")
+        curl = str(Path(curl).resolve())
+        # Absolute reviewed client, fixed flags, and a validated repository identity.
         result = subprocess.run(
             [
-                "curl", "--fail", "--silent", "--show-error", "--location",
+                curl, "--fail", "--silent", "--show-error", "--location",
                 "--header", "Accept: application/vnd.github+json",
                 "--header", "X-GitHub-Api-Version: 2022-11-28",
                 f"https://api.github.com/repos/{owner}/{repo}/security-advisories?per_page=100",

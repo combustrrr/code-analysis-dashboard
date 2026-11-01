@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 from defusedxml import ElementTree as ET
 
 from scripts.code_analysis.hosted import load, write
+from scripts.code_analysis.process_access import required_executable
 
 SERVICE_CONFIG = Path(__file__).resolve().parents[2] / 'config/code-analysis/service.json'
 TASK_PROFILE_FIELDS = {
@@ -54,6 +55,7 @@ def main():
     env = {k: v for k, v in os.environ.items() if not any(s in k.upper() for s in ('TOKEN', 'SECRET', 'PASSWORD', 'CREDENTIAL'))}
     if a.task == 'api-fuzz':
         env.update(profile.get('api_environment', {}))
+        # api_command is loaded only from the reviewed immutable service profile.
         process = subprocess.Popen(profile['api_command'], cwd=cwd, env=env)
         status = 'OPERATIONAL_FAILURE'
         reason = 'API startup or bounded Schemathesis execution failed'
@@ -75,7 +77,7 @@ def main():
                     time.sleep(1)
             else:
                 raise RuntimeError('API schema startup deadline exceeded')
-            result = subprocess.run(['schemathesis', 'run', str(root / 'schema.json'),
+            result = subprocess.run([required_executable('schemathesis'), 'run', str(root / 'schema.json'),
                 '--experimental=openapi-3.1', '--base-url', f'{parsed.scheme}://{parsed.netloc}',
                 '--checks', 'all', '--max-response-time', '5000', '--hypothesis-max-examples', '50',
                 '--junit-xml=' + str(root / 'fuzzing-results.xml')], cwd=cwd, env=env, timeout=300, check=False)
@@ -113,6 +115,7 @@ def main():
             raise ValueError('python_test_timeout_seconds must be an integer between 60 and 2400')
         test_timeout = configured_timeout
     try:
+        # command is selected from the reviewed immutable service profile; shell execution is disabled.
         result = subprocess.run(
             command, cwd=cwd, env=env, check=False,
             timeout=test_timeout if a.task == 'python-test' else 900 if a.task == 'javascript-test' else None,

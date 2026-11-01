@@ -22,7 +22,8 @@ class GitHubSecurityAdvisoriesAdapterTests(unittest.TestCase):
         output_file = self.root / "output.json"
         request_file.write_text(json.dumps(request_json))
 
-        with patch("subprocess.run") as mock_run:
+        with patch("scripts.code_analysis.adapters.github_security_advisories.shutil.which", return_value="/usr/bin/curl"), \
+                patch("subprocess.run") as mock_run:
             if mock_gh_output is not None:
                 mock_run.return_value = Mock(
                     returncode=mock_gh_returncode,
@@ -42,7 +43,7 @@ class GitHubSecurityAdvisoriesAdapterTests(unittest.TestCase):
                 sys.argv = old_argv
 
             command = mock_run.call_args.args[0]
-            self.assertEqual(command[0], "curl")
+            self.assertIn(Path(command[0]).name.lower(), {"curl", "curl.exe"})
             self.assertNotIn("Authorization", " ".join(command))
 
         return json.loads(output_file.read_text())
@@ -115,7 +116,8 @@ class GitHubSecurityAdvisoriesAdapterTests(unittest.TestCase):
             }
         }
         # Invalid JSON from gh
-        with patch("subprocess.run") as mock_run:
+        with patch("scripts.code_analysis.adapters.github_security_advisories.shutil.which", return_value="/usr/bin/curl"), \
+                patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(returncode=0, stdout="not json", stderr="")
             request_file = self.root / "request.json"
             output_file = self.root / "output.json"

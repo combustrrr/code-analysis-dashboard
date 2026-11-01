@@ -6,6 +6,7 @@ import re
 import subprocess
 
 from scripts.code_analysis import github_service as github
+from scripts.code_analysis.process_access import required_executable
 
 FILES=('.github/code-analysis/projects.json',)
 PREFIX='tooling-rollout/'
@@ -35,7 +36,8 @@ def main():
     if current!=candidate:
         print('Default branch advanced; next reconciliation will validate the new revision.');return
     files=contents(repo,current);old=json.loads(files[FILES[0]])['tooling_sha']
-    changed=subprocess.check_output(['git','diff','--name-only',old,current],text=True).splitlines()
+    git = required_executable('git')
+    changed=subprocess.check_output([git,'diff','--name-only',old,current],text=True).splitlines()
     if not any(relevant(p) for p in changed):
         print('Active tooling already contains the current scanner implementation.');return
     pulls=github.pages(f'repos/{repo}/pulls?state=open')
@@ -44,7 +46,7 @@ def main():
         pr=pending[0];head=pr['head']['sha'];pin=pr['head']['ref'][len(PREFIX):]
         if not re.fullmatch('[a-f0-9]{40}',pin):raise ValueError('Unrecognized rollout branch')
         # The candidate must remain an ancestor of the trusted default branch.
-        subprocess.run(['git','merge-base','--is-ancestor',pin,current],check=True)
+        subprocess.run([git,'merge-base','--is-ancestor',pin,current],check=True)
         actual=contents(repo,head);expected=replacement(files,pin)
         changed_files=github.pages(f'repos/{repo}/pulls/{pr["number"]}/files')
         if {p['filename'] for p in changed_files}!=set(FILES) or actual!=expected:
