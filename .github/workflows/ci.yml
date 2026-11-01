@@ -56,7 +56,7 @@ jobs:
   ui:
     name: CI · UI
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: analysis-ui
@@ -75,6 +75,12 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Run UI unit tests
         run: npm run test:unit
+      - name: Install Chromium for browser acceptance
+        run: npx playwright install --with-deps chromium
+      - name: Run clean-checkout browser acceptance
+        run: npm test
+      - name: Run authenticated browser acceptance
+        run: npm run test:access
       - name: Build production UI
         env:
           VITE_APPLICATION_MODE: repositories

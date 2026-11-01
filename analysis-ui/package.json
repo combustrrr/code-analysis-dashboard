@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && npm run check:landing-budgets",
-    "build:fixtures": "tsc --noEmit && vite build --mode fixtures",
+    "build:fixtures": "node scripts/generate-test-fixtures.mjs && tsc --noEmit && vite build --mode fixtures",
     "test": "playwright test",
+    "test:access": "node scripts/run-access-tests.mjs",
     "test:unit": "vitest run --dir src",
     "check:landing-budgets": "node scripts/check-landing-budgets.mjs",
     "test:lighthouse": "npx --yes @lhci/cli@0.15.1 autorun",

@@ -93,6 +93,7 @@ test.describe('production shell',()=>{
   await expect(page).toHaveURL(/group=rule/);
   await expect(page.getByText(/finding/).first()).toBeVisible();
   await page.getByRole('button',{name:'More filters'}).click();
+  for(const label of ['Annotation sources','Workflows','Jobs','Annotation levels','Correlated scanners'])await expect(page.locator('.path-multi-picker summary').filter({hasText:new RegExp(label,'i')})).toBeVisible();
   await page.locator('.path-multi-picker summary').filter({hasText:/Choose files/i}).click();
   const pathOptions=page.getByLabel('Files options').getByRole('option');
   await expect(pathOptions.first()).toBeVisible();
@@ -115,21 +116,25 @@ test.describe('production shell',()=>{
  });
 
  test('workflow annotations filter safely and expose exact run provenance',async({page})=>{
-  const annotation={id:'workflow-annotation:1',severity:'MEDIUM',category:'WORKFLOW',message:'Compiler warning <script>alert(1)</script>',file:'src/example.ts',line:12,scanners:['Workflow annotations'],rules:['TS1234'],observation_count:1,scanner_family_count:1,page:0,annotation:{source:'check-run',level:'warning',workflow:'.github/workflows/ci.yml',run_id:123,run_attempt:2,job:'build',step:null,check_run_id:456,policy:'actionable',contributes_to_needs_attention:true,run_url:'https://github.com/combustrrr/code-analysis-dashboard/actions/runs/123/attempts/2',check_url:'https://github.com/combustrrr/code-analysis-dashboard/runs/456',file_url:'https://github.com/combustrrr/Agentic-Kibana/blob/'+'a'.repeat(40)+'/src/example.ts#L12',correlation:{status:'unmatched',finding_id:null,scanner:null}}};
-  await page.route('**/*',route=>{const url=decodeURIComponent(route.request().url());if(url.includes('data/index.json'))return route.fulfill({json:{schema_version:'dashboard-index-v1',checked_at:'2026-01-01T00:00:00Z',preferred_branch:'main',analysis_repository:'combustrrr/code-analysis-dashboard',source_repository:'combustrrr/Agentic-Kibana',targets:[{id:'current',label:'main',repository:'combustrrr/Agentic-Kibana',source_repository:'combustrrr/Agentic-Kibana',head_sha:'a'.repeat(40),kind:'branch',branch:'main',checked_at:'2026-01-01T00:00:00Z',status:'current',report:'reports/fixture'}]}});if(url.includes('project-overview.json'))return route.fulfill({json:{schema_version:'project-overview-v1',analyzed_sha:'a'.repeat(40),generated_at:'2026-01-01T00:00:00Z',findings:{total:1,observations:1,critical:0,high:0,located:1},coverage:{completed:1,total:1,publication_gate_satisfied:true,incomplete_channels:[]},distributions:{severity:[{label:'MEDIUM',count:1}],category:[{label:'WORKFLOW',count:1}],scanner:[{label:'Workflow annotations',count:1}],rule:[{label:'TS1234',count:1}],directory:[{label:'src',count:1}],scanner_overlap:[{label:'1 scanner',count:1}]},priority_findings:[annotation],investigation_clusters:[]}});if(url.includes('findings-catalog.json'))return route.fulfill({json:{schema_version:'findings-catalog-v1',total:1,page_size:500,pages:1}});if(url.includes('findings-pages/0.json'))return route.fulfill({json:[annotation]});if(url.includes('finding-locators/1.json'))return route.fulfill({json:[{id:annotation.id,detail_page:0}]});if(url.includes('details/0.json'))return route.fulfill({json:[{...annotation,origins:[{scanner_family:'Workflow annotations',rule:'TS1234',file:'src/example.ts',start_line:12,raw_artifact:'workflow-annotations.json',observation_id:annotation.id}],source:null,source_start:null,source_url:null}]});return route.continue();});
+  const annotation={id:'workflow-annotation:1',severity:'MEDIUM',category:'WORKFLOW_UPDATE',message:'Node.js 20 actions are deprecated <script>alert(1)</script>',file:'src/example.ts',line:12,scanners:['Workflow annotations'],rules:['deprecated-runtime'],observation_count:1,scanner_family_count:1,page:0,annotation:{source:'check-run',level:'warning',workflow:'.github/workflows/ci.yml',run_id:123,run_attempt:2,job:'build',step:null,check_run_id:456,policy:'actionable',policy_provenance:{rule_id:'annotation-level-policy-v1',basis:'annotation_level'},kind:'workflow_update',contributes_to_needs_attention:true,run_url:'https://github.com/combustrrr/code-analysis-dashboard/actions/runs/123/attempts/2',check_url:'https://github.com/combustrrr/code-analysis-dashboard/runs/456',file_url:'https://github.com/combustrrr/Agentic-Kibana/blob/'+'a'.repeat(40)+'/src/example.ts#L12',correlation:{status:'unmatched',finding_id:null,scanner:null}}};
+  await page.route('**/*',route=>{const url=decodeURIComponent(route.request().url());if(url.includes('data/index.json'))return route.fulfill({json:{schema_version:'dashboard-index-v1',checked_at:'2026-01-01T00:00:00Z',preferred_branch:'main',analysis_repository:'combustrrr/code-analysis-dashboard',source_repository:'combustrrr/Agentic-Kibana',targets:[{id:'current',label:'main',repository:'combustrrr/Agentic-Kibana',source_repository:'combustrrr/Agentic-Kibana',head_sha:'a'.repeat(40),kind:'branch',branch:'main',checked_at:'2026-01-01T00:00:00Z',status:'current',report:'reports/fixture'}]}});if(url.includes('project-overview.json'))return route.fulfill({json:{schema_version:'project-overview-v1',analyzed_sha:'a'.repeat(40),generated_at:'2026-01-01T00:00:00Z',findings:{total:1,observations:1,critical:0,high:0,located:1},coverage:{completed:1,total:1,publication_gate_satisfied:true,incomplete_channels:[]},distributions:{severity:[{label:'MEDIUM',count:1}],category:[{label:'WORKFLOW_UPDATE',count:1}],scanner:[{label:'Workflow annotations',count:1}],rule:[{label:'deprecated-runtime',count:1}],directory:[{label:'src',count:1}],scanner_overlap:[{label:'1 scanner',count:1}]},priority_findings:[annotation],investigation_clusters:[]}});if(url.includes('findings-catalog.json'))return route.fulfill({json:{schema_version:'findings-catalog-v1',total:1,page_size:500,pages:1}});if(url.includes('findings-pages/0.json'))return route.fulfill({json:[annotation]});if(url.includes('finding-locators/1.json'))return route.fulfill({json:[{id:annotation.id,detail_page:0}]});if(url.includes('details/0.json'))return route.fulfill({json:[{...annotation,origins:[{scanner_family:'Workflow annotations',rule:'deprecated-runtime',file:'src/example.ts',start_line:12,raw_artifact:'workflow-annotations.json',observation_id:annotation.id}],source:null,source_start:null,source_url:null}]});return route.continue();});
   await page.goto(PROJECT+'/issues');
-  await expect(page.getByText('Compiler warning <script>alert(1)</script>')).toBeVisible();
+  await expect(page.getByText('Node.js 20 actions are deprecated <script>alert(1)</script>')).toBeVisible();
   await expect(page.locator('.issue-link').first()).toContainText('<script>alert(1)</script>');
   await page.getByRole('button',{name:'More filters'}).click();
   await page.locator('.path-multi-picker summary').filter({hasText:/Choose annotation sources/i}).click();
   await page.getByLabel('Annotation sources options').getByRole('option',{name:'check-run'}).click();
   await expect(page).toHaveURL(/annotationSource=check-run/);
-  await page.getByRole('button',{name:'Compiler warning <script>alert(1)</script>'}).click();
-  await expect(page.getByRole('heading',{name:'Workflow annotation provenance'})).toBeVisible();
+  await page.getByRole('button',{name:'Node.js 20 actions are deprecated <script>alert(1)</script>'}).click();
+  await expect(page.getByRole('heading',{name:'Workflow update required'})).toBeVisible();
+  await expect(page.getByText('Update the affected workflow or action')).toBeVisible();
+  await expect(page.getByText(/via annotation level/)).toBeVisible();
   await expect(page.getByText(/run 123 attempt 2/)).toBeVisible();
   for(const name of ['Open trusted run','Open trusted check','Open immutable file']){
    const link=page.getByRole('link',{name});await expect(link).toHaveAttribute('target','_blank');await expect(link).toHaveAttribute('rel',/noopener noreferrer/);
   }
+  await page.getByRole('link',{name:'Open trusted run'}).focus();
+  await expect(page.getByRole('link',{name:'Open trusted run'})).toBeFocused();
  });
 
  test('project status and issue content remain in intrinsic document flow',async({page})=>{
@@ -213,6 +218,14 @@ test.describe('production shell',()=>{
   await expect(page.getByText('Atheris',{exact:true})).toBeVisible();
   await expect(page.getByText('Schemathesis',{exact:true})).toBeVisible();
   await expect(page.getByText('Coverage does not guarantee that the code is secure')).toBeVisible();
+ });
+
+ test('workflow annotation evidence states remain distinct',async({page})=>{
+  const states=[['complete','Complete','COMPLETED_OPTIONAL'],['measured_zero','Measured zero','COMPLETED_OPTIONAL'],['partial','Partial read','PARTIAL'],['truncated','Truncated','PARTIAL'],['permission_denied','Permission denied','NOT_AVAILABLE'],['rate_limited','Rate limited','NOT_AVAILABLE'],['unavailable','Unavailable','NOT_AVAILABLE'],['invalid','Invalid evidence','NOT_AVAILABLE'],['operational_failure','Operational failure','NOT_AVAILABLE'],['unknown','Unknown','NOT_AVAILABLE']] as const;
+  await page.route('**/*',route=>{const url=decodeURIComponent(route.request().url());if(url.includes('data/index.json'))return route.fulfill({json:{schema_version:'dashboard-index-v1',checked_at:'2026-01-01T00:00:00Z',preferred_branch:'main',analysis_repository:'combustrrr/code-analysis-dashboard',source_repository:'combustrrr/Agentic-Kibana',targets:[{id:'current',label:'main',repository:'combustrrr/Agentic-Kibana',source_repository:'combustrrr/Agentic-Kibana',head_sha:'a'.repeat(40),kind:'branch',branch:'main',checked_at:'2026-01-01T00:00:00Z',status:'partial',report:'reports/states'}]}});if(url.includes('coverage.json'))return route.fulfill({json:{schema_version:'project-coverage-v1',analyzed_sha:'a'.repeat(40),generated_at:'2026-01-01T00:00:00Z',status:'partial',finding_count:0,observation_count:0,severities:{},publication_gate:{satisfied:false},channels:states.map(([state,label,status])=>({channel:`workflow-annotations-${state}`,name:`Workflow annotations: ${label}`,class:'reliability',status,evidence_state:state,findings:state==='measured_zero'?0:null,observation_count:0,reason:`${label} evidence`,workflow:'ci.yml'}))}});return route.continue();});
+  await page.goto(PROJECT+'/coverage');
+  await expect(page.getByRole('heading',{name:'Analysis channels'})).toBeVisible();
+  for(const [,label] of states)await expect(page.locator('.evidence-state',{hasText:label})).toHaveCount(1);
  });
 
  test('reports provides a direct issues PDF export without duplicating issue content',async({page})=>{

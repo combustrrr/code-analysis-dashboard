@@ -21,7 +21,12 @@ Its independent jobs validate:
 - deployment isolation contracts;
 - launcher authentication, report, and durable-queue behavior;
 - locked UI installation and production dependency audit; and
-- UI unit tests, TypeScript validation, and production build.
+- UI unit tests, TypeScript validation, production build, clean-checkout
+  Playwright workspace acceptance, and authenticated access acceptance.
+
+The browser fixtures are generated from a tracked, bounded script into an ignored
+test-only directory. Production builds use a separate static directory and cannot
+copy report fixtures into Pages output.
 
 The final `CI` job succeeds only when every lane succeeds. Branch protection requires
 that stable status together with `Scanner compatibility` before ordinary pull requests

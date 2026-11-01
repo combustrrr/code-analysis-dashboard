@@ -12,10 +12,14 @@ PROFILE = "c" * 64
 
 
 class FakeGitHub:
-    def __init__(self, annotations=None, *, failure=None, summary=""):
+    def __init__(self, annotations=None, *, failure=None, summary="", job_name="build",
+                 check_name="build", action_identity="github-actions"):
         self.annotations = annotations or []
         self.failure = failure
         self.summary = summary
+        self.job_name = job_name
+        self.check_name = check_name
+        self.action_identity = action_identity
         self.paths = []
 
     def __call__(self, path):
@@ -24,9 +28,9 @@ class FakeGitHub:
             raise self.failure
         headers = {"x-ratelimit-remaining": "100"}
         if "/jobs?" in path:
-            return {"jobs": [{"id": 22, "name": "build", "check_run_url": "https://api.github.com/repos/o/r/check-runs/33"}]}, headers
+            return {"jobs": [{"id": 22, "name": self.job_name, "check_run_url": "https://api.github.com/repos/o/r/check-runs/33"}]}, headers
         if path.endswith("/check-runs/33"):
-            return {"id": 33, "name": "build", "app": {"slug": "github-actions"},
+            return {"id": 33, "name": self.check_name, "app": {"slug": self.action_identity},
                     "output": {"summary": self.summary}}, headers
         if "/annotations?" in path:
             page = int(path.rsplit("page=", 1)[1])
@@ -127,6 +131,38 @@ class WorkflowAnnotationCollectionTests(unittest.TestCase):
         self.assertEqual(result["annotations"][0]["source"], "job-summary")
         self.assertEqual(result["annotations"][0]["message"], "### Build\n<script>x</script>")
 
+    def test_free_text_canary_does_not_suppress_actionable_annotation(self):
+        row = {"annotation_level": "warning", "title": "canary service is outdated",
+               "message": "This is production evidence, not a reviewed fixture."}
+        annotation = collect(**identity(), fetch=FakeGitHub([row], job_name="canary build"))["annotations"][0]
+        self.assertEqual(annotation["policy"], "actionable")
+        self.assertTrue(annotation["contributes_to_needs_attention"])
+        self.assertEqual(annotation["policy_provenance"]["basis"], "annotation_level")
+        self.assertEqual(annotation["kind"], "workflow_update")
+
+    def test_reviewed_exact_canary_identity_is_a_validation_fixture(self):
+        row = {"annotation_level": "warning", "title": "Expected fixture finding", "message": "fixture"}
+        annotation = collect(
+            **identity(workflow=".github/workflows/06-canary-validation.yml"),
+            fetch=FakeGitHub([row], job_name="Scan Canary Suite with All Tools",
+                             check_name="Scan Canary Suite with All Tools"),
+        )["annotations"][0]
+        self.assertEqual(annotation["policy"], "validation_fixture")
+        self.assertFalse(annotation["contributes_to_needs_attention"])
+        self.assertEqual(annotation["policy_provenance"], {
+            "rule_id": "canary-coverage-workflow-v1",
+            "basis": "reviewed_exact_execution_identity",
+        })
+
+    def test_near_match_does_not_inherit_reviewed_fixture_policy(self):
+        row = {"annotation_level": "failure", "title": "Expected fixture finding", "message": "fixture"}
+        annotation = collect(
+            **identity(workflow=".github/workflows/06-canary-validation.yml"),
+            fetch=FakeGitHub([row], job_name="Scan Canary Suite with All Tools (copy)",
+                             check_name="Scan Canary Suite with All Tools"),
+        )["annotations"][0]
+        self.assertEqual(annotation["policy"], "actionable")
+
     def test_paths(self):
         self.assertEqual(safe_path("src/main.py"), "src/main.py")
         for path in ("../a", "/etc/a", "C:/a", "/home/runner/work/a", "a\x00b"):
@@ -166,7 +202,7 @@ class WorkflowAnnotationReconciliationTests(unittest.TestCase):
         row = {"annotation_id": "workflow-annotation:1", "level": "warning", "title": "python.sql-injection",
                "message": "SQL injection", "file": "src/a.py", "start_line": 5, "end_line": 5,
                "source": "check-run", "workflow": ".github/workflows/ci.yml", "run_id": 10, "run_attempt": 2,
-               "job": "semgrep", "step": None,
+               "job": "semgrep", "check_name": "Semgrep", "source_sha": SHA, "step": None,
                "step_provenance": {"status": "unavailable",
                                    "reason": "github_check_run_annotations_do_not_expose_step_identity"},
                "check_run_id": 33, "action_identity": "semgrep",
@@ -182,6 +218,37 @@ class WorkflowAnnotationReconciliationTests(unittest.TestCase):
         evidence = json.loads((self.root / "workflow-annotations.json").read_text())
         self.assertEqual(evidence["annotations"][0]["correlation"]["status"], "supporting")
 
+    def test_substring_scanner_identity_does_not_correlate(self):
+        result = apply(self.root, self.envelope([self.annotation(
+            annotation_id="workflow-annotation:substring", action_identity="semgrep-wrapper",
+            check_name="Semgrep wrapper", job="Semgrep wrapper",
+        )]))
+        self.assertEqual(result["finding_count"], 2)
+        evidence = json.loads((self.root / "workflow-annotations.json").read_text())
+        self.assertEqual(evidence["annotations"][0]["correlation"]["status"], "unmatched")
+
+    def test_source_sha_mismatch_does_not_correlate(self):
+        result = apply(self.root, self.envelope([self.annotation(
+            annotation_id="workflow-annotation:wrong-sha", source_sha="d" * 40,
+        )]))
+        self.assertEqual(result["finding_count"], 2)
+
+    def test_rule_and_line_range_must_match_exactly(self):
+        for suffix, values in (
+                ("rule", {"title": "python.sql-injection-extra"}),
+                ("range", {"end_line": 6})):
+            with self.subTest(suffix=suffix):
+                with tempfile.TemporaryDirectory() as temporary:
+                    destination = Path(temporary)
+                    (destination / "details").mkdir()
+                    for source in ("report.json", "findings.json", "details/0.json"):
+                        target = destination / source
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text((self.root / source).read_text(), encoding="utf-8")
+                    result = apply(destination, self.envelope([self.annotation(
+                        annotation_id=f"workflow-annotation:{suffix}", **values)]))
+                    self.assertEqual(result["finding_count"], 2)
+
     def test_unmatched_annotation_becomes_visible_workflow_finding(self):
         result = apply(self.root, self.envelope([self.annotation(annotation_id="workflow-annotation:2", title="build-warning",
                                                                   action_identity="github-actions", file=None,
@@ -192,6 +259,20 @@ class WorkflowAnnotationReconciliationTests(unittest.TestCase):
         self.assertEqual(findings[1]["annotation"]["job"], "semgrep")
         self.assertEqual(findings[1]["annotation"]["step_provenance"]["status"], "unavailable")
 
+    def test_deprecated_runtime_annotation_is_an_actionable_workflow_update(self):
+        annotation = self.annotation(
+            annotation_id="workflow-annotation:update", title="deprecated-runtime",
+            message="Node.js 20 actions are deprecated", file=None, start_line=None,
+            action_identity="github-actions", policy="actionable",
+            policy_provenance={"rule_id": "annotation-level-policy-v1", "basis": "annotation_level"},
+            kind="workflow_update", contributes_to_needs_attention=True,
+        )
+        result = apply(self.root, self.envelope([annotation]))
+        findings = json.loads((self.root / "findings.json").read_text())
+        self.assertEqual(findings[1]["category"], "WORKFLOW_UPDATE")
+        self.assertEqual(result["annotation_evidence"]["actionable_count"], 1)
+        self.assertEqual(result["annotation_evidence"]["workflow_update_count"], 1)
+
     def test_unavailable_keeps_native_sibling_and_marks_report_partial(self):
         envelope = self.envelope([], "permission_denied")
         envelope["diagnostics"] = [{"message": "missing actions read permission"}]
@@ -201,6 +282,15 @@ class WorkflowAnnotationReconciliationTests(unittest.TestCase):
         channel = next(row for row in result["channels"] if row["channel"] == "workflow-annotations")
         self.assertIsNone(channel["findings"])
         self.assertEqual(channel["status"], "NOT_AVAILABLE")
+        self.assertEqual(channel["evidence_state"], "permission_denied")
+
+    def test_measured_zero_remains_a_distinct_channel_state(self):
+        measured = apply(self.root, self.envelope([], "measured_zero"))
+        channel = next(row for row in measured["channels"] if row["channel"] == "workflow-annotations")
+        self.assertEqual(channel["status"], "COMPLETED_OPTIONAL")
+        self.assertEqual(channel["evidence_state"], "measured_zero")
+        self.assertEqual(channel["findings"], 0)
+        self.assertIn("zero workflow annotations", channel["reason"])
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ def build_workspace_documents(report: dict, findings: list[dict]) -> dict[str, o
             'severities': report.get('severities', {}),
             'channels': [{key: row.get(key) for key in (
                 'channel', 'name', 'class', 'status', 'findings', 'observation_count',
-                'reason', 'workflow',
+                'reason', 'workflow', 'evidence_state',
             )} for row in report.get('channels', []) if isinstance(row, dict)],
             'publication_gate': report.get('publication_gate', {}),
         },

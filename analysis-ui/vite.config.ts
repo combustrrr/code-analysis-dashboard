@@ -4,7 +4,7 @@ export default defineConfig(({ mode }) => {
   return {
     base: './',
     build: { manifest: true },
-    publicDir: mode === 'fixtures' && !accessTest ? 'public' : 'public-static',
+    publicDir: mode === 'fixtures' && !accessTest ? '.test-public' : 'public-static',
     define: accessTest ? {
       'import.meta.env.VITE_APPLICATION_MODE': JSON.stringify('repositories'),
       'import.meta.env.VITE_LAUNCH_ENDPOINT': JSON.stringify('https://launcher.example'),

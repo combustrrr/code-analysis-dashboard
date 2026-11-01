@@ -15,6 +15,7 @@ analysis-ui/playwright-report/
 analysis-ui/.lighthouseci/
 analysis-ui/.lighthouseci-routes/
 analysis-ui/.lighthouseci-routes-mobile/
+analysis-ui/.test-public/
 
 .verification/
 .superdesign/tmp/

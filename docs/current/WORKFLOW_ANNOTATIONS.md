@@ -46,13 +46,29 @@ It remains supporting provenance without increasing the canonical total. Similar
 text alone never establishes a shared root cause.
 
 Unmatched warnings and failures are actionable workflow observations. Notices
-are advisory. Jobs, checks, or titles carrying deterministic `canary` or
-`negative test` provenance are labelled `validation_fixture` and remain visible
-without promotion to a production defect. This reviewed policy, not colour
-alone, determines whether an observation contributes to Needs attention.
+are advisory. Validation fixtures are excluded only when workflow, job, check,
+and action identities exactly match a reviewed rule in trusted tooling. Words
+such as `canary` or `negative test` in provider-controlled annotation, job, or
+check text never change policy. Every retained record includes the policy rule
+and basis, so a fixture exclusion is reviewable rather than inferred from text.
+This reviewed provenance, not colour alone, determines whether an observation
+contributes to Needs attention.
+
+Correlation uses the exact report source SHA and exact normalized rule, scanner,
+path, and line range. Scanner aliases are an explicit reviewed registry; there
+is no substring fallback. Unknown identities remain unmatched observations and
+cannot suppress a canonical finding.
 
 Issues filters annotations by source, workflow, job, level, file, and correlated
-scanner. Details show run/attempt, job, step availability, policy, and correlation.
+scanner. Details show run/attempt, job, step availability, policy basis, and
+correlation. Deprecation and outdated-runtime annotations are retained as
+`WORKFLOW_UPDATE` issues with an explicit workflow-update action rather than
+being hidden by a successful run.
 Links are built from configured repository identity and validated IDs/SHAs, pass
 the UI GitHub URL allowlist, and open with `noopener noreferrer`.
+
+Coverage retains the collector's `evidence_state` separately from the broader
+channel status. The UI therefore renders complete, measured zero, partial,
+truncated, permission denied, rate limited, unavailable, invalid, operational
+failure, and unknown states distinctly instead of collapsing them.
 

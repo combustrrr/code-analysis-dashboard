@@ -41,6 +41,80 @@ ENVIRONMENT_CREDENTIAL = re.compile(
     r"\s*[:=]\s*(?:\"[^\"\r\n]*\"|'[^'\r\n]*'|[^\s,;]+)"
 )
 RUNNER_PATH = re.compile(r"^(?:[A-Za-z]:[\\/]|/(?:home/runner|opt/hostedtoolcache|tmp|__w)/)", re.I)
+WORKFLOW_UPDATE = re.compile(
+    r"(?i)\b(?:deprecated|deprecation|outdated|no longer supported|"
+    r"will be forced to run using node|uses? node(?:\.js)?\s*[0-9]+)\b"
+)
+
+# Validation annotations may be downgraded only by an exact, reviewed execution
+# identity. Annotation, job, and check text are provider-controlled evidence and
+# are never treated as fixture provenance merely because they contain words such
+# as "canary" or "negative test".
+VALIDATION_FIXTURE_RULES = ({
+    "rule_id": "canary-coverage-workflow-v1",
+    "workflow": ".github/workflows/06-canary-validation.yml",
+    "job": "Scan Canary Suite with All Tools",
+    "check_name": "Scan Canary Suite with All Tools",
+    "action_identity": "github-actions",
+},)
+
+# Exact aliases connect reviewed GitHub check-job identities to the canonical
+# scanner families retained in native evidence. There is deliberately no
+# substring fallback: an unrecognized identity remains an unmatched workflow
+# observation instead of being silently deduplicated.
+SCANNER_IDENTITY_ALIASES = {
+    "bandit": "bandit",
+    "banditpythonsecurity": "bandit",
+    "coderabbit": "coderabbit",
+    "isolatedcoderabbitevidence": "coderabbit",
+    "checkov": "checkov",
+    "checkoviacsecurity": "checkov",
+    "codeql": "codeql",
+    "codeqlsemanticsast": "codeql",
+    "eslint": "eslint",
+    "eslinttsctypescriptreact": "eslint",
+    "coveragepy": "coveragepy",
+    "pytestcoverage": "coveragepy",
+    "gitleaks": "gitleaks",
+    "gitleakssecretsdetection": "gitleaks",
+    "hadolint": "hadolint",
+    "hadolintdockerfilelint": "hadolint",
+    "osvscanner": "osvscanner",
+    "osvscannerdependencycves": "osvscanner",
+    "openssfscorecard": "openssfscorecard",
+    "scorecard": "openssfscorecard",
+    "pyright": "pyright",
+    "pyrightpythontypechecking": "pyright",
+    "radon": "radon",
+    "radoncomplexitymetrics": "radon",
+    "repositorysecurityposture": "repositorysecurityposture",
+    "ruff": "ruff",
+    "ruffpythonlintformat": "ruff",
+    "semgrep": "semgrep",
+    "semgreppatternanalysis": "semgrep",
+    "shippingimagetrivy": "shippingimagetrivy",
+    "sbompolicy": "sbompolicy",
+    "snyk": "snyk",
+    "isolatedsnykevidence": "snyk",
+    "sonarqubecloud": "sonarqubecloud",
+    "isolatedsonarqubeevidence": "sonarqubecloud",
+    "trivy": "trivy",
+    "trivyfilesystemcontainersecurity": "trivy",
+    "typescript": "typescript",
+    "atheris": "atheris",
+    "atherisstatemachinefuzzing": "atheris",
+    "schemathesis": "schemathesis",
+    "schemathesisapifuzzing": "schemathesis",
+    "vulture": "vulture",
+    "vulturedeadcodedetection": "vulture",
+    "xenon": "xenon",
+    "xenoncomplexitythresholds": "xenon",
+    "zizmor": "zizmor",
+    "githubactionssecurityzizmor": "zizmor",
+    "njsscan": "njsscan",
+    "trufflehog": "trufflehog",
+    "grype": "grype",
+}
 
 
 class ApiFailure(RuntimeError):
@@ -70,6 +144,31 @@ def safe_path(value: object) -> str | None:
 
 def _int(value: object) -> int | None:
     return value if type(value) is int and value >= 0 else None
+
+
+def _policy(identity: dict, job: dict, check: dict, level: str) -> tuple[str, dict]:
+    provenance = {
+        "workflow": identity.get("workflow"),
+        "job": str(job.get("name") or ""),
+        "check_name": str(check.get("name") or ""),
+        "action_identity": str(check.get("app", {}).get("slug") or "")
+        if isinstance(check.get("app"), dict) else "",
+    }
+    for rule in VALIDATION_FIXTURE_RULES:
+        if all(provenance[key] == rule[key] for key in (
+                "workflow", "job", "check_name", "action_identity")):
+            return "validation_fixture", {
+                "rule_id": rule["rule_id"],
+                "basis": "reviewed_exact_execution_identity",
+            }
+    return ("advisory" if level == "notice" else "actionable"), {
+        "rule_id": "annotation-level-policy-v1",
+        "basis": "annotation_level",
+    }
+
+
+def _annotation_kind(title: object, message: object) -> str:
+    return "workflow_update" if WORKFLOW_UPDATE.search(f"{title or ''}\n{message or ''}") else "workflow_observation"
 
 
 def _status(error: ApiFailure) -> str:
@@ -155,9 +254,7 @@ def _record(annotation: dict, *, job: dict, check: dict, identity: dict, source:
         check.get("id"), path, annotation.get("start_line"), annotation.get("end_line"),
         annotation.get("title"), annotation.get("message"),
     ])[:24]
-    validation_fixture = any("canary" in str(value or "").lower() or "negative test" in str(value or "").lower()
-                             for value in (job.get("name"), check.get("name"), annotation.get("title")))
-    policy = "validation_fixture" if validation_fixture else "advisory" if level == "notice" else "actionable"
+    policy, policy_provenance = _policy(identity, job, check, level)
     run_url = f"https://github.com/{identity['execution_repository']}/actions/runs/{identity['run_id']}/attempts/{identity['run_attempt']}"
     file_url = (f"https://github.com/{identity['source_repository']}/blob/{identity['source_sha']}/{path}"
                 + (f"#L{annotation.get('start_line')}" if path and _int(annotation.get("start_line")) else "")) if path else None
@@ -194,6 +291,8 @@ def _record(annotation: dict, *, job: dict, check: dict, identity: dict, source:
         "tooling_sha": identity["tooling_sha"],
         "profile_digest": identity["profile_digest"],
         "policy": policy,
+        "policy_provenance": policy_provenance,
+        "kind": _annotation_kind(annotation.get("title"), annotation.get("message")),
         "contributes_to_needs_attention": policy == "actionable",
         "run_url": run_url,
         "check_url": f"https://github.com/{identity['execution_repository']}/runs/{check.get('id')}" if check.get("id") else None,
@@ -281,21 +380,48 @@ def _scanner_key(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
+def _canonical_scanner_identity(value: object) -> str | None:
+    key = _scanner_key(str(value or ""))
+    return SCANNER_IDENTITY_ALIASES.get(key)
+
+
+def _annotation_scanner_identities(annotation: dict) -> set[str]:
+    identities: set[str] = set()
+    for field in ("action_identity", "check_name", "job"):
+        value = str(annotation.get(field) or "")
+        candidates = [value]
+        if " / " in value:
+            candidates.append(value.rsplit(" / ", 1)[-1])
+        for candidate in candidates:
+            canonical = _canonical_scanner_identity(candidate)
+            if canonical:
+                identities.add(canonical)
+    return identities
+
+
 def _correlate(annotation: dict, details: list[dict], source_sha: str) -> dict | None:
-    if annotation.get("file") is None or annotation.get("start_line") is None:
+    if (annotation.get("source_sha") != source_sha or not SHA.fullmatch(str(source_sha or ""))
+            or annotation.get("file") is None or annotation.get("start_line") is None):
         return None
-    action = _scanner_key(annotation.get("action_identity") or annotation.get("check_name") or "")
-    title = _scanner_key(annotation.get("title") or "")
+    annotation_path = safe_path(annotation.get("file"))
+    title = _scanner_key(str(annotation.get("title") or ""))
+    annotation_scanners = _annotation_scanner_identities(annotation)
+    if not annotation_path or not title or not annotation_scanners:
+        return None
     candidates = []
     for detail in details:
-        if detail.get("file") != annotation["file"] or detail.get("line") != annotation["start_line"]:
+        if safe_path(detail.get("file")) != annotation_path or detail.get("line") != annotation["start_line"]:
             continue
         if (detail.get("end_line") or detail.get("line")) != (annotation.get("end_line") or annotation.get("start_line")):
             continue
-        rules = [_scanner_key(value) for value in detail.get("rules", [])]
-        scanners = [_scanner_key(value) for value in detail.get("scanners", [])]
-        exact_rule = bool(title and title in rules)
-        exact_scanner = bool(action and any(action in value or value in action for value in scanners))
+        rules = {_scanner_key(str(value)) for value in detail.get("rules", [])}
+        scanner_values = list(detail.get("scanners", [])) + [
+            origin.get("scanner_family") for origin in detail.get("origins", []) if isinstance(origin, dict)
+        ]
+        scanners = {_canonical_scanner_identity(value) for value in scanner_values}
+        scanners.discard(None)
+        exact_rule = title in rules
+        exact_scanner = bool(annotation_scanners & scanners)
         if exact_rule and exact_scanner:
             candidates.append(detail)
     return candidates[0] if len(candidates) == 1 else None
@@ -322,7 +448,7 @@ def apply(destination: Path, envelope: dict) -> dict:
             "raw_artifact": "workflow-annotations.json", "observation_id": annotation["annotation_id"],
             "annotation": {key: annotation.get(key) for key in (
                 "source", "level", "run_id", "run_attempt", "job", "step", "step_provenance",
-                "check_run_id", "policy")},
+                "check_run_id", "policy", "policy_provenance", "kind")},
         }
         if correlated:
             annotation["correlation"] = {"status": "supporting", "finding_id": correlated["id"],
@@ -330,8 +456,8 @@ def apply(destination: Path, envelope: dict) -> dict:
             target = by_id[correlated["id"]]
             annotation_meta = {key: annotation.get(key) for key in (
                 "source", "level", "workflow", "run_id", "run_attempt", "job", "step", "step_provenance",
-                "check_run_id", "correlation", "policy", "contributes_to_needs_attention", "run_url",
-                "check_url", "file_url")}
+                "check_run_id", "check_name", "action_identity", "source_sha", "correlation", "policy",
+                "policy_provenance", "kind", "contributes_to_needs_attention", "run_url", "check_url", "file_url")}
             correlated.setdefault("annotation", annotation_meta)
             target.setdefault("annotation", annotation_meta)
             if not any(value.get("observation_id") == annotation["annotation_id"] for value in target["origins"]):
@@ -343,15 +469,16 @@ def apply(destination: Path, envelope: dict) -> dict:
             continue
         fid = annotation["annotation_id"]
         severity = "INFO" if annotation.get("policy") == "validation_fixture" else {"failure": "HIGH", "warning": "MEDIUM", "notice": "INFO"}[annotation["level"]]
-        category = "VALIDATION" if annotation.get("policy") == "validation_fixture" else "WORKFLOW"
+        category = ("VALIDATION" if annotation.get("policy") == "validation_fixture"
+                    else "WORKFLOW_UPDATE" if annotation.get("kind") == "workflow_update" else "WORKFLOW")
         row = {"id": fid, "severity": severity, "category": category, "message": annotation["message"],
                "file": annotation.get("file") or "", "line": annotation.get("start_line") or 0,
                "scanners": ["Workflow annotations"], "rules": [annotation.get("title") or "workflow-annotation"],
                "observation_count": 1, "scanner_family_count": 1, "page": 0,
                "annotation": {key: annotation.get(key) for key in (
                    "source", "level", "workflow", "run_id", "run_attempt", "job", "step", "step_provenance",
-                   "check_run_id", "correlation", "policy", "contributes_to_needs_attention", "run_url",
-                   "check_url", "file_url")}}
+                   "check_run_id", "check_name", "action_identity", "source_sha", "correlation", "policy",
+                   "policy_provenance", "kind", "contributes_to_needs_attention", "run_url", "check_url", "file_url")}}
         detail = {**row, "origins": [origin], "source": None, "source_start": None, "source_url": None}
         findings.append(row)
         details.append(detail)
@@ -374,11 +501,24 @@ def apply(destination: Path, envelope: dict) -> dict:
         write(destination / "details" / f"{start // 100}.json", details[start:start + 100])
     status = envelope.get("status")
     complete = status in {"complete", "measured_zero"}
+    state_reasons = {
+        "complete": "Workflow annotations were collected completely for the exact run and attempt.",
+        "measured_zero": "GitHub returned zero workflow annotations for the exact run and attempt.",
+        "partial": "Some workflow annotations were retained, but collection was incomplete.",
+        "truncated": "Workflow annotation collection reached a reviewed bound and was truncated.",
+        "permission_denied": "GitHub denied permission to read workflow annotations.",
+        "rate_limited": "GitHub rate limiting prevented workflow annotation collection.",
+        "unavailable": "GitHub workflow annotation evidence was unavailable.",
+        "invalid": "GitHub returned invalid workflow annotation evidence.",
+        "operational_failure": "Workflow annotation collection failed operationally.",
+    }
+    diagnostic_reason = "; ".join(row.get("message", "") for row in envelope.get("diagnostics", []))[:1000]
     channel = {"channel": "workflow-annotations", "name": "Workflow annotations", "class": "reliability",
                "status": "COMPLETED_OPTIONAL" if complete else "PARTIAL" if envelope.get("annotations") else "NOT_AVAILABLE",
+               "evidence_state": status or "unknown",
                "findings": len(unique) if complete else None, "observation_count": len(envelope.get("annotations", [])),
                "observation_ids": [row["annotation_id"] for row in envelope.get("annotations", [])],
-               "reason": "" if complete else "; ".join(row.get("message", "") for row in envelope.get("diagnostics", []))[:1000],
+               "reason": diagnostic_reason or state_reasons.get(status, "Workflow annotation evidence state is unknown."),
                "workflow": report.get("producer_runs", [{}])[0].get("url", "")}
     report["channels"] = [row for row in report.get("channels", []) if row.get("channel") != channel["channel"]] + [channel]
     report["finding_count"] = len(findings)
@@ -387,7 +527,14 @@ def apply(destination: Path, envelope: dict) -> dict:
                             for level in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")}
     report["annotation_evidence"] = {"schema_version": SCHEMA, "status": status,
                                      "count": len(envelope.get("annotations", [])),
-                                     "unique_findings": len(unique), "truncated": bool(envelope.get("truncated"))}
+                                      "unique_findings": len(unique),
+                                      "actionable_count": sum(bool(row.get("contributes_to_needs_attention"))
+                                                               for row in envelope.get("annotations", [])),
+                                      "validation_fixture_count": sum(row.get("policy") == "validation_fixture"
+                                                                      for row in envelope.get("annotations", [])),
+                                      "workflow_update_count": sum(row.get("kind") == "workflow_update"
+                                                                   for row in envelope.get("annotations", [])),
+                                      "truncated": bool(envelope.get("truncated"))}
     if not complete:
         report["status"] = "partial"
         if "workflow-annotations" not in report.setdefault("incomplete_channels", []):

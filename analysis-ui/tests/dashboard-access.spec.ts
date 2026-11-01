@@ -330,7 +330,7 @@ test('repository deep links open the authenticated workspace with a shared theme
  await expect(page.locator('.shell-user')).toContainText('developer');
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
  await page.locator('.shell-header').getByRole('link',{name:'Settings'}).click();
- await page.locator('.settings-control-card').getByText('Dark',{exact:true}).click();
+  await page.locator('.settings-preference-list').getByText('Dark',{exact:true}).click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
  await page.setViewportSize({width:390,height:844});
  const mobileLayout=await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,overflowing:[...document.querySelectorAll('body *')].map(element=>({element:element.tagName+'.'+(element as HTMLElement).className?.toString().replaceAll(' ',' .'),right:Math.round(element.getBoundingClientRect().right)})).filter(item=>item.right>innerWidth+1).slice(0,8)}));

@@ -4,3 +4,4 @@ ui-build/
 public/data/
 test-results/
 playwright-report/
+.test-public/

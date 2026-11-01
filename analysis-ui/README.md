@@ -44,10 +44,10 @@ the current immutable publication contract.
 
 ## Local browser fixtures
 
-`public/data/` is an ignored, local-only fixture dataset used by `npm test`. The
-Playwright server builds with the explicit `fixtures` mode; `npm run build` and the
-Pages workflow use the normal/repository mode, where Vite disables `public/` copying
-and no report fixtures enter `dist/`. Keep the retained fixture evidence available for
-browser tests, but remove generated `dist/` and `test-results/` directories when they
-are no longer needed. CI security scans run from Git-tracked checkouts, so these
-ignored local fixtures are not part of production or security packaging.
+`npm run build:fixtures` generates a bounded deterministic dataset in ignored
+`.test-public/` from the tracked `scripts/generate-test-fixtures.mjs` contract.
+Playwright therefore runs reproducibly from a clean checkout without depending on
+ignored `public/data/` evidence. The explicit `fixtures` mode copies only that
+generated test dataset; `npm run build` and the Pages workflow use
+`public-static/`, so no report fixtures enter production `dist/` output. CI runs
+both the fixture workspace suite and the authenticated access suite in Chromium.

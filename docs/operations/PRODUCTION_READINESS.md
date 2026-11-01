@@ -46,9 +46,11 @@ The repository deployment checks cover service tests, workflow policy, launcher 
 UI build/browser coverage, and configuration-level deployment validation. The live
 anonymous check confirms that sign-in is visible and that an unauthenticated
 project-integration request is denied; it is not a successful authenticated scan.
-Playwright runs are serialized with one worker against local fixture data, so those
-tests do not validate concurrent browser workers or prove the deployed Pages/Worker
-pair is healthy.
+Playwright runs are serialized with one worker against a clean-checkout,
+deterministically generated fixture plus a separately built authenticated-access
+suite. They prove the checked-in browser contract is reproducible, but do not
+validate concurrent browser workers or by themselves prove the deployed
+Pages/Worker pair is healthy.
 
 External deployment verification remains outstanding where it requires credentials or
 provider state: an authorized owner must validate the installed GitHub App, Worker

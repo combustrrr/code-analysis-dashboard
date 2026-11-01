@@ -20,11 +20,13 @@ class WorkspaceDocumentTests(unittest.TestCase):
             'finding_count': len(findings),
             'observation_count': len(findings),
             'severities': {'LOW': len(findings)},
-            'channels': [{'channel': 'semgrep', 'status': 'COMPLETED'}],
+            'channels': [{'channel': 'workflow-annotations', 'status': 'COMPLETED_OPTIONAL',
+                          'evidence_state': 'measured_zero'}],
             'publication_gate': {'satisfied': True},
         }
         documents = build_workspace_documents(report, findings)
         self.assertEqual(documents['coverage.json']['schema_version'], 'project-coverage-v1')
+        self.assertEqual(documents['coverage.json']['channels'][0]['evidence_state'], 'measured_zero')
         self.assertEqual(documents['findings-catalog.json']['pages'], 2)
         self.assertEqual(len(documents['findings-pages/0.json']), FINDINGS_PAGE_SIZE)
         self.assertEqual(len(documents['findings-pages/1.json']), 1)
