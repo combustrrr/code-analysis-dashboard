@@ -28,7 +28,14 @@ The deployment secret contract is centralized in
 as ordinary variables, production credentials entering source-executing jobs, required
 Worker binding drift, and tracked token/private-key-like content. Provider checks read
 names only. `WORKER_API_TOKEN` has a transition-probed, stdin-only dual-store rotation
-procedure documented in `SECRET-MANAGEMENT.md`.
+procedure documented in `SECRET-MANAGEMENT.md`. The procedure is operator-triggered;
+there is no unattended rotation schedule. The 2026-11-01 deployment proved the
+contract, required secret names, and Worker deployment, but did not prove that a live
+coordinated token rotation occurred. A same-named `WORKER_API_TOKEN` is also present in
+the GitHub `production` Environment even though the manifest designates the repository
+secret and Cloudflare Worker secret as the authoritative pair. It is not consumed by
+the current deployment workflow; canonical-scope enforcement, safe cleanup, and
+scheduled rotation are tracked in issue #202.
 
 Sonar's OSS plan accepts the project main branch, not arbitrary long-lived branches. The
 service-owned Agentic-Kibana and dashboard scanner identities therefore use dedicated CI

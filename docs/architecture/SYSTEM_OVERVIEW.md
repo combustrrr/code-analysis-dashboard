@@ -102,6 +102,20 @@ sequenceDiagram
 | Publisher | Read producer artifacts and write validated report objects | Execute source-controlled commands |
 | Public report API | Return authorized, bounded, sanitized evidence | Detected secret values or session material |
 
+## Credential ownership
+
+The repository owns a value-free, versioned secret governance manifest. It does not
+store or broker the secret values themselves. GitHub repository secrets hold trusted
+workflow credentials, the protected GitHub `production` Environment holds Worker
+deployment credentials, and Cloudflare Worker secrets hold runtime OAuth, App, session,
+and Worker authentication material. The ephemeral GitHub-provided `GITHUB_TOKEN` is
+never persisted or copied between stores.
+
+`WORKER_API_TOKEN` is intentionally duplicated only across the GitHub repository secret
+store and Cloudflare Worker secret store because both the coordinator and Worker must
+authenticate the same internal request. Its checked-in two-secret transition procedure
+is operator-triggered; unattended rotation is future work tracked in issue #202.
+
 ## Consistency and concurrency
 
 - Admission is durable before the coordinator is woken.

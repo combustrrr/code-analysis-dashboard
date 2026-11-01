@@ -129,4 +129,7 @@ artifacts in the public service repository remain publicly accessible; dashboard
 does not make scanner evidence confidential.
 
 See [free services and OSS perks](docs/operations/FREE_SERVICES.md) for the Cloudflare operations
-configuration, diagnostics privacy and evaluated optional programs.
+configuration, diagnostics privacy and evaluated optional programs. The
+[secret-management runbook](docs/operations/SECRET-MANAGEMENT.md) documents the
+value-free central manifest, provider-owned value stores, and the current
+operator-triggered rotation boundary.

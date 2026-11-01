@@ -34,6 +34,17 @@ Scanner coverage is limited to the secrets configured for the run. If a
 required credential is missing or expired, the corresponding scan is skipped
 or incomplete.
 
+## Secret rotation is not unattended
+
+The repository centrally governs secret metadata and validates required provider names,
+but GitHub and Cloudflare retain their respective secret values. The coordinated
+`WORKER_API_TOKEN` transition script automates a safe rotation only after an operator
+explicitly invokes it; no cron workflow currently performs rotations. Provider-issued
+Sonar, Snyk, R2, GitHub OAuth/App, and Cloudflare deployment credentials follow their
+provider procedures. A successful deployment or name-only audit is not evidence that a
+live value was rotated. Scheduled rotation and canonical-store enforcement are tracked
+in issue #202.
+
 ## Dashboard requires GitHub App + Cloudflare Workers setup
 
 The dashboard is not self-contained. It requires a configured GitHub App for

@@ -7,7 +7,9 @@ description: SESSION_KEY entropy requirements and secret rotation procedures.
 
 `config/secret-manifest-v1.json` is the versioned authority for secret names,
 stores, consumers, minimum scope, required/optional state, rotation cadence, and
-source-job eligibility. It contains metadata only, never values. Validate it with:
+source-job eligibility. It is a centralized governance contract, not a centralized
+secret vault. It contains metadata only, never values; GitHub and Cloudflare remain
+the systems of record for the values assigned to them. Validate it with:
 
 ```bash
 python -m scripts.deployment.secret_contract
@@ -17,6 +19,19 @@ python -m scripts.deployment.secret_contract --verify-provider-names
 The second command reads names only from GitHub and Cloudflare. It also fails if a
 manifest secret name has been placed in a GitHub Actions Variable. Worker deployment
 performs the Cloudflare name check using the protected `production` Environment.
+
+The intended value-store boundaries are:
+
+| Store | Examples | Boundary |
+|---|---|---|
+| GitHub repository secrets | Scanner tokens, R2 workflow credentials, `SCANNER_UPDATE_TOKEN`, coordinator `WORKER_API_TOKEN` | Trusted workflow consumers only |
+| GitHub `production` Environment secrets | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Protected Worker deployment only |
+| Cloudflare Worker secrets | OAuth/App secrets, `SESSION_KEY`, Worker `WORKER_API_TOKEN` | Worker runtime only |
+| GitHub built-in token | `GITHUB_TOKEN` | Ephemeral job token; never copied into another store |
+
+`WORKER_API_TOKEN` is the deliberate exception that has matching values in the GitHub
+repository secret store and Cloudflare Worker store. An identically named secret in a
+different GitHub scope is not a third authoritative copy.
 
 ## SESSION_KEY entropy requirements
 
@@ -79,6 +94,12 @@ stops before primary promotion, retain `WORKER_API_TOKEN_NEXT`, correct the prov
 or network failure, and rerun. Do not manually remove the transition secret until the
 new primary probe succeeds.
 
+This is operator-triggered automation. No scheduled workflow currently invokes the
+procedure, so a deployment or successful secret-name audit must not be reported as a
+completed live rotation. Scheduled rotation, non-secret due/overdue evidence, and
+canonical-scope duplicate enforcement are tracked in
+[#202](https://github.com/combustrrr/code-analysis-dashboard/issues/202).
+
 ### GitHub App secrets
 
 1. In GitHub: Settings → Developer settings → GitHub Apps → <app> → Generate a new client secret.
@@ -113,12 +134,12 @@ new primary probe succeeds.
 
 | Secret | Rotation cadence | Trigger |
 |--------|------------------|---------|
-| SESSION_KEY | 90 days or on compromise suspicion | Scheduled or incident |
-| GITHUB_CLIENT_SECRET | 180 days or on compromise suspicion | Scheduled or incident |
-| R2_ACCESS_KEY / R2_SECRET_KEY | 90 days | Scheduled |
+| SESSION_KEY | 90 days or on compromise suspicion | Operator-scheduled maintenance window or incident; rotation signs out active sessions |
+| GITHUB_CLIENT_SECRET | 180 days or on compromise suspicion | Operator/provider procedure or incident |
+| R2_ACCESS_KEY / R2_SECRET_KEY | 90 days | Operator/provider procedure |
 | SNYK_TOKEN / SONAR_TOKEN / SONAR_API_TOKEN | Per provider policy | Provider notification |
-| SCANNER_UPDATE_TOKEN | 180 days or on personnel change | Scheduled or offboarding |
-| WORKER_API_TOKEN | 180 days | Scheduled |
+| SCANNER_UPDATE_TOKEN | 180 days or on personnel change | Operator/provider procedure or offboarding |
+| WORKER_API_TOKEN | 180 days | Operator invokes the transition script; unattended scheduling is not implemented |
 
 Document each rotation in the deployment changelog with date, operator, and reason
 (without recording the secret value).
