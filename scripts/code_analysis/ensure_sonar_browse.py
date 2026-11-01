@@ -10,8 +10,10 @@ import urllib.request
 from pathlib import Path
 
 try:
+    from .network_access import open_url
     from .sonar_identity import environment_identity, project_identity
 except ImportError:
+    from network_access import open_url
     from sonar_identity import environment_identity, project_identity
 
 
@@ -26,7 +28,7 @@ def _request(url: str, token: str, data: bytes | None = None) -> tuple[int, obje
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with open_url(request, timeout=30, allowed_hosts={"sonarcloud.io"}) as response:
             body = response.read()
             return response.status, json.loads(body) if body else None
     except urllib.error.HTTPError as error:

@@ -12,6 +12,11 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+try:
+    from .network_access import open_url
+except ImportError:
+    from network_access import open_url
+
 
 class SonarApiError(RuntimeError):
     def __init__(self, status: int):
@@ -24,7 +29,7 @@ def _request(url: str, token: str) -> dict[str, Any]:
         url, headers={"Authorization": f"Bearer {token}"}
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with open_url(request, timeout=30, allowed_hosts={"sonarcloud.io"}) as response:
             return json.load(response)
     except urllib.error.HTTPError as error:
         raise SonarApiError(error.code) from None

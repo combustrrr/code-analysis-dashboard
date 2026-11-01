@@ -14,6 +14,7 @@ from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 
 from scripts.code_analysis.hosted import digest, load, write
+from scripts.code_analysis.network_access import open_url
 from scripts.code_analysis.project_overview import build_project_overview
 from scripts.code_analysis.workspace_documents import build_workspace_documents
 
@@ -199,7 +200,7 @@ class GitHubReader:
             headers["Authorization"] = "Bearer " + self.token
         request = urllib.request.Request(url, headers=headers, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with open_url(request, timeout=30, allowed_hosts={"api.github.com"}) as response:
                 body = response.read(5_000_001)
                 if len(body) > 5_000_000:
                     raise ApiFailure(413, "GitHub response exceeded the bounded payload")

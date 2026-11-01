@@ -9,6 +9,8 @@ import re
 import time
 import urllib.request
 
+from scripts.code_analysis.network_access import open_url
+
 EXIT_CODE = re.compile(r"sonar-scanner.+failed with exit code (\d+)", re.IGNORECASE)
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
@@ -27,7 +29,7 @@ def request(path: str) -> object:
         headers={"Accept": "application/vnd.github+json", "User-Agent": "code-analysis-dashboard",
                  "X-GitHub-Api-Version": "2022-11-28"},
     )
-    with urllib.request.urlopen(api_request, timeout=30) as response:
+    with open_url(api_request, timeout=30, allowed_hosts={"api.github.com"}) as response:
         return json.load(response)
 
 

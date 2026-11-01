@@ -8,6 +8,8 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+from scripts.code_analysis.network_access import open_url
+
 PR_ONLY_CHANNELS = {"coderabbit-ai-advisory"}
 
 
@@ -21,7 +23,7 @@ def github(path: str) -> dict:
         "https://api.github.com/" + path,
         headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json", "User-Agent": "code-analysis-operator"},
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
+    with open_url(request, timeout=30, allowed_hosts={"api.github.com"}) as response:
         return json.load(response)
 
 

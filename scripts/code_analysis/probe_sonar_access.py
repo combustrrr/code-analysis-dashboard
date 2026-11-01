@@ -10,8 +10,10 @@ import urllib.request
 from pathlib import Path
 
 try:
+    from .network_access import open_url
     from .sonar_identity import environment_identity
 except ImportError:
+    from network_access import open_url
     from sonar_identity import environment_identity
 
 
@@ -21,7 +23,7 @@ def _request(url: str, token: str) -> tuple[int, object | None]:
         url, headers={"Authorization": f"Bearer {token}"} if token else {}
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with open_url(request, timeout=30, allowed_hosts={"sonarcloud.io"}) as response:
             return response.status, json.load(response)
     except urllib.error.HTTPError as error:
         # Retain a classified cause only, never an arbitrary provider response.

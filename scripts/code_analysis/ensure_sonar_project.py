@@ -10,6 +10,11 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+try:
+    from .network_access import open_url
+except ImportError:
+    from network_access import open_url
+
 SERVER = "https://sonarcloud.io"
 
 
@@ -19,7 +24,7 @@ def _request(url: str, token: str = "", data: bytes | None = None) -> tuple[int,
         headers["Authorization"] = f"Bearer {token}"
     request = urllib.request.Request(url, data=data, headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with open_url(request, timeout=30, allowed_hosts={"sonarcloud.io"}) as response:
             body = response.read()
             return response.status, json.loads(body) if body else {}
     except urllib.error.HTTPError as error:

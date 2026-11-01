@@ -15,7 +15,7 @@ import tempfile
 import uuid
 import zipfile
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from scripts.code_analysis.hosted import (
     accept,
@@ -27,6 +27,7 @@ from scripts.code_analysis.hosted import (
     target,
     write,
 )
+from scripts.code_analysis.network_access import open_url
 
 GH_TIMEOUT_SECONDS = 120
 
@@ -119,6 +120,7 @@ def cf_api(config: dict, path: str, method: str = 'GET', data: bytes | None = No
     endpoint = config.get('launch_endpoint')
     if not endpoint:
         raise ValueError("launch_endpoint is required to store state in Cloudflare")
+    endpoint_host = urlsplit(endpoint).hostname or ""
     url = endpoint.rstrip('/') + path
     token = os.environ.get('WORKER_API_TOKEN', '')
     headers = {'Authorization': f'Bearer {token}', 'User-Agent': 'code-analysis-dashboard-reconciler/1', 'Accept': 'application/json'}
@@ -126,7 +128,7 @@ def cf_api(config: dict, path: str, method: str = 'GET', data: bytes | None = No
         headers['Content-Type'] = content_type
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req) as res:
+        with open_url(req, timeout=30, allowed_hosts={endpoint_host}) as res:
             return res.read()
     except urllib.error.HTTPError as e:
         if e.code == 404 and method == 'GET':

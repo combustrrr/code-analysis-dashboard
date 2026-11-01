@@ -3,10 +3,11 @@ import json
 import re
 import subprocess
 import sys
-import urllib.request
 from pathlib import Path
 
 import yaml
+
+from scripts.code_analysis.network_access import open_url
 
 
 def sync_release_checksum(root: Path, relative_path: str, product: str, url_template: str, asset_template: str):
@@ -17,7 +18,7 @@ def sync_release_checksum(root: Path, relative_path: str, product: str, url_temp
         raise ValueError(f'Invalid {product} version')
     if pin['checksum_version'] != version:
         url = url_template.format(version=version)
-        with urllib.request.urlopen(url, timeout=30) as response:
+        with open_url(url, timeout=30, allowed_hosts={"github.com"}) as response:
             checksums = response.read(1_000_001)
         if len(checksums) > 1_000_000:
             raise ValueError('Oversized release checksum file')

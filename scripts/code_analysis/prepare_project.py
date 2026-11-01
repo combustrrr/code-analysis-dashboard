@@ -7,6 +7,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.code_analysis.network_access import open_url
 from scripts.code_analysis.projects import service_config, validate
 
 
@@ -14,7 +15,7 @@ def fetch(path):
     request = urllib.request.Request('https://api.github.com/' + path, headers={
         'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json',
         'User-Agent': 'code-analysis-project-loader'})
-    with urllib.request.urlopen(request, timeout=30) as response:
+    with open_url(request, timeout=30, allowed_hosts={"api.github.com"}) as response:
         return json.load(response)
 
 
