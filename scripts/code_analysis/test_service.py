@@ -23,6 +23,7 @@ from scripts.code_analysis.dashboard import (
 )
 from scripts.code_analysis.evidence_contract import build as build_evidence_contract
 from scripts.code_analysis.export_sonar_issues import export as export_sonar_issues
+from scripts.code_analysis.ensure_sonar_public import ensure as ensure_sonar_public
 from scripts.code_analysis.monitoring import (
     EvidenceError,
     build_snapshot,
@@ -72,6 +73,16 @@ def snapshot(items=None, channel_state=None):
     return build_analysis_snapshot(build_snapshot(current,channels,provenance),catalog)
 
 class MonitoringTests(unittest.TestCase):
+    def test_sonar_public_visibility_is_idempotent_and_verified(self):
+        with tempfile.TemporaryDirectory() as d, patch(
+            "scripts.code_analysis.ensure_sonar_public._request",
+            side_effect=[(404, {}), (204, {}), (200, {"component": {"visibility": "public"}})],
+        ) as request:
+            result = ensure_sonar_public("org_repo", "token", Path(d) / "visibility.json")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["visibility"], "public")
+        self.assertEqual(request.call_count, 3)
+
     def test_coderabbit_branch_status_is_not_a_measured_zero(self):
         status = coderabbit_branch_status()
         self.assertEqual(status["status"], "NOT_APPLICABLE")

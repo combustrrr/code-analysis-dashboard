@@ -93,6 +93,8 @@ the same configured key, selected branch, and immutable source SHA; a missing pr
 permission failure, or unsuccessful compute/export remains incomplete evidence.
 The dashboard uses a dedicated CI-owned Sonar project key so its retained scanner lane
 does not conflict with SonarCloud Automatic Analysis on the existing linked project.
+CI-owned Sonar projects for these public repositories are verified as public before the
+separate read-only API token exports native issues.
 The dashboard-source profile
 explicitly defers container-image/SBOM channels (there is no shipping image),
 Schemathesis (there is no application API contract), and Hadolint (its only Dockerfile

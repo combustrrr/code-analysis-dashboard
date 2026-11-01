@@ -127,6 +127,7 @@ jobs:
           sparse-checkout: |
             scripts/code_analysis/export_sonar_issues.py
             scripts/code_analysis/finalize_sonar_status.py
+            scripts/code_analysis/ensure_sonar_public.py
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Record Sonar unavailable status
@@ -166,6 +167,14 @@ jobs:
             -Dproject.settings=${{ runner.temp }}/sonar-project.properties
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Ensure public Sonar project visibility
+        if: always() && env.SONAR_TOKEN != '' && hashFiles('.source/.scannerwork/report-task.txt') != ''
+        env:
+          SONAR_PROJECT_KEY: ${{ fromJSON(inputs.target).sonar_project_key }}
+        run: |
+          python .analysis-tooling/scripts/code_analysis/ensure_sonar_public.py \
+            --project "$SONAR_PROJECT_KEY" \
+            --output sonar-visibility.json
       - name: Export Sonar findings
         id: sonar_export
         if: always() && env.SONAR_TOKEN != '' && env.SONAR_API_TOKEN != '' && hashFiles('.source/.scannerwork/report-task.txt') != ''
@@ -197,6 +206,7 @@ jobs:
           path: |
             sonar-status.json
             sonar-native-issues.json
+            sonar-visibility.json
           if-no-files-found: error
           retention-days: 7
 
