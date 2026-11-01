@@ -18,7 +18,7 @@ PROJECTS = {
 SONAR_PROJECTS = {
     "1267340546": ("combustrrr", "combustrrr_Kavach-AgenticSOC"),
     "1278177697": ("combustrrr", "combustrrr_Agentic-Kibana"),
-    "1360051890": ("combustrrr", "combustrrr_code-analysis-dashboard"),
+    "1360051890": ("combustrrr", "combustrrr_code-analysis-dashboard-ci"),
 }
 
 

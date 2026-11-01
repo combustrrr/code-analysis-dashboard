@@ -33,7 +33,7 @@ class QueueContractTests(unittest.TestCase):
         expected = {
             "1267340546": ("ARYDESTROYER/Kavach-AgenticSOC", "combustrrr_Kavach-AgenticSOC"),
             "1278177697": ("combustrrr/Agentic-Kibana", "combustrrr_Agentic-Kibana"),
-            "1360051890": ("combustrrr/code-analysis-dashboard", "combustrrr_code-analysis-dashboard"),
+            "1360051890": ("combustrrr/code-analysis-dashboard", "combustrrr_code-analysis-dashboard-ci"),
         }
         for project_id, (repository, sonar_key) in expected.items():
             claim = self.intent()

@@ -84,9 +84,8 @@ class MonitoringTests(unittest.TestCase):
         def request(url, _token):
             calls.append(url)
             if "ce/task" in url:
-                return {"task": {"status": "SUCCESS", "analysisId": "analysis-1"}}
-            if 'project_analyses/search' in url:
-                return {'analyses': [{'key': 'analysis-1', 'revision': 'a' * 40}]}
+                return {"task": {"status": "SUCCESS", "analysisId": "analysis-1",
+                                 "componentKey": "org_repo"}}
             return {"issues": [], "paging": {"total": 0}}
 
         with tempfile.TemporaryDirectory() as d, patch(
@@ -112,19 +111,19 @@ class MonitoringTests(unittest.TestCase):
             )
             self.assertEqual(result["branch"], "feature/source")
             self.assertEqual(result["sonar_branch"], "branch-issue-wall-1234")
-            self.assertIn("branch=branch-issue-wall-1234", calls[-1])
+            self.assertTrue(any("branch=branch-issue-wall-1234" in call for call in calls))
+            self.assertFalse(any("project_analyses/search" in call for call in calls))
 
-    def test_sonar_export_rejects_a_branch_changed_during_issue_collection(self):
+    def test_sonar_export_rejects_a_compute_task_changed_during_issue_collection(self):
         responses = [
-            {'task': {'status': 'SUCCESS', 'analysisId': 'one'}},
-            {'analyses': [{'key': 'one', 'revision': 'a' * 40}]},
+            {'task': {'status': 'SUCCESS', 'analysisId': 'one', 'componentKey': 'org_repo'}},
             {'issues': [], 'paging': {'total': 0}},
-            {'analyses': [{'key': 'two', 'revision': 'b' * 40}]}]
+            {'task': {'status': 'SUCCESS', 'analysisId': 'two', 'componentKey': 'org_repo'}}]
         with tempfile.TemporaryDirectory() as d, patch('scripts.code_analysis.export_sonar_issues._request', side_effect=responses):
             root=Path(d)
             task=root/'report-task.txt'
             task.write_text('serverUrl=https://sonarcloud.io\nceTaskUrl=https://sonarcloud.io/api/ce/task?id=1\n')
-            with self.assertRaisesRegex(ValueError, 'revision cannot be verified'):
+            with self.assertRaisesRegex(ValueError, 'compute task changed'):
                 export_sonar_issues(task, root/'issues.json', 'org_repo', 'main', 'a'*40, 'token')
             self.assertFalse((root/'issues.json').exists())
 
