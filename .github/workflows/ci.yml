@@ -81,6 +81,14 @@ jobs:
         run: npm test
       - name: Run authenticated browser acceptance
         run: npm run test:access
+      - name: Upload browser regression diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ui-browser-regression-${{ github.run_id }}
+          path: analysis-ui/test-results/
+          if-no-files-found: error
+          retention-days: 7
       - name: Build production UI
         env:
           VITE_APPLICATION_MODE: repositories

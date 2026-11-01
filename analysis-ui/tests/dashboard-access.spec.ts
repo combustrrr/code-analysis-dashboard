@@ -76,7 +76,7 @@ test('public landing remains accessible and visually stable across target viewpo
   await page.evaluate(()=>document.fonts.ready);
   await page.waitForTimeout(500);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
-  await expect(page).toHaveScreenshot(`landing-${viewport.name}.png`,{fullPage:false,animations:'disabled',maxDiffPixelRatio:.002});
+  await expect.soft(page).toHaveScreenshot(`landing-${viewport.name}.png`,{fullPage:false,animations:'disabled',maxDiffPixelRatio:.002});
  }
  await page.setViewportSize({width:1536,height:720});
  await page.goto('/');
