@@ -120,9 +120,15 @@ class ScannerAccessTests(unittest.TestCase):
         settings = next(step for step in steps if step.get('name') == 'Prepare isolated Sonar project settings')
         scan = next(step for step in steps if step.get('name') == 'Run SonarQube analysis')
         self.assertIn('sonar.sources=.', settings['run'])
-        self.assertIn('sonar.organization=$organization', settings['run'])
+        self.assertEqual(settings['env']['SONAR_ORGANIZATION'], '${{ fromJSON(inputs.target).sonar_organization }}')
+        self.assertEqual(settings['env']['SONAR_PROJECT_KEY'], '${{ fromJSON(inputs.target).sonar_project_key }}')
+        self.assertIn('sonar.organization=$SONAR_ORGANIZATION', settings['run'])
+        self.assertIn('sonar.projectKey=$SONAR_PROJECT_KEY', settings['run'])
+        self.assertIn('sonar.branch.name=$SOURCE_BRANCH', settings['run'])
         self.assertIn('${{ runner.temp }}/sonar-project.properties', scan['with']['args'])
         self.assertNotIn('sonar.projectKey=${{', scan['with']['args'])
+        export = next(step for step in steps if step.get('name') == 'Export Sonar findings')
+        self.assertIn('--project "$SONAR_PROJECT_KEY"', export['run'])
 
     def test_reconciliation_cannot_publish_checks_or_security_events_to_sources(self):
         for path in ('.github/workflows/code-analysis-coordinator.yml',):

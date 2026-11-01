@@ -13,6 +13,7 @@ from scripts.code_analysis.audit_workflows import audit_runtime_isolation
 from scripts.code_analysis.bound_sarif import bound as bound_sarif
 from scripts.code_analysis.channel_status import build as build_channel_status
 from scripts.code_analysis.collect_coderabbit import collect as collect_coderabbit
+from scripts.code_analysis.source_identity import coderabbit_branch_status
 from scripts.code_analysis.dashboard import (
     artifact_readme,
     generate,
@@ -71,6 +72,12 @@ def snapshot(items=None, channel_state=None):
     return build_analysis_snapshot(build_snapshot(current,channels,provenance),catalog)
 
 class MonitoringTests(unittest.TestCase):
+    def test_coderabbit_branch_status_is_not_a_measured_zero(self):
+        status = coderabbit_branch_status()
+        self.assertEqual(status["status"], "NOT_APPLICABLE")
+        self.assertIsNone(status["finding_count"])
+        self.assertIn("exact-head pull request", status["reason"])
+
     def test_sonar_export_queries_projection_branch_but_retains_git_identity(self):
         calls = []
 
@@ -1074,6 +1081,7 @@ class MonitoringTests(unittest.TestCase):
         commit="d"*40;repository="combustrrr/Agentic-Kibana";branch="feature/limited"
         responses=[
             [{"number":9,"state":"open","head":{"sha":commit,"ref":branch,
+              "repo":{"full_name":repository}},"base":{"sha":"b"*40,"ref":"main",
               "repo":{"full_name":repository}}}], [], [],
             {"statuses":[{"context":"CodeRabbit","state":"success",
                            "description":"Review rate limited"}]},
@@ -1081,6 +1089,7 @@ class MonitoringTests(unittest.TestCase):
         with patch("scripts.code_analysis.collect_coderabbit.request_json",side_effect=responses):
             evidence,status=collect_coderabbit(repository,branch,commit,"token")
         self.assertEqual(status["status"],"NOT_APPLICABLE")
+        self.assertIsNone(status["finding_count"])
         self.assertEqual(evidence["completion_signals"],[])
 
     def test_coderabbit_rejects_base_mismatch_and_preserves_provenance(self):
@@ -1093,6 +1102,7 @@ class MonitoringTests(unittest.TestCase):
                                                   pr_number=10, base_sha="c" * 40,
                                                   provenance={"workflow_run_id": "42", "workflow_run_attempt": "2"})
         self.assertEqual(status["status"], "NOT_AVAILABLE")
+        self.assertIsNone(status["finding_count"])
         self.assertIn("base/head identity", status["reason"])
         self.assertEqual(evidence["provenance"]["workflow_run_id"], "42")
 
@@ -1105,6 +1115,7 @@ class MonitoringTests(unittest.TestCase):
                    side_effect=[row] + [[{"id": i} for i in range(100)] for _ in range(10)] + [{"statuses": []}]):
             _, status = collect_coderabbit("owner/repo", "feature", commit, "token", pr_number=11)
         self.assertEqual(status["status"], "PARTIAL")
+        self.assertIsNone(status["finding_count"])
         self.assertTrue(status["partial_reasons"])
 
 if __name__=="__main__": unittest.main()

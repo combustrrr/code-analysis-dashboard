@@ -83,7 +83,15 @@ every known channel to be enabled or explicitly deferred. Portable channels are
 preselected for a run; configured vendor lanes (including Snyk and Sonar) require an
 explicit opt-in and use the pinned source repository/commit with trusted settings.
 CodeRabbit is an optional PR-only advisory lane; its evidence is retained in a distinct
-PR overlay, not merged into the source-only report. The dashboard-source profile
+AI-advisory channel. Branch targets record `NOT_APPLICABLE` with an unknown finding
+count; only an exact-head completed PR review may record a measured zero. Its evidence
+is retained in a PR overlay, not merged into the source-only report.
+
+SonarQube Cloud organization and project keys are trusted per configured project rather
+than derived from the source repository owner. Scanner submission and native export use
+the same configured key, selected branch, and immutable source SHA; a missing project,
+permission failure, or unsuccessful compute/export remains incomplete evidence.
+The dashboard-source profile
 explicitly defers container-image/SBOM channels (there is no shipping image),
 Schemathesis (there is no application API contract), and Hadolint (its only Dockerfile
 is a scanner fixture). The Kavach product profile retains its Python/API/web/image-

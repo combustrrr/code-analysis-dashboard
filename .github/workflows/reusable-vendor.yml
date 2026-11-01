@@ -137,17 +137,22 @@ jobs:
         env:
           SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
           SOURCE_SHA: ${{ fromJSON(inputs.target).head_sha }}
+          SOURCE_BRANCH: ${{ fromJSON(inputs.target).branch }}
+          SONAR_ORGANIZATION: ${{ fromJSON(inputs.target).sonar_organization }}
+          SONAR_PROJECT_KEY: ${{ fromJSON(inputs.target).sonar_project_key }}
         run: |
           set -euo pipefail
-          organization="${SOURCE_REPOSITORY%%/*}"
-          project_key="${SOURCE_REPOSITORY//\//_}"
+          [[ "$SONAR_ORGANIZATION" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo "Invalid trusted Sonar organization" >&2; exit 2; }
+          [[ "$SONAR_PROJECT_KEY" =~ ^[A-Za-z0-9_.:-]+$ ]] || { echo "Invalid trusted Sonar project key" >&2; exit 2; }
+          [[ -n "$SOURCE_BRANCH" && "$SOURCE_BRANCH" != *$'\n'* && "$SOURCE_BRANCH" != *$'\r'* ]] || { echo "Invalid source branch" >&2; exit 2; }
           cat > "$RUNNER_TEMP/sonar-project.properties" <<EOF
-          sonar.projectKey=$project_key
-          sonar.organization=$organization
+          sonar.projectKey=$SONAR_PROJECT_KEY
+          sonar.organization=$SONAR_ORGANIZATION
           sonar.projectName=$SOURCE_REPOSITORY
           sonar.sources=.
           sonar.sourceEncoding=UTF-8
           sonar.scm.revision=$SOURCE_SHA
+          sonar.branch.name=$SOURCE_BRANCH
           sonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/.venv/**,**/vendor/**
           EOF
       - name: Run SonarQube analysis
@@ -170,11 +175,12 @@ jobs:
           SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
           SOURCE_BRANCH: ${{ fromJSON(inputs.target).branch }}
           SOURCE_SHA: ${{ fromJSON(inputs.target).head_sha }}
+          SONAR_PROJECT_KEY: ${{ fromJSON(inputs.target).sonar_project_key }}
         run: |
           python .analysis-tooling/scripts/code_analysis/export_sonar_issues.py \
             --report-task .source/.scannerwork/report-task.txt \
             --output sonar-native-issues.json \
-            --project "$SOURCE_REPOSITORY" \
+            --project "$SONAR_PROJECT_KEY" \
             --branch "$SOURCE_BRANCH" \
             --sonar-branch "$SOURCE_BRANCH" \
             --commit "$SOURCE_SHA"

@@ -74,7 +74,7 @@ def unavailable(repository: str, branch: str, commit: str, reason: str,
                 "head_branch": branch, "head_sha": commit, "provenance": provenance or {},
                 "completion_signals": [], "advisories": []}
     status = {"schema_version": "1", "scanner_family": "CodeRabbit", "status": "UNAVAILABLE",
-              "reason": reason, "finding_count": 0, "observation_count": 0,
+              "reason": reason, "finding_count": None, "observation_count": None,
               "commit_sha": commit, "pr_number": pr_number, "provenance": provenance or {},
               "partial_reasons": [], "unavailable_reasons": [reason]}
     return evidence, status
@@ -90,7 +90,7 @@ def collect(repository: str, branch: str, commit: str, token: str, *, pr_number:
                  "completion_signals": [], "advisories": []},
                 {"schema_version": "1", "scanner_family": "CodeRabbit", "status": "UNAVAILABLE",
                  "reason": "CODERABBIT_GITHUB_TOKEN credential contract is not configured",
-                 "finding_count": 0, "observation_count": 0, "commit_sha": commit,
+                 "finding_count": None, "observation_count": None, "commit_sha": commit,
                  "provenance": provenance or {}, "partial_reasons": [], "unavailable_reasons": ["credential contract"]})
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("commit must be a full SHA")
@@ -198,9 +198,10 @@ def collect(repository: str, branch: str, commit: str, token: str, *, pr_number:
                  "provenance": provenance or {},
                  "completion_signals": sorted(set(completion_signals)),
                  "advisories": advisories}
+    measured = status == "COMPLETED_OPTIONAL"
     status_doc = {"schema_version": "1", "scanner_family": "CodeRabbit", "status": status,
-                  "reason": reason, "finding_count": len(advisories),
-                  "observation_count": len(advisories), "commit_sha": commit,
+                  "reason": reason, "finding_count": len(advisories) if measured else None,
+                  "observation_count": len(advisories) if measured else None, "commit_sha": commit,
                   "pr_number": pr_number, "base_sha": evidence["base_sha"],
                   "base_branch": evidence["base_branch"], "head_sha": commit,
                   "provenance": provenance or {},
@@ -224,7 +225,7 @@ def main() -> None:
         (args.output_dir / "coderabbit-status.json").write_text(json.dumps({
             "schema_version": "1", "scanner_family": "CodeRabbit", "status": "UNAVAILABLE",
             "reason": "CODERABBIT_GITHUB_TOKEN credential contract is not configured",
-            "finding_count": 0, "observation_count": 0,
+            "finding_count": None, "observation_count": None,
         }, indent=2) + "\n", encoding="utf-8")
         return
     selected_pr = args.pr_number

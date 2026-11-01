@@ -10,6 +10,15 @@ from scripts.code_analysis.hosted import load, target, write
 from scripts.code_analysis.hosted_pipeline import assemble
 
 
+def coderabbit_branch_status() -> dict:
+    """Return an explicit unknown/not-run status for a non-PR target."""
+    return {
+        'scanner_family': 'CodeRabbit', 'status': 'NOT_APPLICABLE',
+        'reason': 'Branch target; CodeRabbit evidence is available only for an exact-head pull request review.',
+        'finding_count': None, 'observation_count': None,
+    }
+
+
 def execution_jobs_with_terminal_conclusions(host: str, run: str, attempt: int,
                                              selected_jobs: list[str], adapter_jobs: dict[str, list[str]],
                                              retries: int = 6, delay_seconds: float = 2) -> list[dict]:
@@ -149,7 +158,7 @@ def main():
     if 'coderabbit-ai-advisory' in excluded:
         write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', **excluded['coderabbit-ai-advisory']})
     elif not row.get('pr_context'):
-        write(root / 'coderabbit/coderabbit-status.json', {'scanner_family': 'CodeRabbit', 'status': 'COMPLETED_OPTIONAL', 'reason': 'Branch target; CodeRabbit evidence is collected on PR targets'})
+        write(root / 'coderabbit/coderabbit-status.json', coderabbit_branch_status())
     report = assemble(root, Path('.hosted/output'), validated, host, run, Path('.source'), Path('config/code-analysis'), row.get('execution_channels') or row.get('requested_channels'))
     report.update(tooling_sha=os.environ['TOOLING_SHA'], producer_run_attempt=attempt,
                   producer_artifact_bytes=artifact_bytes, source_boundary='isolated-tooling-v1',
