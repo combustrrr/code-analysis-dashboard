@@ -55,7 +55,7 @@ def validate(document: dict) -> dict:
         if 'fast_scanners' in project:
             raise ValueError('Fast analysis must derive every available enabled scanner')
         if not isinstance(project.get('deferred_channels', {}), dict):
-            raise ValueError('Invalid scanner deferrals')
+            raise TypeError('Invalid scanner deferrals')
         if project.get('native_feedback_enabled', False) is not False:
             raise ValueError('Native feedback must remain disabled for every configured project')
         project['native_feedback_enabled'] = False

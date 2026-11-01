@@ -51,12 +51,12 @@ def run(channel: str) -> None:
             command += ['--source', str(source)]
         # Do not retain arbitrary scanner output in public workflow logs.
         completed = subprocess.run(command, cwd=work, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                   timeout=row.get('timeout_minutes', 15) * 60)
+                                   timeout=row.get('timeout_minutes', 15) * 60, check=False)
         if completed.returncode or result.is_symlink() or result.stat().st_size > 50_000_000:
             raise ValueError('Adapter execution failed')
         value = load(result)
         if not isinstance(value, dict):
-            raise ValueError('Adapter result must be an object')
+            raise TypeError('Adapter result must be an object')
         # Vendor adapters must verify the native export's revision, not relabel a latest response.
         if value.get('source_repository') != target['source_repository'] or value.get('source_sha') != target['head_sha']:
             raise ValueError('Adapter source attribution mismatch')

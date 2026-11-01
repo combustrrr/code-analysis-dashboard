@@ -1,12 +1,12 @@
 """Shared, reviewed frontend scanner execution for configured source projects."""
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import time
 import urllib.request
 from pathlib import Path
-
 
 TOOLING_ROOT = Path(__file__).resolve().parents[3]
 
@@ -16,10 +16,10 @@ def profile(project_id: str) -> dict:
     project = next((row for row in config.get('projects', [])
                     if str(row.get('id')) == str(project_id)), None)
     if not isinstance(project, dict):
-        raise ValueError('Trusted frontend project is unavailable')
+        raise TypeError('Trusted frontend project is unavailable')
     value = project.get('profile')
     if not isinstance(value, dict):
-        raise ValueError('Reviewed project profile is unavailable')
+        raise TypeError('Reviewed project profile is unavailable')
     return value
 
 
@@ -32,6 +32,17 @@ def frontend(source: Path, project_id: str) -> tuple[Path, dict]:
     if not ui.is_relative_to(source.resolve()) or not (ui / 'package-lock.json').is_file():
         raise ValueError('Reviewed frontend project is unavailable')
     return ui, value
+
+
+def request(description: str) -> tuple[argparse.Namespace, dict, Path, dict]:
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('--request', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--source', type=Path, required=True)
+    arguments = parser.parse_args()
+    target = json.loads(arguments.request.read_text(encoding='utf-8'))['target']
+    ui, project_profile = frontend(arguments.source, target['project_id'])
+    return arguments, target, ui, project_profile
 
 
 def command(value: dict, key: str) -> list[str]:

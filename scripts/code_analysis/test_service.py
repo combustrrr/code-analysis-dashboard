@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from argparse import Namespace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,7 +13,6 @@ from scripts.code_analysis.audit_workflows import audit_runtime_isolation
 from scripts.code_analysis.bound_sarif import bound as bound_sarif
 from scripts.code_analysis.channel_status import build as build_channel_status
 from scripts.code_analysis.collect_coderabbit import collect as collect_coderabbit
-from scripts.code_analysis.source_identity import coderabbit_branch_status
 from scripts.code_analysis.dashboard import (
     artifact_readme,
     generate,
@@ -21,9 +20,9 @@ from scripts.code_analysis.dashboard import (
     validate_snapshot,
     write_dashboard,
 )
+from scripts.code_analysis.ensure_sonar_project import ensure as ensure_sonar_project
 from scripts.code_analysis.evidence_contract import build as build_evidence_contract
 from scripts.code_analysis.export_sonar_issues import export as export_sonar_issues
-from scripts.code_analysis.ensure_sonar_project import ensure as ensure_sonar_project
 from scripts.code_analysis.monitoring import (
     EvidenceError,
     build_snapshot,
@@ -54,6 +53,7 @@ from scripts.code_analysis.snapshot import (
     build_analysis_channels,
     build_analysis_snapshot,
 )
+from scripts.code_analysis.source_identity import coderabbit_branch_status
 from scripts.code_analysis.validate_sbom import _denied_license
 from scripts.code_analysis.validate_sbom import evaluate as evaluate_sbom
 
@@ -95,11 +95,10 @@ class MonitoringTests(unittest.TestCase):
     def test_sonar_project_does_not_mutate_existing_private_visibility(self):
         with patch(
             "scripts.code_analysis.ensure_sonar_project._request", return_value=(403, {})
-        ) as request:
-            with self.assertRaisesRegex(RuntimeError, "not publicly readable"):
-                ensure_sonar_project(
-                    "org", "org_repo_ci", "org/repo", "token"
-                )
+        ) as request, self.assertRaisesRegex(RuntimeError, "not publicly readable"):
+            ensure_sonar_project(
+                "org", "org_repo_ci", "org/repo", "token"
+            )
         request.assert_called_once()
 
     def test_sonar_project_renames_fresh_main_branch_before_analysis(self):
@@ -244,7 +243,7 @@ class MonitoringTests(unittest.TestCase):
     def test_triage_expiry_and_no_identity_transfer(self):
         old=evidence([raw()]);sid=old["findings"][0]["stable_id"]
         registry={"decisions":[{"stable_id":sid,"status":"FALSE_POSITIVE","expires_at":"2020-01-01T00:00:00Z"}]}
-        self.assertEqual(effective_triage(registry,datetime.now(timezone.utc))[sid]["effective_status"],"UNREVIEWED")
+        self.assertEqual(effective_triage(registry,datetime.now(UTC))[sid]["effective_status"],"UNREVIEWED")
         changed=evidence([raw(snippet="different statement")]);self.assertNotEqual(sid,changed["findings"][0]["stable_id"])
     def test_required_channel_missing_fails(self):
         with tempfile.TemporaryDirectory() as d:

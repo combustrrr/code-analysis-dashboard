@@ -5,7 +5,6 @@ from pathlib import Path
 
 from scripts.code_analysis.workflow_annotations import ApiFailure, apply, collect, safe_path
 
-
 SHA = "a" * 40
 TOOLING = "b" * 40
 PROFILE = "c" * 64
@@ -39,9 +38,9 @@ class FakeGitHub:
 
 
 def identity(**values):
-    result = dict(execution_repository="o/r", source_repository="s/r", source_sha=SHA,
-                  workflow=".github/workflows/ci.yml", run_id=10, run_attempt=2,
-                  tooling_sha=TOOLING, profile_digest=PROFILE)
+    result = {"execution_repository": "o/r", "source_repository": "s/r", "source_sha": SHA,
+                  "workflow": ".github/workflows/ci.yml", "run_id": 10, "run_attempt": 2,
+                  "tooling_sha": TOOLING, "profile_digest": PROFILE}
     result.update(values)
     return result
 
@@ -237,17 +236,16 @@ class WorkflowAnnotationReconciliationTests(unittest.TestCase):
         for suffix, values in (
                 ("rule", {"title": "python.sql-injection-extra"}),
                 ("range", {"end_line": 6})):
-            with self.subTest(suffix=suffix):
-                with tempfile.TemporaryDirectory() as temporary:
-                    destination = Path(temporary)
-                    (destination / "details").mkdir()
-                    for source in ("report.json", "findings.json", "details/0.json"):
-                        target = destination / source
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        target.write_text((self.root / source).read_text(), encoding="utf-8")
-                    result = apply(destination, self.envelope([self.annotation(
-                        annotation_id=f"workflow-annotation:{suffix}", **values)]))
-                    self.assertEqual(result["finding_count"], 2)
+            with self.subTest(suffix=suffix), tempfile.TemporaryDirectory() as temporary:
+                destination = Path(temporary)
+                (destination / "details").mkdir()
+                for source in ("report.json", "findings.json", "details/0.json"):
+                    target = destination / source
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text((self.root / source).read_text(), encoding="utf-8")
+                result = apply(destination, self.envelope([self.annotation(
+                    annotation_id=f"workflow-annotation:{suffix}", **values)]))
+                self.assertEqual(result["finding_count"], 2)
 
     def test_unmatched_annotation_becomes_visible_workflow_finding(self):
         result = apply(self.root, self.envelope([self.annotation(annotation_id="workflow-annotation:2", title="build-warning",

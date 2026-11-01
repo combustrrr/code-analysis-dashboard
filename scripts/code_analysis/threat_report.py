@@ -67,11 +67,11 @@ def load_catalog(path: Path = CATALOG_PATH) -> dict[str, Any]:
         raise ValueError("threat guidance catalog has no fallback")
     for key, entry in rules.items():
         if not isinstance(key, str) or not isinstance(entry, dict):
-            raise ValueError("invalid threat guidance rule")
+            raise TypeError("invalid threat guidance rule")
         if entry.get("category") not in CATEGORIES or not isinstance(entry.get("title"), str):
             raise ValueError("invalid threat guidance category/title")
         if not isinstance(entry.get("summary"), str) or not isinstance(entry.get("impact"), str):
-            raise ValueError("invalid threat guidance explanation")
+            raise TypeError("invalid threat guidance explanation")
         steps = entry.get("remediation_steps")
         refs = entry.get("references", [])
         if not isinstance(steps, list) or not 0 < len(steps) <= MAX_REMEDIATION or any(not isinstance(s, str) or not s.strip() for s in steps):

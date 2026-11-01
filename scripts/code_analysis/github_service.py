@@ -88,7 +88,7 @@ def pages(path: str, field: str | None = None) -> list:
         result = api(f"{path}{'&' if '?' in path else '?'}per_page=100&page={page}")
         rows = result[field] if field else result
         if not isinstance(rows, list):
-            raise ValueError('incomplete GitHub listing')
+            raise TypeError('incomplete GitHub listing')
         all_rows.extend(rows)
         if len(rows) < 100:
             return all_rows
@@ -204,9 +204,8 @@ def resolve_selection(config: dict, selected: str, rows: list[dict]) -> dict:
                 raise ValueError('Full commit SHA required')
             # Bypass branch labels that happen to look like commit SHAs.
             checkout_repository=selection['repository']
-            if checkout_repository != repo:
-                if not isinstance(selection.get('repository_id'),int) or api(f'repos/{checkout_repository}')['id'] != selection['repository_id']:
-                    raise ValueError('Selected fork identity changed')
+            if checkout_repository != repo and (not isinstance(selection.get('repository_id'),int) or api(f'repos/{checkout_repository}')['id'] != selection['repository_id']):
+                raise ValueError('Selected fork identity changed')
             sha = api(f'repos/{checkout_repository}/commits/{ref}')['sha']
             return target(repo, 'Selected commit', sha, source_repository=checkout_repository, kind='commit')
     if value.startswith(prefix):
@@ -403,7 +402,8 @@ def collect(config: dict, row: dict, destination: Path) -> dict:
         raise ValueError('mixed producer runs')
     # Annotation collection happens only after the producer identity above is
     # validated. A caller/browser cannot select a different run or attempt.
-    from scripts.code_analysis.workflow_annotations import apply as apply_annotations, collect as collect_annotations
+    from scripts.code_analysis.workflow_annotations import apply as apply_annotations
+    from scripts.code_analysis.workflow_annotations import collect as collect_annotations
     profile_digest = row.get('profile_digest')
     if not isinstance(profile_digest, str) or not re.fullmatch(r'[0-9a-f]{64}', profile_digest):
         # Legacy collection has no versioned profile digest. Preserve the
@@ -492,7 +492,7 @@ def publish(config: dict, output: Path) -> None:
                 if not bundle.exists():
                     try:
                         bundle.write_bytes(read_storage(config, 'report', f'current-reports/{name}'))
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- storage backends expose heterogeneous failures.
                         raise ValueError(f'manifest references a missing retained report: {e}')
                 unpacked = gzip.decompress(bundle.read_bytes())
                 if len(unpacked) > config['site_limit_bytes']:

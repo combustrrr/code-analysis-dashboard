@@ -12,19 +12,19 @@ from urllib.parse import quote
 from scripts.code_analysis import github_service as github
 from scripts.code_analysis import release_manifest
 from scripts.code_analysis.applicability import GROUPS as SCANNER_GROUPS
+from scripts.code_analysis.audit_bundle import build_audit_bundle
 from scripts.code_analysis.hosted import accept, analysis_key, now, reconcile
+from scripts.code_analysis.project_overview import build_project_overview
 from scripts.code_analysis.projects import service_config, validate
 from scripts.code_analysis.report_assets import shard, verify_asset
-from scripts.code_analysis.project_overview import build_project_overview
-from scripts.code_analysis.workspace_documents import build_workspace_documents
-from scripts.code_analysis.audit_bundle import build_audit_bundle
 from scripts.code_analysis.status_contract import (
     is_complete,
     is_not_run,
-    is_report_incomplete,
     is_replacement_eligible,
+    is_report_incomplete,
     is_reusable,
 )
+from scripts.code_analysis.workspace_documents import build_workspace_documents
 
 WORKFLOW = '.github/workflows/code-analysis-coordinator.yml'
 GENERATED_WORKFLOW = '.github/workflows/11-source-analysis.yml'
@@ -112,7 +112,7 @@ def queued_selection(intent):
         raise ValueError('Unsupported queued request schema')
     selection = intent.get('resolved_selection')
     if not isinstance(selection, dict):
-        raise ValueError('Queued request selection is invalid')
+        raise TypeError('Queued request selection is invalid')
     pr_context=intent.get('pr_context')
     expected_repository=pr_context.get('head_repository') if isinstance(pr_context,dict) else intent.get('source_repository')
     expected_repository_id=pr_context.get('head_repository_id') if isinstance(pr_context,dict) else intent.get('source_repository_id')
@@ -200,7 +200,7 @@ def merge_channel_documents(previous, incoming, selected_channels):
     old_report = previous.get('report.json', {})
     new_report = incoming.get('report.json', {})
     if not isinstance(old_snapshot, dict) or not isinstance(new_snapshot, dict):
-        raise ValueError('Same-revision channel merge requires validated snapshot documents')
+        raise TypeError('Same-revision channel merge requires validated snapshot documents')
     selected = set(selected_channels)
     old_channels = {row['channel']:row for row in old_snapshot.get('analysis_channels', [])}
     new_channels = {row['channel']:row for row in new_snapshot.get('analysis_channels', [])}
@@ -295,7 +295,7 @@ def merge_channel_documents(previous, incoming, selected_channels):
         findings.append(row)
         details[identity]={**detail,**row,'origins':[{key:origin.get(key) for key in ('scanner_family','rule','file','start_line','raw_artifact','observation_id')} for origin in origins]}
     findings.sort(key=lambda row:(row.get('severity',''),row.get('file',''),row.get('line',0),row['id']))
-    merged_documents={path:value for path,value in previous.items() if not (path.startswith('details/') or path.startswith('findings-pages/') or path.startswith('finding-locators/') or path in {'report.json','snapshot.json','findings.json','project-overview.json','coverage.json','findings-catalog.json'})}
+    merged_documents={path:value for path,value in previous.items() if not (path.startswith(('details/', 'findings-pages/', 'finding-locators/')) or path in {'report.json', 'snapshot.json', 'findings.json', 'project-overview.json', 'coverage.json', 'findings-catalog.json'})}
     merged_documents.update({path:value for path,value in incoming.items() if path.startswith('source/')})
     for index,row in enumerate(findings):
         row['page']=index//100
@@ -400,7 +400,6 @@ def report_publication(config, state, report_release, document=None):
     pending_exports = {}
     entries = []
     with tempfile.TemporaryDirectory(prefix='analysis-publication-') as directory:
-        project_dispatches = 0
         for row in state['targets']:
             entry = {**row}
             entry['lifecycle_status'] = ('collecting' if row.get('status') == 'collected' else
@@ -599,7 +598,7 @@ def report_publication(config, state, report_release, document=None):
         try:
             # Append current point with timestamp; keep last 60 points (~rolling window via publisher cadence)
             history = [h for h in history if isinstance(h, dict) and 'compressed_bytes' in h and 'at' in h]
-        except Exception:
+        except TypeError:
             history = []
         history.append({'at': now(), 'compressed_bytes': size})
         result['report_storage_history'] = history[-60:]
@@ -617,7 +616,7 @@ def report_publication(config, state, report_release, document=None):
 
 
 def reconcile_repository(repository, project_id='', selection='', request_id=''):
-    repo, document, execution_sha = load_projects(repository)
+    _repo, document, execution_sha = load_projects(repository)
     queued_asset = None
     external_queue = bool(os.environ.get('QUEUE_INTENT'))
     if external_queue:
@@ -651,7 +650,6 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
         stored[project['id']] = (rel, release_manifest.read(config_tmp, rel))
     projects = sorted(document['projects'], key=lambda p: not (str(p['id']) == str(project_id) and selection or any(r.get('manual_refresh') for r in stored[p['id']][1].get('targets', []))))
     for project in projects:
-        queue_advanced=False
         config = service_config(document, project['id'], template)
         config['source_workflow'] = WORKFLOW
         if external_queue:
@@ -791,7 +789,6 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                 if receipt:
                     if active_request.get('status')=='cached':
                         receipt.update(status='reused',target_id=published.get('current_target_id',receipt.get('target_id')))
-                        queue_advanced=True
                     else:
                         recent=next((run for run in published.get('recent_runs',[])
                                      if (run.get('client_request_id') or run.get('request_id'))==request_id
@@ -816,7 +813,6 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                         overlay=published.get('current_overlay',{})
                         if overlay.get('client_request_id')==request_id and overlay.get('head_sha')==receipt.get('head_sha'):
                             receipt['overlay_id']=overlay.get('overlay_key')
-                        queue_advanced=True
                     published['requests']=state['requests']
                     release_manifest.write(config,current,published)
                 if not external_queue and not active_request.get('remaining_channels') and active_request.get('status') in {'collected','cached'}:

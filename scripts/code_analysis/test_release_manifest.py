@@ -35,12 +35,13 @@ class ReleaseManifestTests(unittest.TestCase):
         self.assertNotIn('observation_ids', channel)
 
     def test_storage_failure_is_not_treated_as_missing(self):
-        with patch.object(release_manifest.github, 'cf_api', side_effect=RuntimeError('storage unavailable')):
-            with self.assertRaisesRegex(RuntimeError, 'storage unavailable'):
-                release_manifest.read({}, 'analysis-current-1')
+        with patch.object(release_manifest.github, 'cf_api', side_effect=RuntimeError('storage unavailable')), \
+                self.assertRaisesRegex(RuntimeError, 'storage unavailable'):
+            release_manifest.read({}, 'analysis-current-1')
 
     def test_empty_or_invalid_manifest_fails_closed(self):
-        for response in (b'', b'[]'):
-            with self.subTest(response=response), patch.object(release_manifest.github, 'cf_api', return_value=response):
-                with self.assertRaises(ValueError):
-                    release_manifest.read({}, 'analysis-current-1')
+        for response, exception in ((b'', ValueError), (b'[]', TypeError)):
+            with self.subTest(response=response), \
+                    patch.object(release_manifest.github, 'cf_api', return_value=response), \
+                    self.assertRaises(exception):
+                release_manifest.read({}, 'analysis-current-1')

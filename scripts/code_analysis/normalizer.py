@@ -307,7 +307,7 @@ class Finding:
 
     def __post_init__(self) -> None:
         import datetime
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now = datetime.datetime.now(datetime.UTC).isoformat()
         self.file = canonicalize_file(self.file)
         if not self.rule_concept:
             self.rule_concept = normalize_concept(self.rule_id)
@@ -400,7 +400,7 @@ def normalize_category(tool: str, rule_id: str, tags: list[str]) -> str:
 class SarifParser:
     """Parses SARIF 2.1 format (CodeQL, Semgrep, Trivy, Hadolint, Qodana, OSV)."""
 
-    TOOL_NAME_MAP: dict[str, str] = {
+    TOOL_NAME_MAP: ClassVar[dict[str, str]] = {
         "codeql": "CodeQL",
         "semgrep": "Semgrep",
         "trivy": "Trivy",
@@ -767,7 +767,7 @@ class RadonParser:
                 retain(file_name, child)
 
         if not isinstance(report, dict):
-            raise ValueError("Radon report must be an object keyed by source path")
+            raise TypeError("Radon report must be an object keyed by source path")
         for file_name, blocks in report.items():
             if isinstance(blocks, dict) and isinstance(blocks.get("error"), str):
                 findings.append(Finding(
@@ -779,7 +779,7 @@ class RadonParser:
                 ))
                 continue
             if not isinstance(blocks, list):
-                raise ValueError(f"Radon blocks must be an array: {file_name}")
+                raise TypeError(f"Radon blocks must be an array: {file_name}")
             for block in blocks:
                 retain(file_name, block)
         return findings
@@ -792,7 +792,7 @@ class CoverageParser:
         report = json.loads(path.read_text(encoding="utf-8"))
         files = report.get("files")
         if not isinstance(files, dict):
-            raise ValueError("Coverage.py report is missing the files object")
+            raise TypeError("Coverage.py report is missing the files object")
         findings: list[Finding] = []
         for file_name, detail in files.items():
             if file_name.startswith(("app/", "tests/")):
@@ -923,7 +923,7 @@ class FindingDeduplicator:
     finding becomes canonical; others are marked as duplicates.
     """
 
-    _SEVERITY_RANK = {
+    _SEVERITY_RANK: ClassVar[dict[str, int]] = {
         "CRITICAL": 5, "HIGH": 4, "MEDIUM": 3, "LOW": 2, "INFO": 1
     }
 
@@ -1094,7 +1094,7 @@ class FlounderParser:
         import json
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except:
+        except (OSError, json.JSONDecodeError):
             data = []
         findings = []
         for issue in data:
@@ -1119,7 +1119,7 @@ class VulnAgentParser:
         import json
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except:
+        except (OSError, json.JSONDecodeError):
             data = []
         findings = []
         for issue in data:
@@ -1196,7 +1196,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(sonar_file)
             if verbose:
                 print(f"[Sonar] {sonar_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(sonar_file, e)
 
     flounder_parser = FlounderParser()
@@ -1207,7 +1207,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             findings = flounder_parser.parse(file)
             retain(findings, file)
             parsed_files.add(file)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed extension evidence is retained as a parse error.
             report_parse_error(file, e)
 
     for file in input_path.rglob("vulnagent.json"):
@@ -1215,7 +1215,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             findings = vulnagent_parser.parse(file)
             retain(findings, file)
             parsed_files.add(file)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed extension evidence is retained as a parse error.
             report_parse_error(file, e)
 
     for sarif_file in input_path.rglob("*.sarif"):
@@ -1235,7 +1235,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(sarif_file)
             if verbose:
                 print(f"[SARIF] {sarif_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- SARIF parsers can surface vendor-specific failures.
             report_parse_error(sarif_file, e)
 
     # ── Parse Bandit JSON ────────────────────────────────────
@@ -1247,7 +1247,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(bandit_file)
             if verbose:
                 print(f"[Bandit] {bandit_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(bandit_file, e)
 
     # ── Parse Ruff JSON ──────────────────────────────────────
@@ -1258,7 +1258,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(ruff_file)
             if verbose:
                 print(f"[Ruff] {ruff_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(ruff_file, e)
 
     for semgrep_file in (p for p in json_files if "semgrep" in p.name.lower()):
@@ -1268,7 +1268,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(semgrep_file)
             if verbose:
                 print(f"[Semgrep] {semgrep_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(semgrep_file, e)
 
     for pyright_file in (p for p in json_files if "pyright" in p.name.lower()):
@@ -1278,7 +1278,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(pyright_file)
             if verbose:
                 print(f"[Pyright] {pyright_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(pyright_file, e)
 
     for eslint_file in (p for p in json_files if "eslint" in p.name.lower()):
@@ -1288,7 +1288,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(eslint_file)
             if verbose:
                 print(f"[ESLint] {eslint_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(eslint_file, e)
 
     for coderabbit_file in (p for p in json_files if p.name.lower() == "coderabbit-advisories.json"):
@@ -1298,7 +1298,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(coderabbit_file)
             if verbose:
                 print(f"[CodeRabbit] {coderabbit_file.name}: {len(findings)} advisories")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed advisory evidence remains explicitly unavailable.
             report_parse_error(coderabbit_file, e)
 
     # ── Parse Vulture JSON ───────────────────────────────────
@@ -1309,7 +1309,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(vulture_file)
             if verbose:
                 print(f"[Vulture] {vulture_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(vulture_file, e)
 
     for vulture_file in (p for p in input_path.rglob("*.txt") if "vulture" in p.name.lower()):
@@ -1319,7 +1319,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(vulture_file)
             if verbose:
                 print(f"[Vulture] {vulture_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(vulture_file, e)
 
     for tsc_file in (p for p in input_path.rglob("*.txt") if "tsc" in p.name.lower()):
@@ -1329,7 +1329,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(tsc_file)
             if verbose:
                 print(f"[TypeScript] {tsc_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(tsc_file, e)
 
     for xenon_file in (p for p in input_path.rglob("*.txt") if "xenon" in p.name.lower()):
@@ -1339,7 +1339,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(xenon_file)
             if verbose:
                 print(f"[Xenon] {xenon_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(xenon_file, e)
 
     for radon_file in (p for p in json_files if p.name.lower() == "radon-cc.json"):
@@ -1349,7 +1349,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(radon_file)
             if verbose:
                 print(f"[Radon] {radon_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(radon_file, e)
 
     for coverage_file in (p for p in json_files if p.name.lower() == "coverage.json"):
@@ -1359,7 +1359,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(coverage_file)
             if verbose:
                 print(f"[Coverage.py] {coverage_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(coverage_file, e)
 
     for schemathesis_file in (p for p in input_path.rglob("*.xml")
@@ -1370,7 +1370,7 @@ def main(input_dir: str, output_dir: str, verbose: bool, allow_partial: bool = F
             parsed_files.add(schemathesis_file)
             if verbose:
                 print(f"[Schemathesis] {schemathesis_file.name}: {len(findings)} findings")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- malformed native evidence must not hide healthy siblings.
             report_parse_error(schemathesis_file, e)
 
     if parse_errors and not allow_partial:

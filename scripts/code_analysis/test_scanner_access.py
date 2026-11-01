@@ -59,7 +59,7 @@ class ScannerAccessTests(unittest.TestCase):
             script.write_text('import sibling; print(sibling.value)')
             helper = Path('scripts/code_analysis/snyk_python.py').resolve()
             result = subprocess.run([sys.executable,'-I',str(helper),str(source),str(script)], cwd=source,
-                                    env={**os.environ,'PYTHONPATH':str(source)},capture_output=True,text=True)
+                                    env={**os.environ,'PYTHONPATH':str(source)},capture_output=True,text=True,check=False)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertIn('trusted resolver helper',result.stdout)
             bad = source/'pip_resolve.py'; bad.write_text('')

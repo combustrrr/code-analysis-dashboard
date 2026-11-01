@@ -20,7 +20,7 @@ def execute(channel, profile, source, output):
         if not p.is_relative_to(source):raise ValueError('Source path escapes checkout')
         return p
     def run(argv,cwd,stdout=subprocess.DEVNULL):
-        return subprocess.run(argv,cwd=cwd,stdout=stdout,stderr=subprocess.STDOUT if stdout != subprocess.DEVNULL else subprocess.DEVNULL,timeout=900).returncode
+        return subprocess.run(argv,cwd=cwd,stdout=stdout,stderr=subprocess.STDOUT if stdout != subprocess.DEVNULL else subprocess.DEVNULL,timeout=900,check=False).returncode
     try:
         root=profile.get('python_root','.')
         native=output/OUTPUTS.get(channel,'campaign.txt')

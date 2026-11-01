@@ -43,15 +43,21 @@ class ScannerUpdateTests(unittest.TestCase):
         projects = json.loads(Path('.github/code-analysis/projects.json').read_text(encoding='utf-8'))['projects']
         for project in projects:
             self.assertEqual(profile(project['id']), project['profile'])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             profile('../../untrusted')
 
         for name in ('frontend_build.py', 'frontend_tests.py',
                      'frontend_axe.py', 'frontend_lighthouse.py'):
             adapter = Path('scripts/code_analysis/adapters') / name
             source = adapter.read_text(encoding='utf-8')
-            self.assertIn("frontend(a.source, target['project_id'])", source,
-                          f'{name} must select the reviewed project profile')
+            if name in ('frontend_axe.py', 'frontend_lighthouse.py'):
+                self.assertIn('browser.request(', source,
+                              f'{name} must use the shared reviewed request boundary')
+            else:
+                self.assertIn("frontend(a.source, target['project_id'])", source,
+                              f'{name} must select the reviewed project profile')
+        common = Path('scripts/code_analysis/adapters/frontend_common.py').read_text(encoding='utf-8')
+        self.assertIn("frontend(arguments.source, target['project_id'])", common)
 
     def test_zizmor_pin_is_stable_and_synchronized_across_generated_workflows(self):
         paths = (
@@ -141,9 +147,11 @@ class ScannerUpdateTests(unittest.TestCase):
             self.assertEqual(status['ext-second']['status'], 'COMPLETED')
 
     def test_malformed_registration_is_rejected_predictably(self):
-        for row in [None, [], {'channel': []}]:
-            with self.assertRaises(ValueError):
+        for row in [None, []]:
+            with self.assertRaises(TypeError):
                 extensions.registry({'scanner_extensions': [row]})
+        with self.assertRaises(ValueError):
+            extensions.registry({'scanner_extensions': [{'channel': []}]})
         example = json.loads(Path('config/code-analysis/scanner-extension.example.json').read_text())
         with self.assertRaises(ValueError):
             extensions.registry({'scanner_extensions': [{**example, 'name': 'Ruff'}]})

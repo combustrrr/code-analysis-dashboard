@@ -6,21 +6,21 @@ import hashlib
 import json
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
 from scripts.code_analysis.dashboard import validate_snapshot
 from scripts.code_analysis.project_overview import build_project_overview
-from scripts.code_analysis.workspace_documents import build_workspace_documents
 from scripts.code_analysis.status_contract import is_not_run, is_report_incomplete
+from scripts.code_analysis.workspace_documents import build_workspace_documents
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
 def now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def digest(value: object) -> str:

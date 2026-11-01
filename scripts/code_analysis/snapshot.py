@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 try:
@@ -132,7 +132,7 @@ def main() -> None:
         "commit_sha": args.commit,
         "branch": args.branch,
         "workflow_run_id": args.workflow_run_id[0],
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
     }
     current = canonicalize(load_json(args.raw_findings), args.repository, run,
                            load_json(args.channel_manifest))

@@ -62,8 +62,7 @@ def shard(documents: dict, *, asset_limit: int = 4_000_000) -> tuple[dict, dict]
         # These documents have distinct UI loading boundaries. Keeping each in its
         # own content-addressed object prevents an Overview request from downloading
         # and parsing the much larger report or findings catalog.
-        if (path in ISOLATED_DOCUMENTS or path.startswith('findings-pages/')
-                or path.startswith('finding-locators/')):
+        if (path in ISOLATED_DOCUMENTS or path.startswith(('findings-pages/', 'finding-locators/'))):
             emit(current);current={};estimated=0;unpacked=0
             emit({path:value})
             continue

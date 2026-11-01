@@ -9,7 +9,7 @@ import json
 import re
 import unicodedata
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
@@ -265,7 +265,7 @@ def build_snapshot(current: dict[str, Any], channel_status: dict[str, Any],
         raise EvidenceError("canonical finding and observation counts do not reconcile")
     deterministic = [row for row in findings if row.get("evidence_source") != "AI_ADVISORY"]
     advisories = [row for row in findings if row.get("evidence_source") == "AI_ADVISORY"]
-    generated_at = str(run.get("generated_at") or datetime.now(timezone.utc).isoformat())
+    generated_at = str(run.get("generated_at") or datetime.now(UTC).isoformat())
     snapshot_key = "\0".join((repository, commit, str(run.get("branch") or ""), generated_at,
                                *sorted(str(row["sha256"]) for row in artifact_hashes)))
     return {
@@ -303,7 +303,7 @@ def validate_evidence(document: dict[str, Any], expected_repository: str) -> str
 
 
 def effective_triage(registry: dict[str, Any], now: datetime | None = None) -> dict[str, dict[str, Any]]:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     result: dict[str, dict[str, Any]] = {}
     for migration in registry.get("identity_migrations", []):
         required = ("from_stable_id", "to_stable_id", "reviewed_by", "reviewed_at", "rationale")
@@ -314,7 +314,7 @@ def effective_triage(registry: dict[str, Any], now: datetime | None = None) -> d
             raise EvidenceError("invalid triage decision")
         effective = row["status"]
         if row.get("expires_at"):
-            expires = datetime.fromisoformat(str(row["expires_at"]).replace("Z", "+00:00"))
+            expires = datetime.fromisoformat(str(row["expires_at"]))
             if expires <= now:
                 effective = "UNREVIEWED"
         result[str(row["stable_id"])] = {**row, "effective_status": effective}
@@ -443,7 +443,7 @@ def main() -> None:
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     run = {"commit_sha": args.commit, "branch": args.branch, "workflow_run_id": args.workflow_run_id,
-           "generated_at": datetime.now(timezone.utc).isoformat()}
+           "generated_at": datetime.now(UTC).isoformat()}
     current = canonicalize(load_json(args.raw_findings), args.repository, run, load_json(args.channel_manifest))
     baseline = load_json(args.baseline)
     previous = load_json(args.previous) if args.previous and args.previous.exists() else None
