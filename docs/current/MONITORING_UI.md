@@ -44,7 +44,8 @@ identifiers.
    repository size, selected scanners, and GitHub runner availability.
    Different projects, revisions, and selected scanner lanes may execute concurrently;
    active project/SHA duplicates merge missing channels. `NOT_SELECTED`, `NOT_APPLICABLE`,
-   `DEFERRED`, failures, and validated completion are separate states. Same-SHA results
+   `DEFERRED`, failures, and validated completion are separate states. Not-run states do
+   not increase completion totals, satisfy a selected lane, or enter the reuse cache. Same-SHA results
    replace only successfully validated selected-channel evidence; failed attempts do not
    erase the previous valid evidence.
    Only the newest accepted request is tracked for a project. If its retained producer
@@ -82,7 +83,8 @@ identifiers.
    API, including App access and both workflows. An unavailable check disables its
    launch shortcut. Settings identifies the selected project's configured or portable
    source profile, reports how many channels can be submitted together, separates vendor
-   lanes, and groups terminal evidence using every valid completion status rather than
+   lanes, and groups terminal evidence using the versioned
+   [channel status contract](CHANNEL_STATUS_CONTRACT.md) rather than
    treating only literal `COMPLETED` as healthy. Successful routing does not prove all
    scanners completed.
 7. Repositories lists only the fixed trusted projects. Authorized collaborators can inspect

@@ -8,6 +8,7 @@ from pathlib import Path
 
 try:
     from monitoring import build_snapshot, canonicalize, load_json, write_json
+    from status_contract import is_complete
 except ModuleNotFoundError:  # package import in repository tests
     from scripts.code_analysis.monitoring import (
         build_snapshot,
@@ -15,10 +16,10 @@ except ModuleNotFoundError:  # package import in repository tests
         load_json,
         write_json,
     )
+    from scripts.code_analysis.status_contract import is_complete
 
 
 CLASSES = {"code", "security", "dependencies", "infrastructure", "reliability"}
-COMPLETE_STATUSES = {"COMPLETED", "CONFIGURED_COMPLETE", "COMPLETED_OPTIONAL", "POLICY_FINDINGS"}
 
 
 def build_analysis_channels(catalog: dict, artifacts: Path | None,
@@ -76,7 +77,7 @@ def build_analysis_channels(catalog: dict, artifacts: Path | None,
             "channel": configured["channel"], "name": name,
             "class": configured["class"], "surface": configured.get("surface", ""),
             "status": status,
-            "findings": len(finding_ids) if finding_ids or status in COMPLETE_STATUSES else None,
+            "findings": len(finding_ids) if finding_ids or is_complete(status) else None,
             "observation_count": len(observations),
             "observation_ids": [row["observation_id"] for row in observations],
             "reason": reason,

@@ -18,6 +18,13 @@ from scripts.code_analysis.report_assets import shard, verify_asset
 from scripts.code_analysis.project_overview import build_project_overview
 from scripts.code_analysis.workspace_documents import build_workspace_documents
 from scripts.code_analysis.audit_bundle import build_audit_bundle
+from scripts.code_analysis.status_contract import (
+    is_complete,
+    is_not_run,
+    is_report_incomplete,
+    is_replacement_eligible,
+    is_reusable,
+)
 
 WORKFLOW = '.github/workflows/code-analysis-coordinator.yml'
 GENERATED_WORKFLOW = '.github/workflows/11-source-analysis.yml'
@@ -59,9 +66,8 @@ def terminal_queue_request(state, published, request_id):
 
 
 def channel_execution_plan(requested, cached_channels, run_again=False):
-    reusable={'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE'}
     cached={value.get('channel'):value for value in cached_channels}
-    reused=[] if run_again else [channel for channel in requested if cached.get(channel,{}).get('status') in reusable]
+    reused=[] if run_again else [channel for channel in requested if is_reusable(cached.get(channel,{}).get('status'))]
     execution=[channel for channel in requested if channel not in reused]
     for group in SCANNER_GROUPS.values():
         members=set(group).intersection(requested)
@@ -87,6 +93,12 @@ def channel_lanes(channels):
 def concurrent_execution_channels(channels):
     """Flatten trusted shared-producer groups into one concurrent workflow dispatch."""
     return [channel for lane in channel_lanes(channels) for channel in lane]
+
+
+def has_completed_selected_channel(channel_rows, selected_channels):
+    """Require retained completion evidence before a selected run may publish."""
+    return any(is_complete(channel_rows.get(channel, {}).get('status'))
+               for channel in selected_channels)
 
 
 def producer_dispatch_id(request_id, channels):
@@ -190,10 +202,9 @@ def merge_channel_documents(previous, incoming, selected_channels):
     if not isinstance(old_snapshot, dict) or not isinstance(new_snapshot, dict):
         raise ValueError('Same-revision channel merge requires validated snapshot documents')
     selected = set(selected_channels)
-    success = {'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE'}
     old_channels = {row['channel']:row for row in old_snapshot.get('analysis_channels', [])}
     new_channels = {row['channel']:row for row in new_snapshot.get('analysis_channels', [])}
-    replace = {channel for channel in selected if new_channels.get(channel, {}).get('status') in success}
+    replace = {channel for channel in selected if is_replacement_eligible(new_channels.get(channel, {}).get('status'))}
     if not replace:
         raise ValueError('No selected scanner channel produced valid evidence for this revision')
 
@@ -293,7 +304,8 @@ def merge_channel_documents(previous, incoming, selected_channels):
         merged_documents[f'details/{page}.json']=[details[row['id']] for row in findings[start:start+100] if row['id'] in details]
     severities={}
     for row in findings:severities[row.get('severity','UNKNOWN')]=severities.get(row.get('severity','UNKNOWN'),0)+1
-    incomplete=[row for row in channels if row.get('status') not in {'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_SELECTED'} and not (row.get('status') in {'NOT_APPLICABLE','DEFERRED'} and row.get('reason'))]
+    incomplete=[row for row in channels if is_report_incomplete(row.get('status'))
+                or (is_not_run(row.get('status')) and not row.get('reason'))]
     report={**old_report,**new_report,'finding_count':len(findings),'observation_count':len(snapshot['observations']),
             'channels':channels,'severities':severities,'status':'partial' if incomplete or selected-replace else 'complete'}
     merged_documents.update({'snapshot.json':snapshot,'report.json':report,'findings.json':findings,
@@ -327,7 +339,7 @@ def build_pr_overlay(documents, report, row):
     context=row.get('pr_context')
     snapshot=documents.get('snapshot.json',{})
     channel=next((value for value in snapshot.get('analysis_channels',[]) if value.get('channel')=='coderabbit-ai-advisory'),None)
-    if not context or not channel or channel.get('status') not in {'COMPLETED','COMPLETED_OPTIONAL','POLICY_FINDINGS'}:
+    if not context or not channel or not is_complete(channel.get('status')):
         raise ValueError('Pull-request overlay lacks validated CodeRabbit evidence and complete PR provenance')
     observations={value['observation_id']:value for value in snapshot.get('observations',[])}
     observation_ids=set(channel.get('observation_ids',[]))
@@ -430,7 +442,7 @@ def report_publication(config, state, report_release, document=None):
                     attempt_channel_statuses=[dict(value) for value in report.get('channels',[]) if isinstance(value,dict)]
                     selected_channels=row.get('execution_channels',row.get('requested_channels',[]))
                     channel_rows={value.get('channel'):value for value in report.get('channels',[])}
-                    valid_selected=any(channel_rows.get(channel,{}).get('status') in {'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE'} for channel in selected_channels)
+                    valid_selected=has_completed_selected_channel(channel_rows, selected_channels)
                     if (selected_channels==['coderabbit-ai-advisory'] and row.get('pr_context')):
                         overlay=build_pr_overlay(documents,report,row)
                         overlay_manifest,overlay_blobs=shard({'pr-overlay.json':overlay})
@@ -786,7 +798,6 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                                      and run.get('scan_run_id')==active_request.get('scan_run_id')
                                      and run.get('run_attempt')==active_request.get('run_attempt')),None)
                         attempt_rows={value.get('channel'):value for value in (recent or {}).get('attempt_channel_statuses',[])}
-                        success={'COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE'}
                         progress={value.get('channel'):value for value in receipt.get('channel_statuses',[])}
                         completed=set(receipt.get('completed_channels',[]))
                         failed=set(receipt.get('failed_channels',[]))
@@ -794,8 +805,8 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                             attempt=attempt_rows.get(channel,{})
                             status=attempt.get('status','FAILED')
                             progress[channel]={**attempt,'channel':channel,'status':status,
-                                               'reason':attempt.get('reason') or (None if status in success else active_request.get('error') or 'Scanner lane did not produce valid evidence.')}
-                            if status in success:
+                                               'reason':attempt.get('reason') or (None if is_complete(status) else active_request.get('error') or 'Scanner lane did not produce valid evidence.')}
+                            if is_complete(status):
                                 completed.add(channel);failed.discard(channel)
                             else:
                                 failed.add(channel);completed.discard(channel)

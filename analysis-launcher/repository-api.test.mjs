@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {repositoryApi,channelProgress,cachedChannelsForSnapshot,registryReportState} from './repository-api.mjs';
 import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID} from './target-registry.mjs';
+import {CHANNEL_STATUS_CONTRACT,isCompleteChannelStatus,isNotRunChannelStatus,isReportIncompleteChannelStatus,isReusableChannelStatus} from './status-contract.mjs';
 
 class Failure extends Error { constructor(status,message,code){super(message);this.status=status;this.code=code;} }
 const json=(value,status=200,headers={})=>new Response(JSON.stringify(value),{status,headers});
@@ -65,11 +66,32 @@ test('project register never treats empty or revisionless scanner evidence as re
   const complete=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),channel_statuses:[{channel:'semgrep',status:'COMPLETED'}]});
   assert.equal(complete.attention,null);
   assert.deepEqual(complete.report.scanner_summary,{completed:1,total:1,incomplete:0,not_run:0});
-  const deferred=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),channel_statuses:[{channel:'semgrep',status:'COMPLETED'},{channel:'snyk',status:'DEFERRED'}]});
+  const deferred=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),channel_statuses:[{channel:'semgrep',status:'COMPLETED'},{channel:'snyk',status:'DEFERRED',reason:'Not enabled by the reviewed profile.'}]});
   assert.equal(deferred.attention,null);
   assert.deepEqual(deferred.report.scanner_summary,{completed:1,total:2,incomplete:0,not_run:1});
+  const notApplicable=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),channel_statuses:[{channel:'semgrep',status:'COMPLETED'},{channel:'codeql',status:'NOT_APPLICABLE',reason:'No supported source language.'}]});
+  assert.equal(notApplicable.attention,null);
+  assert.deepEqual(notApplicable.report.scanner_summary,{completed:1,total:2,incomplete:0,not_run:1});
+  const reasonless=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),channel_statuses:[{channel:'semgrep',status:'COMPLETED'},{channel:'codeql',status:'NOT_APPLICABLE'}]});
+  assert.match(reasonless.attention,/incomplete scanner evidence/);
+  assert.deepEqual(reasonless.report.scanner_summary,{completed:1,total:2,incomplete:1,not_run:0});
+  const partial=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),channel_statuses:[{channel:'semgrep',status:'COMPLETED'},{channel:'snyk',status:'CONFIGURED_PARTIAL'}]});
+  assert.match(partial.attention,/incomplete scanner evidence/);
+  assert.deepEqual(partial.report.scanner_summary,{completed:1,total:2,incomplete:1,not_run:0});
   const timestamps=registryReportState({status:'complete',analyzed_sha:'a'.repeat(40),generated_at:'2026-10-24T00:00:00Z',report_generation_timestamp:'2026-10-26T07:00:00Z',checked_at:'2026-10-26T07:01:00Z',channel_statuses:[{channel:'semgrep',status:'COMPLETED'}]});
   assert.equal(timestamps.report.generated_at,'2026-10-26T07:00:00Z');
+});
+
+test('versioned status contract fails closed for every terminal and incomplete state',()=>{
+  for(const [status,row] of Object.entries(CHANNEL_STATUS_CONTRACT.statuses)){
+    assert.equal(isCompleteChannelStatus(status),row.complete,status);
+    assert.equal(isReusableChannelStatus(status),row.reusable,status);
+    assert.equal(isReportIncompleteChannelStatus(status),row.report_incomplete,status);
+    assert.equal(isNotRunChannelStatus(status),row.not_run,status);
+  }
+  assert.equal(isCompleteChannelStatus('NEW_PROVIDER_STATE'),false);
+  assert.equal(isReusableChannelStatus('NEW_PROVIDER_STATE'),false);
+  assert.equal(isReportIncompleteChannelStatus('NEW_PROVIDER_STATE'),true);
 });
 
 test('pull-only collaborators can list and launch from the exact fixed target registry',async()=>{
@@ -222,6 +244,18 @@ test('matching preview cache includes CodeRabbit only for the same PR head and b
     pr_context:{...manifest.current_overlay.pr_context,base_sha:'e'.repeat(40)}}}),['semgrep']);
   assert.deepEqual(cachedChannelsForSnapshot({...snapshot,pr_context:null},manifest),['semgrep']);
   assert.deepEqual(cachedChannelsForSnapshot({...snapshot,pr_context:{...snapshot.pr_context,head_repository_id:1000}},manifest),['semgrep']);
+});
+
+test('matching preview cache never reuses not-applicable or incomplete evidence',()=>{
+  const snapshot={target_sha:'b'.repeat(40),tooling_sha:'a'.repeat(40),profile_digest:'c'.repeat(64),pr_context:null};
+  const manifest={current_target_id:'current:1',targets:[{id:'current:1',analyzed_sha:snapshot.target_sha,tooling_sha:snapshot.tooling_sha,
+    profile_digest:snapshot.profile_digest,channel_statuses:[
+      {channel:'semgrep',status:'COMPLETED'},
+      {channel:'codeql',status:'NOT_APPLICABLE'},
+      {channel:'snyk',status:'CONFIGURED_PARTIAL'},
+      {channel:'osv',status:'NOT_AVAILABLE'},
+    ]}]};
+  assert.deepEqual(cachedChannelsForSnapshot(snapshot,manifest),['semgrep']);
 });
 
 test('incomplete individual PR heads are disclosed without blocking usable inventory',async()=>{

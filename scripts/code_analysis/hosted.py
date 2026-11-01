@@ -13,7 +13,7 @@ from urllib.parse import quote
 from scripts.code_analysis.dashboard import validate_snapshot
 from scripts.code_analysis.project_overview import build_project_overview
 from scripts.code_analysis.workspace_documents import build_workspace_documents
-from scripts.code_analysis.snapshot import COMPLETE_STATUSES
+from scripts.code_analysis.status_contract import is_not_run, is_report_incomplete
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -100,8 +100,9 @@ def build(snapshot: dict, identity: dict, output: Path, *, producer_repository: 
     if len(observations) != len(snapshot["observations"]):
         raise ValueError("duplicate observation identity")
     channels = snapshot["analysis_channels"]
-    incomplete = [row["channel"] for row in channels if row["status"] not in COMPLETE_STATUSES | {"NOT_SELECTED"}
-                  and not (row["status"] in {"NOT_APPLICABLE", "DEFERRED"} and row.get("reason"))]
+    incomplete = [row["channel"] for row in channels
+                  if is_report_incomplete(row.get("status"))
+                  or (is_not_run(row.get("status")) and not row.get("reason"))]
     runs = []
     for run in snapshot["workflow_run_ids"]:
         if not str(run).isdigit():

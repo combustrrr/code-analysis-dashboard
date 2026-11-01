@@ -2,11 +2,11 @@ import {readBody, BodyLimitError, resolveLimit, DEFAULT_LIMITS} from './request-
 import {canonicalReportTarget, publicReports} from './reports.mjs';
 import {validatePortableProfile} from './profile-policy.mjs';
 import {CONFIGURED_TARGETS, EXECUTION_REPOSITORY, EXECUTION_REPOSITORY_ID, SUPPORTED_SCANNERS, VENDOR_SCANNERS, UNAVAILABLE_SCANNERS, SCANNER_GROUPS, validateTargetRegistry} from './target-registry.mjs';
+import {isCompleteChannelStatus,isNotRunChannelStatus,isReportIncompleteChannelStatus,isReusableChannelStatus} from './status-contract.mjs';
 
 const CONFIG = '.github/code-analysis/projects.json';
 const SHA = /^[a-f0-9]{40}$/i;
 const DIGEST = /^[a-f0-9]{64}$/i;
-const COMPLETED_REPORT_STATUSES = new Set(['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE']);
 const branchHeadCache = new Map();
 const reportManifestCache = new Map();
 const settingsAggregateCache = new Map();
@@ -21,9 +21,9 @@ const coalescedActivityQueue=(id,queue)=>{if(activityQueueFlights.has(id))return
 export function registryReportState(target) {
   if (!target) return {report:null, attention:'No current report is available. Run analysis to create the first evidence set.'};
   const channels=Array.isArray(target.channel_statuses)?target.channel_statuses:[];
-  const completed=channels.filter(value=>COMPLETED_REPORT_STATUSES.has(value.status)).length;
-  const incomplete=channels.filter(value=>!COMPLETED_REPORT_STATUSES.has(value.status)&&!['NOT_SELECTED','DEFERRED'].includes(value.status));
-  const notRun=channels.filter(value=>['NOT_SELECTED','DEFERRED'].includes(value.status)).length;
+  const completed=channels.filter(value=>isCompleteChannelStatus(value.status)).length;
+  const incomplete=channels.filter(value=>isReportIncompleteChannelStatus(value.status)||(isNotRunChannelStatus(value.status)&&!value.reason));
+  const notRun=channels.filter(value=>isNotRunChannelStatus(value.status)&&value.reason).length;
   const revision=target.analyzed_sha||target.head_sha;
   const report={source_sha:target.head_sha,analyzed_sha:target.analyzed_sha,generated_at:target.report_generation_timestamp||target.checked_at||target.generated_at||null,status:target.report_status||target.status,scanner_summary:{completed,total:channels.length,incomplete:incomplete.length,not_run:notRun},limitations:incomplete.slice(0,3).map(value=>({channel:value.channel||value.name||'Scanner',status:value.status||'Unavailable',reason:String(value.reason||'Evidence is incomplete.').slice(0,180)}))};
   if(!SHA.test(revision||''))return {report,attention:'The current report does not identify an immutable source revision. Run analysis to publish verifiable evidence.'};
@@ -81,8 +81,7 @@ export function cachedChannelsForSnapshot(snapshot, manifest) {
   const cached=[];
   const target=canonicalReportTarget(manifest);
   if(target?.analyzed_sha===snapshot.target_sha&&target.tooling_sha===snapshot.tooling_sha&&target.profile_digest===snapshot.profile_digest){
-    const complete=new Set(['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE']);
-    cached.push(...(target.channel_statuses||[]).filter(value=>complete.has(value.status)).map(value=>value.channel));
+    cached.push(...(target.channel_statuses||[]).filter(value=>isReusableChannelStatus(value.status)).map(value=>value.channel));
   }
   const overlay=manifest?.current_overlay;
   const currentPr=snapshot.pr_context;
@@ -160,7 +159,7 @@ export async function repositoryApi(request, env, session, helpers, executionCon
   function settingsChannels(project,target){
     const observed=new Map((target?.channel_statuses||[]).map(value=>[value.channel,value]));
     return scannerChoices(project).map(choice=>{
-      const last=observed.get(choice.id),observedStatus=String(last?.status||'').toUpperCase(),complete=COMPLETED_REPORT_STATUSES.has(observedStatus);
+      const last=observed.get(choice.id),observedStatus=String(last?.status||'').toUpperCase(),complete=isCompleteChannelStatus(observedStatus);
       const status=choice.status==='DEFERRED'?'deferred':['SETUP_REQUIRED','NOT_AVAILABLE'].includes(choice.status)?'unavailable':last&&!complete?'needs_attention':'ready';
       return{channel_id:choice.id,name:choice.id,tier:choice.mode==='vendor'?'vendor':choice.default_selected?'essential':'extended',mode:choice.mode,status,selectable:choice.selectable===true,version:null,reason:String(last?.reason||choice.reason||'').slice(0,240)||null};
     });
@@ -384,8 +383,7 @@ export async function repositoryApi(request, env, session, helpers, executionCon
         const response=await publicReports(new Request(reportUrl),env);
         if(response.ok){const manifest=await response.json();const target=canonicalReportTarget(manifest);observed=new Map((target?.channel_statuses||[]).map(value=>[value.channel,value]));observedAt=target?.generated_at||target?.checked_at||null;}
       } catch {}
-      const completeStatuses=new Set(['COMPLETED','COMPLETED_OPTIONAL','CONFIGURED_COMPLETE','POLICY_FINDINGS','NOT_APPLICABLE']);
-      const channels = scannerChoices(project).map(value=>{const last=observed.get(value.id),observedStatus=String(last?.status||'unknown').toUpperCase();return {...value,channel:value.id,status:value.status==='READY'?'profile_declared':value.status.toLowerCase(),reason:value.reason||'Declared in the trusted profile; completed evidence is still required.',last_observed:last?{status:observedStatus.toLowerCase(),complete:completeStatuses.has(observedStatus),reason:last.reason||null,findings:Number.isFinite(last.findings)?last.findings:null,checked_at:observedAt}:null};});
+      const channels = scannerChoices(project).map(value=>{const last=observed.get(value.id),observedStatus=String(last?.status||'unknown').toUpperCase();return {...value,channel:value.id,status:value.status==='READY'?'profile_declared':value.status.toLowerCase(),reason:value.reason||'Declared in the trusted profile; completed evidence is still required.',last_observed:last?{status:observedStatus.toLowerCase(),complete:isCompleteChannelStatus(observedStatus),reason:last.reason||null,findings:Number.isFinite(last.findings)?last.findings:null,checked_at:observedAt}:null};});
       return json({project_id:project.id,preferred_branch:project.preferred_branch,profile_mode:project.profile.mode,tooling_sha:configuration.tooling_sha,summary:{selectable:channels.filter(channel=>channel.selectable).length,vendor:channels.filter(channel=>channel.selectable&&channel.mode==='vendor').length,deferred:channels.filter(channel=>channel.status==='deferred').length,unavailable:channels.filter(channel=>['setup_required','not_available'].includes(channel.status)).length,completed:channels.filter(channel=>channel.last_observed?.complete).length,needs_attention:channels.filter(channel=>channel.last_observed&&!channel.last_observed.complete).length},channels,checked_at:new Date().toISOString()});
     }
 

@@ -1,0 +1,221 @@
+{
+  "schema_version": "channel-status-contract-v1",
+  "statuses": {
+    "COMPLETED": {
+      "category": "complete",
+      "label": "Completed",
+      "complete": true,
+      "reusable": true,
+      "replacement_eligible": true,
+      "report_incomplete": false,
+      "not_run": false
+    },
+    "COMPLETED_OPTIONAL": {
+      "category": "complete",
+      "label": "Complete",
+      "complete": true,
+      "reusable": true,
+      "replacement_eligible": true,
+      "report_incomplete": false,
+      "not_run": false
+    },
+    "CONFIGURED_COMPLETE": {
+      "category": "complete",
+      "label": "Completed",
+      "complete": true,
+      "reusable": true,
+      "replacement_eligible": true,
+      "report_incomplete": false,
+      "not_run": false
+    },
+    "POLICY_FINDINGS": {
+      "category": "complete",
+      "label": "Findings retained",
+      "complete": true,
+      "reusable": true,
+      "replacement_eligible": true,
+      "report_incomplete": false,
+      "not_run": false
+    },
+    "PARTIAL": {
+      "category": "partial",
+      "label": "Partial",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "CONFIGURED_PARTIAL": {
+      "category": "partial",
+      "label": "Partial",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "NOT_AVAILABLE": {
+      "category": "unavailable",
+      "label": "Unavailable",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "UNAVAILABLE": {
+      "category": "unavailable",
+      "label": "Unavailable",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "SETUP_REQUIRED": {
+      "category": "unavailable",
+      "label": "Setup required",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "PERMISSION_DENIED": {
+      "category": "unavailable",
+      "label": "Permission denied",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "PERMISSION_BLOCKED": {
+      "category": "unavailable",
+      "label": "Permission blocked",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "VENDOR_UNAVAILABLE": {
+      "category": "unavailable",
+      "label": "Vendor unavailable",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "VENDOR_PERMISSION_REQUIRED": {
+      "category": "unavailable",
+      "label": "Vendor permission required",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "FAILED": {
+      "category": "failed",
+      "label": "Failed",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "OPERATIONAL_FAILURE": {
+      "category": "failed",
+      "label": "Operational failure",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "INVALID_EVIDENCE": {
+      "category": "failed",
+      "label": "Invalid evidence",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "RATE_LIMITED": {
+      "category": "failed",
+      "label": "Rate limited",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "TRUNCATED": {
+      "category": "partial",
+      "label": "Truncated",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "CANCELLED": {
+      "category": "failed",
+      "label": "Cancelled",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "TIMEOUT": {
+      "category": "failed",
+      "label": "Timed out",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": true,
+      "not_run": false
+    },
+    "NOT_APPLICABLE": {
+      "category": "not_run",
+      "label": "Not applicable",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": false,
+      "not_run": true
+    },
+    "DEFERRED": {
+      "category": "not_run",
+      "label": "Deferred",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": false,
+      "not_run": true
+    },
+    "NOT_SELECTED": {
+      "category": "not_run",
+      "label": "Not selected",
+      "complete": false,
+      "reusable": false,
+      "replacement_eligible": false,
+      "report_incomplete": false,
+      "not_run": true
+    }
+  },
+  "unknown_status": {
+    "category": "unknown",
+    "label": "Unknown",
+    "complete": false,
+    "reusable": false,
+    "replacement_eligible": false,
+    "report_incomplete": true,
+    "not_run": false
+  }
+}

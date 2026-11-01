@@ -1,5 +1,7 @@
 export type AnalysisStatus = 'Preparing' | 'Analyzing' | 'Preparing report' | 'Ready' | 'Needs attention';
 
+export { isCompleteChannelStatus } from './channelStatusContract';
+
 const ready = new Set(['published', 'reused', 'superseded']);
 const failed = new Set(['failed', 'cancelled_cutover']);
 
@@ -33,8 +35,4 @@ export function displayRuleId(rule?: string) {
 
 export function displayFindingMessage(message?: string) {
   return String(message || '').replace(/\[([^\]]+)\]\(https?:\/\/[^)\s]+\)/g, '$1');
-}
-
-export function isCompleteChannelStatus(status?: string) {
-  return ['COMPLETED', 'COMPLETED_OPTIONAL', 'CONFIGURED_COMPLETE', 'POLICY_FINDINGS'].includes(String(status || '').toUpperCase());
 }

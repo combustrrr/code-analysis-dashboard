@@ -7,6 +7,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from scripts.code_analysis.status_contract import is_complete
+
 ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = ROOT / "config/code-analysis/threat-guidance.json"
 CATEGORIES = {"security", "dependency", "infrastructure", "quality", "reliability", "advisory", "unknown"}
@@ -16,7 +18,6 @@ MAX_STRING = 4_000
 MAX_REMEDIATION = 8
 MAX_REFERENCES = 8
 MAX_OUTPUT_BYTES = 20_000_000
-SUCCESS_STATUSES = {"COMPLETED", "COMPLETED_OPTIONAL", "CONFIGURED_COMPLETE", "POLICY_FINDINGS"}
 
 
 def normalize_channel(channel: dict[str, Any]) -> dict[str, Any]:
@@ -24,7 +25,7 @@ def normalize_channel(channel: dict[str, Any]) -> dict[str, Any]:
     raw = str(channel.get("status") or "UNKNOWN")
     count = channel.get("findings")
     meaningful_count = count if isinstance(count, int) and count >= 0 else None
-    if raw in SUCCESS_STATUSES:
+    if is_complete(raw):
         normalized = "COMPLETED_WITH_FINDINGS" if meaningful_count and meaningful_count > 0 else "COMPLETED_NO_FINDINGS"
     elif raw in {"OPERATIONAL_FAILURE", "INVALID_EVIDENCE", "FAILED"}:
         normalized = "FAILED"
@@ -176,7 +177,7 @@ def enrich(snapshot: dict[str, Any], identity: dict[str, Any], report: dict[str,
     coverage = {
         "status": "partial" if incomplete else "complete",
         "expected_channels": [str(c.get("channel")) for c in report.get("channels", [])],
-        "available_channels": [str(c.get("channel")) for c in report.get("channels", []) if c.get("status") in {"COMPLETED", "COMPLETED_OPTIONAL", "CONFIGURED_COMPLETE", "POLICY_FINDINGS"}],
+        "available_channels": [str(c.get("channel")) for c in report.get("channels", []) if is_complete(c.get("status"))],
         "incomplete_channels": incomplete,
     }
     report_id = _identity_digest(report["analyzed_sha"], schema, catalog["catalog_version"], generator)

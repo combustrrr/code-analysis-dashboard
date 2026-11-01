@@ -44,7 +44,10 @@ execution; the configured branch is not treated as a permanent revision pin.
    its selected channels; a different SHA replaces the one current report only after its
    first valid channel result. Check source SHA, channel status, workflow run/attempt,
    tooling, and explicit unavailable/deferred/not-applicable status before interpreting
-   finding counts.
+   finding counts. Only `COMPLETED`, `COMPLETED_OPTIONAL`, `CONFIGURED_COMPLETE`,
+   and `POLICY_FINDINGS` are reusable completion evidence. `NOT_APPLICABLE`,
+   `DEFERRED`, and `NOT_SELECTED` never satisfy or replace a selected channel; see the
+   [channel status contract](../current/CHANNEL_STATUS_CONTRACT.md).
 
 There is no Evaluation Mode SHA or dispatch budget. This local implementation does not
 deploy the Worker, report reader, UI, or workflows and does not trigger a live scan.
@@ -124,6 +127,7 @@ The selected project's report and optional overlay are read from the Worker/API 
 UI. Preserve workflow run and attempt when investigating producer artifacts. A published
 report does not imply that every configured scanner completed; use the requested-channel
 inventory, per-channel status, and selected coverage for completeness. `NOT_SELECTED`,
-`NOT_APPLICABLE`, `DEFERRED`, and execution failure are different states. GitHub Actions
+`NOT_APPLICABLE`, and `DEFERRED` are explicit not-run states, not reusable completion;
+partial, unavailable, invalid, and execution-failure states remain incomplete. GitHub Actions
 artifacts in the public service repository remain accessible outside the dashboard;
 authentication does not make those scanner artifacts confidential.

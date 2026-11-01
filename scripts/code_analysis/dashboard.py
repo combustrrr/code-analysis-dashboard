@@ -7,6 +7,11 @@ import json
 from collections import Counter
 from pathlib import Path
 
+try:
+    from status_contract import CONTRACT, is_complete
+except ModuleNotFoundError:  # package import in repository tests
+    from scripts.code_analysis.status_contract import CONTRACT, is_complete
+
 
 def load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -70,8 +75,7 @@ def github_summary(snapshot: dict) -> str:
     validate_snapshot(snapshot)
     severities = Counter(row.get("severity", "UNKNOWN") for row in snapshot["canonical_findings"])
     all_channels = snapshot["analysis_channels"]
-    covered_statuses = {"COMPLETED", "CONFIGURED_COMPLETE", "COMPLETED_OPTIONAL"}
-    covered = sum(row.get("status") in covered_statuses for row in all_channels)
+    covered = sum(is_complete(row.get("status")) for row in all_channels)
     lines = ["## Issue Wall — Web of Scanners", "",
              f"- **Snapshot commit:** `{snapshot['commit_sha']}`",
              f"- **Analysis coverage:** {covered}/{len(all_channels)} channels",
@@ -124,7 +128,8 @@ def artifact_readme(snapshot: dict) -> str:
 def generate(snapshot: dict, output: Path) -> None:
     """Render the current UI from the separately reviewable static template."""
     validate_snapshot(snapshot)
-    payload = json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False).replace("<", "\\u003c")
+    browser_snapshot = {**snapshot, "status_contract": CONTRACT}
+    payload = json.dumps(browser_snapshot, separators=(",", ":"), ensure_ascii=False).replace("<", "\\u003c")
     template = (Path(__file__).resolve().parents[2] / "config/code-analysis/templates/dashboard.html").read_text(encoding="utf-8")
     output.write_text(template.replace("__PAYLOAD__", payload), encoding="utf-8")
 

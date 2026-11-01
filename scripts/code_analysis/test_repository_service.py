@@ -73,9 +73,10 @@ class RepositoryExecutionTests(unittest.TestCase):
     def test_channel_cache_reuses_matching_evidence_and_run_again_forces_every_lane(self):
         from scripts.code_analysis.repository_service import channel_execution_plan
         cached=[{'channel':'semgrep','status':'COMPLETED'},{'channel':'eslint','status':'COMPLETED'},
-                {'channel':'typescript','status':'FAILED'},{'channel':'snyk','status':'NOT_CONFIGURED'}]
-        execution,reused=channel_execution_plan(['semgrep','eslint','typescript','snyk'],cached)
-        self.assertEqual(execution,['eslint','typescript','snyk'])
+                {'channel':'typescript','status':'FAILED'},{'channel':'snyk','status':'NOT_CONFIGURED'},
+                {'channel':'codeql','status':'NOT_APPLICABLE'}]
+        execution,reused=channel_execution_plan(['semgrep','eslint','typescript','snyk','codeql'],cached)
+        self.assertEqual(execution,['eslint','typescript','snyk','codeql'])
         self.assertEqual(reused,['semgrep'])
         forced,forced_reused=channel_execution_plan(['semgrep','snyk'],cached,run_again=True)
         self.assertEqual(forced,['semgrep','snyk'])
@@ -95,6 +96,18 @@ class RepositoryExecutionTests(unittest.TestCase):
                          producer_dispatch_id('12345678-1111-4111-8111-111111111111',lanes[0]))
         self.assertNotEqual(producer_dispatch_id('12345678-1111-4111-8111-111111111111',lanes[0]),
                             producer_dispatch_id('12345678-1111-4111-8111-111111111111',lanes[1]))
+
+    def test_publication_requires_completed_selected_evidence(self):
+        from scripts.code_analysis.repository_service import has_completed_selected_channel
+        rows={
+            'semgrep':{'status':'COMPLETED'},
+            'codeql':{'status':'NOT_APPLICABLE'},
+            'snyk':{'status':'CONFIGURED_PARTIAL'},
+        }
+        self.assertTrue(has_completed_selected_channel(rows,['semgrep','codeql']))
+        self.assertFalse(has_completed_selected_channel(rows,['codeql']))
+        self.assertFalse(has_completed_selected_channel(rows,['snyk']))
+        self.assertFalse(has_completed_selected_channel(rows,['unknown']))
 
     def test_generated_producer_is_current(self):
         self.assertEqual(reusable_source(),Path('.github/workflows/reusable-source.yml').read_text(encoding='utf-8-sig'))
@@ -414,6 +427,13 @@ class PublicationCompletenessTests(unittest.TestCase):
         self.assertEqual({row['id'] for row in merged['findings.json']},{'new-semgrep','keep-bandit'})
         self.assertTrue(all(row['observation_count']==1 and row['scanner_family_count']==1 for row in merged['findings.json']))
         self.assertEqual(report['finding_count'],2)
+        not_applicable={**new_snapshot,
+                        'analysis_channels':[channel('semgrep','Semgrep','NOT_APPLICABLE',None),
+                                             channel('bandit','Bandit','NOT_SELECTED',None)],
+                        'observations':[],'canonical_findings':[],
+                        'finding_count':0,'observation_count':0}
+        with self.assertRaisesRegex(ValueError,'No selected scanner channel produced valid evidence'):
+            merge_channel_documents(documents(old_snapshot,[]),documents(not_applicable,[]),['semgrep'])
 
     def test_publication_has_one_canonical_target_and_bounded_run_history(self):
         config = {'analysis_repository': 'owner/repo', 'report_release': 'analysis-current-1', 'project_id': '1'}

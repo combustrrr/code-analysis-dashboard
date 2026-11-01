@@ -4,6 +4,8 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from pathlib import PurePosixPath
 
+from scripts.code_analysis.status_contract import is_complete
+
 
 def _count_entries(values, *, limit: int | None = None):
     rows = [{"label": str(label), "count": count}
@@ -20,12 +22,9 @@ def _directory(path: str) -> str:
 
 def build_project_overview(report: dict, findings: list[dict]) -> dict:
     """Derive a compact overview exclusively from normalized public evidence."""
-    completed_statuses = {
-        "COMPLETED", "COMPLETED_OPTIONAL", "CONFIGURED_COMPLETE", "POLICY_FINDINGS",
-    }
     channels = [row for row in report.get("channels", []) if isinstance(row, dict)]
     incomplete = [str(row.get("name") or row.get("channel") or "Unknown scanner")
-                  for row in channels if row.get("status") not in completed_statuses]
+                  for row in channels if not is_complete(row.get("status"))]
     severity = [str(row.get("severity") or "UNKNOWN") for row in findings]
     categories = [str(row.get("category") or "Uncategorized") for row in findings]
     scanners = [str(value) for row in findings for value in set(row.get("scanners") or [])]
@@ -77,7 +76,7 @@ def build_project_overview(report: dict, findings: list[dict]) -> dict:
             "located": located,
         },
         "coverage": {
-            "completed": sum(row.get("status") in completed_statuses for row in channels),
+            "completed": sum(is_complete(row.get("status")) for row in channels),
             "total": len(channels),
             "publication_gate_satisfied": bool(report.get("publication_gate", {}).get("satisfied")),
             "incomplete_channels": incomplete,
