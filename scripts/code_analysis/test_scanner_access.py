@@ -129,16 +129,18 @@ class ScannerAccessTests(unittest.TestCase):
         self.assertNotIn('sonar.projectKey=${{', scan['with']['args'])
         export = next(step for step in steps if step.get('name') == 'Export Sonar findings')
         self.assertIn('--project "$SONAR_PROJECT_KEY"', export['run'])
-        self.assertNotIn('SONAR_API_TOKEN', yaml.safe_dump(workflow['jobs']['sonar']))
         self.assertEqual(workflow['jobs']['sonar']['env']['SONAR_TOKEN'],
                          '${{ secrets.SONAR_TOKEN }}')
-        self.assertNotIn('SONAR_API_TOKEN',
-                         workflow.get('on', workflow.get(True))['workflow_call']['secrets'])
+        self.assertEqual(workflow['jobs']['sonar']['env']['SONAR_API_TOKEN'],
+                         '${{ secrets.SONAR_API_TOKEN }}')
+        self.assertIn('SONAR_API_TOKEN',
+                      workflow.get('on', workflow.get(True))['workflow_call']['secrets'])
         bootstrap = next(step for step in steps if step.get('name') == 'Ensure trusted public Sonar project')
         self.assertEqual(bootstrap['env']['SONAR_ORGANIZATION'],
                          '${{ fromJSON(inputs.target).sonar_organization }}')
         self.assertEqual(bootstrap['env']['SONAR_PROJECT_KEY'],
                          '${{ fromJSON(inputs.target).sonar_project_key }}')
+        self.assertNotIn('SONAR_API_TOKEN', yaml.safe_dump(bootstrap))
 
     def test_reconciliation_cannot_publish_checks_or_security_events_to_sources(self):
         for path in ('.github/workflows/code-analysis-coordinator.yml',):

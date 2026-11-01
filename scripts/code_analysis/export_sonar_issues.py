@@ -6,18 +6,28 @@ import argparse
 import json
 import os
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
 
 
+class SonarApiError(RuntimeError):
+    def __init__(self, status: int):
+        super().__init__(f"Sonar API request failed with HTTP {status}")
+        self.status = status
+
+
 def _request(url: str, token: str) -> dict[str, Any]:
     request = urllib.request.Request(
         url, headers={"Authorization": f"Bearer {token}"}
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.load(response)
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        raise SonarApiError(error.code) from None
 
 
 def _task_file(path: Path) -> dict[str, str]:
@@ -112,11 +122,24 @@ def main() -> None:
     parser.add_argument("--pull-request", default="")
     parser.add_argument("--sonar-branch", default="")
     args = parser.parse_args()
-    token = os.environ.get("SONAR_TOKEN", "")
+    token = os.environ.get("SONAR_API_TOKEN", "")
     if not token:
-        raise SystemExit("SONAR_TOKEN is required for analysis and native issue export")
-    export(args.report_task, args.output, args.project, args.branch, args.commit, token,
-           pull_request=args.pull_request, sonar_branch=args.sonar_branch)
+        raise SystemExit("SONAR_API_TOKEN from a Sonar user with project Browse permission is required")
+    try:
+        export(args.report_task, args.output, args.project, args.branch, args.commit, token,
+               pull_request=args.pull_request, sonar_branch=args.sonar_branch)
+    except SonarApiError as error:
+        reason = ("Sonar native issue export was denied with HTTP 403. SONAR_API_TOKEN must be a "
+                  "Sonar user personal access token with Browse permission on the trusted project."
+                  if error.status == 403 else
+                  f"Sonar native issue export failed with HTTP {error.status}.")
+        Path("sonar-export-error.json").write_text(
+            json.dumps({"schema_version": "1", "http_status": error.status,
+                        "reason": reason}, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        if error.status == 403:
+            Path("sonar-export-forbidden").touch()
+        raise SystemExit(reason) from None
 
 
 if __name__ == "__main__":

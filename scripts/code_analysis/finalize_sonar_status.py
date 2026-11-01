@@ -9,7 +9,8 @@ from pathlib import Path
 
 
 def build_status(scan_outcome: str, export_outcome: str, native_path: Path,
-                 scanner_exit_code: int | None = None) -> dict:
+                 scanner_exit_code: int | None = None,
+                 export_forbidden_path: Path | None = None) -> dict:
     base = {"schema_version": "1", "scanner_family": "SonarQube Cloud"}
     if scan_outcome != "success":
         exit_detail = (f" with exit code {scanner_exit_code}"
@@ -18,8 +19,11 @@ def build_status(scan_outcome: str, export_outcome: str, native_path: Path,
                 "reason": (f"Sonar analysis failed{exit_detail}. Successful compute processing and native issue "
                            "export were not proven. Sonar findings are unknown.")}
     if export_outcome != "success" or not native_path.is_file():
+        export_reason = ("Sonar native issue export was denied with HTTP 403. SONAR_API_TOKEN must be a Sonar "
+                         "user personal access token with Browse permission on the trusted project. "
+                         if export_forbidden_path and export_forbidden_path.is_file() else "")
         return {**base, "status": "OPERATIONAL_FAILURE", "scanner_exit_code": scanner_exit_code,
-                "reason": ("Sonar analysis was submitted, but successful compute processing and native issue export "
+                "reason": (export_reason + "Sonar analysis was submitted, but successful compute processing and native issue export "
                            "were not proven. Sonar findings are unknown.")}
     try:
         native = json.loads(native_path.read_text(encoding="utf-8"))
@@ -43,7 +47,8 @@ def main() -> None:
     scanner_exit_code = int(raw_exit_code) if raw_exit_code.isdigit() else None
     native_path = Path("sonar-native-issues.json")
     output_path = Path("sonar-status.json")
-    result = build_status(scan_outcome, export_outcome, native_path, scanner_exit_code)
+    result = build_status(scan_outcome, export_outcome, native_path, scanner_exit_code,
+                          Path("sonar-export-forbidden"))
     output_path.write_text(json.dumps(result, sort_keys=True) + "\n", encoding="utf-8")
 
 

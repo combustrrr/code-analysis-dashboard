@@ -25,6 +25,17 @@ class SonarStatusTests(unittest.TestCase):
         )
         self.assertNotIn('native_issue_count', result)
 
+    def test_export_denial_reason_is_preserved_without_claiming_zero(self):
+        with tempfile.TemporaryDirectory() as directory:
+            error = Path(directory) / 'sonar-export-forbidden'
+            error.touch()
+            result = build_status('success', 'failure', Path('missing.json'),
+                                  export_forbidden_path=error)
+        self.assertEqual(result['status'], 'OPERATIONAL_FAILURE')
+        self.assertIn('HTTP 403', result['reason'])
+        self.assertIn('findings are unknown', result['reason'])
+        self.assertNotIn('native_issue_count', result)
+
     def test_completion_requires_valid_native_export(self):
         with tempfile.TemporaryDirectory() as directory:
             native = Path(directory) / 'sonar-native-issues.json'
