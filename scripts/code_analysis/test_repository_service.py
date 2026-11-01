@@ -23,6 +23,8 @@ class RepositoryExecutionTests(unittest.TestCase):
                   'attempt_channel_statuses':[{'channel':'semgrep','status':'COMPLETED'}]}
         recovered = terminal_queue_request({'targets':[], 'requests':[receipt]},
                                            {'recent_runs':[recent]}, 'request-1')
+        if recovered is None:
+            self.fail('published run was not recovered')
         self.assertEqual(recovered['status'], 'collected')
         self.assertEqual(recovered['scan_run_id'], 42)
 
@@ -32,6 +34,8 @@ class RepositoryExecutionTests(unittest.TestCase):
                   'execution_channels':['osv'],'remaining_channels':[]}
         recovered = terminal_queue_request({'targets':[], 'requests':[]},
                                            {'targets':[target]}, 'request-1')
+        if recovered is None:
+            self.fail('canonical target was not recovered')
         self.assertEqual(recovered['scan_run_id'], 42)
         self.assertEqual(recovered['status'], 'collected')
 

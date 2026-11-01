@@ -827,6 +827,8 @@ class SchemathesisParser:
         from defusedxml import ElementTree as ET
 
         root = ET.parse(path).getroot()
+        if root is None:
+            raise ValueError("Schemathesis XML has no document element")
         findings: list[Finding] = []
         for case in root.iter("testcase"):
             failures = [*case.findall("failure"), *case.findall("error")]

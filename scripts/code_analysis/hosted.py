@@ -8,6 +8,7 @@ import re
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
+from typing import Any
 from urllib.parse import quote
 
 from scripts.code_analysis.dashboard import validate_snapshot
@@ -32,7 +33,8 @@ def write(path: Path, data: object) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
 
-def load(path: Path) -> dict:
+def load(path: Path) -> Any:
+    """Load JSON whose top-level shape is validated by its consuming contract."""
     return json.loads(path.read_text(encoding="utf-8"))
 
 

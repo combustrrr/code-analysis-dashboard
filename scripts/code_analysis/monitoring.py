@@ -432,7 +432,7 @@ def compare(current: dict[str, Any], baseline: dict[str, Any] | None,
     accounted = sum(counts[state] for state in ("EXISTING", "MOVED", "NOT_OBSERVED", "INDETERMINATE"))
     if accounted != len(baseline_findings):
         raise EvidenceError(f"conservation failure: baseline={len(baseline_findings)} accounted={accounted}")
-    return {"schema_version": SCHEMA_VERSION, **validity, "baseline_id": baseline.get("baseline_id"),
+    return {"schema_version": SCHEMA_VERSION, **validity, "baseline_id": baseline.get("baseline_id") if baseline else None,
             "current_run": current.get("run"), "previous_run": previous.get("run") if previous else "UNAVAILABLE",
             "channel_status": channel_status, "findings": rows, "counts": dict(counts)}
 

@@ -84,6 +84,12 @@ Add a scanner's real compatibility test before registering its pin for automatic
 Passing tests reduces upgrade risk; it cannot guarantee that arbitrary future
 scanner versions or source projects will never break.
 
+The service CI also runs the pinned Pyright version against `scripts/code_analysis`.
+Dynamic JSON, YAML, and provider responses must be narrowed at their consumption
+boundary or represented as explicitly dynamic JSON; do not restore a green check
+with broad exclusions. A malformed provider object or generated workflow shape
+must fail explicitly while valid incomplete scanner evidence remains publishable.
+
 ### One-time updater access
 
 Set `SCANNER_UPDATE_TOKEN` in the analysis host, scoped to that repository only.

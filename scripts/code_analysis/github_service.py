@@ -15,6 +15,7 @@ import tempfile
 import uuid
 import zipfile
 from pathlib import Path
+from typing import Any, Literal, cast, overload
 from urllib.parse import quote, urlsplit
 
 from scripts.code_analysis.hosted import (
@@ -54,7 +55,22 @@ def read_storage(config: dict, kind: str, key: str) -> bytes:
     return cf_api(config, f'/api/{kind}/{key}')
 
 
-def gh(*args: str, payload: object | None = None, binary: bool = False):
+def object_payload(value: object, context: str) -> dict[str, Any]:
+    """Validate an external JSON object before its fields are consumed."""
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        raise TypeError(f'{context} must be a JSON object')
+    return cast(dict[str, Any], value)
+
+
+@overload
+def gh(*args: str, payload: object | None = None, binary: Literal[True]) -> bytes: ...
+
+
+@overload
+def gh(*args: str, payload: object | None = None, binary: Literal[False] = False) -> object | None: ...
+
+
+def gh(*args: str, payload: object | None = None, binary: bool = False) -> object | bytes | None:
     command = ['gh', *args]
     if payload is not None:
         command += ['--input', '-']
@@ -74,24 +90,34 @@ def gh(*args: str, payload: object | None = None, binary: bool = False):
         raise RuntimeError(f"GitHub request failed ({result.returncode}): {' '.join(args[:2])}: {detail}")
     if binary:
         return result.stdout
-    return json.loads(result.stdout) if result.stdout.strip() else None
+    return cast(object, json.loads(result.stdout)) if result.stdout.strip() else None
 
 
-def api(path: str, payload: object | None = None, method: str | None = None):
+def api(path: str, payload: object | None = None, method: str | None = None) -> object | None:
     args = ['api', path, '-H', 'X-GitHub-Api-Version: 2022-11-28']
     if method:
         args += ['--method', method]
     return gh(*args, payload=payload)
 
 
-def pages(path: str, field: str | None = None) -> list:
-    all_rows = []
+def api_object(path: str, payload: object | None = None, method: str | None = None) -> dict[str, Any]:
+    if method is not None:
+        response = api(path, payload, method)
+    elif payload is not None:
+        response = api(path, payload)
+    else:
+        response = api(path)
+    return object_payload(response, f'GitHub response for {path}')
+
+
+def pages(path: str, field: str | None = None) -> list[dict[str, Any]]:
+    all_rows: list[dict[str, Any]] = []
     for page in range(1, 1001):
         result = api(f"{path}{'&' if '?' in path else '?'}per_page=100&page={page}")
-        rows = result[field] if field else result
+        rows = object_payload(result, f'GitHub listing for {path}').get(field) if field else result
         if not isinstance(rows, list):
             raise TypeError('incomplete GitHub listing')
-        all_rows.extend(rows)
+        all_rows.extend(object_payload(row, f'GitHub listing row for {path}') for row in rows)
         if len(rows) < 100:
             return all_rows
     raise ValueError('GitHub listing exceeds bounded pagination; retain previous inventory')
@@ -141,7 +167,7 @@ def cf_api(config: dict, path: str, method: str = 'GET', data: bytes | None = No
 def release(repository: str, tag: str, *, create: bool = False) -> dict | None:
     found = next((r for r in pages(f'repos/{repository}/releases') if r['tag_name'] == tag), None)
     if found is None and create:
-        found = api(f'repos/{repository}/releases', {'tag_name': tag, 'name': tag, 'body': '{}', 'make_latest': 'false'})
+        found = api_object(f'repos/{repository}/releases', {'tag_name': tag, 'name': tag, 'body': '{}', 'make_latest': 'false'})
     return found
 
 def save_state(repository: str, rel: dict, state: dict) -> None:
@@ -207,9 +233,9 @@ def resolve_selection(config: dict, selected: str, rows: list[dict]) -> dict:
                 raise ValueError('Full commit SHA required')
             # Bypass branch labels that happen to look like commit SHAs.
             checkout_repository=selection['repository']
-            if checkout_repository != repo and (not isinstance(selection.get('repository_id'),int) or api(f'repos/{checkout_repository}')['id'] != selection['repository_id']):
+            if checkout_repository != repo and (not isinstance(selection.get('repository_id'),int) or api_object(f'repos/{checkout_repository}')['id'] != selection['repository_id']):
                 raise ValueError('Selected fork identity changed')
-            sha = api(f'repos/{checkout_repository}/commits/{ref}')['sha']
+            sha = api_object(f'repos/{checkout_repository}/commits/{ref}')['sha']
             return target(repo, 'Selected commit', sha, source_repository=checkout_repository, kind='commit')
     if value.startswith(prefix):
         value = value[len(prefix):].split('#', 1)[0].rstrip('/')
@@ -225,13 +251,16 @@ def resolve_selection(config: dict, selected: str, rows: list[dict]) -> dict:
     if len(matches) == 1:
         return matches[0]
     if re.fullmatch(r'PR #?[1-9][0-9]*', value, re.IGNORECASE):
-        number = int(re.search(r'[0-9]+', value)[0])
-        p = api(f'repos/{repo}/pulls/{number}')
+        number_match = re.search(r'[0-9]+', value)
+        if number_match is None:
+            raise ValueError('Invalid PR number')
+        number = int(number_match[0])
+        p = api_object(f'repos/{repo}/pulls/{number}')
         return target(repo, p['head']['ref'], p['head']['sha'], pr=number,
                       source_repository=p['head']['repo']['full_name'],
                       base_sha=p['base']['sha'], base_branch=p['base']['ref'])
     if re.fullmatch(r'[0-9a-fA-F]{40}', value):
-        sha = api(f'repos/{repo}/commits/{value}')['sha']
+        sha = api_object(f'repos/{repo}/commits/{value}')['sha']
         row = target(repo, 'Selected commit', sha, kind='commit')
         return row
     raise ValueError('Select an active branch, PR #number, full 40-character commit SHA, or matching upstream GitHub URL')
@@ -242,6 +271,7 @@ def scan(config: dict, refresh_target: str | None = None) -> None:
     state = json.loads(read_storage(config, 'state', 'current-analysis-state.json'))
     # No mutation until full discovery succeeds.
     discovered = inventory(config, state)
+    selected: dict[str, Any] | None = None
     if refresh_target:
         selected = resolve_selection(config, refresh_target, discovered)
         if not any(r['id'] == selected['id'] for r in discovered if r != state.get('manual_target')):
@@ -251,14 +281,14 @@ def scan(config: dict, refresh_target: str | None = None) -> None:
             state['manual_target'] = selected
             discovered.append(selected)
     state = reconcile(state, discovered, now())
-    if refresh_target:
+    if refresh_target and selected is not None:
         request_refresh(state, selected['id'])
     # Explicit operator retries precede automatic backfill without removing any
     # active targets. The request persists if both analysis slots are occupied.
     state['targets'].sort(key=lambda row: not row.get('manual_refresh', False))
-    info = api(f'repos/{host}')
+    info = api_object(f'repos/{host}')
     branch = info['default_branch']
-    tooling = api(f"repos/{host}/commits/{quote(branch, safe='')}")['sha']
+    tooling = api_object(f"repos/{host}/commits/{quote(branch, safe='')}")['sha']
     runs = pages(f'repos/{host}/actions/workflows/11-source-analysis.yml/runs', 'workflow_runs')
     by_title = {r['display_title']: r for r in reversed(runs)}
     by_id = {r['id']: r for r in runs}
@@ -318,9 +348,11 @@ def scan(config: dict, refresh_target: str | None = None) -> None:
         row.update(request_id=request_id, status='dispatching', tooling_sha=tooling)
         row.pop('manual_refresh', None)
         cf_api(config, storage_path(config, 'state', 'current-analysis-state.json'), method='POST', data=json.dumps(state, separators=(',', ':')).encode())  # Intent persists before side effects.
-        dispatched = api(f'repos/{host}/actions/workflows/11-source-analysis.yml/dispatches',
+        dispatch_response = api(f'repos/{host}/actions/workflows/11-source-analysis.yml/dispatches',
             {'ref': branch, 'return_run_details': True, 'inputs': {'target': json.dumps(row), 'tooling_sha': tooling,
                                       'request_id': request_id}})
+        dispatched = (object_payload(dispatch_response, 'workflow dispatch response')
+                      if dispatch_response is not None else None)
         if dispatched and dispatched.get('workflow_run_id'):
             row.update(scan_run_id=dispatched['workflow_run_id'], run_attempt=1)
         row['status'] = 'scanning'
@@ -364,7 +396,7 @@ def validate_bundle(destination: Path, report: dict) -> None:
 
 def collect(config: dict, row: dict, destination: Path) -> dict:
     host, run_id = config['analysis_repository'], row['scan_run_id']
-    run = api(f'repos/{host}/actions/runs/{run_id}')
+    run = api_object(f'repos/{host}/actions/runs/{run_id}')
     current_coordinator = (str(config.get('active_coordinator_run_id', '')) == str(run_id)
                            and run['status'] == 'in_progress')
     if (run['path'] != config.get('source_workflow', '.github/workflows/11-source-analysis.yml')
@@ -414,8 +446,12 @@ def collect(config: dict, row: dict, destination: Path) -> dict:
         # Legacy collection has no versioned profile digest. Preserve the
         # absence explicitly instead of fabricating successful annotation evidence.
         profile_digest = digest({'legacy_analysis_key': row.get('analysis_key', '')})
+    report_target = object_payload(report.get('target'), 'hosted report target')
+    source_repository = report_target.get('source_repository')
+    if not isinstance(source_repository, str):
+        raise TypeError('hosted report source repository is missing')
     envelope = collect_annotations(
-        execution_repository=host, source_repository=report['target']['source_repository'],
+        execution_repository=host, source_repository=source_repository,
         source_sha=report['analyzed_sha'], workflow=run['path'], run_id=int(run_id),
         run_attempt=int(row['run_attempt']), tooling_sha=report['tooling_sha'],
         profile_digest=profile_digest,

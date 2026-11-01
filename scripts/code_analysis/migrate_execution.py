@@ -36,6 +36,8 @@ def migrate(source, destination, project):
     manifest = migrated_manifest(original, source, destination)
     references = {name:meta for target in manifest['targets'] for name,meta in target.get('assets', {}).items()}
     dst = github.release(destination, 'analysis-current-' + project, create=True)
+    if dst is None:
+        raise ValueError('Destination report release could not be created')
     existing = release_manifest.read(destination, dst)
     if existing and existing.get('migration', {}).get('from_execution_repository') != source:
         raise ValueError('Destination already has independent current reports')
@@ -60,7 +62,10 @@ def migrate(source, destination, project):
             github.gh('release','upload',dst['tag_name'],str(path),'--repo',destination)
             path.unlink()
     release_manifest.write(destination, dst, manifest)
-    verified = release_manifest.read(destination, github.release(destination, dst['tag_name']))
+    verified_release = github.release(destination, dst['tag_name'])
+    if verified_release is None:
+        raise ValueError('Published destination release is missing')
+    verified = release_manifest.read(destination, verified_release)
     if verified != manifest:
         raise ValueError('Published migration manifest mismatch')
     return {'project':project,'targets':len(manifest['targets']),'assets':len(references),'bytes':sum(m['bytes'] for m in references.values()),'verified':True}

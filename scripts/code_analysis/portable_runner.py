@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 from scripts.code_analysis.portable_profile import validate
 
@@ -14,7 +15,8 @@ OUTPUTS={'bandit':'bandit-results.json','ruff':'ruff-results.json','radon':'rado
 
 def execute(channel, profile, source, output):
     validate(profile);source=source.resolve();output.mkdir(parents=True,exist_ok=True)
-    status={'scanner_family':FAMILIES[channel],'status':'FAILED','reason':'Scanner did not produce usable evidence.'}
+    status: dict[str, Any] = {'scanner_family':FAMILIES[channel],'status':'FAILED','reason':'Scanner did not produce usable evidence.'}
+    data: object = {}
     def inside(relative):
         p=(source/relative).resolve()
         if not p.is_relative_to(source):raise ValueError('Source path escapes checkout')
@@ -76,7 +78,7 @@ def execute(channel, profile, source, output):
                     reason=(f'Tests exited with code {rc}. Coverage output was retained but cannot be accepted '
                             'as successful evidence. Finding count is unknown; other scanner results remain available.'),
                 )
-            if channel=='radon' and any(isinstance(v,dict) and 'error' in v for v in data.values()):
+            if channel=='radon' and isinstance(data, dict) and any(isinstance(v,dict) and 'error' in v for v in data.values()):
                 status.update(status='FAILED',reason='Radon could not parse one or more source files; retained diagnostics identify affected files.')
         if channel=='typescript' and native.exists() and command and command.get('cwd','.')!='.':
             prefix=Path(command['cwd']).as_posix().rstrip('/')+'/'

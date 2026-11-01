@@ -6,7 +6,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from scripts.code_analysis.github_service import api, extract_zip, gh, pages
+from scripts.code_analysis.github_service import api_object, extract_zip, gh, pages
 from scripts.code_analysis.hosted import load, target, write
 from scripts.code_analysis.hosted_pipeline import assemble
 from scripts.code_analysis.process_access import required_executable
@@ -66,7 +66,7 @@ def validate_durable_request(row: dict) -> dict:
     if not isinstance(intent, dict):
         raise TypeError('Explicit Durable Object request is unavailable')
     if (intent.get('schema_version') != 'analysis-request-v4' or intent.get('request_id') != request_id
-            or intent.get('execution_repository_id') != api(f'repos/{host}')['id']
+            or intent.get('execution_repository_id') != api_object(f'repos/{host}')['id']
             or intent.get('source_sha') != row.get('head_sha') or intent.get('target_sha') != intent.get('source_sha')
             or intent.get('tooling_sha') != os.environ['TOOLING_SHA']
             or intent.get('project_id') != row.get('project_id')
@@ -118,7 +118,7 @@ def main():
     root = Path('.hosted/artifacts')
     root.mkdir(parents=True, exist_ok=True)
     # A rerun reuses its run ID; only artifacts created after this attempt started qualify.
-    producer = api(f'repos/{host}/actions/runs/{run}/attempts/{attempt}')
+    producer = api_object(f'repos/{host}/actions/runs/{run}/attempts/{attempt}')
     artifact_bytes = 0
     # Download from R2 (temp-runs prefix isolates ephemeral brokered artifacts)
     bucket = os.environ.get('R2_BUCKET_NAME')

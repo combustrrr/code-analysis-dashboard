@@ -126,12 +126,12 @@ def queued_selection(intent):
 
 
 def load_projects(repository):
-    repo = github.api('repos/' + repository)
-    blob = github.api(f"repos/{repository}/contents/.github/code-analysis/projects.json?ref={quote(repo['default_branch'], safe='')}")
+    repo = github.api_object('repos/' + repository)
+    blob = github.api_object(f"repos/{repository}/contents/.github/code-analysis/projects.json?ref={quote(repo['default_branch'], safe='')}")
     document = validate(json.loads(base64.b64decode(blob['content'])))
     if repo['id'] != document['execution_repository']['id']:
         raise ValueError('Execution repository identity changed')
-    revision = github.api(f"repos/{repository}/commits/{quote(repo['default_branch'], safe='')}")['sha']
+    revision = github.api_object(f"repos/{repository}/commits/{quote(repo['default_branch'], safe='')}")['sha']
     return repo, document, revision
 
 
@@ -253,13 +253,20 @@ def merge_channel_documents(previous, incoming, selected_channels):
         old=old_channels.get(identity)
         new=new_channels.get(identity)
         if identity in replace:
+            if new is None:
+                raise ValueError(f'replacement channel {identity} is missing from incoming evidence')
             row=dict(new)
         elif identity in selected and new:
             row=dict(old or new)
             row['last_attempt_status']=new.get('status')
             row['last_attempt_reason']=new.get('reason')
         else:
-            row=dict(old or new)
+            if old is None and new is None:
+                raise ValueError(f'channel {identity} is missing from both evidence sets')
+            retained = old if old is not None else new
+            if retained is None:
+                raise ValueError(f'channel {identity} has no retainable evidence')
+            row=dict(retained)
         channels.append(row)
     channels.sort(key=lambda row:row['channel'])
     snapshot={**old_snapshot,**new_snapshot,
@@ -618,9 +625,12 @@ def report_publication(config, state, report_release, document=None):
 def reconcile_repository(repository, project_id='', selection='', request_id=''):
     _repo, document, execution_sha = load_projects(repository)
     queued_asset = None
+    intent = {}
     external_queue = bool(os.environ.get('QUEUE_INTENT'))
     if external_queue:
         intent = json.loads(os.environ['QUEUE_INTENT'])
+        if not isinstance(intent, dict):
+            raise TypeError('QUEUE_INTENT must be a JSON object')
         project_id = intent.get('project_id', '')
         selection = queued_selection(intent)
         request_id = intent.get('request_id', '')
@@ -656,7 +666,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
             config['active_coordinator_run_id'] = int(os.environ['GITHUB_RUN_ID'])
         current=config['report_release']
         current_manifest=release_manifest.read(config,current)
-        source = github.api('repos/' + config['source_repository'])
+        source = github.api_object('repos/' + config['source_repository'])
         if source['id'] != config['source_repository_id'] or source['private']:
             raise ValueError('Source repository identity/visibility changed')
         config['source_repository'] = source['full_name']
@@ -678,6 +688,8 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                      analysis_repository=repository, relationship=project['relationship'],
                      preferred_branch=project['preferred_branch'])
         if selection and str(project['id']) == str(project_id) and request_id != old.get('last_request_id'):
+            if selected is None:
+                raise ValueError('selected target was not resolved')
             github.request_refresh(state, selected['id'])
             state['last_request_id'] = request_id
             accepted = next(r for r in state['targets'] if r['id'] == selected['id'])

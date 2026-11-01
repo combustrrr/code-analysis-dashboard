@@ -40,6 +40,8 @@ def main() -> None:
         return
     for attempt in range(6):
         jobs = request(f"repos/{repository}/actions/runs/{run_id}/jobs?per_page=100")
+        if not isinstance(jobs, dict):
+            return
         sonar_jobs = [job for job in jobs.get("jobs", [])
                       if str(job.get("name", "")).endswith("Isolated SonarQube evidence")]
         if sonar_jobs:

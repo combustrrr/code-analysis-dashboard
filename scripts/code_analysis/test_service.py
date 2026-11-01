@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
+from scripts.code_analysis import github_service
 from scripts.code_analysis.audit_workflows import audit as audit_workflows
 from scripts.code_analysis.audit_workflows import audit_runtime_isolation
 from scripts.code_analysis.bound_sarif import bound as bound_sarif
@@ -73,6 +74,13 @@ def snapshot(items=None, channel_state=None):
     return build_analysis_snapshot(build_snapshot(current,channels,provenance),catalog)
 
 class MonitoringTests(unittest.TestCase):
+    def test_github_json_boundaries_reject_non_object_payloads(self):
+        with self.assertRaisesRegex(TypeError, "must be a JSON object"):
+            github_service.object_payload([], "test response")
+        with (patch.object(github_service, "api", return_value=[{"id": 1}, "invalid-row"]),
+              self.assertRaisesRegex(TypeError, "listing row")):
+            github_service.pages("repos/owner/project/releases")
+
     def test_sonar_project_is_created_public_once_and_verified(self):
         with patch(
             "scripts.code_analysis.ensure_sonar_project._request",

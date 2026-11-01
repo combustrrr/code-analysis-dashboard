@@ -7,6 +7,7 @@ import copy
 import json
 import re
 from pathlib import Path
+from typing import Any, cast
 
 import yaml
 
@@ -18,18 +19,30 @@ PYTHON = 'actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1'
 GITHUB_TOKEN_EXPRESSION = '${{ github.token }}'
 
 
-def generate(config=None):
-    config = config or json.loads((ROOT / 'config/code-analysis/service.json').read_text())
-    profile = config['profile']
-    inputs = {k: {'required': True, 'type': 'string'} for k in ('target', 'tooling_sha', 'request_id', 'dispatch_id')}
-    document = {'name': 'Exact Source Analysis', 'run-name': 'Source analysis ${{ inputs.dispatch_id }}',
+def mapping(value: object, context: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
+        raise ValueError(f'{context} must be a string-keyed mapping')
+    return cast(dict[str, Any], value)
+
+
+def step_list(value: object, context: str) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
+        raise ValueError(f'{context} must be a list of step mappings')
+    return cast(list[dict[str, Any]], value)
+
+
+def generate(config: dict[str, Any] | None = None) -> str:
+    config = config or mapping(json.loads((ROOT / 'config/code-analysis/service.json').read_text()), 'service config')
+    profile = mapping(config['profile'], 'service profile')
+    inputs: dict[str, Any] = {k: {'required': True, 'type': 'string'} for k in ('target', 'tooling_sha', 'request_id', 'dispatch_id')}
+    document: dict[str, Any] = {'name': 'Exact Source Analysis', 'run-name': 'Source analysis ${{ inputs.dispatch_id }}',
                 'on': {'workflow_call': {'inputs': inputs}}, 'permissions': {'contents': 'read'},
                  # Every explicit launch gets its own producer artifact.  A
                  # newer request may supersede the dashboard target, but it
                  # must not cancel the earlier run before its evidence/report
                  # artifact is assembled.
                   'concurrency': {'group': 'source-analysis-${{ inputs.dispatch_id }}', 'cancel-in-progress': False}, 'jobs': {}}
-    jobs = document['jobs']
+    jobs = mapping(document['jobs'], 'workflow jobs')
     jobs['identity'] = {'runs-on': 'ubuntu-24.04', 'timeout-minutes': 5,
         'outputs': {'jobs': '${{ steps.identity.outputs.jobs }}', 'languages': '${{ steps.identity.outputs.languages }}'},
         'steps': [{'uses': CHECKOUT, 'with': {'persist-credentials': False}},
@@ -43,8 +56,8 @@ def generate(config=None):
     templates = ROOT / 'config/code-analysis/workflow-templates'
     for number in (1, 2, 3, 4, 7):
         path = next(templates.glob(f'0{number}-*.yml'))
-        old = yaml.safe_load(path.read_text(encoding='utf-8'))
-        for name, original in old['jobs'].items():
+        old = mapping(yaml.safe_load(path.read_text(encoding='utf-8')), f'{path.name} workflow')
+        for name, original in mapping(old['jobs'], f'{path.name} jobs').items():
             if name in {'workflow-security-posture','snyk','sonarqube-cloud'}:
                 # These lanes run only in the isolated vendor workflow, not in
                 # source-checkout scanner jobs.
@@ -56,13 +69,13 @@ def generate(config=None):
             if name == 'dependency-review':
                 # GitHub's host-PR gate is not an upstream-head scanner.
                 continue
-            job = copy.deepcopy(original)
+            job = copy.deepcopy(mapping(original, f'{name} job'))
             if name == 'test-coverage':
                 job['timeout-minutes'] = max(job.get('timeout-minutes', 30), 40)
             # Source jobs may inspect public source, but never receive credentials.
             job['env'] = {key: value for key, value in job.get('env', {}).items()
                           if not (isinstance(value, str) and 'secrets.' in value)}
-            for step in job.get('steps', []):
+            for step in step_list(job.get('steps', []), f'{name} steps'):
                 if isinstance(step.get('env'), dict):
                     step['env'] = {key:value for key,value in step['env'].items()
                                    if not (isinstance(value,str) and 'secrets.' in value)}
@@ -71,7 +84,7 @@ def generate(config=None):
             # Older generated scanner jobs used single-brace GitHub expressions in
             # shell strings. Normalize those inputs while regenerating exact-source
             # workflows so secrets and run metadata are evaluated by Actions.
-            def normalize_expressions(value):
+            def normalize_expressions(value: Any) -> Any:
                 if isinstance(value, str):
                     return re.sub(r'\$\{\s*((?:secrets|github)\.[^{}]+?)\s*\}', r'${{ \1 }}', value)
                 if isinstance(value, list):
@@ -79,7 +92,7 @@ def generate(config=None):
                 if isinstance(value, dict):
                     return {key: normalize_expressions(item) for key, item in value.items()}
                 return value
-            job = normalize_expressions(job)
+            job = mapping(normalize_expressions(job), f'{name} normalized job')
             job['needs'] = ['identity']
             job['permissions'] = {'contents': 'read'}
             if name == 'codeql':
@@ -95,8 +108,8 @@ def generate(config=None):
             if name == 'atheris-state-machine':
                 job['env'].update(ANALYSIS_BACKEND_ROOT='${{ github.workspace }}/' + profile['python_root'],
                                   ANALYSIS_SOURCE_SHA='${{ fromJSON(inputs.target).head_sha }}')
-            steps = []
-            for step in job['steps']:
+            steps: list[dict[str, Any]] = []
+            for step in step_list(job['steps'], f'{name} normalized steps'):
                 uses = step.get('uses', '')
                 if 'R2_' in json.dumps(step):
                     command = re.search(r'aws s3 cp\s+(.*?)\s+s3://', str(step.get('run', '')), re.DOTALL)
@@ -148,7 +161,7 @@ def generate(config=None):
                 text = text.replace('env.SNYK_TOKEN == \'\'', "env.SNYK_CONFIGURED != 'true'")
                 text = text.replace('--command=.snyk-venv/bin/python', '--command="$RUNNER_TEMP/snyk-metadata/inspect-python"')
                 text = text.replace('repos/${GITHUB_REPOSITORY}', 'repos/${SOURCE_REPOSITORY}')
-                step = yaml.safe_load(text)
+                step = mapping(yaml.safe_load(text), f'{name} rendered step')
                 if name == 'snyk' and step.get('name') == 'Record configured scan status':
                     step['run'] = step['run'].replace('jq -n', 'if [[ "$SCA_OUTCOME" != success || "$CODE_OUTCOME" != success ]] && grep -q "monthly limit" snyk-*.log; then\n  reason="Snyk execution incomplete; a quota warning was also emitted. Inspect the failing manifest or surface before attributing the failure to quota."\nfi\njq -n')
                 if step.get('name') == 'Ensure Browse for the verified Sonar API user':
@@ -170,8 +183,10 @@ def generate(config=None):
                     steps.insert(1, {'uses': CHECKOUT, 'with': {'repository': '${{ github.repository }}',
                                  'ref': '${{ inputs.tooling_sha }}', 'path': '.analysis-tooling', 'persist-credentials': False}})
                 for s in steps:
-                    task = {'Install dependencies': 'python-install', 'Run pytest with coverage': 'python-test',
-                            'Install locked dependencies': 'javascript-install'}.get(s.get('name'))
+                    step_name = s.get('name')
+                    task = ({'Install dependencies': 'python-install', 'Run pytest with coverage': 'python-test',
+                             'Install locked dependencies': 'javascript-install'}.get(step_name)
+                            if isinstance(step_name, str) else None)
                     if task:
                         s['run'] = f'PYTHONPATH="$GITHUB_WORKSPACE/.analysis-tooling" python -m scripts.code_analysis.run_profile {task} --source "$GITHUB_WORKSPACE"'
             if number == 7:
@@ -270,7 +285,7 @@ def generate(config=None):
                     if 'run' in step and 'backend/ webui/src/' in step['run']:
                         step['run'] = 'semgrep --config=p/owasp-top-ten --config=p/secrets --json --output=semgrep-results.json .'
             job['steps'] = isolated
-            for source_step in job['steps']:
+            for source_step in step_list(job['steps'], f'{name} isolated steps'):
                 if 'env' in source_step:
                     source_step['env'] = {key: value for key, value in source_step['env'].items()
                                           if not (isinstance(value, str) and 'secrets.' in value)}
@@ -287,8 +302,8 @@ def generate(config=None):
                             '  echo "SOURCE_REPOSITORY must be an owner/repository identity" >&2\n'
                             '  exit 1\nfi\n'
                             'printf "organization=%s\nproject_key=%s_%s\n" "$organization" "$organization" "$repository" >> "$GITHUB_OUTPUT"')}
-                job['steps'].insert(0, identity_step)
-                for sonar_step in job['steps']:
+                step_list(job['steps'], 'Sonar steps').insert(0, identity_step)
+                for sonar_step in step_list(job['steps'], 'Sonar steps'):
                     if 'with' in sonar_step and 'args' in sonar_step['with']:
                         args = sonar_step['with']['args']
                         args = args.replace(
@@ -306,7 +321,7 @@ def generate(config=None):
                     if 'run' in sonar_step and '$SONAR_PROJECT_KEY' in sonar_step['run']:
                         sonar_step.setdefault('env', {})['SONAR_PROJECT_KEY'] = '${{ steps.sonar-project.outputs.project_key }}'
             if name == 'snyk':
-                job['steps'].append({'name': 'Upload isolated resolver diagnostics', 'if': 'always()',
+                step_list(job['steps'], 'Snyk steps').append({'name': 'Upload isolated resolver diagnostics', 'if': 'always()',
                                      'uses': UPLOAD, 'with': {'name': 'snyk-resolver-diagnostics',
                                      'path': '${{ runner.temp }}/snyk-resolver-error.json',
                                      'if-no-files-found': 'ignore', 'retention-days': 7}})
@@ -318,7 +333,7 @@ def generate(config=None):
         channel = extension['channel']
         if extension['mode'] == 'source' and extension.get('secrets'):
             raise ValueError('Source extensions cannot receive credentials')
-        steps = [{'uses': CHECKOUT, 'with': {'ref': '${{ inputs.tooling_sha }}', 'persist-credentials': False}},
+        steps: list[dict[str, Any]] = [{'uses': CHECKOUT, 'with': {'ref': '${{ inputs.tooling_sha }}', 'persist-credentials': False}},
                  {'uses': PYTHON, 'with': {'python-version': '3.11'}}]
         if extension['mode'] == 'source':
             steps.append({'uses': CHECKOUT, 'with': {'repository': '${{ fromJSON(inputs.target).source_repository }}',
@@ -357,14 +372,17 @@ def generate(config=None):
     return '# Generated by scripts/code_analysis/generate_source_workflow.py; do not edit by hand.\n' + yaml.safe_dump(document, sort_keys=False, width=110)
 
 
-def diagnostics():
-    document = yaml.safe_load(generate())
-    trigger = document.pop('on', document.pop(True, None))
-    document['on'] = {'workflow_dispatch': trigger['workflow_call']}
+def diagnostics() -> str:
+    raw_document = yaml.safe_load(generate())
+    if not isinstance(raw_document, dict):
+        raise TypeError('generated source workflow must be a mapping')
+    trigger = raw_document.pop('on', raw_document.pop(True, None))
+    document = mapping(raw_document, 'generated source workflow')
+    document['on'] = {'workflow_dispatch': mapping(trigger, 'workflow trigger')['workflow_call']}
     document['name'] = 'Scanner access diagnostics'
     document['run-name'] = 'Scanner diagnostics ${{ inputs.dispatch_id }}'
-    document['concurrency']['group'] = 'scanner-diagnostics-${{ inputs.dispatch_id }}'
-    document['jobs'] = {key: value for key, value in document['jobs'].items()
+    mapping(document['concurrency'], 'workflow concurrency')['group'] = 'scanner-diagnostics-${{ inputs.dispatch_id }}'
+    document['jobs'] = {key: value for key, value in mapping(document['jobs'], 'workflow jobs').items()
                         if key in {'identity', 'scanner-3-snyk', 'scanner-1-sonarqube-cloud'}}
     return '# Generated scanner diagnostics; never publishes a target report.\n' + yaml.safe_dump(document, sort_keys=False, width=110)
 

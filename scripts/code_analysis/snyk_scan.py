@@ -11,7 +11,7 @@ def main():
     config = json.loads((Path(__file__).resolve().parents[2] / 'config/code-analysis/service.json').read_text())
     profile = config['profile']
     repository = os.environ.get('SOURCE_REPOSITORY', config['source_repository'])
-    if not re.fullmatch(r'[\w.-]+/[\w.-]+', repository):
+    if not isinstance(repository, str) or not re.fullmatch(r'[\w.-]+/[\w.-]+', repository):
         raise ValueError('Invalid source repository for Snyk attribution')
     root = Path.cwd().resolve()
     runs, failures = [], []
