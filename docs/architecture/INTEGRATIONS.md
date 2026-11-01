@@ -205,8 +205,11 @@ compatible but contains project-specific commands; copying it is not generic sup
 Portable launches invoke `reusable-vendor.yml` before source report assembly. The
 vendor jobs receive only the exact target checkout and configured GitHub Environment
 secrets; source scanner jobs receive none of these values and vendor jobs receive
-no R2/publication credentials. Configure `SNYK_TOKEN`, `SONAR_TOKEN`, and optionally
-`SONAR_API_TOKEN` in the selected Actions Environment. Missing secrets produce
+no R2/publication credentials. Configure `SNYK_TOKEN` and `SONAR_TOKEN` in the
+selected Actions Environment. The same project-scoped Sonar token submits the exact
+analysis and reads its bounded native issue export; this avoids a second user token
+whose project permissions can drift. The workflow does not change project visibility.
+Missing secrets produce
 explicit `NOT_CONFIGURED` evidence. Snyk SARIF and Sonar native issue exports are
 uploaded as run-scoped artifacts and included by normal report assembly.
 

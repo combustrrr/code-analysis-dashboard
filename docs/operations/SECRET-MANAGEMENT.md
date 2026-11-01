@@ -63,7 +63,7 @@ Reusable source-executing jobs must never receive this token.
 
 ### Scanner and vendor tokens
 
-- `SNYK_TOKEN`, `SONAR_API_TOKEN`, `SCANNER_UPDATE_TOKEN` — rotate at the provider,
+- `SNYK_TOKEN`, `SONAR_TOKEN`, `SONAR_API_TOKEN`, `SCANNER_UPDATE_TOKEN` — rotate at the provider,
   then update the GitHub repository secret.
 - `SCANNER_UPDATE_TOKEN` requires Contents, Pull requests, Workflows, Issues, and
   Commit statuses read/write; metadata, checks, and Administration read access.
@@ -85,7 +85,7 @@ Reusable source-executing jobs must never receive this token.
 | GITHUB_CLIENT_SECRET | 180 days or on compromise suspicion | Scheduled or incident |
 | WEBHOOK_SECRET | 180 days or on compromise suspicion | Scheduled or incident |
 | R2_ACCESS_KEY / R2_SECRET_KEY | 90 days | Scheduled |
-| SNYK_TOKEN / SONAR_API_TOKEN | Per provider policy | Provider notification |
+| SNYK_TOKEN / SONAR_TOKEN / SONAR_API_TOKEN | Per provider policy | Provider notification |
 | SCANNER_UPDATE_TOKEN | 180 days or on personnel change | Scheduled or offboarding |
 | WORKER_API_TOKEN | 180 days | Scheduled |
 

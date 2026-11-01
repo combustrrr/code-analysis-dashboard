@@ -129,6 +129,11 @@ class ScannerAccessTests(unittest.TestCase):
         self.assertNotIn('sonar.projectKey=${{', scan['with']['args'])
         export = next(step for step in steps if step.get('name') == 'Export Sonar findings')
         self.assertIn('--project "$SONAR_PROJECT_KEY"', export['run'])
+        self.assertNotIn('SONAR_API_TOKEN', yaml.safe_dump(workflow['jobs']['sonar']))
+        self.assertEqual(workflow['jobs']['sonar']['env']['SONAR_TOKEN'],
+                         '${{ secrets.SONAR_TOKEN }}')
+        self.assertNotIn('SONAR_API_TOKEN',
+                         workflow.get('on', workflow.get(True))['workflow_call']['secrets'])
 
     def test_reconciliation_cannot_publish_checks_or_security_events_to_sources(self):
         for path in ('.github/workflows/code-analysis-coordinator.yml',):
