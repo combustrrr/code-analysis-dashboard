@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from scripts.code_analysis.source_identity import (
+    download_artifact_with_retry,
     execution_jobs_with_terminal_conclusions,
     producer_artifacts_with_consistency_wait,
 )
@@ -47,6 +48,25 @@ class ExecutionJobConsistencyTests(unittest.TestCase):
             )
         self.assertEqual({row['id'] for row in result}, {1, 2})
         self.assertEqual(sleep.call_count, 2)
+
+    def test_artifact_download_retries_transient_github_failure(self):
+        with patch('scripts.code_analysis.source_identity.gh', side_effect=[
+                RuntimeError('GitHub request failed (1): api artifact: gh: HTTP 503'),
+                b'zip-bytes',
+        ]) as gh, patch('scripts.code_analysis.source_identity.time.sleep') as sleep:
+            result = download_artifact_with_retry('owner/repo', 42, delay_seconds=0.5)
+        self.assertEqual(result, b'zip-bytes')
+        self.assertEqual(gh.call_count, 2)
+        sleep.assert_called_once_with(0.5)
+
+    def test_artifact_download_does_not_retry_non_transient_failure(self):
+        with patch('scripts.code_analysis.source_identity.gh', side_effect=RuntimeError(
+                'GitHub request failed (1): api artifact: gh: HTTP 403')) as gh, \
+                patch('scripts.code_analysis.source_identity.time.sleep') as sleep:
+            with self.assertRaises(RuntimeError):
+                download_artifact_with_retry('owner/repo', 42)
+        gh.assert_called_once()
+        sleep.assert_not_called()
 
 
 if __name__ == '__main__':

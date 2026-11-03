@@ -161,7 +161,12 @@ conclusions. The report job already depends on every producer, but the REST
 projection can lag the workflow scheduler; a missing conclusion must not be
 converted into a false scanner failure. Artifact-list projections are likewise
 merged across a bounded consistency window before report assembly so a newly
-finalized scanner artifact is not misclassified as absent. Trusted Python coverage profiles may set
+finalized scanner artifact is not misclassified as absent. Individual GitHub artifact
+downloads retry only bounded transient HTTP 429 and 5xx failures; authorization,
+identity, expiry, and malformed-evidence failures still fail closed. Sparse tooling
+checkouts for isolated vendor jobs must include every trusted helper imported by their
+entrypoints, and the Sonar lane regression test enforces its network helper dependency.
+Trusted Python coverage profiles may set
 `python_test_timeout_seconds` from 60 through 2400 seconds. The two larger
 configured sources use 1500 seconds, within the generated 40-minute coverage
 job boundary, so their progressing test suites can finish and retain current-run

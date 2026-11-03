@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -52,6 +53,24 @@ def producer_artifacts_with_consistency_wait(host: str, run: str, retries: int =
         if index + 1 < retries:
             time.sleep(delay_seconds)
     return list(artifacts.values())
+
+
+def download_artifact_with_retry(host: str, artifact_id: int, retries: int = 4,
+                                 delay_seconds: float = 2) -> bytes:
+    """Download one producer artifact with bounded retries for transient GitHub failures."""
+    path = f"repos/{host}/actions/artifacts/{artifact_id}/zip"
+    for attempt in range(retries):
+        try:
+            archive = gh('api', path, binary=True)
+            if not isinstance(archive, bytes):
+                raise TypeError('GitHub artifact download did not return bytes')
+            return archive
+        except RuntimeError as error:
+            transient = re.search(r'HTTP (?:429|5\d\d)\b', str(error)) is not None
+            if not transient or attempt + 1 >= retries:
+                raise
+            time.sleep(delay_seconds)
+    raise AssertionError('bounded artifact download loop did not return or raise')
 
 
 def expected_dispatch_id(request_id: str, channels: list[str]) -> str:
@@ -137,7 +156,7 @@ def main():
                 continue
             destination = root / str(artifact['id'])
             artifact_bytes += artifact.get('size_in_bytes', 0)
-            extract_zip(gh('api', f"repos/{host}/actions/artifacts/{artifact['id']}/zip", binary=True), destination)
+            extract_zip(download_artifact_with_retry(host, artifact['id']), destination)
     write(root / 'producer-status.json', {'scanner_family': 'Producer', 'run_id': run, 'run_attempt': attempt,
                                         'source_repository': row['source_repository'], 'source_sha': row['head_sha']})
     from scripts.code_analysis.applicability import selection

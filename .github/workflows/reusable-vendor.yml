@@ -128,6 +128,7 @@ jobs:
             scripts/code_analysis/ensure_sonar_project.py
             scripts/code_analysis/export_sonar_issues.py
             scripts/code_analysis/finalize_sonar_status.py
+            scripts/code_analysis/network_access.py
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Record Sonar unavailable status
@@ -233,6 +234,7 @@ jobs:
           path: .analysis-tooling
           sparse-checkout: |
             scripts/code_analysis/finalize_sonar_status.py
+            scripts/code_analysis/network_access.py
             scripts/code_analysis/retain_sonar_exit_code.py
           sparse-checkout-cone-mode: false
           persist-credentials: false
