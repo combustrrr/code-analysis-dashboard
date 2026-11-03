@@ -47,7 +47,7 @@ class PortableTests(unittest.TestCase):
                 'output':'fuzzing-results.xml',
             }}}
             with patch('scripts.code_analysis.portable_runner.required_executable', return_value='/trusted/bin/schemathesis'), \
-                    patch('scripts.code_analysis.portable_runner.os.name', 'nt'), \
+                    patch('scripts.code_analysis.portable_runner._supports_process_groups', return_value=False), \
                     patch('scripts.code_analysis.portable_runner.subprocess.run', side_effect=run):
                 result = execute('schemathesis', profile, source, source / 'output')
             self.assertEqual(result['status'], 'COMPLETED')
@@ -69,7 +69,7 @@ class PortableTests(unittest.TestCase):
                 'output':'fuzzing-results.xml',
             }}}
             with patch('scripts.code_analysis.portable_runner.required_executable', return_value='/trusted/bin/schemathesis'), \
-                    patch('scripts.code_analysis.portable_runner.os.name', 'nt'), \
+                    patch('scripts.code_analysis.portable_runner._supports_process_groups', return_value=False), \
                     patch('scripts.code_analysis.portable_runner.subprocess.run', side_effect=run):
                 result = execute('schemathesis', profile, source, source / 'output')
             self.assertEqual(result['status'], 'COMPLETED')
@@ -85,7 +85,7 @@ class PortableTests(unittest.TestCase):
                 'output':'fuzzing-results.xml',
             }}}
             with patch('scripts.code_analysis.portable_runner.required_executable', return_value='/trusted/bin/schemathesis'), \
-                    patch('scripts.code_analysis.portable_runner.os.name', 'posix'), \
+                    patch('scripts.code_analysis.portable_runner._supports_process_groups', return_value=True), \
                     patch('scripts.code_analysis.portable_runner.subprocess.Popen', return_value=process), \
                     patch('scripts.code_analysis.portable_runner._kill_process_group') as kill_group:
                 result = execute('schemathesis', profile, source, source / 'output')

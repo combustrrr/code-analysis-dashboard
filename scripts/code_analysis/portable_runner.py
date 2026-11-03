@@ -23,6 +23,9 @@ def _kill_process_group(process_id: int) -> None:
         raise RuntimeError('Process-group cleanup is unavailable on this runner')
     kill_group(process_id, getattr(signal, 'SIGKILL', 9))
 
+def _supports_process_groups() -> bool:
+    return os.name != 'nt'
+
 def execute(channel, profile, source, output):
     validate(profile);source=source.resolve();output.mkdir(parents=True,exist_ok=True)
     status: dict[str, Any] = {'scanner_family':FAMILIES[channel],'status':'FAILED','reason':'Scanner did not produce usable evidence.'}
@@ -34,7 +37,7 @@ def execute(channel, profile, source, output):
     def run(argv,cwd,stdout=subprocess.DEVNULL,env=None,process_group=False):
         # argv is assembled from the reviewed portable profile and fixed scanner commands.
         stderr=subprocess.STDOUT if stdout != subprocess.DEVNULL else subprocess.DEVNULL
-        if not process_group or os.name == 'nt':
+        if not process_group or not _supports_process_groups():
             return subprocess.run(argv,cwd=cwd,stdout=stdout,stderr=stderr,timeout=900,check=False,env=env).returncode
         process=subprocess.Popen(argv,cwd=cwd,stdout=stdout,stderr=stderr,env=env,start_new_session=True)
         try:
