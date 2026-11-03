@@ -53,6 +53,13 @@ class SonarStatusTests(unittest.TestCase):
     def test_vendor_workflow_finalizes_after_export(self):
         workflow = yaml.safe_load(Path('.github/workflows/reusable-vendor.yml').read_text(encoding='utf-8'))
         steps = workflow['jobs']['sonar']['steps']
+        tooling_checkout = next(
+            step for step in steps
+            if step.get('uses', '').startswith('actions/checkout@')
+            and step.get('with', {}).get('path') == '.analysis-tooling'
+        )
+        self.assertIn('scripts/code_analysis/network_access.py',
+                      tooling_checkout['with']['sparse-checkout'])
         scan = next(step for step in steps if step.get('name') == 'Run SonarQube analysis')
         export = next(step for step in steps if step.get('name') == 'Export Sonar findings')
         finalize = next(step for step in steps if step.get('name') == 'Finalize truthful Sonar status')
@@ -65,6 +72,12 @@ class SonarStatusTests(unittest.TestCase):
         finalizer = workflow['jobs']['sonar-finalize']
         self.assertEqual(finalizer['needs'], 'sonar')
         self.assertEqual(finalizer['permissions']['contents'], 'none')
+        finalizer_checkout = next(
+            step for step in finalizer['steps']
+            if step.get('uses', '').startswith('actions/checkout@')
+        )
+        self.assertIn('scripts/code_analysis/network_access.py',
+                      finalizer_checkout['with']['sparse-checkout'])
         reconcile = next(step for step in finalizer['steps'] if step.get('name') == 'Reconcile completed Sonar job')
         self.assertIn('retain_sonar_exit_code.py', reconcile['run'])
         self.assertIn('SONAR_SCANNER_EXIT_CODE', reconcile['run'])
