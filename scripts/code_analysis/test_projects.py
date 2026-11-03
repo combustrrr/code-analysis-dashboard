@@ -1,5 +1,7 @@
 import copy
+import json
 import unittest
+from pathlib import Path
 
 from scripts.code_analysis.projects import (
     native_feedback_allowed,
@@ -19,6 +21,17 @@ def config():
 
 
 class ProjectTests(unittest.TestCase):
+    def test_dashboard_enables_bounded_schemathesis_campaign(self):
+        document = validate(json.loads(Path('.github/code-analysis/projects.json').read_text()))
+        project = next(row for row in document['projects']
+                       if row['source_repository']['full_name'] == 'combustrrr/code-analysis-dashboard')
+        command = project['profile']['commands']['schemathesis']
+        self.assertIn('schemathesis', project['enabled_scanners'])
+        self.assertNotIn('schemathesis', project['deferred_channels'])
+        self.assertEqual(command['output'], 'fuzzing-results.xml')
+        self.assertEqual(command['argv'],
+                         ['node', 'tests/security_canary/dashboard_schemathesis_campaign.mjs'])
+
     def test_legacy_application_parallel_limit_is_ignored(self):
         doc=config();doc['max_parallel_analyses']=1
         self.assertNotIn('max_parallel_analyses', validate(doc))

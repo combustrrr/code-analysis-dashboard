@@ -36,8 +36,10 @@ class ScannerAccessTests(unittest.TestCase):
             condition = workflow['jobs'][name]['if']
             self.assertIn('always()', condition)
             self.assertEqual(workflow['jobs'][name]['needs'], 'claim')
-        self.assertEqual(workflow['jobs']['portable_profile']['name'], 'Source scanners · portable profile')
-        self.assertEqual(workflow['jobs']['agentic_profile']['name'], 'Source scanners · agentic-soc profile')
+        self.assertEqual(workflow['jobs']['portable_profile']['name'],
+                         'Source scanners · Code Analysis Dashboard portable profile')
+        self.assertEqual(workflow['jobs']['agentic_profile']['name'],
+                         'Source scanners · Agentic-Kibana profile')
         self.assertIn("profile_mode == 'portable'", workflow['jobs']['portable_profile']['if'])
         self.assertIn("profile_mode == 'agentic-soc'", workflow['jobs']['agentic_profile']['if'])
 

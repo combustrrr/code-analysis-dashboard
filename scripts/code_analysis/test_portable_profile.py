@@ -18,6 +18,20 @@ class PortableTests(unittest.TestCase):
             self.assertNotIn('coverage',readiness(profile))
         self.assertIn('bandit',readiness({'mode':'portable','python_root':'.'}))
 
+    def test_reviewed_schemathesis_campaign_is_available(self):
+        profile = {
+            'mode': 'portable',
+            'commands': {
+                'schemathesis': {
+                    'install': [['python', '-m', 'pip', 'install', 'schemathesis==3.39.16']],
+                    'argv': ['node', 'tests/security_canary/dashboard_schemathesis_campaign.mjs'],
+                    'output': 'fuzzing-results.xml',
+                },
+            },
+        }
+        self.assertIn('schemathesis', readiness(profile))
+        self.assertEqual(validate(profile), profile)
+
     def test_reject_escape_and_malformed_commands(self):
         for profile in [{'mode':'portable','python_root':'../secret'},{'mode':'portable','commands':{'coverage':{'argv':'pytest'}}},{'mode':'portable','commands':{'coverage':{'argv':['pytest'],'cwd':'C:/host'}}}]:
             with self.assertRaises(ValueError):validate(profile)

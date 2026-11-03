@@ -112,7 +112,7 @@ jobs:
       SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
       CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
   portable_profile:
-    name: Source scanners · portable profile
+    name: Source scanners · Code Analysis Dashboard portable profile
     if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'portable'
     needs: claim
     permissions:
@@ -125,7 +125,7 @@ jobs:
       target: ${{ needs.claim.outputs.target }}
       request_id: ${{ needs.claim.outputs.request_id }}
   agentic_profile:
-    name: Source scanners · agentic-soc profile
+    name: Source scanners · Agentic-Kibana profile
     if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'agentic-soc'
     needs: claim
     permissions:
