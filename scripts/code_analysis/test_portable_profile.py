@@ -32,6 +32,26 @@ class PortableTests(unittest.TestCase):
         self.assertIn('schemathesis', readiness(profile))
         self.assertEqual(validate(profile), profile)
 
+    def test_schemathesis_campaign_receives_resolved_scanner_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            seen = []
+            def run(argv, **kwargs):
+                seen.append((argv, kwargs.get('env')))
+                if argv[0] == 'node':
+                    (source / 'fuzzing-results.xml').write_text('<testsuite tests="1"/>')
+                return subprocess.CompletedProcess(argv, 0)
+            profile = {'mode':'portable','commands':{'schemathesis':{
+                'install':[['python','-m','pip','install','schemathesis==3.39.16']],
+                'argv':['node','tests/security_canary/dashboard_schemathesis_campaign.mjs'],
+                'output':'fuzzing-results.xml',
+            }}}
+            with patch('scripts.code_analysis.portable_runner.required_executable', return_value='/trusted/bin/schemathesis'), \
+                    patch('scripts.code_analysis.portable_runner.subprocess.run', side_effect=run):
+                result = execute('schemathesis', profile, source, source / 'output')
+            self.assertEqual(result['status'], 'COMPLETED')
+            self.assertEqual(seen[-1][1]['SCHEMATHESIS_EXECUTABLE'], '/trusted/bin/schemathesis')
+
     def test_reject_escape_and_malformed_commands(self):
         for profile in [{'mode':'portable','python_root':'../secret'},{'mode':'portable','commands':{'coverage':{'argv':'pytest'}}},{'mode':'portable','commands':{'coverage':{'argv':['pytest'],'cwd':'C:/host'}}}]:
             with self.assertRaises(ValueError):validate(profile)

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
+import { isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import worker from '../../analysis-launcher/worker.mjs';
@@ -119,7 +120,11 @@ export async function startServer(port = PORT) {
 async function campaign() {
   const server = await startServer();
   try {
-    const scanner = spawn('schemathesis', [
+    const scannerExecutable = process.env.SCHEMATHESIS_EXECUTABLE;
+    if (!scannerExecutable || !isAbsolute(scannerExecutable)) {
+      throw new Error('SCHEMATHESIS_EXECUTABLE must be a trusted absolute path');
+    }
+    const scanner = spawn(scannerExecutable, [
       'run',
       `http://${HOST}:${PORT}/openapi.json`,
       '--experimental=openapi-3.1',
