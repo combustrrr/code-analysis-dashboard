@@ -20,4 +20,9 @@ test('Schemathesis harness exercises the real public Worker handler', async t =>
   assert.equal(payload.mode, 'repositories');
   assert.equal(payload.execution_repository.full_name, 'combustrrr/code-analysis-dashboard');
   assert.equal(response.headers.get('X-Frame-Options'), 'DENY');
+  const configSchema = schema.paths['/api/public/config'].get.responses[200]
+    .content['application/json'].schema;
+  for (const key of ['require_report_login', 'admission_paused']) {
+    assert.ok(configSchema.required.includes(key), `public config schema must require ${key}`);
+  }
 });

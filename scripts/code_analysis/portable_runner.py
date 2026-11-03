@@ -1,9 +1,11 @@
 """Run one scanner inside a read-only-token source job, retaining native evidence."""
 import argparse
+import contextlib
 import importlib.metadata
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +17,12 @@ from scripts.code_analysis.process_access import required_executable
 FAMILIES={'bandit':'Bandit','ruff':'Ruff','radon':'Radon','xenon':'Xenon','vulture':'Vulture','eslint':'ESLint','typescript':'TypeScript','coverage':'Coverage.py','atheris':'Atheris','schemathesis':'Schemathesis','pyright':'Pyright','osv':'OSV-Scanner', 'coderabbit-ai-advisory': 'CodeRabbit', 'codex-security': 'Codex', 'alibaba-ocr': 'Alibaba', 'flounder-audit': 'Flounder', 'vulnagent-triage': 'VulnAgent', 'owasp-jvm': 'FindSecBugs', 'owasp-go': 'Gosec', 'owasp-js': 'njsscan', 'owasp-ruby': 'Brakeman', 'owasp-iac-secrets': 'TruffleHog'}
 OUTPUTS={'bandit':'bandit-results.json','ruff':'ruff-results.json','radon':'radon-cc.json','xenon':'xenon-results.txt','vulture':'vulture-results.txt','eslint':'eslint-results.json','typescript':'tsc-results.txt','coverage':'coverage.json','schemathesis':'fuzzing-results.xml','pyright':'pyright-results.json'}
 
+def _kill_process_group(process_id: int) -> None:
+    kill_group = getattr(os, 'killpg', None)
+    if kill_group is None:
+        raise RuntimeError('Process-group cleanup is unavailable on this runner')
+    kill_group(process_id, getattr(signal, 'SIGKILL', 9))
+
 def execute(channel, profile, source, output):
     validate(profile);source=source.resolve();output.mkdir(parents=True,exist_ok=True)
     status: dict[str, Any] = {'scanner_family':FAMILIES[channel],'status':'FAILED','reason':'Scanner did not produce usable evidence.'}
@@ -23,9 +31,21 @@ def execute(channel, profile, source, output):
         p=(source/relative).resolve()
         if not p.is_relative_to(source):raise ValueError('Source path escapes checkout')
         return p
-    def run(argv,cwd,stdout=subprocess.DEVNULL,env=None):
+    def run(argv,cwd,stdout=subprocess.DEVNULL,env=None,process_group=False):
         # argv is assembled from the reviewed portable profile and fixed scanner commands.
-        return subprocess.run(argv,cwd=cwd,stdout=stdout,stderr=subprocess.STDOUT if stdout != subprocess.DEVNULL else subprocess.DEVNULL,timeout=900,check=False,env=env).returncode
+        stderr=subprocess.STDOUT if stdout != subprocess.DEVNULL else subprocess.DEVNULL
+        if not process_group or os.name == 'nt':
+            return subprocess.run(argv,cwd=cwd,stdout=stdout,stderr=stderr,timeout=900,check=False,env=env).returncode
+        process=subprocess.Popen(argv,cwd=cwd,stdout=stdout,stderr=stderr,env=env,start_new_session=True)
+        try:
+            return_code=process.wait(timeout=900)
+        except BaseException:
+            with contextlib.suppress(ProcessLookupError):_kill_process_group(process.pid)
+            process.wait()
+            raise
+        if return_code != 0:
+            with contextlib.suppress(ProcessLookupError):_kill_process_group(process.pid)
+        return return_code
     try:
         root=profile.get('python_root','.')
         native=output/OUTPUTS.get(channel,'campaign.txt')
@@ -47,7 +67,7 @@ def execute(channel, profile, source, output):
                 command_environment['SCHEMATHESIS_EXECUTABLE'] = required_executable('schemathesis')
             if channel in ('typescript','pyright'):
                 with native.open('w',encoding='utf-8') as stream:rc=run(command['argv'],cwd,stream)
-            else:rc=run(command['argv'],cwd,env=command_environment)
+            else:rc=run(command['argv'],cwd,env=command_environment,process_group=channel=='schemathesis')
             if channel=='coverage':
                 status['coverage_exit_code']=run([sys.executable,'-m','coverage','json','-o',str(native)],cwd)
             if channel=='coverage':status['test_exit_code']=rc
