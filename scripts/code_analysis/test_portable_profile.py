@@ -10,6 +10,16 @@ from scripts.code_analysis.portable_runner import execute
 from scripts.code_analysis.snapshot import build_analysis_channels
 
 
+def schemathesis_profile(*, install=True):
+    command = {
+        'argv': ['node', 'tests/security_canary/dashboard_schemathesis_campaign.mjs'],
+        'output': 'fuzzing-results.xml',
+    }
+    if install:
+        command['install'] = [['python', '-m', 'pip', 'install', 'schemathesis==3.39.16']]
+    return {'mode': 'portable', 'commands': {'schemathesis': command}}
+
+
 class PortableTests(unittest.TestCase):
     def test_distinct_layouts_and_missing_commands(self):
         for profile in ({'mode':'portable','python_root':'pkg'},{'mode':'portable','javascript_root':'frontend'}):
@@ -19,16 +29,7 @@ class PortableTests(unittest.TestCase):
         self.assertIn('bandit',readiness({'mode':'portable','python_root':'.'}))
 
     def test_reviewed_schemathesis_campaign_is_available(self):
-        profile = {
-            'mode': 'portable',
-            'commands': {
-                'schemathesis': {
-                    'install': [['python', '-m', 'pip', 'install', 'schemathesis==3.39.16']],
-                    'argv': ['node', 'tests/security_canary/dashboard_schemathesis_campaign.mjs'],
-                    'output': 'fuzzing-results.xml',
-                },
-            },
-        }
+        profile = schemathesis_profile()
         self.assertIn('schemathesis', readiness(profile))
         self.assertEqual(validate(profile), profile)
 
@@ -41,11 +42,7 @@ class PortableTests(unittest.TestCase):
                 if argv[0] == 'node':
                     (source / 'fuzzing-results.xml').write_text('<testsuite tests="1"/>')
                 return subprocess.CompletedProcess(argv, 0)
-            profile = {'mode':'portable','commands':{'schemathesis':{
-                'install':[['python','-m','pip','install','schemathesis==3.39.16']],
-                'argv':['node','tests/security_canary/dashboard_schemathesis_campaign.mjs'],
-                'output':'fuzzing-results.xml',
-            }}}
+            profile = schemathesis_profile()
             with patch('scripts.code_analysis.portable_runner.required_executable', return_value='/trusted/bin/schemathesis'), \
                     patch('scripts.code_analysis.portable_runner._supports_process_groups', return_value=False), \
                     patch('scripts.code_analysis.portable_runner.subprocess.run', side_effect=run):
@@ -63,11 +60,7 @@ class PortableTests(unittest.TestCase):
                         '<failure message="status code: 500"/></testcase></testsuite>')
                     return subprocess.CompletedProcess(argv, 1)
                 return subprocess.CompletedProcess(argv, 0)
-            profile = {'mode':'portable','commands':{'schemathesis':{
-                'install':[['python','-m','pip','install','schemathesis==3.39.16']],
-                'argv':['node','tests/security_canary/dashboard_schemathesis_campaign.mjs'],
-                'output':'fuzzing-results.xml',
-            }}}
+            profile = schemathesis_profile()
             with patch('scripts.code_analysis.portable_runner.required_executable', return_value='/trusted/bin/schemathesis'), \
                     patch('scripts.code_analysis.portable_runner._supports_process_groups', return_value=False), \
                     patch('scripts.code_analysis.portable_runner.subprocess.run', side_effect=run):
@@ -80,10 +73,7 @@ class PortableTests(unittest.TestCase):
             source = Path(tmp)
             process = MagicMock(pid=4312)
             process.wait.side_effect = [subprocess.TimeoutExpired(['node'], 900), 0]
-            profile = {'mode':'portable','commands':{'schemathesis':{
-                'argv':['node','tests/security_canary/dashboard_schemathesis_campaign.mjs'],
-                'output':'fuzzing-results.xml',
-            }}}
+            profile = schemathesis_profile(install=False)
             with patch('scripts.code_analysis.portable_runner.required_executable', return_value='/trusted/bin/schemathesis'), \
                     patch('scripts.code_analysis.portable_runner._supports_process_groups', return_value=True), \
                     patch('scripts.code_analysis.portable_runner.subprocess.Popen', return_value=process), \
