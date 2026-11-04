@@ -51,7 +51,7 @@ def preferred_intents(document: dict, execution_sha: str) -> list[dict]:
             "resolved_selection": {"repository": source["full_name"], "repository_id": source["id"], "kind": "commit", "ref": target_sha},
             "source_sha": target_sha, "target_sha": target_sha, "pr_context": None, "requested_channels": channels,
             "tooling_sha": document["tooling_sha"], "profile_digest": profile_digest,
-            "profile_mode": "portable" if project["profile"].get("mode") == "portable" else "agentic-soc",
+            "profile_mode": project["profile"]["mode"],
             "analysis_key": {"project_id": str(project["id"]), "source_repository_id": source["id"], "target_sha": target_sha, "tooling_sha": document["tooling_sha"], "profile_digest": profile_digest},
             "actor_id": 0, "idempotency_key": request_id, "run_again": True,
             "preview_id": str(uuid.uuid4()), "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat().replace("+00:00", "Z"),

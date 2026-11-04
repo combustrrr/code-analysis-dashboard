@@ -37,7 +37,7 @@ def scanner_target(claim: dict) -> dict:
             or not re.fullmatch(r"[0-9a-f]{40}", intent["source_sha"])
             or not re.fullmatch(r"[0-9a-f]{40}", intent["tooling_sha"])
             or not re.fullmatch(r"[0-9a-f]{64}", intent["profile_digest"])
-            or intent["profile_mode"] not in {"portable", "agentic-soc"}
+            or intent["profile_mode"] not in {"portable", "code-analysis-dashboard", "agentic-soc"}
             or not isinstance(intent.get("requested_channels"), list)
             or not intent["requested_channels"]):
         raise ValueError("queue envelope identity is not trusted")

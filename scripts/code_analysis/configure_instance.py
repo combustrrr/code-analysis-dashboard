@@ -15,8 +15,8 @@ def configure(template: dict, source: str, analysis: str, publishing: str, branc
         raise ValueError('Observer source must be separate from its execution and publication host')
     if not isinstance(profile, dict) or not profile:
         raise ValueError('Supply the new repository profile explicitly')
-    required = set() if profile.get('mode') == 'portable' else {'python_root', 'python_requirements', 'javascript_root'}
-    if profile.get('mode', 'legacy') not in {'portable', 'legacy'}:
+    required = set() if profile.get('mode') in {'portable', 'code-analysis-dashboard'} else {'python_root', 'python_requirements', 'javascript_root'}
+    if profile.get('mode', 'legacy') not in {'portable', 'code-analysis-dashboard', 'legacy'}:
         raise ValueError('Unknown repository profile mode')
     if not required.issubset(profile):
         raise ValueError('Profile requires python_root, python_requirements and javascript_root')

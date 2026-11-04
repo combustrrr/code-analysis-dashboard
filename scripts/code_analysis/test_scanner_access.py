@@ -32,15 +32,15 @@ class ScannerAccessTests(unittest.TestCase):
 
     def test_source_profiles_run_independently_from_vendor_evidence(self):
         workflow = yaml.safe_load(Path('.github/workflows/code-analysis-coordinator.yml').read_text(encoding='utf-8'))
-        for name in ('portable_profile', 'agentic_profile'):
+        for name in ('dashboard_profile', 'agentic_profile'):
             condition = workflow['jobs'][name]['if']
             self.assertIn('always()', condition)
             self.assertEqual(workflow['jobs'][name]['needs'], 'claim')
-        self.assertEqual(workflow['jobs']['portable_profile']['name'],
-                         'Source scanners · Code Analysis Dashboard portable profile')
+        self.assertEqual(workflow['jobs']['dashboard_profile']['name'],
+                         'Source scanners · Code Analysis Dashboard profile')
         self.assertEqual(workflow['jobs']['agentic_profile']['name'],
                          'Source scanners · Agentic-Kibana profile')
-        self.assertIn("profile_mode == 'portable'", workflow['jobs']['portable_profile']['if'])
+        self.assertIn("profile_mode == 'code-analysis-dashboard'", workflow['jobs']['dashboard_profile']['if'])
         self.assertIn("profile_mode == 'agentic-soc'", workflow['jobs']['agentic_profile']['if'])
 
     def test_vendor_diagnostics_cannot_publish_a_target_report(self):

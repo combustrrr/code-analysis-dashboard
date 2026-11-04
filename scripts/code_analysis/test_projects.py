@@ -26,6 +26,7 @@ class ProjectTests(unittest.TestCase):
         project = next(row for row in document['projects']
                        if row['source_repository']['full_name'] == 'combustrrr/code-analysis-dashboard')
         command = project['profile']['commands']['schemathesis']
+        self.assertEqual(project['profile']['mode'], 'code-analysis-dashboard')
         self.assertIn('schemathesis', project['enabled_scanners'])
         self.assertNotIn('schemathesis', project['deferred_channels'])
         self.assertEqual(command['output'], 'fuzzing-results.xml')

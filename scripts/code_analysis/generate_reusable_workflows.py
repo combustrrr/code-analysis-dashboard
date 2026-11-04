@@ -1,4 +1,4 @@
-"""Generate the reusable portable producer from the existing isolated scanners."""
+"""Generate reusable project-profile producers from the isolated scanners."""
 import json
 from pathlib import Path
 
@@ -20,7 +20,7 @@ def reusable_source(portable=True):
         # Dropping them here allowed an enabled channel to be selected without a
         # corresponding producer job in the reusable workflow.
         extensions = [row for row in config.get('scanner_extensions', []) if not row.get('secrets')]
-        config.update(profile={'mode':'portable'}, scanner_extensions=extensions)
+        config.update(profile={'mode':'code-analysis-dashboard'}, scanner_extensions=extensions)
     document = yaml.safe_load(generate(config))
     document['name'] = 'Reusable source analysis'
     document.pop('run-name', None)
@@ -46,7 +46,7 @@ def reusable_source(portable=True):
                     steps.append(step)
                     path = opts.get('path', '.')
                     steps.append({'name':'Load reviewed execution project configuration',
-                        'env': {'GH_TOKEN':GITHUB_TOKEN_EXPRESSION, 'TOOLING_SHA':'${{ inputs.tooling_sha }}', 'TARGET_JSON':'${{ inputs.target }}', 'EXPECTED_PROFILE':'portable' if portable else 'agentic-soc'},
+                        'env': {'GH_TOKEN':GITHUB_TOKEN_EXPRESSION, 'TOOLING_SHA':'${{ inputs.tooling_sha }}', 'TARGET_JSON':'${{ inputs.target }}', 'EXPECTED_PROFILE':'code-analysis-dashboard' if portable else 'agentic-soc'},
                         'run': f'python -I "$GITHUB_WORKSPACE/{path}/scripts/code_analysis/prepare_project.py"'})
                     continue
             if 'env' in step and 'TOOLING_SHA' in step['env']:

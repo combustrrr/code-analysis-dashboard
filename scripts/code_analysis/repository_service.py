@@ -759,7 +759,7 @@ def reconcile_repository(repository, project_id='', selection='', request_id='')
                 continue
             if running >= 1:
                 continue
-            row.update(profile_mode='portable' if project['profile'].get('mode') == 'portable' else 'agentic-soc', project_id=project['id'],request_id=request_id,status='dispatching',
+            row.update(profile_mode=project['profile']['mode'], project_id=project['id'],request_id=request_id,status='dispatching',
                        tooling_sha=document['tooling_sha'], execution_sha=execution_sha,
                        requested_channels=row.get('requested_channels',project['enabled_scanners']),
                        execution_channels=execution_channels,dispatch_id=dispatch_id,

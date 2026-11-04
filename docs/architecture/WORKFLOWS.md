@@ -12,7 +12,7 @@ Run analysis button
   -> Worker authorization, SHA resolution, durable admission
   -> Run analysis coordinator
        -> vendor lane         (only selected vendor scanners)
-       -> portable-profile lane     (portable project profile)
+       -> dashboard-profile lane    (Code Analysis Dashboard project profile)
        -> agentic-soc-profile lane  (agentic-soc project profile)
        -> per-project publication fence
   -> Ready / Needs attention in the application

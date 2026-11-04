@@ -63,7 +63,7 @@ def validate(document: dict) -> dict:
             raise ValueError('A scanner cannot be enabled and deferred')
         if any(not isinstance(x, str) or not x.strip() for x in project.get('deferred_channels', {}).values()):
             raise ValueError('Every deferral requires a reason')
-        if project['profile'].get('mode') == 'portable':
+        if project['profile'].get('mode') in {'portable', 'code-analysis-dashboard'}:
             from scripts.code_analysis.portable_profile import (
                 validate as validate_profile,
             )

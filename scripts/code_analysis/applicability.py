@@ -85,7 +85,7 @@ def selection(config: dict, source: Path, requested_channels: list[str] | None =
         if not path.is_relative_to(source.resolve()):
             raise ValueError('Profile path escapes selected source')
         return path.exists()
-    portable = profile.get('mode') == 'portable'
+    portable = profile.get('mode') in {'portable', 'code-analysis-dashboard'}
     if portable:
         from scripts.code_analysis.portable_profile import readiness
         capabilities = discover_capabilities(source)

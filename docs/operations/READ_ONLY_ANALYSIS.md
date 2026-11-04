@@ -26,7 +26,7 @@ execution; the configured branch is not treated as a permanent revision pin.
    repository administration is required to change the trusted project registry.
 4. Choose the target's configured branch (`Testing` for Agentic-Kibana,
    `main` for dashboard self-analysis), an open pull request, or a full 40-character
-   commit SHA. Choose the scanner channels; the common portable baseline is preselected
+   commit SHA. Choose the scanner channels; the reviewed project baseline is preselected
    and vendor lanes are opt-in. CodeRabbit review is available only for an open PR.
 5. Review the resolved full SHA, original selection, PR fork/head/base provenance, exact
    selected channels, cache/reuse state, readiness, and usage caveat. Confirm explicitly
@@ -120,7 +120,7 @@ not clean zeroes.
 
 The coordinator contains two static reusable-workflow call sites because GitHub Actions
 cannot choose a reusable workflow dynamically. Exactly one is applicable: the dashboard
-self-analysis uses the explicitly named Code Analysis Dashboard portable-profile lane,
+self-analysis uses the explicitly named Code Analysis Dashboard profile lane,
 while Agentic-Kibana uses the explicitly named Agentic-Kibana profile lane. Actions
 displays the non-applicable profile branch as skipped;
 this is expected profile routing and is not an incomplete scanner channel. The jobs use

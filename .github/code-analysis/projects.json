@@ -127,7 +127,7 @@
       "native_feedback_enabled": false,
       "preferred_branch": "main",
       "profile": {
-        "mode": "portable",
+        "mode": "code-analysis-dashboard",
         "python_root": "scripts/code_analysis",
         "javascript_root": "analysis-ui",
         "javascript_install_command": ["npm", "ci", "--ignore-scripts"],

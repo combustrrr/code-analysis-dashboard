@@ -52,11 +52,11 @@ def main():
         raise ValueError('Source repository identity or visibility changed')
     if target['repository'].lower() != source['full_name'].lower():
         raise ValueError('Selected target is outside the configured source')
-    # The first reusable producer is deliberately portable. Never run the original
-    # repository harness against a new project simply because Python is detected.
-    expected = os.environ.get('EXPECTED_PROFILE', 'portable')
-    if expected == 'portable' and config['profile'].get('mode') != 'portable':
-        raise ValueError('This producer requires a portable profile')
+    # The dashboard producer is bound to its named reviewed profile. Never run a
+    # repository harness against another project simply because Python is detected.
+    expected = os.environ.get('EXPECTED_PROFILE', 'code-analysis-dashboard')
+    if expected in {'portable', 'code-analysis-dashboard'} and config['profile'].get('mode') != expected:
+        raise ValueError('This producer requires the Code Analysis Dashboard profile')
     configured_profile = {key: value for key, value in config['profile'].items() if key != 'mode'}
     if expected == 'agentic-soc' and configured_profile != template['profile']:
         raise ValueError('Configured commands require a matching reviewed scanner workflow adapter')
