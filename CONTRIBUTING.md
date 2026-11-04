@@ -52,6 +52,11 @@ templates or generation logic changes. Commit generated output with its source.
 - Complete the pull-request template and disclose known limitations.
 
 By contributing, you confirm that you have the right to submit the contribution
-under the repository's applicable terms. This repository currently has no
-declared open-source license; contribution does not itself grant additional
-rights to reuse the project.
+under the repository's applicable terms. The project is proprietary and is not
+offered under an open-source license. By submitting a contribution, you grant
+the repository owner a perpetual, worldwide, irrevocable, royalty-free,
+non-exclusive license to use, reproduce, modify, distribute, sublicense, and
+relicense that contribution as part of this project. Copyright in a contribution
+is not assigned unless a separate written agreement says otherwise. Submission
+does not grant third parties additional rights to reuse the project. See
+[LICENSE](LICENSE).

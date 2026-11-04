@@ -8,6 +8,16 @@ vulnerabilities privately as described in [SECURITY.md](SECURITY.md), and see
 [ACCESSIBILITY.md](ACCESSIBILITY.md) for the accessibility commitment and known
 limitations.
 
+## License and ownership
+
+Copyright (c) 2026 Sarthak Prasad Kulkarni. All rights reserved. This repository
+is publicly viewable but is not licensed as open-source software. No permission
+is granted to use, copy, modify, redistribute, host, deploy, or create derivative
+works except for GitHub's limited public-repository platform rights, applicable-law
+exceptions, or separate written permission from the copyright holder. See the
+[proprietary notice](LICENSE). Third-party components remain governed by their own
+licenses.
+
 Start with the [documentation index](docs/README.md), then read the
 [system architecture](docs/architecture/SYSTEM_OVERVIEW.md). Operational guides are grouped under
 the [current](docs/current/README.md), [architecture](docs/architecture/README.md),
