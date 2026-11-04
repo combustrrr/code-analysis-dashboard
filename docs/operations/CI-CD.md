@@ -25,7 +25,9 @@ or post the static `@coderabbitai review` command; the resulting completed App c
 then enters the same exact-head evidence path. Do not treat the initial skipped check
 as a completed review. Automatic reviews are deliberately scoped to pull requests
 targeting `main`; pull requests targeting other branches require a manual review
-request and are not part of the production evidence contract.
+request. Completed same-repository reviews are retained as pull-request overlays
+regardless of target branch, and the `overlay_only` boundary keeps them out of
+canonical branch publication.
 
 ## Continuous integration
 
