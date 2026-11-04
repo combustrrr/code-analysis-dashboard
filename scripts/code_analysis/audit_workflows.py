@@ -208,8 +208,8 @@ def audit() -> list[str]:
     auto_review = ((coderabbit.get("reviews") or {}).get("auto_review") or {})
     if auto_review.get("enabled") is not True:
         errors.append(".coderabbit.yaml: automatic cloud review must remain enabled")
-    if auto_review.get("base_branches") != [".*"]:
-        errors.append(".coderabbit.yaml: base_branches must explicitly cover every PR target")
+    if auto_review.get("base_branches") != ["main"]:
+        errors.append(".coderabbit.yaml: automatic reviews must target main only")
     github_checks = ((coderabbit.get("reviews") or {}).get("tools") or {}).get(
         "github-checks"
     ) or {}

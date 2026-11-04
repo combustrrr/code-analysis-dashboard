@@ -23,7 +23,11 @@ eligibility policy. On 2026-11-04 it reported that automatic reviews require ten
 repository stars. A maintainer can use the check comment's **Trigger review** action
 or post the static `@coderabbitai review` command; the resulting completed App check
 then enters the same exact-head evidence path. Do not treat the initial skipped check
-as a completed review.
+as a completed review. Automatic reviews are deliberately scoped to pull requests
+targeting `main`; pull requests targeting other branches require a manual review
+request. Completed same-repository reviews are retained as pull-request overlays
+regardless of target branch, and the `overlay_only` boundary keeps them out of
+canonical branch publication.
 
 ## Continuous integration
 

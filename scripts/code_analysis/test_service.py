@@ -534,7 +534,7 @@ class MonitoringTests(unittest.TestCase):
         self.assertIn("presentation",layout["layers"])
         self.assertIn("infrastructure_adapters",layout["layers"])
         coderabbit=(Path(__file__).resolve().parents[2]/".coderabbit.yaml").read_text(encoding="utf-8")
-        self.assertIn('base_branches:\n      - ".*"',coderabbit)
+        self.assertIn('base_branches:\n      - "main"',coderabbit)
         self.assertIn("timeout_ms: 900000",coderabbit)
 
     def test_product_runtime_cannot_depend_on_external_analysis_service(self):
