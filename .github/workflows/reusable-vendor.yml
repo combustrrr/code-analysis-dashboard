@@ -21,6 +21,8 @@ name: Isolated vendor evidence
         required: false
       CODERABBIT_GITHUB_TOKEN:
         required: false
+      SECURITY_POSTURE_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -35,7 +37,7 @@ jobs:
       contents: read
       security-events: read
     env:
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.SECURITY_POSTURE_TOKEN || github.token }}
       SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
       SOURCE_SHA: ${{ fromJSON(inputs.target).head_sha }}
     steps:
@@ -64,7 +66,7 @@ jobs:
           reason="Repository secret-protection controls and open-alert count were observed without retaining secret values."
           if [[ "$secret_scanning" == UNAVAILABLE || "$push_protection" == UNAVAILABLE || "$alerts_status" == UNAVAILABLE ]]; then
             status=CONFIGURED_PARTIAL
-            reason="GitHub did not expose one or more repository secret-protection controls to the isolated read-only posture job."
+            reason="The configured posture credential or built-in token could not observe one or more secret-protection controls or the open-alert count."
           elif [[ "$secret_scanning" != enabled || "$push_protection" != enabled ]]; then
             reason="Repository secret-protection posture was observed; one or more controls are not enabled."
           fi
