@@ -88,10 +88,13 @@ expose a control or the alert count, the job records `CONFIGURED_PARTIAL`. The
 job does not check out or execute source code, and its evidence is bound to the
 accepted source SHA in `repository-security-posture-status.json`.
 
-The project profile selects the configured scanner stack for each source and requires
-every known channel to be enabled or explicitly deferred. Portable channels are
-preselected for a run; configured vendor lanes (including Snyk and Sonar) require an
-explicit opt-in and use the pinned source repository/commit with trusted settings.
+Every project exposes the same service-wide supported scanner catalog. Project profiles
+hold only reviewed source paths, commands, and build recipes; they cannot enable, defer,
+or hide a scanner for one project. The full catalog is preselected for a run, while the
+configuration flow lets a user select a smaller set. Applicability is evaluated against
+the selected immutable revision and retained as explicit `NOT_APPLICABLE` or
+`NOT_AVAILABLE` evidence rather than as a project-specific scanner list. Configured vendor
+lanes (including Snyk and Sonar) use the pinned source repository/commit with trusted settings.
 CodeRabbit is an optional PR-only advisory lane; its evidence is retained in a distinct
 AI-advisory channel. Branch targets record `NOT_APPLICABLE` with an unknown finding
 count; only an exact-head completed PR review may record a measured zero. Its evidence
@@ -111,12 +114,13 @@ result onto the configured main branch.
 The dashboard-source profile runs a bounded Schemathesis campaign against the actual
 Worker public-configuration handler through a credential-free loopback harness and a
 reviewed OpenAPI document. The harness exposes no authenticated routes, external
-services, vendor credentials, or publication credentials. The profile explicitly
-defers container-image/SBOM channels (there is no shipping image) and Hadolint (its only
-Dockerfile is a scanner fixture). The Agentic-Kibana fork profile retains its
-Python/API/web/image-specific adapters; the equivalent upstream Kavach profile is
-preserved as a restoration requirement in issue #194. Unsupported integrations remain explicitly deferred/unavailable,
-not clean zeroes.
+services, vendor credentials, or publication credentials. The dashboard has no shipping
+image and its only Dockerfile is a scanner fixture, so those selected channels retain
+revision-level inapplicability instead of being removed from its catalog. The
+Agentic-Kibana fork profile retains its Python/API/web/image-specific recipes; the
+equivalent upstream Kavach profile is preserved as a restoration requirement in issue
+#194. Proposal-only integrations without a production adapter are not part of the
+supported catalog and cannot be mistaken for scanner evidence.
 
 The coordinator contains two static reusable-workflow call sites because GitHub Actions
 cannot choose a reusable workflow dynamically. Exactly one is applicable: the dashboard

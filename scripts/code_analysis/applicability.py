@@ -41,14 +41,7 @@ GROUPS = {
     'dead-code': ['vulture'], 'test-coverage': ['coverage'],
     'schemathesis-fuzz': ['schemathesis'], 'atheris-state-machine': ['atheris'],
     'coderabbit': ['coderabbit-ai-advisory'],
-    'codex-security': ['codex-security'],
-    'alibaba-ocr': ['alibaba-ocr'],
-    'flounder-audit': ['flounder-audit'],
-    'vulnagent-triage': ['vulnagent-triage'],
-    'owasp-jvm': ['owasp-jvm'],
-    'owasp-go': ['owasp-go'],
     'owasp-js': ['owasp-js'],
-    'owasp-ruby': ['owasp-ruby'],
     'owasp-iac-secrets': ['owasp-iac-secrets'],
 }
 PORTABLE_JOBS = {'semgrep', 'gitleaks', 'trivy', 'checkov', 'openssf-scorecard', 'coderabbit'}

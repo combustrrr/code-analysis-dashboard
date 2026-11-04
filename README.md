@@ -49,10 +49,14 @@ workspace home, to browse the service's two trusted targets. Project selection,
 settings, and report viewing do not trigger a scan. On a project, **Fast analysis** repeats
 that user's most recent branch, pull request, or commit, then recomputes and submits every
 scanner currently available for the resolved revision. Without prior history it resolves the
+same service-wide scanner catalog for every configured project; repository profiles provide
+only reviewed paths and commands, never a different scanner allowlist. It then resolves the
 configured preferred branch. The independent scanner lanes run concurrently; “Fast” refers to
 automatic selection and never reuses an older reduced scanner subset. **Configure analysis** starts with a full 40-character SHA, offers
 branch or pull-request selection as a fallback, and supports safe defaults, individual
-producer groups, or every currently available channel with explicit vendor confirmation.
+producer groups, or the full shared catalog with explicit vendor confirmation. A selected
+channel can still report revision-level `NOT_APPLICABLE` when its required artifact or
+language is absent; that evidence is distinct from removing the scanner for a project.
 The service verifies the resolved immutable SHA before starting the request. A 202 means
 accepted and preparing, not completed. Different projects and revisions run concurrently;
 matching active project/SHA requests merge missing scanner channels instead of duplicating

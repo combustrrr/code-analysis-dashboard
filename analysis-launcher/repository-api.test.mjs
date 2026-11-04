@@ -192,9 +192,9 @@ test('read-only collaborators can preview an exact branch revision and trusted c
 
 test('repository secret-protection posture is a selectable isolated vendor lane',async()=>{
   const source=CONFIGURED_TARGETS[0];
-  const configured={...config,projects:config.projects.map(project=>project.id===source.id?{
+  const configured={...config,projects:config.projects.map(project=>({
     ...project,enabled_scanners:[...project.enabled_scanners,'github-secret-protection-posture'],
-  }:project)};
+  }))};
   const registryPath=`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`;
   const h=helpers({overrides:{[registryPath]:{content:Buffer.from(JSON.stringify(configured)).toString('base64')},
     [`repos/${source.repository}/branches/Testing`]:{commit:{sha:'b'.repeat(40)}}}});
@@ -224,26 +224,26 @@ test('Configure analysis resolves branch pull request and commit selections for 
   }
 });
 
-test('analysis choices expose deferred scanners with honest non-selectable reasons',async()=>{
+test('analysis choices expose the same selectable scanner catalog across profiles',async()=>{
   const source=CONFIGURED_TARGETS[0];
-  const configured={...config,projects:config.projects.map(project=>project.id===source.id?{...project,
-    deferred_channels:{'owasp-go':'No configured Go project.','owasp-jvm':'No configured JVM project.'}}:project)};
+  const uniform=['semgrep','snyk','hadolint','shipping-image-cves','sbom-license-provenance'];
+  const configured={...config,projects:config.projects.map(project=>({...project,
+    enabled_scanners:uniform,deferred_channels:{}}))};
   const registryPath=`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`;
   const h=helpers({overrides:{[registryPath]:{content:Buffer.from(JSON.stringify(configured)).toString('base64')},
     [`repos/${source.repository}/branches/Testing`]:{commit:{sha:'b'.repeat(40)}}}});
   const result=await (await repositoryApi(post('/api/project-preview',{project_id:source.id,selection:{kind:'branch',ref:'Testing'}}),env,session,h)).json();
-  assert.deepEqual(result.channels.map(channel=>channel.id).sort(),['owasp-go','owasp-jvm','semgrep','snyk']);
-  for(const id of ['owasp-go','owasp-jvm']){
+  assert.deepEqual(result.channels.map(channel=>channel.id).sort(),[...uniform].sort());
+  for(const id of uniform){
     const choice=result.channels.find(channel=>channel.id===id);
-    assert.equal(choice.selectable,false);
-    assert.equal(choice.status,'DEFERRED');
-    assert.match(choice.reason,/No configured/);
+    assert.equal(choice.selectable,true);
+    assert.equal(choice.status,'READY');
   }
 });
 
 test('CodeRabbit selection is unavailable outside an open PR and launch validation enforces the restriction',async()=>{
   const source=CONFIGURED_TARGETS[0];
-  const configured={...config,projects:config.projects.map(project=>project.id===source.id?{...project,enabled_scanners:[...project.enabled_scanners,'coderabbit-ai-advisory']}:project)};
+  const configured={...config,projects:config.projects.map(project=>({...project,enabled_scanners:[...project.enabled_scanners,'coderabbit-ai-advisory']}))};
   const registryPath=`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`;
   const h=helpers({overrides:{[registryPath]:{content:Buffer.from(JSON.stringify(configured)).toString('base64')},
     [`repos/${source.repository}/branches/Testing`]:{commit:{sha:'a'.repeat(40)}},
@@ -353,7 +353,7 @@ test('Fast Path allows a pull-only collaborator and admits every available chann
 test('Fast Path repeats the current users last revision and restores every available scanner',async()=>{
   const source=CONFIGURED_TARGETS[1],key='44444444-4444-4444-8444-444444444445',sha='c'.repeat(40),base='d'.repeat(40);
   const remembered={request_id:'33333333-3333-4333-8333-333333333333',status:'published',intent:{project_id:source.id,actor_id:73,selection:{kind:'pr',ref:'12'},requested_channels:['semgrep']}};
-  const allScannerConfig={...config,projects:config.projects.map(project=>String(project.id)===source.id?{...project,enabled_scanners:['semgrep','snyk','coderabbit-ai-advisory']}:project)};
+  const allScannerConfig={...config,projects:config.projects.map(project=>({...project,enabled_scanners:['semgrep','snyk','coderabbit-ai-advisory']}))};
   const h=helpers({queueRecent:[remembered],overrides:{
     [`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`]:{content:Buffer.from(JSON.stringify(allScannerConfig)).toString('base64')},
     [`repos/${source.repository}/pulls/12`]:{number:12,title:'Remembered PR',draft:false,head:{sha,ref:'feature',repo:{id:source.repository_id,full_name:source.repository}},base:{sha:base,ref:source.branch,repo:{full_name:source.repository}}}

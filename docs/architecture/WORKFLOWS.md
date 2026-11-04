@@ -18,10 +18,12 @@ Run analysis button
   -> Ready / Needs attention in the application
 ```
 
-Only one source-profile producer runs for a request. GitHub renders the other static
+Only one source-profile producer runs for a request, but both producers implement the same
+service-wide scanner channel catalog; profiles differ only in reviewed execution recipes.
+GitHub renders the other static
 workflow branch as skipped because reusable-workflow selection cannot be dynamic. That
-skip means **not applicable to this project's reviewed profile**, not that a requested
-scanner failed to run. Scanner jobs inside the selected producer are independent jobs
+skip is routing evidence, not a project-specific scanner omission or scanner failure.
+Scanner jobs inside the selected producer are independent jobs
 and therefore run concurrently. Source-executing jobs receive neither vendor nor
 publication credentials.
 

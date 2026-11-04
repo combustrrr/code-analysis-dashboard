@@ -32,6 +32,7 @@ def validate(document: dict) -> dict:
     if not isinstance(projects, list) or not projects:
         raise ValueError('At least one project is required')
     seen = set()
+    shared_scanners = None
     for project in projects:
         source = repository(project.get('source_repository'))
         identity = str(source['id'])
@@ -52,10 +53,19 @@ def validate(document: dict) -> dict:
             raise ValueError('An explicit repository profile is required')
         if not isinstance(project.get('enabled_scanners'), list) or not all(isinstance(x, str) for x in project['enabled_scanners']):
             raise ValueError('Explicit scanner selection is required')
+        scanners = project['enabled_scanners']
+        if len(scanners) != len(set(scanners)):
+            raise ValueError('Scanner catalog cannot contain duplicates')
+        if shared_scanners is None:
+            shared_scanners = set(scanners)
+        elif set(scanners) != shared_scanners:
+            raise ValueError('Every project must use the same service-wide scanner catalog')
         if 'fast_scanners' in project:
             raise ValueError('Fast analysis must derive every available enabled scanner')
         if not isinstance(project.get('deferred_channels', {}), dict):
             raise TypeError('Invalid scanner deferrals')
+        if project.get('deferred_channels'):
+            raise ValueError('Project-specific scanner deferrals are prohibited; use revision evidence for applicability')
         if project.get('native_feedback_enabled', False) is not False:
             raise ValueError('Native feedback must remain disabled for every configured project')
         project['native_feedback_enabled'] = False
