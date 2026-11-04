@@ -21,6 +21,31 @@ def config():
 
 
 class ProjectTests(unittest.TestCase):
+    def test_every_project_uses_the_full_service_scanner_catalog(self):
+        from scripts.code_analysis.applicability import GROUPS
+        from scripts.code_analysis.extensions import registry
+
+        document = validate(json.loads(Path('.github/code-analysis/projects.json').read_text()))
+        service = json.loads(Path('config/code-analysis/service.json').read_text())
+        expected = ({channel for channels in GROUPS.values() for channel in channels}
+                    | {row['channel'] for row in registry(service)})
+        for project in document['projects']:
+            self.assertEqual(set(project['enabled_scanners']), expected)
+            self.assertEqual(project['deferred_channels'], {})
+
+    def test_project_specific_scanner_catalogs_and_deferrals_are_rejected(self):
+        document = config()
+        second = copy.deepcopy(document['projects'][0])
+        second.update(id='3', source_repository={'id': 3, 'full_name': 'source/second', 'private': False})
+        document['projects'].append(second)
+        document['projects'][1]['enabled_scanners'].append('snyk')
+        with self.assertRaisesRegex(ValueError, 'same service-wide scanner catalog'):
+            validate(document)
+        document['projects'][1]['enabled_scanners'] = ['semgrep']
+        document['projects'][1]['deferred_channels'] = {'snyk': 'project-specific restriction'}
+        with self.assertRaisesRegex(ValueError, 'Project-specific scanner deferrals are prohibited'):
+            validate(document)
+
     def test_dashboard_enables_bounded_schemathesis_campaign(self):
         document = validate(json.loads(Path('.github/code-analysis/projects.json').read_text()))
         project = next(row for row in document['projects']

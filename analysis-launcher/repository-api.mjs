@@ -49,25 +49,19 @@ function requestIdFromKey(value) {
 }
 function scannerChoices(project) {
   const dashboardProfile=['portable','code-analysis-dashboard'].includes(project.profile?.mode);
-  const portable = new Set(['semgrep','gitleaks','trivy','checkov','osv','snyk','sonarqube-cloud','openssf-scorecard','ext-github-security-advisories','github-secret-protection-posture','github-actions-security','owasp-js','owasp-iac-secrets','coderabbit-ai-advisory']);
-  if (project.profile?.python_root) ['bandit','ruff','radon','xenon','vulture','codeql'].forEach(channel=>portable.add(channel));
-  if (project.profile?.javascript_root) ['eslint','typescript','codeql','ext-frontend-build','ext-frontend-tests','ext-axe-accessibility','ext-lighthouse-ui'].forEach(channel=>portable.add(channel));
-  Object.keys(project.profile?.commands || {}).forEach(channel=>portable.add(channel));
-  // Show the complete reviewed project catalog. Deferred channels remain visible
-  // with their reason but cannot be selected or mistaken for completed evidence.
-  const catalog=[...project.enabled_scanners,...Object.keys(project.deferred_channels||{})];
+  // Profiles provide safe execution recipes, never a project-specific scanner
+  // allowlist. Registry validation binds every project to the same catalog.
+  const catalog=[...project.enabled_scanners];
   const choices=[...new Set(catalog)].map(channel=>{
-    const reason=project.deferred_channels?.[channel];
     const supported=SUPPORTED_SCANNERS.includes(channel);
     const mode=VENDOR_SCANNERS.has(channel)?'vendor':project.profile?.mode==='code-analysis-dashboard'?'configured':dashboardProfile?'portable':'configured';
-    const setupRequired=dashboardProfile&&!portable.has(channel);
     const group=SCANNER_GROUPS.find(values=>values.includes(channel));
-    const status=reason?'DEFERRED':!supported||UNAVAILABLE_SCANNERS.has(channel)?'NOT_AVAILABLE':setupRequired?'SETUP_REQUIRED':'READY';
-    const unavailableReason=UNAVAILABLE_SCANNERS.has(channel)?'This lane requires a cross-repository credential and is withheld from source scanner jobs.':!supported?'No registered adapter in this tooling revision.':setupRequired?'Requires a reviewed language or execution profile.':channel==='coderabbit-ai-advisory'?'Available only when analyzing an open pull request.':'';
+    const status=!supported||UNAVAILABLE_SCANNERS.has(channel)?'NOT_AVAILABLE':'READY';
+    const unavailableReason=UNAVAILABLE_SCANNERS.has(channel)?'This lane requires a cross-repository credential and is withheld from source scanner jobs.':!supported?'No registered adapter in this tooling revision.':channel==='coderabbit-ai-advisory'?'Available only when analyzing an open pull request.':'';
     // Fast analysis removes revision/scanner setup; it does not reduce coverage.
     // CodeRabbit remains contextual because it requires an open pull request.
     const approvedDefault = channel !== 'coderabbit-ai-advisory';
-    return {id:channel,mode,group:group?.join('+')||channel,status,reason:reason||unavailableReason,default_selected:status==='READY'&&approvedDefault,selectable:status==='READY'};
+    return {id:channel,mode,group:group?.join('+')||channel,status,reason:unavailableReason,default_selected:status==='READY'&&approvedDefault,selectable:status==='READY'};
   });
   for(const group of SCANNER_GROUPS){
     const members=choices.filter(value=>group.includes(value.id));
@@ -503,7 +497,7 @@ export async function repositoryApi(request, env, session, helpers, executionCon
     if (signedPreview.actor_id !== (await github('user',token)).id || !preview || preview.project_id !== String(project.id) || preview.source_repository_id !== source.id || !SHA.test(preview.target_sha || '') || !DIGEST.test(preview.profile_digest || '') || !SHA.test(preview.tooling_sha || '') || !/^[0-9a-f-]{36}$/i.test(preview.preview_id || '')) throw new Failure(400,'The revision preview does not match this user or project.','preview_required');
     if (!Array.isArray(input.requested_channels) || !input.requested_channels.length || input.requested_channels.length>SUPPORTED_SCANNERS.length || new Set(input.requested_channels).size!==input.requested_channels.length) throw new Failure(400,'Select one or more available scanner channels.','invalid_channels');
     const channelChoices=scannerChoices(project);
-    if (input.requested_channels.some(channel=>!channelChoices.some(value=>value.id===channel&&value.selectable))) throw new Failure(400,'A selected scanner channel is not enabled by the trusted project profile.','invalid_channels');
+    if (input.requested_channels.some(channel=>!channelChoices.some(value=>value.id===channel&&value.selectable))) throw new Failure(400,'A selected scanner channel is not available in the shared service catalog for this revision.','invalid_channels');
     if (SCANNER_GROUPS.some(group=>group.some(channel=>input.requested_channels.includes(channel))&&!group.every(channel=>input.requested_channels.includes(channel)))) throw new Failure(400,'Select all channels produced by a shared scanner lane.','invalid_channels');
     if (!/^[0-9a-f-]{36}$/i.test(input.idempotency_key || '')) throw new Failure(400,'A request idempotency key is required.','invalid_idempotency_key');
     const current = await revisionSnapshot(configuration, project, source, preview.selection);

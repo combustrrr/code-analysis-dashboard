@@ -13,6 +13,7 @@ export function validateTargetRegistry(configuration, repository) {
   if (repository.id !== EXECUTION_REPOSITORY_ID || repository.full_name?.toLowerCase() !== EXECUTION_REPOSITORY.toLowerCase() ||
       configuration.execution_repository?.id !== EXECUTION_REPOSITORY_ID || configuration.execution_repository?.full_name?.toLowerCase() !== EXECUTION_REPOSITORY.toLowerCase() ||
       !Array.isArray(configuration.projects) || configuration.projects.length !== CONFIGURED_TARGETS.length) return false;
+  const sharedCatalog=[...(configuration.projects[0]?.enabled_scanners||[])].sort().join(',');
 
   return CONFIGURED_TARGETS.every(expected => {
     const project = configuration.projects.find(value => String(value.id) === expected.id);
@@ -20,6 +21,11 @@ export function validateTargetRegistry(configuration, repository) {
       project.source_repository.full_name?.toLowerCase() === expected.repository.toLowerCase() &&
       project.relationship === expected.relationship &&
       project.preferred_branch === expected.branch &&
+      Array.isArray(project.enabled_scanners) &&
+      project.enabled_scanners.length > 0 &&
+      project.enabled_scanners.every(channel => SUPPORTED_SCANNERS.includes(channel)) &&
+      [...project.enabled_scanners].sort().join(',') === sharedCatalog &&
+      project.deferred_channels && Object.keys(project.deferred_channels).length === 0 &&
       !Object.hasOwn(project, 'fast_scanners') &&
       project.native_feedback_enabled === expected.native_feedback;
   });

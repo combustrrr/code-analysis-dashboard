@@ -62,11 +62,12 @@ validated selected channels; other statuses remain distinct, including `NOT_SELE
 configured project and one separately keyed PR overlay (project, PR, head repository/SHA,
 base SHA, tooling, profile). Source-only report replacement waits for the first valid
 new-SHA channel result; failures preserve the previous report.
-Each project has one reviewed source-execution profile: `agentic-soc` channels are labelled
-**configured**, while the self-analysis profile is labelled **portable**. Those source
-channels fan out together with separately isolated vendor lanes when the user selects all
-available channels. Deferred, setup-required, revision-inapplicable, and credential-withheld
-channels remain visible but are not counted as selectable or silently submitted.
+Each project has one reviewed source-execution profile for safe paths, commands, and build
+recipes, but every project receives the same service-wide scanner catalog. Source channels
+fan out together with separately isolated vendor lanes when the user selects the full catalog;
+the user may instead submit any valid individual channel or shared producer group.
+Revision-inapplicable and credential-limited outcomes remain visible in the resulting evidence
+and never mutate the catalog for that project.
 Profile-runner jobs install the pinned trusted tooling runtime before executing a reviewed
 project command. Frontend build, test, axe, and Lighthouse adapters resolve their commands,
 root, preview URL, and budgets from the selected trusted project entry rather than from a
