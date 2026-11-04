@@ -20,7 +20,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
@@ -68,7 +68,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
@@ -138,7 +138,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/.analysis-tooling/scripts/code_analysis/prepare_project.py"
     - name: Keep trusted tooling outside the source scan tree
       run: mv "$GITHUB_WORKSPACE/.analysis-tooling" "$RUNNER_TEMP/analysis-tooling"
@@ -312,7 +312,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - name: Install verified Scorecard 5.5.0
       run: 'curl --fail --location --retry 3 https://github.com/ossf/scorecard/releases/download/v5.5.0/scorecard_5.5.0_linux_amd64.tar.gz
@@ -376,7 +376,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -420,7 +420,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -464,7 +464,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -502,7 +502,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -546,7 +546,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -591,7 +591,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - &id002
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -636,7 +636,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - *id002
     - *id003
@@ -685,7 +685,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - *id002
     - *id003
@@ -734,7 +734,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -776,7 +776,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -818,7 +818,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -862,7 +862,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -904,7 +904,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -949,7 +949,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -991,7 +991,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -1033,7 +1033,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -1076,7 +1076,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
@@ -1118,7 +1118,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       with:
@@ -1184,7 +1184,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         TOOLING_SHA: ${{ inputs.tooling_sha }}
         TARGET_JSON: ${{ inputs.target }}
-        EXPECTED_PROFILE: portable
+        EXPECTED_PROFILE: code-analysis-dashboard
       run: python -I "$GITHUB_WORKSPACE/./scripts/code_analysis/prepare_project.py"
     - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:

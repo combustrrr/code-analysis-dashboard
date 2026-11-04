@@ -10,6 +10,7 @@ test('application facade exposes only the configured repository service', () => 
 test('profile policy remains a pure reviewed boundary', () => {
   const profile={mode:'portable',python_root:'.',commands:{eslint:{argv:['eslint','.'],cwd:'.'}}};
   assert.doesNotThrow(()=>validatePortableProfile(profile));
+  assert.doesNotThrow(()=>validatePortableProfile({...profile,mode:'code-analysis-dashboard'}));
   assert.throws(()=>validatePortableProfile({...profile,commands:{eslint:{argv:['eslint','.'],cwd:'../unsafe'}}}),/Invalid command adapter/);
   assert.deepEqual(detectedProfile(['src/main.py','web/index.ts']).profile,{mode:'portable',python_root:'.',javascript_root:'.'});
 });

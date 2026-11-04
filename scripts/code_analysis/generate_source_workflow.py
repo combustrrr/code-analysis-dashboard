@@ -44,7 +44,7 @@ def normalize_expressions(value: Any) -> Any:
 def include_template_job(name: str, profile: dict[str, Any]) -> bool:
     if name in {'workflow-security-posture', 'snyk', 'sonarqube-cloud', 'dependency-review'}:
         return False
-    if profile.get('mode') != 'portable':
+    if profile.get('mode') not in {'portable', 'code-analysis-dashboard'}:
         return True
     from scripts.code_analysis.applicability import PORTABLE_JOBS
     return name in PORTABLE_JOBS | {'codeql'}
@@ -246,13 +246,13 @@ def isolate_steps(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def configure_portable_steps(profile: dict[str, Any], name: str, steps: list[dict[str, Any]]) -> None:
-    if profile.get('mode') == 'portable' and name == 'codeql':
+    if profile.get('mode') in {'portable', 'code-analysis-dashboard'} and name == 'codeql':
         steps[:] = [step for step in steps if not step.get('uses', '').startswith('github/codeql-action/autobuild@')]
         for step in steps:
             if step.get('uses', '').startswith('github/codeql-action/init@'):
                 step['with'].pop('config-file', None)
                 step['with']['build-mode'] = 'none'
-    if profile.get('mode') == 'portable' and name == 'semgrep':
+    if profile.get('mode') in {'portable', 'code-analysis-dashboard'} and name == 'semgrep':
         for step in steps:
             if 'run' in step and 'backend/ webui/src/' in step['run']:
                 step['run'] = 'semgrep --config=p/owasp-top-ten --config=p/secrets --json --output=semgrep-results.json .'
@@ -380,7 +380,7 @@ def generate(config: dict[str, Any] | None = None) -> str:
         scanner_jobs as community_scanner_jobs,
     )
     jobs.update(community_scanner_jobs())
-    if profile.get('mode') == 'portable':
+    if profile.get('mode') in {'portable', 'code-analysis-dashboard'}:
         from scripts.code_analysis.portable_workflow import scanner_jobs
         jobs.update(scanner_jobs())
     jobs['report'] = {'needs': list(jobs), 'if': "${{ always() && needs.identity.result == 'success' }}",

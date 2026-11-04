@@ -2,7 +2,7 @@
 export function validatePortableProfile(profile) {
   const path = p => typeof p === 'string' && p.length > 0 && !p.includes('\\') && !p.includes(':') && !p.startsWith('/') && !p.split('/').includes('..');
   const frontendFields=['javascript_install_command','javascript_test_command','frontend_build_command','frontend_preview_command','frontend_preview_url','frontend_lighthouse_budgets'];
-  if (!profile || profile.mode !== 'portable' || Object.keys(profile).some(k => !['mode', 'python_root', 'javascript_root', 'commands', ...frontendFields].includes(k))) throw new Error('Use a portable profile with reviewed paths and command adapters.');
+  if (!profile || !['portable','code-analysis-dashboard'].includes(profile.mode) || Object.keys(profile).some(k => !['mode', 'python_root', 'javascript_root', 'commands', ...frontendFields].includes(k))) throw new Error('Use the reviewed Code Analysis Dashboard profile with explicit paths and command adapters.');
   for (const key of ['python_root', 'javascript_root']) if (key in profile && !path(profile[key])) throw new Error('Profile paths must stay inside the repository.');
   const commands = profile.commands || {};
   if (typeof commands !== 'object' || Array.isArray(commands)) throw new Error('Commands must be an object.');

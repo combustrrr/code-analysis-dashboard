@@ -113,9 +113,9 @@ jobs:
       SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
       CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
       SECURITY_POSTURE_TOKEN: ${{ secrets.SECURITY_POSTURE_TOKEN }}
-  portable_profile:
-    name: Source scanners · Code Analysis Dashboard portable profile
-    if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'portable'
+  dashboard_profile:
+    name: Source scanners · Code Analysis Dashboard profile
+    if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'code-analysis-dashboard'
     needs: claim
     permissions:
       contents: read
@@ -141,7 +141,7 @@ jobs:
       request_id: ${{ needs.claim.outputs.request_id }}
   publish:
     if: always() && needs.claim.outputs.claimed == 'true'
-    needs: [claim, vendor, portable_profile, agentic_profile]
+    needs: [claim, vendor, dashboard_profile, agentic_profile]
     runs-on: ubuntu-24.04
     concurrency:
       group: analysis-publication-${{ needs.claim.outputs.project_id }}
@@ -179,7 +179,7 @@ jobs:
         run: python -m scripts.code_analysis.repository_service
   complete:
     if: always() && needs.claim.outputs.claimed == 'true'
-    needs: [claim, vendor, portable_profile, agentic_profile, publish]
+    needs: [claim, vendor, dashboard_profile, agentic_profile, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     environment: production
@@ -193,7 +193,7 @@ jobs:
           REQUEST_ID: ${{ needs.claim.outputs.request_id }}
           GENERATION: ${{ needs.claim.outputs.generation }}
           LEASE_TOKEN: ${{ needs.claim.outputs.lease_token }}
-          PORTABLE_RESULT: ${{ needs.portable_profile.result }}
+          DASHBOARD_RESULT: ${{ needs.dashboard_profile.result }}
           CONFIGURED_RESULT: ${{ needs.agentic_profile.result }}
           VENDOR_RESULT: ${{ needs.vendor.result }}
           PUBLISH_RESULT: ${{ needs.publish.result }}
@@ -206,5 +206,5 @@ jobs:
           if [[ "$PUBLISH_RESULT" != success ]]; then status=failed; fi
           curl --fail --silent --show-error --request POST \
             --header "Authorization: Bearer ${WORKER_API_TOKEN}" --header 'Content-Type: application/json' \
-            --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"status\":\"${status}\",\"result\":{\"run_id\":${GITHUB_RUN_ID},\"run_attempt\":${GITHUB_RUN_ATTEMPT},\"publication_status\":\"${PUBLISH_RESULT}\",\"scanner_lanes\":{\"vendor\":\"${VENDOR_RESULT}\",\"portable\":\"${PORTABLE_RESULT}\",\"configured\":\"${CONFIGURED_RESULT}\"}}}" \
+            --data "{\"request_id\":\"${REQUEST_ID}\",\"generation\":${GENERATION},\"lease_token\":\"${LEASE_TOKEN}\",\"status\":\"${status}\",\"result\":{\"run_id\":${GITHUB_RUN_ID},\"run_attempt\":${GITHUB_RUN_ATTEMPT},\"publication_status\":\"${PUBLISH_RESULT}\",\"scanner_lanes\":{\"vendor\":\"${VENDOR_RESULT}\",\"code_analysis_dashboard\":\"${DASHBOARD_RESULT}\",\"agentic_kibana\":\"${CONFIGURED_RESULT}\"}}}" \
             "${WORKER_URL}/api/internal/queue/complete"

@@ -48,6 +48,7 @@ function requestIdFromKey(value) {
   return value.toLowerCase();
 }
 function scannerChoices(project) {
+  const dashboardProfile=['portable','code-analysis-dashboard'].includes(project.profile?.mode);
   const portable = new Set(['semgrep','gitleaks','trivy','checkov','osv','snyk','sonarqube-cloud','openssf-scorecard','ext-github-security-advisories','github-secret-protection-posture','github-actions-security','owasp-js','owasp-iac-secrets','coderabbit-ai-advisory']);
   if (project.profile?.python_root) ['bandit','ruff','radon','xenon','vulture','codeql'].forEach(channel=>portable.add(channel));
   if (project.profile?.javascript_root) ['eslint','typescript','codeql','ext-frontend-build','ext-frontend-tests','ext-axe-accessibility','ext-lighthouse-ui'].forEach(channel=>portable.add(channel));
@@ -58,8 +59,8 @@ function scannerChoices(project) {
   const choices=[...new Set(catalog)].map(channel=>{
     const reason=project.deferred_channels?.[channel];
     const supported=SUPPORTED_SCANNERS.includes(channel);
-    const mode=VENDOR_SCANNERS.has(channel)?'vendor':project.profile?.mode==='portable'?'portable':'configured';
-    const setupRequired=project.profile?.mode==='portable'&&!portable.has(channel);
+    const mode=VENDOR_SCANNERS.has(channel)?'vendor':project.profile?.mode==='code-analysis-dashboard'?'configured':dashboardProfile?'portable':'configured';
+    const setupRequired=dashboardProfile&&!portable.has(channel);
     const group=SCANNER_GROUPS.find(values=>values.includes(channel));
     const status=reason?'DEFERRED':!supported||UNAVAILABLE_SCANNERS.has(channel)?'NOT_AVAILABLE':setupRequired?'SETUP_REQUIRED':'READY';
     const unavailableReason=UNAVAILABLE_SCANNERS.has(channel)?'This lane requires a cross-repository credential and is withheld from source scanner jobs.':!supported?'No registered adapter in this tooling revision.':setupRequired?'Requires a reviewed language or execution profile.':channel==='coderabbit-ai-advisory'?'Available only when analyzing an open pull request.':'';
@@ -142,8 +143,8 @@ export async function repositoryApi(request, env, session, helpers, executionCon
     const project = configuration.projects.find(value => String(value.id) === String(id));
     if (!project || !CONFIGURED_TARGETS.some(value => value.id === String(id))) throw new Failure(404, 'Configured project is unavailable.', 'project_unavailable');
     try {
-      if (!project.profile || typeof project.profile !== 'object' || Array.isArray(project.profile) || !['portable','agentic-soc'].includes(project.profile.mode)) throw new Error('A current project profile is required.');
-      if (project.profile.mode === 'portable') validatePortableProfile(project.profile);
+      if (!project.profile || typeof project.profile !== 'object' || Array.isArray(project.profile) || !['portable','code-analysis-dashboard','agentic-soc'].includes(project.profile.mode)) throw new Error('A current project profile is required.');
+      if (['portable','code-analysis-dashboard'].includes(project.profile.mode)) validatePortableProfile(project.profile);
     }
     catch { throw new Failure(503, 'The configured project profile is invalid.', 'project_profile_invalid'); }
     return project;
@@ -330,7 +331,7 @@ export async function repositoryApi(request, env, session, helpers, executionCon
     if(!requestedChannels.length)throw new Failure(409,'The trusted project has no usable default scanner channel.','default_channels_unavailable');
     if(SCANNER_GROUPS.some(group=>group.some(channel=>requestedChannels.includes(channel))&&!group.every(channel=>requestedChannels.includes(channel))))throw new Failure(409,'The trusted default scanner policy contains an incomplete shared lane.','default_channels_unavailable');
     const targetSha=current.target_sha;
-    const intent={schema_version:'analysis-request-v4',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection:current.selection,selection_source:selectionSource,resolved_selection:{repository:source.full_name,repository_id:source.id,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...requestedChannels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:idempotencyKey.toLowerCase(),run_again:false,preview_id:crypto.randomUUID(),created_at:new Date().toISOString()};
+    const intent={schema_version:'analysis-request-v4',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection:current.selection,selection_source:selectionSource,resolved_selection:{repository:source.full_name,repository_id:source.id,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...requestedChannels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile.mode,analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:idempotencyKey.toLowerCase(),run_again:false,preview_id:crypto.randomUUID(),created_at:new Date().toISOString()};
     const admittedBody=await admit(intent);
     return json({status:'preparing',lifecycle:'Preparing',request_id:admittedBody.request_id||requestId,run_id:null,repository:repository.full_name,source_repository:source.full_name,target_sha:targetSha,selection:current.selection,selection_source:selectionSource,preferred_branch:project.preferred_branch,requested_channels:admittedBody.intent?.requested_channels||[...requestedChannels].sort(),pr_context:current.pr_context,duplicate:admittedBody.duplicate===true,wake_status:admittedBody.wake_status},202);
   }
@@ -515,7 +516,7 @@ export async function repositoryApi(request, env, session, helpers, executionCon
     const selection = current.selection;
     const checkoutRepository=current.pr_context?.head_repository||source.full_name;
     const checkoutRepositoryId=current.pr_context?.head_repository_id||source.id;
-    const intent = {schema_version:'analysis-request-v4',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection,resolved_selection:{repository:checkoutRepository,repository_id:checkoutRepositoryId,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...input.requested_channels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile?.mode==='portable'?'portable':'agentic-soc',analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:input.idempotency_key.toLowerCase(),run_again:input.run_again===true,preview_id:preview.preview_id,created_at:new Date().toISOString()};
+    const intent = {schema_version:'analysis-request-v4',request_id:requestId,execution_repository_id:repository.id,project_id:project.id,source_repository:source.full_name,source_repository_id:source.id,selection,resolved_selection:{repository:checkoutRepository,repository_id:checkoutRepositoryId,kind:'commit',ref:targetSha},source_sha:targetSha,target_sha:targetSha,pr_context:current.pr_context,requested_channels:[...input.requested_channels].sort(),tooling_sha:current.tooling_sha,profile_digest:current.profile_digest,profile_mode:project.profile.mode,analysis_key:{project_id:String(project.id),source_repository_id:source.id,target_sha:targetSha,tooling_sha:current.tooling_sha,profile_digest:current.profile_digest},actor_id:actor.id,idempotency_key:input.idempotency_key.toLowerCase(),run_again:input.run_again===true,preview_id:preview.preview_id,created_at:new Date().toISOString()};
     const admittedBody=await admit(intent);
     return json({status:'preparing',lifecycle:'Preparing',request_id:admittedBody.request_id||requestId,run_id:null,repository:repository.full_name,source_repository:source.full_name,target_sha:targetSha,requested_channels:intent.requested_channels,duplicate:admittedBody.duplicate===true,wake_status:admittedBody.wake_status},202);
   }
