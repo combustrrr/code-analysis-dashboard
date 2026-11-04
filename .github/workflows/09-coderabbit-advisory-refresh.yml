@@ -6,6 +6,7 @@ name: CodeRabbit Advisory Evidence
 permissions:
   contents: read
   pull-requests: read
+  statuses: read
 jobs:
   collect:
     name: Retain exact-head AI advisory evidence
@@ -31,7 +32,10 @@ jobs:
       run: "set -euo pipefail\nprs=\"$(gh api -H 'Accept: application/vnd.github+json' \"repos/$GITHUB_REPOSITORY/commits/$CHECK_HEAD_SHA/pulls?per_page=100\")\"\npr=\"$(jq -cer --arg repo \"$GITHUB_REPOSITORY\" --arg sha \"$CHECK_HEAD_SHA\" '[.[] | select(.state == \"open\" and .head.sha == $sha and .head.repo.full_name == $repo)] | if length == 1 then .[0] else error(\"CodeRabbit check must map to exactly one open same-repository pull request\") end' <<< \"$prs\")\"\njq -r '\"branch=\\(.head.ref)\\ncommit=\\(.head.sha)\\npr_number=\\(.number)\"' <<< \"$pr\" >> \"$GITHUB_OUTPUT\"\n"
     - name: Collect exact-head CodeRabbit evidence
       env:
-        CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
+        # CodeRabbit reviews are free for this public repository. The collector
+        # reads the resulting GitHub review/check evidence with the scoped
+        # workflow token; no paid CodeRabbit credential is required.
+        CODERABBIT_GITHUB_TOKEN: ${{ github.token }}
         COLLECTOR_SHA: 177e333d2bb696424cdde3b1792fc1e08be10be9
         SCAN_BRANCH: ${{ steps.identity.outputs.branch }}
         SCAN_SHA: ${{ steps.identity.outputs.commit }}

@@ -276,7 +276,9 @@ The collector accepts only the selected PR's exact same-repository base and head
 identity; fork PRs are rejected. Reviews and comments use a ten-page bound, and
 partial or unavailable reads retain an explicit reason rather than being treated as
 zero findings. Evidence and status retain the collector revision plus workflow
-run/attempt provenance. Collection uses the optional read-only
-`CODERABBIT_GITHUB_TOKEN` contract in aggregation jobs; source-executing jobs receive
-no CodeRabbit credential or Worker private key. Missing credentials produce
+run/attempt provenance. The public execution repository's refresh workflow uses its
+scoped GitHub Actions token; CodeRabbit OSS review itself requires no paid token.
+Cross-repository aggregation can use the optional read-only
+`CODERABBIT_GITHUB_TOKEN` GitHub API contract. Source-executing jobs receive no
+CodeRabbit or publication credential. Missing cross-repository access produces
 `UNAVAILABLE` evidence status.

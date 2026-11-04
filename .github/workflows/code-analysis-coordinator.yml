@@ -102,6 +102,7 @@ jobs:
       contents: read
       pull-requests: read
       security-events: read
+      statuses: read
     uses: ./.github/workflows/reusable-vendor.yml
     with:
       tooling_sha: ${{ needs.claim.outputs.tooling_sha }}
