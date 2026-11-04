@@ -18,6 +18,12 @@ credential is made available. Comment text and actor display names are not trust
 as an authorization boundary. For this public repository, CodeRabbit's OSS review
 does not require a paid service token. The refresh collector reads the resulting
 same-repository review and check metadata with the scoped GitHub Actions token.
+CodeRabbit may still mark the automatic check `SKIPPED` under its hosted OSS
+eligibility policy. On 2026-11-04 it reported that automatic reviews require ten
+repository stars. A maintainer can use the check comment's **Trigger review** action
+or post the static `@coderabbitai review` command; the resulting completed App check
+then enters the same exact-head evidence path. Do not treat the initial skipped check
+as a completed review.
 
 ## Continuous integration
 
