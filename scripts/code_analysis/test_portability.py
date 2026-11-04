@@ -7,6 +7,7 @@ import yaml
 
 from scripts.code_analysis.applicability import (
     PORTABLE_JOBS,
+    VENDOR_JOBS,
     discover_capabilities,
     selection,
 )
@@ -29,7 +30,7 @@ class PortabilityTests(unittest.TestCase):
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.touch()
                 jobs, excluded, _ = selection(self.config(), root)
-                self.assertEqual(set(jobs), PORTABLE_JOBS | {'snyk', 'sonarqube-cloud', 'owasp-iac-secrets'})
+                self.assertEqual(set(jobs), PORTABLE_JOBS | VENDOR_JOBS | {'owasp-iac-secrets'})
                 self.assertEqual(excluded['atheris']['status'], 'NOT_AVAILABLE')
                 self.assertNotIn('DEFERRED', {v['status'] for v in excluded.values()})
 
@@ -69,8 +70,10 @@ class PortabilityTests(unittest.TestCase):
             jobs, excluded, _ = selection(config, root)
             self.assertIn('snyk', jobs)
             self.assertIn('sonarqube-cloud', jobs)
+            self.assertIn('github-secret-protection-posture', jobs)
             self.assertNotIn('snyk', excluded)
             self.assertNotIn('sonarqube-cloud', excluded)
+            self.assertNotIn('github-secret-protection-posture', excluded)
 
     def test_portable_javascript_selection_runs_typescript_quality(self):
         with tempfile.TemporaryDirectory() as directory:

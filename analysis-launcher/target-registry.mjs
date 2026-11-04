@@ -6,7 +6,7 @@ export const CONFIGURED_TARGETS = [
 ];
 export const SUPPORTED_SCANNERS = ['atheris','bandit','checkov','codeql','coderabbit-ai-advisory','coverage','eslint','ext-axe-accessibility','ext-frontend-build','ext-frontend-tests','ext-github-security-advisories','ext-lighthouse-ui','github-actions-security','github-secret-protection-posture','gitleaks','hadolint','openssf-scorecard','osv','owasp-iac-secrets','owasp-js','pyright','radon','ruff','sbom-license-provenance','schemathesis','semgrep','shipping-image-cves','snyk','sonarqube-cloud','trivy','typescript','vulture','xenon'];
 export const VENDOR_SCANNERS = new Set(['coderabbit-ai-advisory','github-secret-protection-posture','snyk','sonarqube-cloud']);
-export const UNAVAILABLE_SCANNERS = new Set(['github-secret-protection-posture']);
+export const UNAVAILABLE_SCANNERS = new Set();
 export const SCANNER_GROUPS = [['eslint','typescript'],['radon','xenon'],['shipping-image-cves','sbom-license-provenance']];
 
 export function validateTargetRegistry(configuration, repository) {

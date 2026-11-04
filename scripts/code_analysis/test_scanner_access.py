@@ -95,6 +95,16 @@ class ScannerAccessTests(unittest.TestCase):
 
     def test_vendor_jobs_are_opt_in_and_receive_a_credentialless_pinned_snapshot(self):
         workflow = yaml.safe_load(Path('.github/workflows/reusable-vendor.yml').read_text())
+        posture = workflow['jobs']['security-posture']
+        self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'github-secret-protection-posture')", posture['if'])
+        self.assertEqual(posture['permissions'], {'contents': 'read', 'security-events': 'read'})
+        self.assertNotIn('actions/checkout@', yaml.safe_dump(posture))
+        self.assertNotIn('secret-scanning-alert-numbers', yaml.safe_dump(posture))
+        self.assertIn("--jq 'length'", yaml.safe_dump(posture))
+        self.assertEqual(
+            next(step for step in posture['steps'] if step.get('uses', '').startswith('actions/upload-artifact@'))['with']['name'],
+            'vendor-security-posture-${{ inputs.request_id }}',
+        )
         self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'snyk')", workflow['jobs']['snyk']['if'])
         self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'sonarqube-cloud')", workflow['jobs']['sonar']['if'])
         self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'coderabbit-ai-advisory')", workflow['jobs']['coderabbit']['if'])

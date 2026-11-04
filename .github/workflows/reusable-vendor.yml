@@ -26,6 +26,68 @@ permissions:
   contents: read
 
 jobs:
+  security-posture:
+    if: ${{ contains(fromJSON(inputs.target).requested_channels, 'github-secret-protection-posture') }}
+    name: Isolated repository security posture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_REPOSITORY: ${{ fromJSON(inputs.target).source_repository }}
+      SOURCE_SHA: ${{ fromJSON(inputs.target).head_sha }}
+    steps:
+      - name: Observe secret scanning and push protection without alert contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret_scanning=UNAVAILABLE
+          push_protection=UNAVAILABLE
+          alerts_status=UNAVAILABLE
+          alert_count=null
+
+          if repository_json="$(gh api "repos/${SOURCE_REPOSITORY}")"; then
+            secret_scanning="$(jq -r '.security_and_analysis.secret_scanning.status // "UNAVAILABLE"' <<<"$repository_json")"
+            push_protection="$(jq -r '.security_and_analysis.secret_scanning_push_protection.status // "UNAVAILABLE"' <<<"$repository_json")"
+          fi
+
+          if page_counts="$(gh api --paginate \
+              "repos/${SOURCE_REPOSITORY}/secret-scanning/alerts?state=open&per_page=100" \
+              --jq 'length' 2>/dev/null)"; then
+            alerts_status=OBSERVED
+            alert_count="$(awk '{ total += $1 } END { print total + 0 }' <<<"$page_counts")"
+          fi
+
+          status=CONFIGURED_COMPLETE
+          reason="Repository secret-protection controls and open-alert count were observed without retaining secret values."
+          if [[ "$secret_scanning" == UNAVAILABLE || "$push_protection" == UNAVAILABLE || "$alerts_status" == UNAVAILABLE ]]; then
+            status=CONFIGURED_PARTIAL
+            reason="GitHub did not expose one or more repository secret-protection controls to the isolated read-only posture job."
+          elif [[ "$secret_scanning" != enabled || "$push_protection" != enabled ]]; then
+            reason="Repository secret-protection posture was observed; one or more controls are not enabled."
+          fi
+
+          jq -n \
+            --arg status "$status" \
+            --arg reason "$reason" \
+            --arg repository "$SOURCE_REPOSITORY" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg secret_scanning "$secret_scanning" \
+            --arg push_protection "$push_protection" \
+            --arg alerts_status "$alerts_status" \
+            --argjson open_alert_count "$alert_count" \
+            '{schema_version:"1",scanner_family:"Repository Security Posture",status:$status,reason:$reason,repository:$repository,source_sha:$source_sha,secret_scanning:$secret_scanning,push_protection:$push_protection,alerts_status:$alerts_status,open_alert_count:$open_alert_count,finding_count:0,observation_count:0}' \
+            > repository-security-posture-status.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: vendor-security-posture-${{ inputs.request_id }}
+          path: repository-security-posture-status.json
+          if-no-files-found: error
+          retention-days: 7
+
   source-snapshot:
     if: ${{ contains(fromJSON(inputs.target).requested_channels, 'snyk') || contains(fromJSON(inputs.target).requested_channels, 'sonarqube-cloud') }}
     name: Prepare credentialless source snapshot

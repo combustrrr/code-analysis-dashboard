@@ -78,6 +78,13 @@ deploy the Worker, report reader, UI, or workflows and does not trigger a live s
 
 ## Scanner coverage
 
+Repository secret-protection posture runs in the isolated vendor workflow with
+read-only `security-events` access. It records only whether secret scanning and
+push protection are enabled plus the count of open alerts; alert identifiers,
+locations, and detected secret values are never retained. The job does not
+check out or execute source code, and its evidence is bound to the accepted
+source SHA in `repository-security-posture-status.json`.
+
 The project profile selects the configured scanner stack for each source and requires
 every known channel to be enabled or explicitly deferred. Portable channels are
 preselected for a run; configured vendor lanes (including Snyk and Sonar) require an
