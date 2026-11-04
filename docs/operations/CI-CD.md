@@ -15,7 +15,9 @@ CodeRabbit advisory collection starts only from a completed `CodeRabbit` check r
 owned by GitHub App ID `347564`. The collector resolves the check's exact head SHA
 to exactly one open, same-repository pull request before any vendor or publication
 credential is made available. Comment text and actor display names are not trusted
-as an authorization boundary.
+as an authorization boundary. For this public repository, CodeRabbit's OSS review
+does not require a paid service token. The refresh collector reads the resulting
+same-repository review and check metadata with the scoped GitHub Actions token.
 
 ## Continuous integration
 
