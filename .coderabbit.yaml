@@ -18,10 +18,11 @@ reviews:
     auto_incremental_review: true
     auto_pause_after_reviewed_commits: 0
     drafts: false
-    # The default covers only the repository default branch. This fork analyzes PRs
-    # targeting every maintained branch, so make that scope explicit.
+    # Keep automatic reviews scoped to pull requests targeting the production branch.
+    # CodeRabbit includes the default branch automatically; naming main here also
+    # makes the repository policy explicit and auditable.
     base_branches:
-      - ".*"
+      - "main"
     description_keyword: ""
     ignore_usernames:
       - "dependabot[bot]"
