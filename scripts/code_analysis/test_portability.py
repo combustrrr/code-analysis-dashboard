@@ -31,7 +31,7 @@ class PortabilityTests(unittest.TestCase):
                     path.touch()
                 jobs, excluded, _ = selection(self.config(), root)
                 self.assertEqual(set(jobs), PORTABLE_JOBS | VENDOR_JOBS | {'owasp-iac-secrets'})
-                self.assertEqual(excluded['atheris']['status'], 'NOT_AVAILABLE')
+                self.assertEqual(excluded['atheris']['status'], 'NOT_APPLICABLE')
                 self.assertNotIn('DEFERRED', {v['status'] for v in excluded.values()})
 
     def test_portable_capabilities_discover_generic_manifests_and_dockerfiles(self):
@@ -56,6 +56,10 @@ class PortabilityTests(unittest.TestCase):
             self.assertIn('osv-scanner', jobs)
             self.assertNotIn('osv', excluded)
             self.assertIn('hadolint', excluded)
+            self.assertEqual(excluded['hadolint']['status'], 'NOT_APPLICABLE')
+            self.assertIn('not declared shipping artifacts', excluded['hadolint']['reason'])
+            self.assertEqual(excluded['shipping-image-cves']['status'], 'NOT_APPLICABLE')
+            self.assertEqual(excluded['sbom-license-provenance']['status'], 'NOT_APPLICABLE')
 
     def test_portable_selection_keeps_vendor_scanners_in_the_exact_report(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -116,7 +116,8 @@ Worker public-configuration handler through a credential-free loopback harness a
 reviewed OpenAPI document. The harness exposes no authenticated routes, external
 services, vendor credentials, or publication credentials. The dashboard has no shipping
 image and its only Dockerfile is a scanner fixture, so those selected channels retain
-revision-level inapplicability instead of being removed from its catalog. The
+revision-level `NOT_APPLICABLE` evidence instead of being removed from its catalog or
+reported as unavailable adapters. The
 Agentic-Kibana fork profile retains its Python/API/web/image-specific recipes; the
 equivalent upstream Kavach profile is preserved as a restoration requirement in issue
 #194. Proposal-only integrations without a production adapter are not part of the
