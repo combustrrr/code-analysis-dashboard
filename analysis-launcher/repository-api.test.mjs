@@ -190,6 +190,22 @@ test('read-only collaborators can preview an exact branch revision and trusted c
   assert.ok(h.calls.every(call=>!call.options.method));
 });
 
+test('repository secret-protection posture is a selectable isolated vendor lane',async()=>{
+  const source=CONFIGURED_TARGETS[0];
+  const configured={...config,projects:config.projects.map(project=>project.id===source.id?{
+    ...project,enabled_scanners:[...project.enabled_scanners,'github-secret-protection-posture'],
+  }:project)};
+  const registryPath=`repos/${EXECUTION_REPOSITORY}/contents/.github/code-analysis/projects.json?ref=main`;
+  const h=helpers({overrides:{[registryPath]:{content:Buffer.from(JSON.stringify(configured)).toString('base64')},
+    [`repos/${source.repository}/branches/Testing`]:{commit:{sha:'b'.repeat(40)}}}});
+  const result=await (await repositoryApi(post('/api/project-preview',{project_id:source.id,selection:{kind:'branch',ref:'Testing'}}),env,session,h)).json();
+  const posture=result.channels.find(channel=>channel.id==='github-secret-protection-posture');
+  assert.equal(posture.mode,'vendor');
+  assert.equal(posture.status,'READY');
+  assert.equal(posture.default_selected,true);
+  assert.equal(posture.selectable,true);
+});
+
 test('Configure analysis resolves branch pull request and commit selections for all configured projects',async()=>{
   for(const [index,source] of CONFIGURED_TARGETS.entries()){
     const branchSha=String(index+1).repeat(40),prSha=String(index+4).repeat(40),baseSha=String(index+7).repeat(40),commitSha=String.fromCharCode(97+index).repeat(40);

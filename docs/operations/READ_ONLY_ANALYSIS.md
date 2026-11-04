@@ -78,6 +78,16 @@ deploy the Worker, report reader, UI, or workflows and does not trigger a live s
 
 ## Scanner coverage
 
+Repository secret-protection posture runs in the isolated vendor workflow with
+read-only access. It prefers the governed optional `SECURITY_POSTURE_TOKEN` and
+falls back to the job-scoped `GITHUB_TOKEN`; neither credential is given to a
+source-executing job. It records only whether secret scanning and push
+protection are enabled plus the count of open alerts; alert identifiers,
+locations, and detected secret values are never retained. If GitHub does not
+expose a control or the alert count, the job records `CONFIGURED_PARTIAL`. The
+job does not check out or execute source code, and its evidence is bound to the
+accepted source SHA in `repository-security-posture-status.json`.
+
 The project profile selects the configured scanner stack for each source and requires
 every known channel to be enabled or explicitly deferred. Portable channels are
 preselected for a run; configured vendor lanes (including Snyk and Sonar) require an
@@ -128,8 +138,9 @@ and `owasp-iac-secrets` runs a checksum-verified TruffleHog binary. All three us
 the immutable read-only checkout and retain no credentials. TruffleHog output is
 converted directly to redacted SARIF; detected values are discarded before an
 artifact is written. Repository secret-protection posture remains a separate API
-lane and is unavailable until the GitHub App or a dedicated read-only credential
-has the required repository security permissions.
+lane. It uses the optional dedicated read-only credential when configured and
+otherwise tries the job-scoped token. Missing control or alert-count access is
+retained as `CONFIGURED_PARTIAL`, never as a clean result.
 
 ## Result and state storage
 

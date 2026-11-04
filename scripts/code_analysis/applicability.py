@@ -52,7 +52,7 @@ GROUPS = {
     'owasp-iac-secrets': ['owasp-iac-secrets'],
 }
 PORTABLE_JOBS = {'semgrep', 'gitleaks', 'trivy', 'checkov', 'openssf-scorecard', 'coderabbit'}
-VENDOR_JOBS = {'snyk','sonarqube-cloud'}
+VENDOR_JOBS = {'github-secret-protection-posture', 'snyk', 'sonarqube-cloud'}
 
 PYTHON_JOBS = {'python-ruff', 'python-bandit', 'python-types', 'complexity',
                'dead-code', 'test-coverage', 'schemathesis-fuzz', 'atheris-state-machine'}
@@ -108,7 +108,7 @@ def selection(config: dict, source: Path, requested_channels: list[str] | None =
         python = present(profile['python_root'])
         javascript = present(profile['javascript_root'])
         languages = (['python'] if python else []) + (['javascript-typescript'] if javascript else [])
-        absent = {'github-secret-protection-posture':'Repository security-posture access requires a credential unavailable to source scanner jobs.'}
+        absent = {}
         for job in PYTHON_JOBS:
             if not python:
                 absent[job] = 'Selected source has no configured Python project: ' + profile['python_root']

@@ -101,6 +101,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      security-events: read
     uses: ./.github/workflows/reusable-vendor.yml
     with:
       tooling_sha: ${{ needs.claim.outputs.tooling_sha }}
@@ -111,6 +112,7 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
       CODERABBIT_GITHUB_TOKEN: ${{ secrets.CODERABBIT_GITHUB_TOKEN }}
+      SECURITY_POSTURE_TOKEN: ${{ secrets.SECURITY_POSTURE_TOKEN }}
   portable_profile:
     name: Source scanners · Code Analysis Dashboard portable profile
     if: always() && needs.claim.outputs.claimed == 'true' && needs.claim.outputs.profile_mode == 'portable'

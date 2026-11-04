@@ -95,6 +95,20 @@ class ScannerAccessTests(unittest.TestCase):
 
     def test_vendor_jobs_are_opt_in_and_receive_a_credentialless_pinned_snapshot(self):
         workflow = yaml.safe_load(Path('.github/workflows/reusable-vendor.yml').read_text())
+        posture = workflow['jobs']['security-posture']
+        self.assertIn('SECURITY_POSTURE_TOKEN', workflow.get('on', workflow.get(True))['workflow_call']['secrets'])
+        self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'github-secret-protection-posture')", posture['if'])
+        self.assertEqual(posture['permissions'], {'contents': 'read', 'security-events': 'read'})
+        self.assertEqual(posture['env']['GH_TOKEN'], '${{ secrets.SECURITY_POSTURE_TOKEN || github.token }}')
+        self.assertNotIn('actions/checkout@', yaml.safe_dump(posture))
+        self.assertNotIn('secret-scanning-alert-numbers', yaml.safe_dump(posture))
+        self.assertIn("--jq 'length'", yaml.safe_dump(posture))
+        upload = next(step for step in posture['steps'] if step.get('uses', '').startswith('actions/upload-artifact@'))['with']
+        self.assertEqual(upload['name'], 'vendor-security-posture-${{ inputs.request_id }}')
+        self.assertEqual(upload['path'], 'repository-security-posture-status.json')
+        coordinator = yaml.safe_load(Path('.github/workflows/code-analysis-coordinator.yml').read_text())
+        self.assertEqual(coordinator['jobs']['vendor']['secrets']['SECURITY_POSTURE_TOKEN'],
+                         '${{ secrets.SECURITY_POSTURE_TOKEN }}')
         self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'snyk')", workflow['jobs']['snyk']['if'])
         self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'sonarqube-cloud')", workflow['jobs']['sonar']['if'])
         self.assertIn("contains(fromJSON(inputs.target).requested_channels, 'coderabbit-ai-advisory')", workflow['jobs']['coderabbit']['if'])
