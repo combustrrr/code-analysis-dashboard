@@ -3,11 +3,21 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from scripts.code_analysis.portable_profile import readiness, validate
 from scripts.code_analysis.portable_runner import execute
 from scripts.code_analysis.snapshot import build_analysis_channels
+
+
+def schemathesis_profile(*, install=True):
+    command = {
+        'argv': ['node', 'tests/security_canary/dashboard_schemathesis_campaign.mjs'],
+        'output': 'fuzzing-results.xml',
+    }
+    if install:
+        command['install'] = [['python', '-m', 'pip', 'install', 'schemathesis==3.39.16']]
+    return {'mode': 'portable', 'commands': {'schemathesis': command}}
 
 
 class PortableTests(unittest.TestCase):
@@ -17,6 +27,60 @@ class PortableTests(unittest.TestCase):
             self.assertIn('codeql',readiness(profile))
             self.assertNotIn('coverage',readiness(profile))
         self.assertIn('bandit',readiness({'mode':'portable','python_root':'.'}))
+
+    def test_reviewed_schemathesis_campaign_is_available(self):
+        profile = schemathesis_profile()
+        self.assertIn('schemathesis', readiness(profile))
+        self.assertEqual(validate(profile), profile)
+
+    def test_schemathesis_campaign_receives_resolved_scanner_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            seen = []
+            def run(argv, **kwargs):
+                seen.append((argv, kwargs.get('env')))
+                if argv[0] == 'node':
+                    (source / 'fuzzing-results.xml').write_text('<testsuite tests="1"/>')
+                return subprocess.CompletedProcess(argv, 0)
+            profile = schemathesis_profile()
+            with patch('scripts.code_analysis.portable_runner.required_executable', return_value='/trusted/bin/schemathesis'), \
+                    patch('scripts.code_analysis.portable_runner._supports_process_groups', return_value=False), \
+                    patch('scripts.code_analysis.portable_runner.subprocess.run', side_effect=run):
+                result = execute('schemathesis', profile, source, source / 'output')
+            self.assertEqual(result['status'], 'COMPLETED')
+            self.assertEqual(seen[-1][1]['SCHEMATHESIS_EXECUTABLE'], '/trusted/bin/schemathesis')
+
+    def test_schemathesis_failure_report_completes_with_retained_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            def run(argv, **kwargs):
+                if argv[0] == 'node':
+                    (source / 'fuzzing-results.xml').write_text(
+                        '<testsuite tests="1"><testcase name="GET /api/public/config">'
+                        '<failure message="status code: 500"/></testcase></testsuite>')
+                    return subprocess.CompletedProcess(argv, 1)
+                return subprocess.CompletedProcess(argv, 0)
+            profile = schemathesis_profile()
+            with patch('scripts.code_analysis.portable_runner.required_executable', return_value='/trusted/bin/schemathesis'), \
+                    patch('scripts.code_analysis.portable_runner._supports_process_groups', return_value=False), \
+                    patch('scripts.code_analysis.portable_runner.subprocess.run', side_effect=run):
+                result = execute('schemathesis', profile, source, source / 'output')
+            self.assertEqual(result['status'], 'COMPLETED')
+            self.assertTrue((source / 'output' / 'fuzzing-results.xml').is_file())
+
+    def test_schemathesis_timeout_kills_the_campaign_process_group(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            process = MagicMock(pid=4312)
+            process.wait.side_effect = [subprocess.TimeoutExpired(['node'], 900), 0]
+            profile = schemathesis_profile(install=False)
+            with patch('scripts.code_analysis.portable_runner.required_executable', return_value='/trusted/bin/schemathesis'), \
+                    patch('scripts.code_analysis.portable_runner._supports_process_groups', return_value=True), \
+                    patch('scripts.code_analysis.portable_runner.subprocess.Popen', return_value=process), \
+                    patch('scripts.code_analysis.portable_runner._kill_process_group') as kill_group:
+                result = execute('schemathesis', profile, source, source / 'output')
+            self.assertEqual(result['status'], 'FAILED')
+            kill_group.assert_called_once_with(4312)
 
     def test_reject_escape_and_malformed_commands(self):
         for profile in [{'mode':'portable','python_root':'../secret'},{'mode':'portable','commands':{'coverage':{'argv':'pytest'}}},{'mode':'portable','commands':{'coverage':{'argv':['pytest'],'cwd':'C:/host'}}}]:

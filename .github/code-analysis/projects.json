@@ -219,6 +219,23 @@
               "scripts/code_analysis",
               "--outputjson"
             ]
+          },
+          "schemathesis": {
+            "install": [
+              [
+                "python",
+                "-m",
+                "pip",
+                "install",
+                "schemathesis==3.39.16",
+                "httpx==0.27.2"
+              ]
+            ],
+            "argv": [
+              "node",
+              "tests/security_canary/dashboard_schemathesis_campaign.mjs"
+            ],
+            "output": "fuzzing-results.xml"
           }
         }
       },
@@ -245,6 +262,7 @@
         "pyright",
         "radon",
         "ruff",
+        "schemathesis",
         "semgrep",
         "snyk",
         "sonarqube-cloud",
@@ -262,7 +280,6 @@
         "owasp-ruby": "No configured Ruby project in the connected dashboard profile.",
         "vulnagent-triage": "No configured adapter in the connected dashboard profile.",
         "hadolint": "The only Dockerfile is an intentional scanner canary, not a build or shipping image.",
-        "schemathesis": "The dashboard source has no application API contract to fuzz.",
         "shipping-image-cves": "The dashboard source does not produce a shipping container image.",
         "sbom-license-provenance": "No shipping container image is built for this dashboard source."
       },

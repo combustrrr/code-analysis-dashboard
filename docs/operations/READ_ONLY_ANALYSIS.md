@@ -98,18 +98,21 @@ ALM-linked project. CI-owned Sonar projects for these public repositories are ve
 as public before the separate read-only API token exports native issues. The scanner
 submission remains pinned to the admitted source SHA even when Sonar projects the
 result onto the configured main branch.
-The dashboard-source profile
-explicitly defers container-image/SBOM channels (there is no shipping image),
-Schemathesis (there is no application API contract), and Hadolint (its only Dockerfile
-is a scanner fixture). The Agentic-Kibana fork profile retains its
+The dashboard-source profile runs a bounded Schemathesis campaign against the actual
+Worker public-configuration handler through a credential-free loopback harness and a
+reviewed OpenAPI document. The harness exposes no authenticated routes, external
+services, vendor credentials, or publication credentials. The profile explicitly
+defers container-image/SBOM channels (there is no shipping image) and Hadolint (its only
+Dockerfile is a scanner fixture). The Agentic-Kibana fork profile retains its
 Python/API/web/image-specific adapters; the equivalent upstream Kavach profile is
 preserved as a restoration requirement in issue #194. Unsupported integrations remain explicitly deferred/unavailable,
 not clean zeroes.
 
 The coordinator contains two static reusable-workflow call sites because GitHub Actions
 cannot choose a reusable workflow dynamically. Exactly one is applicable: the dashboard
-self-analysis uses the portable-profile lane, while Agentic-Kibana uses the
-agentic-soc-profile lane. Actions displays the non-applicable profile branch as skipped;
+self-analysis uses the explicitly named Code Analysis Dashboard portable-profile lane,
+while Agentic-Kibana uses the explicitly named Agentic-Kibana profile lane. Actions
+displays the non-applicable profile branch as skipped;
 this is expected profile routing and is not an incomplete scanner channel. The jobs use
 explicit profile names so this routing is not confused with scanner execution failure.
 

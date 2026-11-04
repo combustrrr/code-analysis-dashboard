@@ -9,7 +9,7 @@ Repository validation is separated by runtime boundary.
 | Worker tests | `node --test analysis-launcher/*.test.mjs` |
 | UI build | `cd analysis-ui && npm run build` |
 | UI browser tests | `cd analysis-ui && npm test` |
-| Security canary fixtures | `tests/security_canary/` |
+| Security canary fixtures | `tests/security_canary/`; the dashboard Schemathesis campaign imports the real Worker handler and exposes only its public configuration route on loopback |
 
 Tests must preserve read-only source boundaries, exact provenance, credential
 separation, bounded storage, and truthful incomplete evidence.
