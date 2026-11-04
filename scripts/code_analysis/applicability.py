@@ -93,6 +93,9 @@ def selection(config: dict, source: Path, requested_channels: list[str] | None =
             supported.add('osv')
         languages = (['python'] if profile.get('python_root') and present(profile['python_root']) else []) + (['javascript-typescript'] if profile.get('javascript_root') and present(profile['javascript_root']) else [])
         absent = {job: 'Requires a reviewed source path, command adapter or vendor configuration.' for job, channels in GROUPS.items() if not all(c in supported for c in channels) or job not in GENERATED_JOBS}
+        absent['shipping-image-security'] = 'The reviewed profile defines no shipping-image build recipe for this revision.'
+        absent['hadolint'] = ('The reviewed profile defines no product Dockerfile to lint; discovered Dockerfiles are not declared shipping artifacts.'
+                              if capabilities['dockerfiles'] else 'The selected revision contains no product Dockerfile to lint.')
         for job in PYTHON_JOBS:
             if job not in absent and 'python' not in languages:
                 absent[job] = 'Configured Python source path is absent at this revision.'
@@ -134,7 +137,7 @@ def selection(config: dict, source: Path, requested_channels: list[str] | None =
                     excluded[channel] = {'status':'NOT_SELECTED','reason':'Not selected for this request'}
                 else:
                     excluded[channel] = {
-                        'status': ('NOT_AVAILABLE' if portable else 'NOT_APPLICABLE') if active else 'DEFERRED',
+                        'status': 'NOT_APPLICABLE' if active else 'DEFERRED',
                         'reason': absent.get(job) if active else deferred[channel],
                     }
     workflow_directory = source / '.github/workflows'
