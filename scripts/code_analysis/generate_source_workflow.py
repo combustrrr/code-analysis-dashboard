@@ -159,7 +159,7 @@ def configure_profile_steps(name: str, number: int, job: dict[str, Any],
         steps = [step for step in steps if step.get('name') != 'Start FastAPI Backend in Background']
         for step in steps:
             if step.get('name') == 'Install dependencies & Schemathesis':
-                step['run'] = 'PYTHONPATH="$GITHUB_WORKSPACE/.analysis-tooling" python -m scripts.code_analysis.run_profile python-install --source "$GITHUB_WORKSPACE"\npython -m pip install schemathesis==3.39.16 httpx==0.27.2'
+                step['run'] = 'PYTHONPATH="$GITHUB_WORKSPACE/.analysis-tooling" python -m scripts.code_analysis.run_profile python-install --source "$GITHUB_WORKSPACE"\npython -m pip install schemathesis==3.39.16 httpx==0.28.1'
             elif step.get('name') == 'Run API Fuzzing (Schemathesis)':
                 step['run'] = 'PYTHONPATH="$GITHUB_WORKSPACE/.analysis-tooling" python -m scripts.code_analysis.run_profile api-fuzz --source "$GITHUB_WORKSPACE"'
             elif (step.get('name') in {'Upload Fuzzing Report', 'Upload schemathesis-report as artifact'}
@@ -387,7 +387,7 @@ def generate(config: dict[str, Any] | None = None) -> str:
         'runs-on': 'ubuntu-24.04', 'timeout-minutes': 30, 'permissions': {'contents': 'read', 'actions': 'read'},
         'steps': [{'uses': CHECKOUT, 'with': {'ref': '${{ inputs.tooling_sha }}', 'persist-credentials': False}},
             {'uses': PYTHON, 'with': {'python-version': '3.11'}},
-            {'name': 'Install trusted reporting dependencies', 'run': 'python -m pip install click==8.5.0 ruff==0.16.9'},
+            {'name': 'Install trusted reporting dependencies', 'run': 'python -m pip install click==8.5.1 ruff==0.17.4'},
             {'uses': CHECKOUT, 'with': {'repository': '${{ fromJSON(inputs.target).source_repository }}',
                 'ref': '${{ fromJSON(inputs.target).head_sha }}', 'path': '.source', 'persist-credentials': False}},
             {'name': 'Collect exact producer artifacts and assemble report',
