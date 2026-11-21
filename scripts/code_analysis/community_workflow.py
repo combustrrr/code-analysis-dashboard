@@ -40,7 +40,7 @@ def scanner_jobs():
         "timeout-minutes": 20,
         "permissions": {"contents": "read"},
         "steps": common + [
-            {"name": "Install pinned zizmor", "run": "python -m pip install zizmor==1.31.1"},
+            {"name": "Install pinned zizmor", "run": "python -m pip install zizmor==1.32.0"},
             {"name": "Analyze exact-revision workflow definitions", "run":
              "zizmor --format sarif .source/.github/workflows > github-actions-security.sarif"},
             {"name": "Record completed zizmor evidence", "run":
@@ -59,7 +59,7 @@ def scanner_jobs():
         "timeout-minutes": 25,
         "permissions": {"contents": "read"},
         "steps": common + [
-            {"name": "Install pinned njsscan", "run": "python -m pip install njsscan==1.0.1"},
+            {"name": "Install pinned njsscan", "run": "python -m pip install njsscan==1.0.2"},
             {"name": "Analyze exact-revision JavaScript and TypeScript", "run":
              "set +e\n"
              "njsscan --sarif --output owasp-js.sarif .source\n"
